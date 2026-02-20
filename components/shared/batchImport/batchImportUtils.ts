@@ -145,7 +145,7 @@ export const createDefaultPreprocessor = (defaultValue: any) => {
  */
 export const parseDatePreprocessor = (dateStr: any): string => {
   if (!dateStr) return '';
-  
+
   const trim = String(dateStr).trim();
 
   // Already in correct format
@@ -168,24 +168,27 @@ export const parseDatePreprocessor = (dateStr: any): string => {
     'dec': '12', 'december': '12', '12月': '12',
   };
 
-  // Format: YYYY/MM/DD
-  if (/^\d{4}\/\d{2}\/\d{2}$/.test(trim)) {
-    return trim.replace(/\//g, '-');
+  // Format: compact YYYYMMDD
+  if (/^\d{8}$/.test(trim)) {
+    return `${trim.substring(0, 4)}-${trim.substring(4, 6)}-${trim.substring(6, 8)}`;
   }
 
-  // Format: MM/DD/YYYY or DD/MM/YYYY
-  const match1 = trim.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  // Format: YYYY/MM/DD or YYYY.MM.DD
+  if (/^\d{4}[\/\.]\d{2}[\/\.]\d{2}$/.test(trim)) {
+    return trim.replace(/[\/\.]/g, '-');
+  }
+
+  // Format: MM/DD/YYYY or DD/MM/YYYY or DD.MM.YYYY
+  const match1 = trim.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})$/);
   if (match1) {
     const [, part1, part2, year] = match1;
     const p1 = parseInt(part1, 10);
     const p2 = parseInt(part2, 10);
-    // If first part > 12, it's definitely day; if second > 12, it's definitely month
     if (p1 > 12) {
       return `${year}-${part2.padStart(2, '0')}-${part1.padStart(2, '0')}`;
     } else if (p2 > 12) {
       return `${year}-${part1.padStart(2, '0')}-${part2.padStart(2, '0')}`;
     }
-    // Default: MM/DD/YYYY
     return `${year}-${part1.padStart(2, '0')}-${part2.padStart(2, '0')}`;
   }
 
@@ -203,8 +206,8 @@ export const parseDatePreprocessor = (dateStr: any): string => {
     return `${year}-${part1.padStart(2, '0')}-${part2.padStart(2, '0')}`;
   }
 
-  // Format: DD MMM YYYY (e.g., "19 Feb 2026")
-  const match3 = trim.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
+  // Format: DD MMM YYYY or DD-MMM-YYYY (e.g., "19 Feb 2026" or "19-Feb-2026")
+  const match3 = trim.match(/^(\d{1,2})[\s-]([a-zA-Z]+)[\s-](\d{4})$/);
   if (match3) {
     const [, day, month, year] = match3;
     const monthNum = monthMap[month.toLowerCase()] || '';
@@ -213,8 +216,8 @@ export const parseDatePreprocessor = (dateStr: any): string => {
     }
   }
 
-  // Format: MMM DD, YYYY (e.g., "Feb 19, 2026")
-  const match4 = trim.match(/^([a-zA-Z]+)\s+(\d{1,2}),?\s+(\d{4})$/);
+  // Format: MMM DD, YYYY or MMM-DD-YYYY (e.g., "Feb 19, 2026" or "Feb-19-2026")
+  const match4 = trim.match(/^([a-zA-Z]+)[\s-](\d{1,2}),?[\s-](\d{4})$/);
   if (match4) {
     const [, month, day, year] = match4;
     const monthNum = monthMap[month.toLowerCase()] || '';

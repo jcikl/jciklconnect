@@ -76,12 +76,21 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       preprocessor: (val: any) => {
         if (!val) return '';
         const normalized = String(val).trim().toLowerCase();
+        // Standardize to canonical categories
+        if (normalized.includes('project') || normalized.includes('event') || normalized.includes('program') || normalized.includes('activity')) {
+          return 'Projects & Activities';
+        }
+        if (normalized.includes('membership') || normalized.includes('due') || normalized.includes('fee')) {
+          return 'Membership';
+        }
+        if (normalized.includes('admin') || normalized.includes('office') || normalized.includes('operation')) {
+          return 'Administrative';
+        }
+
         const map: Record<string, string> = {
           'projects & activities': 'Projects & Activities',
-          'projects and activities': 'Projects & Activities',
           'membership': 'Membership',
           'administrative': 'Administrative',
-          'admin': 'Administrative',
         };
         return map[normalized] || val;
       },
@@ -93,13 +102,22 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       aliases: ['Project', 'Project Name', 'Activity'],
       validators: [
         (val, context) => {
-          if (!val) return null;
+          // Only validate if category is Projects & Activities
+          const category = context?.row?.category;
+          if (category !== 'Projects & Activities') {
+            return null; // No validation needed for other categories
+          }
+
+          if (!val || String(val).trim() === '') {
+            return 'Project Title is required for Project transactions';
+          }
+
           if (context?.projects) {
             const match = context.projects.find((p: any) =>
-              (p.name?.toLowerCase() === val.toLowerCase()) ||
-              (p.title?.toLowerCase() === val.toLowerCase())
+              (p.name?.toLowerCase() === String(val).toLowerCase()) ||
+              (p.title?.toLowerCase() === String(val).toLowerCase())
             );
-            if (!match) return `Project "${val}" not found`;
+            if (!match) return `Project "${val}" not found in system`;
           }
           return null;
         }
@@ -130,7 +148,7 @@ export const bankTransactionImportConfig: BatchImportConfig = {
   supportCsv: true,
   supportTsv: true,
   autoMapColumns: false, // Don't auto-match, use hardcoded mapping
-  columnMappingEditable: false, // User cannot change column mapping
+  columnMappingEditable: true, // User can change column mapping
 
   // Hardcoded column mapping for standard bank transaction format
   columnMapping: {
@@ -155,8 +173,10 @@ export const bankTransactionImportConfig: BatchImportConfig = {
   importer: async (row, context) => {
     let projectId = '';
     const projectTitle = row.projectTitle?.trim();
+    const category = row.category;
 
-    if (projectTitle && context?.projects) {
+    // Only look up project ID if it's a project transaction
+    if (category === 'Projects & Activities' && projectTitle && context?.projects) {
       const match = context.projects.find((p: any) =>
         (p.name?.toLowerCase() === projectTitle.toLowerCase()) ||
         (p.title?.toLowerCase() === projectTitle.toLowerCase())
@@ -179,7 +199,7 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       amount: amount,
       income: income,
       expense: expense,
-      category: row.category,
+      category: category,
       projectId: projectId || undefined,
       purpose: row.purpose,
       bankAccountId: context?.bankAccountId,

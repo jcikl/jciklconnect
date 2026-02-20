@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers } from 'lucide-react';
-import { Card, Button, Badge, ProgressBar, StatCard, Modal, useToast, Tabs } from '../ui/Common';
+import { Card, Button, Badge, ProgressBar, StatCard, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { LoadingState } from '../ui/Loading';
@@ -89,6 +89,7 @@ export const FinanceView: React.FC = () => {
   const [adminProjectIdFilter, setAdminProjectIdFilter] = useState<string | null>(null);
   const [recordFormMemberId, setRecordFormMemberId] = useState('');
   const [recordFormYear, setRecordFormYear] = useState<number>(new Date().getFullYear());
+  const [recordFormProjectId, setRecordFormProjectId] = useState<string>('');
   const [uncompletedPRs, setUncompletedPRs] = useState<PaymentRequest[]>([]);
   const [editingModalYear, setEditingModalYear] = useState<string>('All');
   const [transactionSplits, setTransactionSplits] = useState<Record<string, TransactionSplit[]>>({});
@@ -99,6 +100,57 @@ export const FinanceView: React.FC = () => {
   const [selectedSplitIds, setSelectedSplitIds] = useState<Set<string>>(new Set());
   const [isBatchCategoryModalOpen, setIsBatchCategoryModalOpen] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [batchOperationProgress, setBatchOperationProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isAccountDetailOpen, setIsAccountDetailOpen] = useState(false);
+  const [detailAccount, setDetailAccount] = useState<BankAccount | null>(null);
+  const [detailYear, setDetailYear] = useState<number>(new Date().getFullYear());
+
+  const availableYears = useMemo(() => {
+    if (!detailAccount) return [new Date().getFullYear()];
+    const years = new Set(transactions
+      .filter(t => t.bankAccountId === detailAccount.id)
+      .map(t => new Date(t.date).getFullYear())
+    );
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [detailAccount, transactions]);
+
+  const monthlyAccountSummary = useMemo(() => {
+    if (!detailAccount || !transactions.length) return [];
+
+    // Filter for only parent transactions (exclude split children to avoid double counting)
+    const accountTxs = transactions.filter(t => t.bankAccountId === detailAccount.id && !t.isSplitChild);
+
+    const startOfYear = new Date(detailYear, 0, 1);
+    const balanceBeforeYear = accountTxs
+      .filter(t => new Date(t.date) < startOfYear)
+      .reduce((sum, t) => sum + (t.type === 'Income' ? t.amount : -t.amount), detailAccount.initialBalance || 0);
+
+    let runningBalance = balanceBeforeYear;
+    const months = Array.from({ length: 12 }, (_, i) => i);
+
+    return months.map(m => {
+      const monthTxs = accountTxs.filter(t => {
+        const d = new Date(t.date);
+        return d.getFullYear() === detailYear && d.getMonth() === m;
+      });
+
+      const income = monthTxs.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+      const expenses = monthTxs.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
+      const openingBalance = runningBalance;
+      runningBalance += (income - expenses);
+      const closingBalance = runningBalance;
+
+      return {
+        month: m,
+        openingBalance,
+        income,
+        expenses,
+        closingBalance
+      };
+    });
+  }, [detailAccount, detailYear, transactions]);
+
   const { showToast } = useToast();
   const { hasPermission, isDeveloper } = usePermissions();
   const { user } = useAuth();
@@ -199,16 +251,21 @@ export const FinanceView: React.FC = () => {
     });
   }, [projectAccounts, projectAccountYearFilter, projects]);
 
-  // Get unique years from approved projects for the split modal year filter
+  // Get unique years from projects for the split modal year filter
   const projectYears = useMemo(() => {
-    const approvedStatuses = ['Approved', 'Planning', 'Active', 'Completed', 'Review'];
     const years = new Set<number>();
+    const currentYear = new Date().getFullYear();
+    years.add(currentYear); // Always include current year
+
     projects.forEach(p => {
-      if (approvedStatuses.includes(p.status as string)) {
-        const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate;
-        if (pDate) {
-          years.add(new Date(pDate).getFullYear());
-        }
+      const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate || p.createdAt || p.updatedAt;
+      if (pDate) {
+        try {
+          const d = new Date(pDate);
+          if (!isNaN(d.getTime())) {
+            years.add(d.getFullYear());
+          }
+        } catch (e) { }
       }
     });
     return Array.from(years).sort((a, b) => b - a);
@@ -216,24 +273,27 @@ export const FinanceView: React.FC = () => {
 
   const filteredProjectsForModal = useMemo(() => {
     if (editingModalYear === 'All') return projects;
+    const yearInt = parseInt(editingModalYear, 10);
+    const currentYear = new Date().getFullYear();
+
     return projects.filter(p => {
-      const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate;
-      if (!pDate) return true;
-      const pYear = new Date(pDate).getFullYear();
-      return pYear === parseInt(editingModalYear, 10);
+      const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate || p.createdAt || p.updatedAt;
+      const pYear = pDate ? new Date(pDate).getFullYear() : currentYear;
+      return pYear === yearInt;
     });
   }, [projects, editingModalYear]);
 
   const groupedProjectsForModal = useMemo(() => {
     const filtered = editingModalYear === 'All' ? projects : filteredProjectsForModal;
     const grouped: Record<number, string[]> = {};
+    const currentYear = new Date().getFullYear();
 
     filtered.forEach(p => {
-      const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate;
-      if (!pDate) return;
-      const year = new Date(pDate).getFullYear();
+      const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate || p.createdAt || p.updatedAt;
+      const year = pDate ? new Date(pDate).getFullYear() : currentYear;
+
       if (!grouped[year]) grouped[year] = [];
-      grouped[year].push(p.name);
+      grouped[year].push(p.name || p.id);
     });
 
     const sortedYears = Object.keys(grouped)
@@ -257,6 +317,109 @@ export const FinanceView: React.FC = () => {
     const combined = Array.from(new Set([...defaultIds, ...txProjectIds]));
     return combined.sort((a, b) => a.localeCompare(b));
   }, [administrativeProjectIds, transactions]);
+
+  const displayTransactions = useMemo(() => {
+    // 1. Filter transactions based on active UI filters
+    const filtered = transactions.filter(tx => {
+      // Category filter
+      if (txCategoryFilter === 'All') {
+        // Keep all
+      } else if (txCategoryFilter === 'Uncategorized') {
+        const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+        const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+        const hasUncategorizedSplit = tx.isSplit && transactionSplits[tx.id]?.some(split => {
+          const sHasProjectId = split.projectId && split.projectId.trim() !== '';
+          const sHasPurpose = split.purpose && split.purpose.trim() !== '';
+          return !sHasProjectId || !sHasPurpose;
+        });
+        if (!hasUncategorizedSplit && (hasProjectId && hasPurpose)) {
+          return false;
+        }
+      } else if (!isTransactionInCategory(tx, txCategoryFilter)) {
+        return false;
+      }
+
+      // Bank account filter
+      if (bankAccountFilter !== 'All' && tx.bankAccountId !== bankAccountFilter) {
+        return false;
+      }
+
+      // Search term
+      if (txSearchTerm &&
+        !tx.description.toLowerCase().includes(txSearchTerm.toLowerCase()) &&
+        !(tx.category && tx.category.toLowerCase().includes(txSearchTerm.toLowerCase())) &&
+        !transactionSplits[tx.id]?.some(s => s.category.toLowerCase().includes(txSearchTerm.toLowerCase()))) {
+        return false;
+      }
+
+      return true;
+    });
+
+    // 2. Sort by date Ascending (Oldest -> Newest) to calculate cumulative sum
+    const sorted = [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // 3. Calculate running balance
+    let rb = 0;
+    if (bankAccountFilter !== 'All') {
+      const selectedAccount = accounts.find(acc => acc.id === bankAccountFilter);
+      rb = selectedAccount?.initialBalance || 0;
+    } else {
+      rb = accounts.reduce((sum, acc) => sum + (acc.initialBalance || 0), 0);
+    }
+
+    const withBalance = sorted.map(tx => {
+      const amountChange = tx.type === 'Income' ? tx.amount : -tx.amount;
+      rb += amountChange;
+      return { ...tx, runningBalance: rb };
+    });
+
+    return [...withBalance].reverse();
+  }, [transactions, txCategoryFilter, txSearchTerm, bankAccountFilter, accounts, transactionSplits]);
+
+  const handleSelectAllTransactions = React.useCallback(() => {
+    const allVisibleTxIds = displayTransactions.map(t => t.id);
+    const allVisibleSplitIds = displayTransactions.flatMap(t =>
+      t.isSplit && transactionSplits[t.id] ? transactionSplits[t.id].map(s => s.id) : []
+    );
+
+    const isAllSelected = allVisibleTxIds.length > 0 && allVisibleTxIds.every(id => selectedTxIds.has(id)) &&
+      (allVisibleSplitIds.length === 0 || allVisibleSplitIds.every(id => selectedSplitIds.has(id)));
+
+    if (isAllSelected) {
+      const nextTx = new Set(selectedTxIds);
+      allVisibleTxIds.forEach(id => nextTx.delete(id));
+      setSelectedTxIds(nextTx);
+
+      const nextSplits = new Set(selectedSplitIds);
+      allVisibleSplitIds.forEach(id => nextSplits.delete(id));
+      setSelectedSplitIds(nextSplits);
+    } else {
+      const nextTx = new Set(selectedTxIds);
+      allVisibleTxIds.forEach(id => nextTx.add(id));
+      setSelectedTxIds(nextTx);
+
+      const nextSplits = new Set(selectedSplitIds);
+      allVisibleSplitIds.forEach(id => nextSplits.add(id));
+      setSelectedSplitIds(nextSplits);
+    }
+  }, [displayTransactions, transactionSplits, selectedTxIds, selectedSplitIds]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        if (moduleTab === 'Transactions' && displayTransactions.length > 0) {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+            return;
+          }
+          e.preventDefault();
+          handleSelectAllTransactions();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSelectAllTransactions, moduleTab, displayTransactions.length]);
 
   useEffect(() => {
     loadData();
@@ -304,7 +467,6 @@ export const FinanceView: React.FC = () => {
   useEffect(() => {
     if (moduleTab === 'Project Account') {
       loadProjectAccounts();
-      loadProjects(); // Load projects for displaying project names
     }
   }, [moduleTab]);
 
@@ -312,29 +474,28 @@ export const FinanceView: React.FC = () => {
     try {
       const list = await ProjectsService.getAllProjects();
       setProjects(list);
+      return list;
     } catch {
       setProjects([]);
+      return [];
     }
   };
-
-  useEffect(() => {
-    if (moduleTab === 'Administrative' || (editingTransaction?.category === 'Administrative' && isEditModalOpen)) {
-      loadProjects();
-    }
-  }, [moduleTab, editingTransaction?.category, isEditModalOpen]);
 
   const loadMembers = async () => {
     try {
       const list = await MembersService.getAllMembers();
-      setMembers(list.map(m => ({
+      const mappedMembers = list.map(m => ({
         id: m.id,
         name: m.fullName && m.name
           ? `${m.fullName} (${m.name})`
           : (m.fullName || m.name || m.email || m.id),
         membershipType: m.membershipType,
-      })));
+      }));
+      setMembers(mappedMembers);
+      return mappedMembers;
     } catch {
       setMembers([]);
+      return [];
     }
   };
 
@@ -463,16 +624,28 @@ export const FinanceView: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [txs, accts, summ, inventory] = await Promise.all([
+      const [txs, accts, summ, inventory, projList, memberList] = await Promise.all([
         FinanceService.getAllTransactions(),
         FinanceService.getAllBankAccounts(),
         FinanceService.getFinancialSummary(reportYear),
-        InventoryService.getAllItems()
+        InventoryService.getAllItems(),
+        ProjectsService.getAllProjects(),
+        MembersService.getAllMembers()
       ]);
       setTransactions(txs);
       setAccounts(accts);
       setSummary(summ);
       setInventoryItems(inventory);
+      setProjects(projList);
+
+      const mappedMembers = memberList.map(m => ({
+        id: m.id,
+        name: m.fullName && m.name
+          ? `${m.fullName} (${m.name})`
+          : (m.fullName || m.name || m.email || m.id),
+        membershipType: m.membershipType,
+      }));
+      setMembers(mappedMembers);
 
       const splitTx = txs.filter(tx => tx.isSplit && tx.splitIds && tx.splitIds.length > 0);
       const splitsMap: Record<string, TransactionSplit[]> = {};
@@ -593,11 +766,144 @@ export const FinanceView: React.FC = () => {
     }
 
     try {
+      // If it's a split transaction, we should also delete its splits
+      const tx = transactions.find(t => t.id === transactionId);
+      if (tx?.isSplit) {
+        const splits = await FinanceService.getTransactionSplits(transactionId);
+        for (const split of splits) {
+          await FinanceService.deleteTransactionSplit(split.id);
+        }
+      }
+
       await FinanceService.deleteTransaction(transactionId);
       showToast('Transaction deleted successfully', 'success');
       await loadData();
     } catch (err) {
       showToast('Failed to delete transaction', 'error');
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    const totalCount = selectedTxIds.size + selectedSplitIds.size;
+    if (totalCount === 0) return;
+
+    if (!confirm(`Are you sure you want to delete ${totalCount} selected item(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setBatchOperationProgress({ current: 0, total: totalCount });
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // 1. Delete main transactions in parallel
+      const txResults = await Promise.all(
+        Array.from(selectedTxIds).map(async (id) => {
+          try {
+            const tx = transactions.find(t => t.id === id);
+            if (tx?.isSplit) {
+              const splits = await FinanceService.getTransactionSplits(id);
+              await Promise.all(splits.map(s => FinanceService.deleteTransactionSplit(s.id)));
+            }
+            await FinanceService.deleteTransaction(id);
+            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+            return { success: true };
+          } catch (err) {
+            console.error(`Failed to delete transaction ${id}:`, err);
+            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+            return { success: false, id };
+          }
+        })
+      );
+
+      // 2. Delete individual splits in parallel
+      const splitResults = await Promise.all(
+        Array.from(selectedSplitIds).map(async (id) => {
+          try {
+            await FinanceService.deleteTransactionSplit(id);
+            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+            return { success: true };
+          } catch (err) {
+            console.error(`Failed to delete split ${id}:`, err);
+            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+            return { success: false, id };
+          }
+        })
+      );
+
+      successCount = txResults.filter(r => r.success).length + splitResults.filter(r => r.success).length;
+      failCount = txResults.filter(r => !r.success).length + splitResults.filter(r => !r.success).length;
+
+      showToast(
+        `Batch delete completed: ${successCount} success${failCount > 0 ? `, ${failCount} failed` : ''}`,
+        failCount === 0 ? 'success' : 'warning'
+      );
+
+      setSelectedTxIds(new Set());
+      setSelectedSplitIds(new Set());
+      await loadData();
+    } catch (err) {
+      showToast('Batch delete failed', 'error');
+    } finally {
+      setLoading(false);
+      setBatchOperationProgress(null);
+    }
+  };
+
+  const handleBatchApprove = async () => {
+    const totalCount = selectedTxIds.size + selectedSplitIds.size;
+    if (totalCount === 0) return;
+
+    if (!confirm(`Are you sure you want to approve ${totalCount} selected item(s)? Status will be set to 'Cleared'.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setBatchOperationProgress({ current: 0, total: totalCount });
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // 1. Approve main transactions
+      const txResults = await Promise.all(
+        Array.from(selectedTxIds).map(async (id) => {
+          try {
+            const tx = transactions.find(t => t.id === id);
+            if (tx && tx.status !== 'Cleared') {
+              await FinanceService.updateTransaction(id, { ...tx, status: 'Cleared' });
+            }
+            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+            return { success: true };
+          } catch (err) {
+            console.error(`Failed to approve transaction ${id}:`, err);
+            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+            return { success: false };
+          }
+        })
+      );
+
+      // 2. Clear individual splits in progress tracking (they don't have separate status in types)
+      const splitResults = Array.from(selectedSplitIds).map(() => {
+        setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+        return { success: true };
+      });
+
+      successCount = txResults.filter(r => r.success).length + splitResults.length;
+      failCount = txResults.filter(r => !r.success).length;
+
+      showToast(
+        `Batch approve completed: ${successCount} success${failCount > 0 ? `, ${failCount} failed` : ''}`,
+        failCount > 0 ? 'warning' : 'success'
+      );
+      setSelectedTxIds(new Set());
+      setSelectedSplitIds(new Set());
+      await loadData();
+    } catch (err) {
+      showToast('Batch approve failed', 'error');
+    } finally {
+      setLoading(false);
+      setBatchOperationProgress(null);
     }
   };
 
@@ -906,7 +1212,15 @@ export const FinanceView: React.FC = () => {
                     <p className="text-sm text-slate-500 text-center py-4">No bank accounts configured</p>
                   ) : (
                     accounts.map(acc => (
-                      <div key={acc.id} className="p-4 rounded-lg border border-slate-100 bg-slate-50 hover:border-jci-blue transition-colors">
+                      <div
+                        key={acc.id}
+                        className="p-4 rounded-lg border border-slate-100 bg-slate-50 hover:border-jci-blue transition-all duration-200 cursor-pointer group shadow-sm hover:shadow-md"
+                        onClick={() => {
+                          setDetailAccount(acc);
+                          setDetailYear(new Date().getFullYear());
+                          setIsAccountDetailOpen(true);
+                        }}
+                      >
                         <div className="flex items-start justify-between mb-2">
                           <p className="text-xs text-slate-500 uppercase font-medium">
                             {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
@@ -915,11 +1229,12 @@ export const FinanceView: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setSelectedAccount(acc);
                                 setIsReconciliationModalOpen(true);
                               }}
-                              className="text-xs"
+                              className="text-xs group-hover:bg-white transition-colors"
                             >
                               <RefreshCw size={12} className="mr-1" />
                               Reconcile
@@ -1490,7 +1805,19 @@ export const FinanceView: React.FC = () => {
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
                       <th className="py-3 px-2 w-8">
-                        {/* Select-all checkbox is intentionally omitted to avoid confusion with splits */}
+                        <input
+                          type="checkbox"
+                          checked={(() => {
+                            const allVisibleTxIds = displayTransactions.map(t => t.id);
+                            const allVisibleSplitIds = displayTransactions.flatMap(t =>
+                              t.isSplit && transactionSplits[t.id] ? transactionSplits[t.id].map(s => s.id) : []
+                            );
+                            return allVisibleTxIds.length > 0 && allVisibleTxIds.every(id => selectedTxIds.has(id)) &&
+                              (allVisibleSplitIds.length === 0 || allVisibleSplitIds.every(id => selectedSplitIds.has(id)));
+                          })()}
+                          onChange={handleSelectAllTransactions}
+                          className="accent-blue-600 cursor-pointer"
+                        />
                       </th>
                       <th className="py-3 px-4 font-semibold">Date</th>
                       <th className="py-3 px-4 font-semibold">Description</th>
@@ -1503,238 +1830,192 @@ export const FinanceView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {(() => {
-                      // 1. Filter transactions based on active UI filters
-                      const filteredTransactions = transactions
-                        .filter(tx => {
-                          // Category filter
-                          if (txCategoryFilter === 'All') {
-                            // Keep all
-                          } else if (txCategoryFilter === 'Uncategorized') {
-                            // Show transactions that don't have both projectId and purpose
-                            const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                            const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                            // Also check if any split is uncategorized
-                            const hasUncategorizedSplit = tx.isSplit && transactionSplits[tx.id]?.some(split => {
-                              const sHasProjectId = split.projectId && split.projectId.trim() !== '';
-                              const sHasPurpose = split.purpose && split.purpose.trim() !== '';
-                              return !sHasProjectId || !sHasPurpose;
-                            });
-                            if (!hasUncategorizedSplit && (hasProjectId && hasPurpose)) {
-                              return false;
-                            }
-                          } else if (!isTransactionInCategory(tx, txCategoryFilter)) {
-                            return false;
-                          }
+                    {displayTransactions.map(tx => (
+                      <React.Fragment key={tx.id}>
+                        {/* Parent Transaction Row */}
+                        <tr className={`hover:bg-slate-50 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-50/60' : ''}`}>
+                          <td className="py-4 px-2 w-8">
+                            <input
+                              type="checkbox"
+                              checked={selectedTxIds.has(tx.id)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                const nextTx = new Set(selectedTxIds);
+                                const nextSplits = new Set(selectedSplitIds);
 
-                          // Bank account filter
-                          if (bankAccountFilter !== 'All' && tx.bankAccountId !== bankAccountFilter) {
-                            return false;
-                          }
-
-                          // Search term
-                          if (txSearchTerm &&
-                            !tx.description.toLowerCase().includes(txSearchTerm.toLowerCase()) &&
-                            !(tx.category && tx.category.toLowerCase().includes(txSearchTerm.toLowerCase())) &&
-                            !transactionSplits[tx.id]?.some(s => s.category.toLowerCase().includes(txSearchTerm.toLowerCase()))) {
-                            return false;
-                          }
-
-                          return true;
-                        });
-
-                      // 2. Sort by date Ascending (Oldest -> Newest) to calculate cumulative sum
-                      const sortedTxs = [...filteredTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-                      // 3. Calculate running balance starting from the oldest record (bottom of the view)
-                      let runningBalance = 0;
-                      if (bankAccountFilter !== 'All') {
-                        const selectedAccount = accounts.find(acc => acc.id === bankAccountFilter);
-                        runningBalance = selectedAccount?.initialBalance || 0;
-                      } else {
-                        runningBalance = accounts.reduce((sum, acc) => sum + (acc.initialBalance || 0), 0);
-                      }
-
-                      const transactionsWithBalance = sortedTxs.map(tx => {
-                        const amountChange = tx.type === 'Income' ? tx.amount : -tx.amount;
-                        runningBalance += amountChange;
-                        return { ...tx, runningBalance };
-                      });
-
-                      return [...transactionsWithBalance].reverse().map(tx => (
-                        <React.Fragment key={tx.id}>
-                          {/* Parent Transaction Row */}
-                          <tr className={`hover:bg-slate-50 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-50/60' : ''}`}>
-                            <td className="py-4 px-2 w-8">
-                              {!tx.isSplit && (
-                                <input
-                                  type="checkbox"
-                                  checked={selectedTxIds.has(tx.id)}
-                                  onChange={(e) => {
-                                    const next = new Set(selectedTxIds);
-                                    if (e.target.checked) next.add(tx.id);
-                                    else next.delete(tx.id);
-                                    setSelectedTxIds(next);
-                                  }}
-                                  className="accent-blue-600 cursor-pointer"
-                                />
-                              )}
-                            </td>
-                            <td className="py-4 px-4 text-slate-500">{formatDate(tx.date)}</td>
-                            <td className="py-4 px-4">
-                              <div className="font-medium text-slate-900">{tx.description}</div>
-                              <div className="text-xs text-slate-400">{tx.type}</div>
-                              {tx.isSplit && (
-                                <div className="text-xs text-blue-600 mt-1">⤷ Split into {transactionSplits[tx.id]?.length || 0} parts</div>
-                              )}
-                            </td>
-                            <td className="py-4 px-4 text-slate-600">{tx.referenceNumber ?? '—'}</td>
-                            <td className="py-4 px-4">
-                              <Badge variant={tx.isSplit ? "info" : "neutral"}>{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
-                            </td>
-                            <td className="py-4 px-4">
-                              {(() => {
-                                const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                if (tx.isSplit) {
-                                  return <Badge variant="info">Split</Badge>;
-                                } else if (hasProjectId && hasPurpose) {
-                                  return <Badge variant="success">Categorized</Badge>;
+                                if (checked) {
+                                  nextTx.add(tx.id);
+                                  // If it's a split, select all its splits too
+                                  if (tx.isSplit && transactionSplits[tx.id]) {
+                                    transactionSplits[tx.id].forEach(s => nextSplits.add(s.id));
+                                  }
                                 } else {
-                                  return <Badge variant="warning">Uncategorized</Badge>;
+                                  nextTx.delete(tx.id);
+                                  // If it's a split, deselect all its splits too
+                                  if (tx.isSplit && transactionSplits[tx.id]) {
+                                    transactionSplits[tx.id].forEach(s => nextSplits.delete(s.id));
+                                  }
+                                }
+                                setSelectedTxIds(nextTx);
+                                setSelectedSplitIds(nextSplits);
+                              }}
+                              className="accent-blue-600 cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-4 px-4 text-slate-500">{formatDate(tx.date)}</td>
+                          <td className="py-4 px-4">
+                            <div className="font-medium text-slate-900">{tx.description}</div>
+                            <div className="text-xs text-slate-400">{tx.type}</div>
+                            {tx.isSplit && (
+                              <div className="text-xs text-blue-600 mt-1">⤷ Split into {transactionSplits[tx.id]?.length || 0} parts</div>
+                            )}
+                          </td>
+                          <td className="py-4 px-4 text-slate-600">{tx.referenceNumber ?? '—'}</td>
+                          <td className="py-4 px-4">
+                            <Badge variant={tx.isSplit ? "info" : "neutral"}>{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
+                          </td>
+                          <td className="py-4 px-4">
+                            {(() => {
+                              const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                              const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                              if (tx.isSplit) {
+                                return <Badge variant="info">Split</Badge>;
+                              } else if (hasProjectId && hasPurpose) {
+                                return <Badge variant="success">Categorized</Badge>;
+                              } else {
+                                return <Badge variant="warning">Uncategorized</Badge>;
+                              }
+                            })()}
+                          </td>
+                          <td className={`py-4 px-4 text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                          </td>
+                          <td className={`py-4 px-4 text-right font-mono font-semibold ${tx.runningBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(tx.runningBalance)}
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditTransaction(tx)}
+                                className="text-slate-600 hover:text-blue-600 p-1"
+                                title="Edit transaction"
+                              >
+                                <Edit size={16} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteTransaction(tx.id)}
+                                className="text-slate-600 hover:text-red-600 p-1"
+                                title="Delete transaction"
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedTransaction(tx);
+                                  setIsSplitModalOpen(true);
+                                  // Load members and projects for the modal
+                                  if (members.length === 0) loadMembers();
+                                  if (projects.length === 0) loadProjects();
+                                  // Load project purposes from multiple sources (filtered by projectId)
+                                  const loadPurposes = async () => {
+                                    const purposes = new Set<string>();
+                                    const targetProjectId = tx.projectId;
+
+                                    try {
+                                      const ptTrx = await projectFinancialService.getAllProjectTrackerTransactions();
+                                      ptTrx.forEach(t => {
+                                        // Filter by projectId matching
+                                        if (t.projectId === targetProjectId && t.description) purposes.add(t.description);
+                                      });
+                                    } catch (e) { console.error('Failed to load PT purposes', e); }
+
+                                    let allTx: Transaction[] = [];
+                                    try {
+                                      allTx = await FinanceService.getAllTransactions();
+                                      // Filter by current transaction's projectId
+                                      allTx.forEach(t => {
+                                        if (t.projectId === targetProjectId && t.purpose) purposes.add(t.purpose);
+                                      });
+                                    } catch (e) { console.error('Failed to load tx purposes', e); }
+
+                                    try {
+                                      const splitTx = allTx.filter(t => t.isSplit && t.splitIds);
+                                      for (const t of splitTx) {
+                                        try {
+                                          const splits = await FinanceService.getTransactionSplits(t.id);
+                                          splits.forEach(s => {
+                                            if (s.projectId === targetProjectId && s.purpose) purposes.add(s.purpose);
+                                          });
+                                        } catch (e) { }
+                                      }
+                                    } catch (e) { console.error('Failed to load split purposes', e); }
+
+                                    setProjectPurposes(Array.from(purposes).sort());
+                                  };
+                                  loadPurposes();
+                                }}
+                                className="text-blue-600 hover:text-blue-700 text-xs px-2"
+                                title={tx.isSplit ? "Edit split" : "Split transaction"}
+                              >
+                                {tx.isSplit ? 'Edit Split' : 'Split'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Split Transaction Rows */}
+                        {tx.isSplit && transactionSplits[tx.id] && transactionSplits[tx.id].map((split, idx) => (
+                          <tr key={`${tx.id}-split-${idx}`} className={`bg-blue-50/30 ${selectedSplitIds.has(split.id) ? 'bg-blue-100/50' : ''}`}>
+                            <td className="py-2 px-2 w-8">
+                              <input
+                                type="checkbox"
+                                checked={selectedSplitIds.has(split.id)}
+                                onChange={(e) => {
+                                  const next = new Set(selectedSplitIds);
+                                  if (e.target.checked) next.add(split.id);
+                                  else next.delete(split.id);
+                                  setSelectedSplitIds(next);
+                                }}
+                                className="accent-blue-600 cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-2 px-4 pl-12"></td>
+                            <td className="py-2 px-4 pl-12">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="text-slate-400">↳</span>
+                                <span className="text-slate-600">{split.description}</span>
+                              </div>
+                            </td>
+                            <td className="py-2 px-4"></td>
+                            <td className="py-2 px-4">
+                              <Badge variant="info" className="text-xs">{split.category}</Badge>
+                            </td>
+                            <td className="py-2 px-4">
+                              {(() => {
+                                const hasProjectId = split.projectId && split.projectId.trim() !== '';
+                                const hasPurpose = split.purpose && split.purpose.trim() !== '';
+                                if (hasProjectId && hasPurpose) {
+                                  return <Badge variant="success" className="text-xs">Categorized</Badge>;
+                                } else {
+                                  return <Badge variant="warning" className="text-xs">Uncategorized</Badge>;
                                 }
                               })()}
                             </td>
-                            <td className={`py-4 px-4 text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                              {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                            <td className={`py-2 px-4 text-right font-mono text-sm ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                              {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
                             </td>
-                            <td className={`py-4 px-4 text-right font-mono font-semibold ${tx.runningBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {formatCurrency(tx.runningBalance)}
-                            </td>
-                            <td className="py-4 px-4">
-                              <div className="flex items-center justify-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditTransaction(tx)}
-                                  className="text-slate-600 hover:text-blue-600 p-1"
-                                  title="Edit transaction"
-                                >
-                                  <Edit size={16} />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteTransaction(tx.id)}
-                                  className="text-slate-600 hover:text-red-600 p-1"
-                                  title="Delete transaction"
-                                >
-                                  <Trash2 size={16} />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedTransaction(tx);
-                                    setIsSplitModalOpen(true);
-                                    // Load members and projects for the modal
-                                    if (members.length === 0) loadMembers();
-                                    if (projects.length === 0) loadProjects();
-                                    // Load project purposes from multiple sources (filtered by projectId)
-                                    const loadPurposes = async () => {
-                                      const purposes = new Set<string>();
-                                      const targetProjectId = tx.projectId;
-
-                                      try {
-                                        const ptTrx = await projectFinancialService.getAllProjectTrackerTransactions();
-                                        ptTrx.forEach(t => {
-                                          // Filter by projectId matching
-                                          if (t.projectId === targetProjectId && t.description) purposes.add(t.description);
-                                        });
-                                      } catch (e) { console.error('Failed to load PT purposes', e); }
-
-                                      let allTx: Transaction[] = [];
-                                      try {
-                                        allTx = await FinanceService.getAllTransactions();
-                                        // Filter by current transaction's projectId
-                                        allTx.forEach(t => {
-                                          if (t.projectId === targetProjectId && t.purpose) purposes.add(t.purpose);
-                                        });
-                                      } catch (e) { console.error('Failed to load tx purposes', e); }
-
-                                      try {
-                                        const splitTx = allTx.filter(t => t.isSplit && t.splitIds);
-                                        for (const t of splitTx) {
-                                          try {
-                                            const splits = await FinanceService.getTransactionSplits(t.id);
-                                            splits.forEach(s => {
-                                              if (s.projectId === targetProjectId && s.purpose) purposes.add(s.purpose);
-                                            });
-                                          } catch (e) { }
-                                        }
-                                      } catch (e) { console.error('Failed to load split purposes', e); }
-
-                                      setProjectPurposes(Array.from(purposes).sort());
-                                    };
-                                    loadPurposes();
-                                  }}
-                                  className="text-blue-600 hover:text-blue-700 text-xs px-2"
-                                  title={tx.isSplit ? "Edit split" : "Split transaction"}
-                                >
-                                  {tx.isSplit ? 'Edit Split' : 'Split'}
-                                </Button>
-                              </div>
-                            </td>
+                            <td className="py-2 px-4"></td>
+                            <td className="py-2 px-4"></td>
                           </tr>
-
-                          {/* Split Transaction Rows */}
-                          {tx.isSplit && transactionSplits[tx.id] && transactionSplits[tx.id].map((split, idx) => (
-                            <tr key={`${tx.id}-split-${idx}`} className={`bg-blue-50/30 ${selectedSplitIds.has(split.id) ? 'bg-blue-100/50' : ''}`}>
-                              <td className="py-2 px-2 w-8">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSplitIds.has(split.id)}
-                                  onChange={(e) => {
-                                    const next = new Set(selectedSplitIds);
-                                    if (e.target.checked) next.add(split.id);
-                                    else next.delete(split.id);
-                                    setSelectedSplitIds(next);
-                                  }}
-                                  className="accent-blue-600 cursor-pointer"
-                                />
-                              </td>
-                              <td className="py-2 px-4 pl-12"></td>
-                              <td className="py-2 px-4 pl-12">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <span className="text-slate-400">↳</span>
-                                  <span className="text-slate-600">{split.description}</span>
-                                </div>
-                              </td>
-                              <td className="py-2 px-4"></td>
-                              <td className="py-2 px-4">
-                                <Badge variant="info" className="text-xs">{split.category}</Badge>
-                              </td>
-                              <td className="py-2 px-4">
-                                {(() => {
-                                  const hasProjectId = split.projectId && split.projectId.trim() !== '';
-                                  const hasPurpose = split.purpose && split.purpose.trim() !== '';
-                                  if (hasProjectId && hasPurpose) {
-                                    return <Badge variant="success" className="text-xs">Categorized</Badge>;
-                                  } else {
-                                    return <Badge variant="warning" className="text-xs">Uncategorized</Badge>;
-                                  }
-                                })()}
-                              </td>
-                              <td className={`py-2 px-4 text-right font-mono text-sm ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                                {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
-                              </td>
-                              <td className="py-2 px-4"></td>
-                              <td className="py-2 px-4"></td>
-                            </tr>
-                          ))}
-                        </React.Fragment>
-                      ));
-                    })()}
+                        ))}
+                      </React.Fragment>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1744,7 +2025,7 @@ export const FinanceView: React.FC = () => {
       )
       }
 
-      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setRecordFormMemberId(''); setRecordFormYear(new Date().getFullYear()); }} title="Record Transaction">
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setRecordFormMemberId(''); setRecordFormYear(new Date().getFullYear()); setRecordFormProjectId(''); }} title="Record Transaction">
         <form onSubmit={handleAddTransaction} className="space-y-6">
           <TransactionForm
             mode="create"
@@ -1763,6 +2044,8 @@ export const FinanceView: React.FC = () => {
             setRecordFormMemberId={setRecordFormMemberId}
             recordFormYear={recordFormYear}
             setRecordFormYear={setRecordFormYear}
+            recordFormProjectId={recordFormProjectId}
+            setRecordFormProjectId={setRecordFormProjectId}
             editingModalYear={editingModalYear}
             setEditingModalYear={setEditingModalYear}
             inventoryItems={inventoryItems}
@@ -1933,43 +2216,185 @@ export const FinanceView: React.FC = () => {
         projectPurposesByProject={editingProjectPurposesByProject}
       />
 
+      {/* Bank Account Detail Drawer */}
+      <Drawer
+        isOpen={isAccountDetailOpen}
+        onClose={() => setIsAccountDetailOpen(false)}
+        title={detailAccount ? (detailAccount.bankName ? `${detailAccount.bankName} · ${detailAccount.name}` : detailAccount.name) : 'Account Details'}
+        size="lg"
+      >
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Monthly Performance</h4>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-medium">Reporting Year:</span>
+              <select
+                value={detailYear}
+                onChange={(e) => setDetailYear(Number(e.target.value))}
+                className="text-sm border-slate-200 rounded-lg py-1.5 pl-3 pr-10 focus:ring-jci-blue focus:border-jci-blue bg-white border shadow-sm outline-none transition-all duration-200"
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="overflow-hidden border border-slate-100 rounded-xl shadow-sm bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[11px] md:text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase tracking-tight">Month</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase tracking-tight text-right">Initial</th>
+                    <th className="py-3 px-4 font-bold text-green-700 uppercase tracking-tight text-right">Income</th>
+                    <th className="py-3 px-4 font-bold text-red-700 uppercase tracking-tight text-right">Expense</th>
+                    <th className="py-3 px-4 font-bold text-slate-900 uppercase tracking-tight text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {monthlyAccountSummary.map((data) => (
+                    <tr key={data.month} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-slate-600">
+                        {new Date(detailYear, data.month).toLocaleString('en', { month: 'short' })}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 text-right font-mono">
+                        {formatCurrency(data.openingBalance, detailAccount?.currency)}
+                      </td>
+                      <td className="py-3 px-4 text-green-600 font-medium text-right font-mono">
+                        {data.income > 0 ? `+${formatCurrency(data.income)}` : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-red-600 font-medium text-right font-mono">
+                        {data.expenses > 0 ? `-${formatCurrency(data.expenses)}` : '—'}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-900 text-right font-mono">
+                        {formatCurrency(data.closingBalance, detailAccount?.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/60">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-jci-blue" />
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Annual Summary</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-0.5">Year Net Flow</p>
+                <p className={`text-sm font-bold ${monthlyAccountSummary.reduce((acc, m) => acc + (m.income - m.expenses), 0) >= 0
+                  ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                  {formatCurrency(monthlyAccountSummary.reduce((acc, m) => acc + (m.income - m.expenses), 0))}
+                </p>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-0.5">Year-End Position</p>
+                <p className="text-sm font-bold text-slate-900">
+                  {formatCurrency(monthlyAccountSummary[11]?.closingBalance || 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Drawer>
+
       {/* Fixed Bottom Action Bar for Batch Selection */}
-      {(selectedTxIds.size > 0 || selectedSplitIds.size > 0) && (
+      {moduleTab === 'Transactions' && displayTransactions.length > 0 && (selectedTxIds.size + selectedSplitIds.size) > 2 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-6 bg-slate-900/95 backdrop-blur-sm px-6 py-3 rounded-full shadow-2xl border border-slate-700">
             <div className="flex items-center gap-3">
               <div className="p-1 bg-blue-500 rounded-md">
                 <Layers size={18} className="text-white" />
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col pr-4 border-r border-slate-700">
                 <span className="text-sm font-bold text-white leading-none">
-                  {selectedTxIds.size + selectedSplitIds.size} selected
+                  {batchOperationProgress
+                    ? `Processing ${batchOperationProgress.current}/${batchOperationProgress.total}...`
+                    : `${selectedTxIds.size + selectedSplitIds.size} selected`
+                  }
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium">
-                  {selectedTxIds.size} main • {selectedSplitIds.size} splits
+                  {batchOperationProgress
+                    ? 'Please wait while we update your records'
+                    : `${selectedTxIds.size} main • ${selectedSplitIds.size} splits`
+                  }
                 </span>
               </div>
             </div>
 
-            <div className="h-8 w-px bg-slate-700" />
+            {batchOperationProgress ? (
+              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-300 ease-out"
+                  style={{ width: `${(batchOperationProgress.current / batchOperationProgress.total) * 100}%` }}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const allVisibleTxIds = displayTransactions.map(t => t.id);
+                  const allVisibleSplitIds = displayTransactions.flatMap(t =>
+                    t.isSplit && transactionSplits[t.id] ? transactionSplits[t.id].map(s => s.id) : []
+                  );
+                  const isAllSelected = allVisibleTxIds.length > 0 && allVisibleTxIds.every(id => selectedTxIds.has(id)) &&
+                    (allVisibleSplitIds.length === 0 || allVisibleSplitIds.every(id => selectedSplitIds.has(id)));
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setSelectedTxIds(new Set()); setSelectedSplitIds(new Set()); }}
-                className="text-slate-300 hover:text-white hover:bg-slate-800 rounded-full h-9 px-4"
-              >
-                Clear
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setIsBatchCategoryModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-500 text-white rounded-full h-9 px-5 font-semibold shadow-lg shadow-blue-500/20"
-              >
-                Batch Set Category
-              </Button>
-            </div>
+                  return !isAllSelected && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSelectAllTransactions}
+                      className="text-slate-300 hover:text-white hover:bg-slate-800 rounded-full h-9 px-4 flex items-center gap-1.5"
+                    >
+                      <CheckCircle size={14} />
+                      Select All
+                    </Button>
+                  );
+                })()}
+
+                {(selectedTxIds.size > 0 || selectedSplitIds.size > 0) && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setSelectedTxIds(new Set()); setSelectedSplitIds(new Set()); }}
+                      className="text-slate-300 hover:text-white hover:bg-slate-800 rounded-full h-9 px-4"
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBatchApprove}
+                      className="border-green-500/50 text-green-500 hover:bg-green-500 hover:text-white rounded-full h-9 px-5 font-semibold transition-all duration-200 flex items-center gap-1.5"
+                    >
+                      <CheckCircle size={14} />
+                      Batch Approve
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBatchDelete}
+                      className="border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white rounded-full h-9 px-5 font-semibold transition-all duration-200 flex items-center gap-1.5"
+                    >
+                      <Trash2 size={14} />
+                      Batch Delete
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsBatchCategoryModalOpen(true)}
+                      className="bg-blue-600 hover:bg-blue-500 text-white rounded-full h-9 px-5 font-semibold shadow-lg shadow-blue-500/20"
+                    >
+                      Batch Set Category
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

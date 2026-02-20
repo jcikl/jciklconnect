@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock } from 'lucide-react';
+import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers } from 'lucide-react';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs } from '../ui/Common';
-import { Input, Select, Textarea } from '../ui/Form';
+import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { LoadingState } from '../ui/Loading';
 import { useProjects } from '../../hooks/useProjects';
@@ -47,6 +47,82 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const { showToast } = useToast();
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
+  const [batchOperationProgress, setBatchOperationProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const handleBatchDelete = async () => {
+    if (selectedProjectIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedProjectIds.size} selected events? This action cannot be undone.`)) return;
+
+    const idsToDelete = Array.from(selectedProjectIds);
+    setBatchOperationProgress({ current: 0, total: idsToDelete.length });
+
+    try {
+      // Process in parallel with progress updates
+      await Promise.all(idsToDelete.map(async (id) => {
+        await deleteProject(id);
+        setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+      }));
+
+      setSelectedProjectIds(new Set());
+      showToast(`Successfully deleted ${idsToDelete.length} events`, 'success');
+    } catch (err) {
+      showToast('Some events could not be deleted', 'error');
+    } finally {
+      setBatchOperationProgress(null);
+    }
+  };
+
+  const handleBatchApprove = async () => {
+    if (selectedProjectIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to approve ${selectedProjectIds.size} selected events?`)) return;
+
+    const idsToUpdate = Array.from(selectedProjectIds);
+    setBatchOperationProgress({ current: 0, total: idsToUpdate.length });
+
+    try {
+      // Process in parallel with progress updates
+      await Promise.all(idsToUpdate.map(async (id) => {
+        const proj = projects.find(p => p.id === id);
+        if (proj && proj.status !== 'Approved' && proj.status !== 'Active') {
+          await updateProject(id, { ...proj, status: 'Approved' });
+        }
+        setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+      }));
+
+      setSelectedProjectIds(new Set());
+      showToast(`Successfully approved ${idsToUpdate.length} events`, 'success');
+    } catch (err) {
+      showToast('Some events could not be approved', 'error');
+    } finally {
+      setBatchOperationProgress(null);
+    }
+  };
+
+  const handleSelectAll = useCallback(() => {
+    const allIds = projects.map(p => p.id).filter(id => !!id) as string[];
+    setSelectedProjectIds(new Set(allIds));
+  }, [projects]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ctrl+a or cmd+a
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        const activeElement = document.activeElement;
+        const isInput = activeElement?.tagName === 'INPUT' ||
+          activeElement?.tagName === 'TEXTAREA' ||
+          (activeElement as HTMLElement)?.isContentEditable;
+
+        if (!isInput && activeTab === 'projects' && !selectedProjectId) {
+          e.preventDefault();
+          handleSelectAll();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSelectAll, activeTab, selectedProjectId]);
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     if (!selectedProjectId) return;
@@ -281,6 +357,16 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
                 onSelect={setSelectedProjectId}
                 onNewProposal={() => setProposalModalOpen(true)}
                 onImport={() => setImportModalOpen(true)}
+                selectedIds={selectedProjectIds}
+                onToggleSelection={(id) => {
+                  setSelectedProjectIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  });
+                }}
+                onSelectAll={handleSelectAll}
               />
             ) : (
               <div className="space-y-4">
@@ -379,6 +465,71 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
             }}
           />
         </>
+      )}
+
+      {/* Floating Batch Action Bar */}
+      {activeTab === 'projects' && !selectedProjectId && projects.length > 0 && selectedProjectIds.size > 2 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-slate-700 backdrop-blur-md bg-slate-900/90">
+            <div className="flex items-center gap-2 border-r border-slate-700 pr-6">
+              <Layers size={18} className="text-blue-400" />
+              <span className="font-bold text-sm tracking-tight">{selectedProjectIds.size} events selected</span>
+            </div>
+
+            {batchOperationProgress ? (
+              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-300 ease-out"
+                  style={{ width: `${(batchOperationProgress.current / batchOperationProgress.total) * 100}%` }}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {selectedProjectIds.size < projects.length && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSelectAll}
+                    className="text-white hover:bg-slate-800 text-xs py-1"
+                  >
+                    <CheckCircle size={14} className="mr-1" />
+                    Select All
+                  </Button>
+                )}
+                {selectedProjectIds.size > 0 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedProjectIds(new Set())}
+                      className="text-white hover:bg-slate-800 text-xs py-1"
+                    >
+                      Clear Selection
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleBatchApprove}
+                      className="text-green-400 hover:bg-green-500/20 text-xs py-1"
+                    >
+                      <CheckCircle size={14} className="mr-1" />
+                      Batch Approve
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={handleBatchDelete}
+                      className="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 text-xs py-1"
+                    >
+                      <Trash2 size={14} className="mr-1" />
+                      Batch Delete
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Project Creation Modal */}
@@ -551,13 +702,15 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
       </Modal>
 
       {/* Template Preview Modal */}
-      {previewTemplate && (
-        <TemplatePreviewModal
-          template={previewTemplate}
-          onClose={() => setPreviewTemplate(null)}
-          onUse={() => { handleUseTemplate(previewTemplate); setPreviewTemplate(null); }}
-        />
-      )}
+      {
+        previewTemplate && (
+          <TemplatePreviewModal
+            template={previewTemplate}
+            onClose={() => setPreviewTemplate(null)}
+            onUse={() => { handleUseTemplate(previewTemplate); setPreviewTemplate(null); }}
+          />
+        )
+      }
 
       {/* Project Import Modal */}
       <BatchImportModal
@@ -570,7 +723,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
           // Reload is handled by hook's listener usually, but projects state is reactive
         }}
       />
-    </div>
+    </div >
   )
 }
 
@@ -581,7 +734,10 @@ const ProjectGrid: React.FC<{
   onSelect: (id: string) => void;
   onNewProposal: () => void;
   onImport: () => void;
-}> = ({ projects, loading, error, onSelect, onNewProposal, onImport }) => {
+  selectedIds?: Set<string>;
+  onToggleSelection?: (id: string) => void;
+  onSelectAll?: () => void;
+}> = ({ projects, loading, error, onSelect, onNewProposal, onImport, selectedIds, onToggleSelection, onSelectAll }) => {
   const getStatusLabel = (status: Project['status']) => {
     switch (status) {
       case 'Planning':
@@ -629,7 +785,22 @@ const ProjectGrid: React.FC<{
 
         {/* Then render all existing projects (if any) */}
         {projects.map(project => (
-          <Card key={project.id} className="flex flex-col h-full cursor-pointer hover:border-jci-blue transition-colors group" onClick={() => onSelect(project.id)}>
+          <Card
+            key={project.id}
+            className={`flex flex-col h-full cursor-pointer transition-all group relative ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
+            onClick={() => onToggleSelection?.(project.id)}
+          >
+            {/* Checkbox for batch selection */}
+            <div
+              className="absolute top-4 right-4 z-10 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Checkbox
+                checked={selectedIds?.has(project.id)}
+                onChange={() => onToggleSelection?.(project.id)}
+              />
+            </div>
+
             {/* Wrapper div to capture click event but stop propagation on buttons if needed */}
             <div className="pointer-events-none">
               <div className="flex justify-between items-start mb-4">
@@ -662,7 +833,7 @@ const ProjectGrid: React.FC<{
             </div>
 
             <div className="border-t border-slate-100 pt-4 mt-auto">
-              <Button variant="outline" className="w-full text-sm" onClick={() => onSelect(project.id)}>Open Board</Button>
+              <Button variant="outline" className="w-full text-sm" onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}>Open Board</Button>
             </div>
           </Card>
         ))}

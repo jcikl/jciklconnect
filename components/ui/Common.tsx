@@ -39,6 +39,7 @@ interface DrawerProps {
   title: string;
   children: React.ReactNode;
   position?: 'left' | 'right';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 interface ToastContextType {
@@ -334,8 +335,22 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
   return createPortal(modalContent, document.body);
 }
 
-export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children, position = 'right' }) => {
+export const Drawer: React.FC<DrawerProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  position = 'right',
+  size = 'md'
+}) => {
   if (!isOpen) return null;
+
+  const sizeClasses = {
+    sm: 'md:w-80',
+    md: 'md:w-96',
+    lg: 'md:w-[600px]',
+    xl: 'md:w-[800px]',
+  };
 
   return (
     <>
@@ -345,7 +360,7 @@ export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children
       />
       <div
         className={`
-          fixed top-0 bottom-0 z-50 w-full md:w-96 bg-white shadow-2xl transition-transform duration-300 ease-in-out
+          fixed top-0 bottom-0 z-50 w-full ${sizeClasses[size]} bg-white shadow-2xl transition-transform duration-300 ease-in-out
           ${position === 'right' ? 'right-0' : 'left-0'}
           ${isOpen ? 'translate-x-0' : (position === 'right' ? 'translate-x-full' : '-translate-x-full')}
         `}

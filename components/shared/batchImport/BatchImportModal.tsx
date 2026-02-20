@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, CheckCircle, Download, Upload, FileSpreadsheet, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, CheckCircle, Download, Upload, FileSpreadsheet, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Modal, Button, useToast } from '../../ui/Common';
 import { Input } from '../../ui/Form';
 import { BatchImportConfig, ImportRow, ColumnMapping, ImportContext } from './batchImportTypes';
@@ -40,6 +40,8 @@ export const BatchImportModal: React.FC<Props> = ({
   const [tablePreviewType, setTablePreviewType] = useState<'summary' | 'valid' | 'invalid'>('summary');
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [expandedErrors, setExpandedErrors] = useState<Set<number>>(new Set());
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Initialize field key to column index mapping
   useEffect(() => {
@@ -164,7 +166,7 @@ export const BatchImportModal: React.FC<Props> = ({
           : (field.defaultValue !== undefined ? field.defaultValue : '');
 
         if (valueToValidate !== '' || field.required) {
-          const fieldErrors = validateField(valueToValidate, field.validators, context);
+          const fieldErrors = validateField(valueToValidate, field.validators, { ...context, row: parsed });
           errors.push(...fieldErrors);
         }
       }
@@ -189,6 +191,35 @@ export const BatchImportModal: React.FC<Props> = ({
     return parsedRows;
   }, [parsedRows, validRows, invalidRows, tablePreviewType]);
 
+  const handleToggleSelectRow = (idx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedRows);
+    if (newSelected.has(idx)) {
+      newSelected.delete(idx);
+    } else {
+      newSelected.add(idx);
+    }
+    setSelectedRows(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedRows.size === tableDisplayRows.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(tableDisplayRows.map(r => r.index)));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedRows.size === 0) return;
+
+    const lines = pastedText.split('\n');
+    const newLines = lines.filter((_, idx) => !selectedRows.has(idx));
+    setPastedText(newLines.join('\n'));
+    setSelectedRows(new Set());
+    showToast(`Deleted ${selectedRows.size} row(s)`, 'success');
+  };
+
   const handleImport = async () => {
     if (validRows.length === 0) {
       showToast('No valid rows to import', 'error');
@@ -196,19 +227,34 @@ export const BatchImportModal: React.FC<Props> = ({
     }
 
     setImporting(true);
+    setImportProgress({ current: 0, total: validRows.length });
     let successCount = 0;
     let failureCount = 0;
 
     try {
-      for (const row of validRows) {
-        try {
-          await config.importer(row.parsed, context);
-          successCount++;
-        } catch (err) {
-          failureCount++;
-          console.error(`Failed to import row ${row.index}:`, err);
-        }
+      // Process in chunks of 10 for better performance and stability
+      const CHUNK_SIZE = 10;
+      const results: { success: boolean }[] = [];
+
+      for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
+        const chunk = validRows.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          chunk.map(async (row) => {
+            try {
+              await config.importer(row.parsed, context);
+              return { success: true };
+            } catch (err) {
+              console.error(`Failed to import row ${row.index}:`, err);
+              return { success: false };
+            }
+          })
+        );
+        results.push(...chunkResults);
+        setImportProgress(prev => prev ? { ...prev, current: Math.min(prev.current + chunk.length, prev.total) } : null);
       }
+
+      successCount = results.filter(r => r.success).length;
+      failureCount = results.filter(r => !r.success).length;
 
       showToast(
         `Import completed: ${successCount} success${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
@@ -218,11 +264,12 @@ export const BatchImportModal: React.FC<Props> = ({
       // Reset form
       setPastedText('');
       setShowMapping(false);
-      setColumnMapping({});
+      setImportProgress(null);
       onImported();
       onClose();
     } catch (err) {
       showToast('Import failed', 'error');
+      setImportProgress(null);
     } finally {
       setImporting(false);
     }
@@ -267,7 +314,12 @@ export const BatchImportModal: React.FC<Props> = ({
         const headers = lines[0].split('\t');
         const threshold = config.autoMatchThreshold || 0.85;
         const result = autoMapColumns(headers, config.fields, threshold);
-        setColumnMapping(result.columnMapping);
+
+        // Merge with existing mapping instead of overwriting entirely
+        // This ensures un-matched fields retain their default positions (index-based)
+        if (Object.keys(result.columnMapping).length > 0) {
+          setColumnMapping(prev => ({ ...prev, ...result.columnMapping }));
+        }
 
         if (result.allRequired) {
           setAutoMatchInfo(`✅ All ${headers.length} columns matched automatically`);
@@ -324,10 +376,28 @@ export const BatchImportModal: React.FC<Props> = ({
         className="hidden"
       />
 
-      <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+      <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto relative">
+        {importProgress && (
+          <div className="absolute inset-0 z-[100] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="w-64 h-3 bg-slate-100 rounded-full overflow-hidden mb-4 border border-slate-200">
+              <div
+                className="h-full bg-blue-600 transition-all duration-300 ease-out"
+                style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+              />
+            </div>
+            <div className="text-xl font-bold text-slate-900 mb-1">
+              Importing Data...
+            </div>
+            <div className="text-slate-500 font-medium">
+              Processed {importProgress.current} of {importProgress.total} rows
+            </div>
+          </div>
+        )}
+
         {children}
+
         {/* Header */}
-        <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100">
+        <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100 uppercase tracking-tight">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="text-blue-600" size={20} />
             <span className="text-sm font-medium text-blue-900">
@@ -469,6 +539,14 @@ export const BatchImportModal: React.FC<Props> = ({
                 <thead className="sticky top-0 bg-slate-100 border-b border-slate-200">
                   <tr>
                     <th className="px-2 py-1.5 text-left font-semibold text-slate-700 border-r border-slate-200 whitespace-nowrap w-8">
+                      <input
+                        type="checkbox"
+                        checked={tableDisplayRows.length > 0 && selectedRows.size === tableDisplayRows.length}
+                        onChange={handleSelectAll}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-slate-700 border-r border-slate-200 whitespace-nowrap w-8 text-center">
                       #
                     </th>
                     {config.tableColumns.map(col => (
@@ -490,7 +568,20 @@ export const BatchImportModal: React.FC<Props> = ({
                         className={`border-b border-slate-200 cursor-pointer transition-colors ${row.valid ? 'bg-green-50 hover:bg-green-100' : 'bg-red-50 hover:bg-red-100'
                           } ${selectedRowIndex === row.index ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
                       >
-                        <td className="px-2 py-1 text-slate-600 border-r border-slate-200 w-8">
+                        <td className="px-2 py-1 border-r border-slate-200 w-8 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.has(row.index)}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedRows);
+                              if (e.target.checked) newSelected.add(row.index);
+                              else newSelected.delete(row.index);
+                              setSelectedRows(newSelected);
+                            }}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-2 py-1 text-slate-600 border-r border-slate-200 w-8 text-center">
                           {row.index + 1}
                         </td>
                         {config.tableColumns.map(col => (
@@ -526,7 +617,7 @@ export const BatchImportModal: React.FC<Props> = ({
                       </tr>
                       {!row.valid && row.errors.length > 0 && (
                         <tr className="bg-red-100 border-b border-slate-200">
-                          <td colSpan={config.tableColumns.length + 1} className="px-2 py-1">
+                          <td colSpan={config.tableColumns.length + 2} className="px-2 py-1">
                             <button
                               type="button"
                               onClick={() => handleToggleError(row.index)}
@@ -561,9 +652,23 @@ export const BatchImportModal: React.FC<Props> = ({
             </div>
 
             {/* Summary */}
-            <div className="bg-slate-50 px-2 py-1.5 border-t border-slate-200 text-xs text-slate-600">
-              Showing {tableDisplayRows.length} row{tableDisplayRows.length !== 1 ? 's' : ''}
-              {tablePreviewType === 'summary' && invalidRows.length > 0 && ` • ${invalidRows.length} error(s)`}
+            <div className="bg-slate-50 px-2 py-1.5 border-t border-slate-200 flex items-center justify-between">
+              <div className="text-xs text-slate-600">
+                Showing {tableDisplayRows.length} row{tableDisplayRows.length !== 1 ? 's' : ''}
+                {tablePreviewType === 'summary' && invalidRows.length > 0 && ` • ${invalidRows.length} error(s)`}
+                {selectedRows.size > 0 && ` • ${selectedRows.size} selected`}
+              </div>
+              {selectedRows.size > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDeleteSelected}
+                  className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 flex items-center gap-1"
+                >
+                  <Trash2 size={12} />
+                  Delete Selected
+                </Button>
+              )}
             </div>
           </div>
         )}

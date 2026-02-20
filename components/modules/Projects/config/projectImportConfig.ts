@@ -14,6 +14,7 @@ import {
     parseDatePreprocessor,
     createChainedPreprocessor,
     trimPreprocessor,
+    toNumberPreprocessor,
 } from '../../../shared/batchImport/batchImportUtils';
 import { ProjectsService } from '../../../../services/projectsService';
 import { ProjectCommitteeMember } from '../../../../types';
@@ -26,17 +27,27 @@ export const projectImportConfig: BatchImportConfig = {
             key: 'title',
             label: 'Project Title',
             required: true,
-            aliases: ['Title', 'Project Name', 'Name', '项目名称', '标题', 'Name of Project'],
+            aliases: ['Title', 'Project Name', 'Name', '项目名称', '标题', 'Name of Project', 'Match'],
             validators: [notEmpty],
             preprocessor: trimPreprocessor,
         },
         {
-            key: 'description',
-            label: 'Description',
+            key: 'category',
+            label: 'Category',
             required: false,
-            aliases: ['Description', '项目描述', '简介', 'About'],
+            aliases: ['Category', '项目类别', '组别', 'Classification', 'events', 'programs', 'projects', 'skill_development'],
             validators: [],
-            preprocessor: trimPreprocessor,
+            preprocessor: (val: any) => {
+                if (!val) return 'projects';
+                const lower = String(val).trim().toLowerCase();
+                // Map common variations to canonical keys
+                if (lower.includes('event')) return 'events';
+                if (lower.includes('program')) return 'programs';
+                if (lower.includes('skill')) return 'skill_development';
+                if (lower.includes('project')) return 'projects';
+                return lower;
+            },
+            defaultValue: 'projects',
         },
         {
             key: 'proposedDate',
@@ -48,13 +59,21 @@ export const projectImportConfig: BatchImportConfig = {
             defaultValue: new Date().toISOString().split('T')[0],
         },
         {
-            key: 'category',
-            label: 'Category',
+            key: 'proposedBudget',
+            label: 'Proposed Budget',
             required: false,
-            aliases: ['Category', '项目类别', '组别', 'Classification'],
+            aliases: ['Budget', 'Proposed Budget', '预计预算', '预算', 'Estimated Cost'],
+            validators: [],
+            preprocessor: toNumberPreprocessor,
+            defaultValue: 0,
+        },
+        {
+            key: 'description',
+            label: 'Description',
+            required: false,
+            aliases: ['Description', '项目描述', '简介', 'About'],
             validators: [],
             preprocessor: trimPreprocessor,
-            defaultValue: 'projects',
         },
         {
             key: 'level',
@@ -75,20 +94,20 @@ export const projectImportConfig: BatchImportConfig = {
             defaultValue: 'Community',
         },
         {
-            key: 'proposedBudget',
-            label: 'Proposed Budget',
-            required: false,
-            aliases: ['Budget', 'Proposed Budget', '预计预算', '预算', 'Estimated Cost'],
-            validators: [],
-            defaultValue: '0',
-        },
-        {
             key: 'objectives',
             label: 'Objectives',
             required: false,
             aliases: ['Objectives', 'Goals', '项目目标', '目标'],
             validators: [],
             preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'eventStartDate',
+            label: 'Event Start Date',
+            required: false,
+            aliases: ['Event Start Date', '活动开始日期', 'Start Date'],
+            validators: [isValidDate],
+            preprocessor: parseDatePreprocessor,
         },
         {
             key: 'targetAudience',
@@ -116,9 +135,9 @@ export const projectImportConfig: BatchImportConfig = {
 
     sampleFileName: 'JCI_Project_Import_Template.csv',
     sampleData: [
-        ['Project Title', 'Description', 'Proposed Date', 'Category', 'Level', 'Pillar', 'Proposed Budget', 'Objectives', 'Target Audience'],
-        ['Summer Leadership Summit', 'Annual youth leadership training program', '2026-07-15', 'programs', 'Local', 'Individual', '5000', 'Develop leadership skills in 50 youth', 'Members and students'],
-        ['Community Clean-up Day', 'Environmental awareness project', '2026-04-22', 'projects', 'Local', 'Community', '1200', 'Clean up Central Park area', 'Public'],
+        ['Project Title', 'Description', 'Proposed Date', 'Event Start Date', 'Category', 'Level', 'Pillar', 'Proposed Budget', 'Objectives', 'Target Audience'],
+        ['Summer Leadership Summit', 'Annual youth leadership training program', '2026-07-15', '2026-07-20', 'programs', 'Local', 'Individual', '5000', 'Develop leadership skills in 50 youth', 'Members and students'],
+        ['Community Clean-up Day', 'Environmental awareness project', '2026-04-22', '2026-04-22', 'projects', 'Local', 'Community', '1200', 'Clean up Central Park area', 'Public'],
     ],
 
     importer: async (row, context) => {
@@ -143,6 +162,7 @@ export const projectImportConfig: BatchImportConfig = {
             level: row.level as any || 'Local',
             pillar: row.pillar as any || 'Community',
             targetAudience: row.targetAudience || '',
+            eventStartDate: row.eventStartDate || undefined,
             status: 'Planning',
             submittedBy: member?.id || '',
             committee: defaultCommittee,

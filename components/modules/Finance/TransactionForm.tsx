@@ -26,6 +26,8 @@ interface Props {
   setRecordFormMemberId?: (id: string) => void;
   recordFormYear?: number;
   setRecordFormYear?: (y: number) => void;
+  recordFormProjectId?: string;
+  setRecordFormProjectId?: (id: string) => void;
 
   // edit-mode props
   editingTransaction?: Transaction | null;
@@ -60,6 +62,8 @@ export const TransactionForm: React.FC<Props> = ({
   setRecordFormMemberId,
   recordFormYear,
   setRecordFormYear,
+  recordFormProjectId,
+  setRecordFormProjectId,
 
   // edit
   editingTransaction,
@@ -243,11 +247,24 @@ export const TransactionForm: React.FC<Props> = ({
                 )}
 
                 {recordFormCategory === 'Projects & Activities' && (
-                  <Select name="projectId" label="Project" options={[{ label: 'None', value: '' }, ...projects.map(p => ({ label: p.name, value: p.id }))]} />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Project</label>
+                    <Combobox
+                      groupedOptions={groupedProjectsForModal}
+                      value={filteredProjectsForModal?.find(p => p.id === recordFormProjectId)?.name || ''}
+                      onChange={(value) => {
+                        const project = filteredProjectsForModal?.find(p => p.name === value);
+                        setRecordFormProjectId?.(project?.id || '');
+                      }}
+                      placeholder="Select or type to search project..."
+                    />
+                    <input type="hidden" name="projectId" value={recordFormProjectId} />
+                    <input type="hidden" name="year" value={editingModalYear || 'All'} />
+                  </div>
                 )}
 
                 {recordFormCategory === 'Administrative' && (
-                  <Select name="projectId" label="Admin Account" options={[{ label: 'Select...', value: '' }, ...administrativeProjectIds.map(p => ({ label: p, value: p }))]} />
+                  <Select name="projectId" label="Admin Account" options={[{ label: 'Select Admin Account...', value: '' }, ...administrativeProjectIds.map(p => ({ label: p, value: p }))]} />
                 )}
               </>
             )}

@@ -579,23 +579,29 @@ export class FinanceService {
       return { updated: transactionIds.length, errors: [] };
     }
 
+    const results = await Promise.all(
+      transactionIds.map(async (txId) => {
+        try {
+          const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, txId);
+          const updateData: any = {
+            ...removeUndefined(categoryUpdates),
+            updatedAt: Timestamp.now(),
+          };
+          await updateDoc(transactionRef, updateData);
+          return { success: true };
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Unknown error';
+          return { success: false, error: `Transaction ${txId}: ${msg}` };
+        }
+      })
+    );
+
     let updated = 0;
     const errors: string[] = [];
-
-    for (const txId of transactionIds) {
-      try {
-        const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, txId);
-        const updateData: any = {
-          ...removeUndefined(categoryUpdates),
-          updatedAt: Timestamp.now(),
-        };
-        await updateDoc(transactionRef, updateData);
-        updated++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Transaction ${txId}: ${msg}`);
-      }
-    }
+    results.forEach(res => {
+      if (res.success) updated++;
+      else if (res.error) errors.push(res.error);
+    });
 
     return { updated, errors };
   }
@@ -617,23 +623,29 @@ export class FinanceService {
       return { updated: splitIds.length, errors: [] };
     }
 
+    const results = await Promise.all(
+      splitIds.map(async (splitId) => {
+        try {
+          const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
+          const updateData: any = {
+            ...removeUndefined(categoryUpdates),
+            updatedAt: Timestamp.now(),
+          };
+          await updateDoc(splitRef, updateData);
+          return { success: true };
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Unknown error';
+          return { success: false, error: `Split ${splitId}: ${msg}` };
+        }
+      })
+    );
+
     let updated = 0;
     const errors: string[] = [];
-
-    for (const splitId of splitIds) {
-      try {
-        const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
-        const updateData: any = {
-          ...removeUndefined(categoryUpdates),
-          updatedAt: Timestamp.now(),
-        };
-        await updateDoc(splitRef, updateData);
-        updated++;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Split ${splitId}: ${msg}`);
-      }
-    }
+    results.forEach(res => {
+      if (res.success) updated++;
+      else if (res.error) errors.push(res.error);
+    });
 
     return { updated, errors };
   }
