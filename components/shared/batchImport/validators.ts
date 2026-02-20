@@ -7,6 +7,7 @@
  * Validate non-empty string
  */
 export const notEmpty = (value: any): string | null => {
+  if (value === 0) return null; // 0 is a valid value
   if (!value || (typeof value === 'string' && value.trim() === '')) {
     return 'Value cannot be empty';
   }

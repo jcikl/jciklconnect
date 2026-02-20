@@ -154,11 +154,17 @@ export const BatchImportModal: React.FC<Props> = ({
             processedValue = rawValue;
           }
         }
-        parsed[field.key] = processedValue || field.defaultValue;
+        parsed[field.key] = (processedValue !== undefined && processedValue !== null && processedValue !== '')
+          ? processedValue
+          : (field.defaultValue !== undefined ? field.defaultValue : '');
 
         // Validate
-        if (processedValue || field.required) {
-          const fieldErrors = validateField(processedValue || '', field.validators, context);
+        const valueToValidate = (processedValue !== undefined && processedValue !== null && processedValue !== '')
+          ? processedValue
+          : (field.defaultValue !== undefined ? field.defaultValue : '');
+
+        if (valueToValidate !== '' || field.required) {
+          const fieldErrors = validateField(valueToValidate, field.validators, context);
           errors.push(...fieldErrors);
         }
       }
@@ -506,7 +512,14 @@ export const BatchImportModal: React.FC<Props> = ({
                                 </span>
                               )
                             ) : (
-                              String(row.parsed[col.key] || '—')
+                              (() => {
+                                const val = row.parsed[col.key];
+                                if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) {
+                                  return '—';
+                                }
+                                if (val === 0 || val === '0') return '0';
+                                return String(val || '—');
+                              })()
                             )}
                           </td>
                         ))}

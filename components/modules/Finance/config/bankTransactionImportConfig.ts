@@ -67,10 +67,24 @@ export const bankTransactionImportConfig: BatchImportConfig = {
     {
       key: 'category',
       label: 'Category',
-      required: true,
+      required: false,
       aliases: ['Category', 'Type'],
-      validators: [(val) => ['Projects & Activities', 'Membership', 'Administrative'].includes(val) ? null : 'Invalid category'],
-      preprocessor: trimPreprocessor,
+      validators: [(val) => {
+        if (!val) return null;
+        return ['Projects & Activities', 'Membership', 'Administrative'].includes(val) ? null : 'Invalid category';
+      }],
+      preprocessor: (val: any) => {
+        if (!val) return '';
+        const normalized = String(val).trim().toLowerCase();
+        const map: Record<string, string> = {
+          'projects & activities': 'Projects & Activities',
+          'projects and activities': 'Projects & Activities',
+          'membership': 'Membership',
+          'administrative': 'Administrative',
+          'admin': 'Administrative',
+        };
+        return map[normalized] || val;
+      },
     },
     {
       key: 'projectTitle',
@@ -153,18 +167,24 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       }
     }
 
+    const income = row.income || 0;
+    const expense = row.expense || 0;
+    const amount = income > 0 ? income : Math.abs(expense);
+    const type = income > 0 ? 'Income' : 'Expense';
+
     await FinanceService.createTransaction({
       date: row.date,
       description: row.description,
       referenceNumber: row.referenceNumber,
-      income: row.income || 0,
-      expense: row.expense || 0,
+      amount: amount,
+      income: income,
+      expense: expense,
       category: row.category,
       projectId: projectId || undefined,
       purpose: row.purpose,
       bankAccountId: context?.bankAccountId,
       status: 'Pending',
-      type: (row.income > 0) ? 'Income' : 'Expense'
+      type: type as 'Income' | 'Expense'
     } as any);
   },
 };

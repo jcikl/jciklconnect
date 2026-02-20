@@ -614,11 +614,11 @@ class ProjectFinancialService {
 
         const totalIncome = projectTransactions
           .filter(t => t.type === 'Income')
-          .reduce((sum, t) => sum + t.amount, 0);
+          .reduce((sum, t) => sum + (t.amount || 0), 0);
 
         const totalExpenses = projectTransactions
           .filter(t => t.type === 'Expense')
-          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+          .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
 
         const budget = project.budget || project.proposedBudget || 0;
 

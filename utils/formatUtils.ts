@@ -1,13 +1,16 @@
 // Formatting Utility Functions
 export const formatCurrency = (
   amount: number,
-  currency: string = 'USD',
-  locale: string = 'en-US'
+  currency: string = 'MYR',
+  locale: string = 'en-MY'
 ): string => {
+  // Handle invalid numbers
+  const safeAmount = (amount === null || amount === undefined || isNaN(amount)) ? 0 : amount;
+
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-  }).format(amount);
+  }).format(safeAmount);
 };
 
 export const formatNumber = (num: number, decimals: number = 0): string => {
