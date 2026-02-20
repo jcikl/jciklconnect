@@ -549,15 +549,20 @@ export const BatchImportModal: React.FC<Props> = ({
                     <th className="px-2 py-1.5 text-left font-semibold text-slate-700 border-r border-slate-200 whitespace-nowrap w-8 text-center">
                       #
                     </th>
-                    {config.tableColumns.map(col => (
-                      <th
-                        key={col.key}
-                        className="px-2 py-1.5 text-left font-semibold text-slate-700 border-r border-slate-200 whitespace-nowrap"
-                        style={{ width: col.width ? `${col.width}px` : 'auto' }}
-                      >
-                        {col.label}
-                      </th>
-                    ))}
+                    {config.tableColumns.map(col => {
+                      const fieldDef = config.fields.find(f => f.key === col.key);
+                      const isRequired = fieldDef?.required === true;
+                      return (
+                        <th
+                          key={col.key}
+                          className="px-2 py-1.5 text-left font-semibold text-slate-700 border-r border-slate-200 whitespace-nowrap"
+                          style={{ width: col.width ? `${col.width}px` : 'auto' }}
+                        >
+                          {col.label}
+                          {isRequired && <span className="text-red-500 ml-0.5">*</span>}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
