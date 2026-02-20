@@ -255,7 +255,7 @@ export const FinanceView: React.FC = () => {
       if (!isEditModalOpen || !editingTransaction || editingTransaction.category !== 'Projects & Activities') {
         return;
       }
-      
+
       const projectId = editingTransaction.projectId;
       if (!projectId) {
         return;
@@ -287,7 +287,7 @@ export const FinanceView: React.FC = () => {
             splits.forEach(s => {
               if (s.projectId === projectId && s.purpose) purposes.add(s.purpose);
             });
-          } catch (e) {}
+          } catch (e) { }
         }
 
         setEditingProjectPurposesByProject(prev => ({
@@ -315,7 +315,7 @@ export const FinanceView: React.FC = () => {
       try {
         const purposes = new Set<string>(ADMINISTRATIVE_PURPOSES);
         const accounts = new Set<string>();
-        
+
         const allTx = await FinanceService.getAllTransactions();
         allTx.forEach(t => {
           if (t.category === 'Administrative') {
@@ -1468,7 +1468,7 @@ export const FinanceView: React.FC = () => {
                                     const loadPurposes = async () => {
                                       const purposes = new Set<string>();
                                       const targetProjectId = tx.projectId;
-                                      
+
                                       try {
                                         const ptTrx = await projectFinancialService.getAllProjectTrackerTransactions();
                                         ptTrx.forEach(t => {
@@ -1476,7 +1476,7 @@ export const FinanceView: React.FC = () => {
                                           if (t.projectId === targetProjectId && t.description) purposes.add(t.description);
                                         });
                                       } catch (e) { console.error('Failed to load PT purposes', e); }
-                                      
+
                                       let allTx: Transaction[] = [];
                                       try {
                                         allTx = await FinanceService.getAllTransactions();
@@ -1485,7 +1485,7 @@ export const FinanceView: React.FC = () => {
                                           if (t.projectId === targetProjectId && t.purpose) purposes.add(t.purpose);
                                         });
                                       } catch (e) { console.error('Failed to load tx purposes', e); }
-                                      
+
                                       try {
                                         const splitTx = allTx.filter(t => t.isSplit && t.splitIds);
                                         for (const t of splitTx) {
@@ -1494,10 +1494,10 @@ export const FinanceView: React.FC = () => {
                                             splits.forEach(s => {
                                               if (s.projectId === targetProjectId && s.purpose) purposes.add(s.purpose);
                                             });
-                                          } catch (e) {}
+                                          } catch (e) { }
                                         }
                                       } catch (e) { console.error('Failed to load split purposes', e); }
-                                      
+
                                       setProjectPurposes(Array.from(purposes).sort());
                                     };
                                     loadPurposes();
@@ -1774,8 +1774,8 @@ export const FinanceView: React.FC = () => {
                       value={editingTransaction.category}
                       onChange={(e) => {
                         const newCategory = e.target.value as any;
-                        setEditingTransaction(prev => prev ? { 
-                          ...prev, 
+                        setEditingTransaction(prev => prev ? {
+                          ...prev,
                           category: newCategory,
                           memberId: newCategory === 'Projects & Activities' || newCategory === 'Administrative' ? '' : prev.memberId,
                           purpose: newCategory === 'Projects & Activities' ? '' : prev.purpose
@@ -1988,13 +1988,13 @@ export const FinanceView: React.FC = () => {
             isOpen={isSplitModalOpen}
             adminProjectIds={administrativeProjectIds}
             memberOptions={members}
-            projectOptions={projects.map(p => { 
+            projectOptions={projects.map(p => {
               const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate;
-              return { 
-                id: p.id, 
+              return {
+                id: p.id,
                 name: p.name || p.id,
                 year: pDate ? new Date(pDate).getFullYear() : undefined
-              }; 
+              };
             })}
             administrativePurposes={[...ADMINISTRATIVE_PURPOSES]}
             projectYears={projectYears}
@@ -2463,7 +2463,7 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
       setLoading(true);
       await FinanceService.createBankAccount({
         name: formData.get('name') as string,
-        accountType: formData.get('type') as 'Checking' | 'Savings' | 'Credit Card' | 'Cash',
+        accountType: formData.get('type') as 'Current' | 'Savings' | 'Fixed Deposit' | 'Cash',
         accountNumber: formData.get('accountNumber') as string,
         balance: parseFloat(formData.get('balance') as string),
         currency: formData.get('currency') as string,
@@ -2485,12 +2485,12 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input name="name" label="Account Name" placeholder="e.g. Main Operating Account" required />
         <Select name="type" label="Account Type" options={[
-          { label: 'Checking', value: 'Checking' },
+          { label: 'Current', value: 'Current' },
           { label: 'Savings', value: 'Savings' },
-          { label: 'Credit Card', value: 'Credit Card' },
+          { label: 'Fixed Deposit', value: 'Fixed Deposit' },
           { label: 'Cash', value: 'Cash' },
         ]} required />
-        <Input name="accountNumber" label="Account Number (Last 4 digits)" placeholder="1234" maxLength={4} />
+        <Input name="accountNumber" label="Account Number" placeholder="1234" />
         <div className="grid grid-cols-2 gap-4">
           <Input name="balance" label="Current Balance" type="number" step="0.01" placeholder="0.00" required />
           <Select name="currency" label="Currency" options={[

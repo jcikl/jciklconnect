@@ -64,13 +64,51 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       defaultValue: 0,
       preprocessor: toNumberPreprocessor,
     },
+    {
+      key: 'category',
+      label: 'Category',
+      required: true,
+      aliases: ['Category', 'Type'],
+      validators: [(val) => ['Projects & Activities', 'Membership', 'Administrative'].includes(val) ? null : 'Invalid category'],
+      preprocessor: trimPreprocessor,
+    },
+    {
+      key: 'projectTitle',
+      label: 'Project Title',
+      required: false,
+      aliases: ['Project', 'Project Name', 'Activity'],
+      validators: [
+        (val, context) => {
+          if (!val) return null;
+          if (context?.projects) {
+            const match = context.projects.find((p: any) =>
+              (p.name?.toLowerCase() === val.toLowerCase()) ||
+              (p.title?.toLowerCase() === val.toLowerCase())
+            );
+            if (!match) return `Project "${val}" not found`;
+          }
+          return null;
+        }
+      ],
+      preprocessor: trimPreprocessor,
+    },
+    {
+      key: 'purpose',
+      label: 'Purpose',
+      required: false,
+      aliases: ['Purpose', 'Goal', 'Target'],
+      validators: [],
+      preprocessor: trimPreprocessor,
+    },
   ],
 
   tableColumns: [
-    { key: 'date', label: 'Date', width: 120 },
-    { key: 'description', label: 'Description', width: 240 },
-    { key: 'income', label: 'Income', width: 100 },
-    { key: 'expense', label: 'Expense', width: 100 },
+    { key: 'date', label: 'Date', width: 100 },
+    { key: 'description', label: 'Description', width: 180 },
+    { key: 'income', label: 'Income', width: 80 },
+    { key: 'expense', label: 'Expense', width: 80 },
+    { key: 'category', label: 'Category', width: 120 },
+    { key: 'projectTitle', label: 'Project', width: 150 },
     { key: 'valid', label: 'Status', width: 80 },
   ],
 
@@ -87,23 +125,46 @@ export const bankTransactionImportConfig: BatchImportConfig = {
     referenceNumber: 2,
     income: 3,
     expense: 4,
+    category: 5,
+    projectTitle: 6,
+    purpose: 7,
   },
 
   sampleFileName: 'Bank_Statement_Import_Template.csv',
   sampleData: [
-    ['Date', 'Description', 'Reference #', 'Income', 'Expense'],
-    ['2026-02-15', 'Membership Fees - John Doe', 'MBR-2026-001', '500', '0'],
-    ['2026-02-16', 'Venue Rental - Grand Hotel', 'EXP-2026-042', '0', '1200'],
+    ['Date', 'Description', 'Reference #', 'Income', 'Expense', 'Category', 'Project Title', 'Purpose'],
+    ['2026-02-15', 'Membership Fees - John Doe', 'MBR-2026-001', '500', '0', 'Membership', '', 'Dues 2026'],
+    ['2026-02-16', 'Venue Rental - Grand Hotel', 'EXP-2026-042', '0', '1200', 'Projects & Activities', 'Convention 2026', 'Venue Deposit'],
   ],
 
   // Import function - called for each valid row
-  importer: async (row) => {
+  importer: async (row, context) => {
+    let projectId = '';
+    const projectTitle = row.projectTitle?.trim();
+
+    if (projectTitle && context?.projects) {
+      const match = context.projects.find((p: any) =>
+        (p.name?.toLowerCase() === projectTitle.toLowerCase()) ||
+        (p.title?.toLowerCase() === projectTitle.toLowerCase())
+      );
+
+      if (match) {
+        projectId = match.id;
+      }
+    }
+
     await FinanceService.createTransaction({
       date: row.date,
       description: row.description,
       referenceNumber: row.referenceNumber,
       income: row.income || 0,
       expense: row.expense || 0,
+      category: row.category,
+      projectId: projectId || undefined,
+      purpose: row.purpose,
+      bankAccountId: context?.bankAccountId,
+      status: 'Pending',
+      type: (row.income > 0) ? 'Income' : 'Expense'
     } as any);
   },
 };

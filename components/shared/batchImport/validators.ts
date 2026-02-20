@@ -68,7 +68,7 @@ export const isValidTier = (tier: string): string | null => {
  */
 export const isValidGender = (gender: string): string | null => {
   if (!gender) return null; // Optional field
-  const validGenders = ['MALE','FEMALE','Male', 'Female','male','female','M','F','m','f'];
+  const validGenders = ['MALE', 'FEMALE', 'Male', 'Female', 'male', 'female', 'M', 'F', 'm', 'f'];
   if (!validGenders.includes(gender)) {
     return `Invalid gender: "${gender}" (must be: ${validGenders.join(', ')})`;
   }
@@ -122,7 +122,8 @@ export const createLengthValidator = (minLength: number, maxLength?: number) => 
  */
 export const validateField = (
   value: any,
-  validators?: ((value: any) => string | null)[]
+  validators?: ((value: any, context?: any) => string | null)[],
+  context?: any
 ): string[] => {
   if (!validators || validators.length === 0) {
     return [];
@@ -130,7 +131,7 @@ export const validateField = (
 
   const errors: string[] = [];
   for (const validator of validators) {
-    const error = validator(value);
+    const error = validator(value, context);
     if (error) {
       errors.push(error);
     }

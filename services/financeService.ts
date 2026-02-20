@@ -116,20 +116,6 @@ export class FinanceService {
       const cleanTransaction = removeUndefined(newTransaction);
       const docRef = await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), cleanTransaction);
 
-      // Update bank account balance if linked
-      if (transactionData.bankAccountId) {
-        const account = await this.getBankAccountById(transactionData.bankAccountId);
-        if (account) {
-          const balanceChange = transactionData.type === 'Income'
-            ? transactionData.amount
-            : -Math.abs(transactionData.amount);
-
-          await this.updateBankAccount(transactionData.bankAccountId, {
-            balance: account.balance + balanceChange,
-          });
-        }
-      }
-
       // Sync with inventory if linked
       await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
 
@@ -787,19 +773,38 @@ export class FinanceService {
     }
   }
 
-  // Get all bank accounts
+  // Get all bank accounts with dynamic balance
   static async getAllBankAccounts(): Promise<BankAccount[]> {
     if (isDevMode()) {
       return MOCK_ACCOUNTS;
     }
 
     try {
-      const snapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
-      return snapshot.docs.map(doc => ({
+      const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
+        getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
+        getDocs(collection(db, COLLECTIONS.TRANSACTIONS))
+      ]);
+
+      const accounts = accountsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
       } as BankAccount));
+
+      const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
+
+      // Calculate dynamic balance for each account
+      return accounts.map(account => {
+        const accountTransactions = transactions.filter(t => t.bankAccountId === account.id);
+        const transactionSum = accountTransactions.reduce((sum, t) => {
+          return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
+        }, 0);
+
+        return {
+          ...account,
+          balance: (account.initialBalance || 0) + transactionSum
+        };
+      });
     } catch (error) {
       console.error('Error fetching bank accounts:', error);
       throw error;
@@ -1439,6 +1444,8 @@ export class FinanceService {
 
     try {
       const allTransactions = await this.getAllTransactions();
+      const accountDoc = await getDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId));
+      const accountInitialBalance = accountDoc.exists() ? (accountDoc.data().initialBalance || 0) : 0;
       const cutoffDate = new Date(upToDate);
 
       // Filter transactions up to the reconciliation date for this account
@@ -1485,9 +1492,9 @@ export class FinanceService {
         }
       }
 
-      const totalBalance = transactionTypeFilter
+      const totalBalance = (transactionTypeFilter
         ? byType[transactionTypeFilter]
-        : Object.values(byType).reduce((sum, val) => sum + val, 0);
+        : Object.values(byType).reduce((sum, val) => sum + val, 0)) + accountInitialBalance;
 
       return { totalBalance, byType };
     } catch (error) {
@@ -1697,7 +1704,7 @@ export class FinanceService {
     }
   }
 
-  // Get bank account by ID
+  // Get bank account by ID with dynamic balance
   static async getBankAccountById(accountId: string): Promise<BankAccount | null> {
     if (isDevMode()) {
       return MOCK_ACCOUNTS.find(a => a.id === accountId) || null;
@@ -1708,11 +1715,29 @@ export class FinanceService {
       if (!accountDoc.exists()) {
         return null;
       }
-      return {
+
+      const accountData = accountDoc.data();
+      const account = {
         id: accountDoc.id,
-        ...accountDoc.data(),
-        lastReconciled: accountDoc.data().lastReconciled?.toDate?.()?.toISOString() || accountDoc.data().lastReconciled,
+        ...accountData,
+        lastReconciled: accountData.lastReconciled?.toDate?.()?.toISOString() || accountData.lastReconciled,
       } as BankAccount;
+
+      // Fetch transactions for this account to calculate balance
+      const transactionsQuery = query(
+        collection(db, COLLECTIONS.TRANSACTIONS),
+        where('bankAccountId', '==', accountId)
+      );
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      const transactionSum = transactionsSnapshot.docs.reduce((sum, doc) => {
+        const t = doc.data();
+        return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
+      }, 0);
+
+      return {
+        ...account,
+        balance: (account.initialBalance || 0) + transactionSum
+      };
     } catch (error) {
       console.error('Error fetching bank account:', error);
       throw error;

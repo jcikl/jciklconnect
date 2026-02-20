@@ -908,7 +908,9 @@ export const FinanceView: React.FC = () => {
                     accounts.map(acc => (
                       <div key={acc.id} className="p-4 rounded-lg border border-slate-100 bg-slate-50 hover:border-jci-blue transition-colors">
                         <div className="flex items-start justify-between mb-2">
-                          <p className="text-xs text-slate-500 uppercase font-medium">{acc.name}</p>
+                          <p className="text-xs text-slate-500 uppercase font-medium">
+                            {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
+                          </p>
                           {hasPermission('canEditFinance') && (
                             <Button
                               variant="ghost"
@@ -2423,10 +2425,11 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
     try {
       setLoading(true);
       await FinanceService.createBankAccount({
+        bankName: formData.get('bankName') as string,
         name: formData.get('name') as string,
-        accountType: formData.get('type') as 'Checking' | 'Savings' | 'Credit Card' | 'Cash',
+        accountType: formData.get('type') as 'Current' | 'Savings' | 'Investment' | 'Fixed Deposit' | 'Cash' | 'Other',
         accountNumber: formData.get('accountNumber') as string,
-        balance: parseFloat(formData.get('balance') as string),
+        balance: 0, // This will be dynamically calculated now
         initialBalance: parseFloat(formData.get('initialBalance') as string) || 0,
         currency: formData.get('currency') as string,
         lastReconciled: new Date().toISOString(),
@@ -2445,25 +2448,55 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add Bank Account">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input name="name" label="Account Name" placeholder="e.g. Main Operating Account" required />
-        <Select name="type" label="Account Type" options={[
-          { label: 'Checking', value: 'Checking' },
-          { label: 'Savings', value: 'Savings' },
-          { label: 'Credit Card', value: 'Credit Card' },
-          { label: 'Cash', value: 'Cash' },
-        ]} required />
-        <Input name="accountNumber" label="Account Number (Last 4 digits)" placeholder="1234" maxLength={4} />
         <div className="grid grid-cols-2 gap-4">
-          <Input name="initialBalance" label="Initial Balance" type="number" step="0.01" placeholder="0.00" required />
-          <Input name="balance" label="Current Balance" type="number" step="0.01" placeholder="0.00" required />
+          <Input name="bankName" label="Bank" placeholder="e.g. Maybank, CIMB" required />
+          <Input name="name" label="Account Name" placeholder="e.g. Main Operating Account" required />
         </div>
+
         <div className="grid grid-cols-2 gap-4">
-          <Select name="currency" label="Currency" options={[
-            { label: 'MYR', value: 'MYR' },
-            { label: 'USD', value: 'USD' },
-            { label: 'SGD', value: 'SGD' },
-          ]} required defaultValue="MYR" />
+          <Select
+            name="type"
+            label="Account Type"
+            defaultValue="Current"
+            options={[
+              { label: 'Current', value: 'Current' },
+              { label: 'Savings', value: 'Savings' },
+              { label: 'Investment', value: 'Investment' },
+              { label: 'Fixed Deposit', value: 'Fixed Deposit' },
+              { label: 'Cash', value: 'Cash' },
+              { label: 'Other', value: 'Other' },
+            ]}
+            required
+          />
+          <Input
+            name="accountNumber"
+            label="Account Number"
+            placeholder="e.g. 1234567890"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            onChange={(e) => {
+              e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            }}
+            required
+          />
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Input name="initialBalance" label="Initial Balance (Starting Balance)" type="number" step="0.01" placeholder="0.00" required />
+          <Select
+            name="currency"
+            label="Currency"
+            defaultValue="MYR"
+            options={[
+              { label: 'MYR', value: 'MYR' },
+              { label: 'USD', value: 'USD' },
+              { label: 'SGD', value: 'SGD' },
+            ]}
+            required
+          />
+        </div>
+
         <div className="pt-4 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose} type="button">Cancel</Button>
           <Button type="submit" disabled={loading}>

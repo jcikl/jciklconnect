@@ -13,7 +13,7 @@ export interface FieldDefinition {
   /** 字段别名（用于自动列头匹配） */
   aliases?: string[];
   /** 验证函数列表 */
-  validators?: ((value: any) => string | null)[];
+  validators?: ((value: any, context?: any) => string | null)[];
   /** 默认值 */
   defaultValue?: any;
   /** 预处理函数（格式化、清理等） */

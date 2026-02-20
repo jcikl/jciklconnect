@@ -14,6 +14,7 @@ interface Props {
   config: BatchImportConfig;
   onImported: () => void;
   context?: ImportContext;
+  children?: React.ReactNode;
 }
 
 export const BatchImportModal: React.FC<Props> = ({
@@ -22,6 +23,7 @@ export const BatchImportModal: React.FC<Props> = ({
   config,
   onImported,
   context,
+  children,
 }) => {
   const { showToast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -156,7 +158,7 @@ export const BatchImportModal: React.FC<Props> = ({
 
         // Validate
         if (processedValue || field.required) {
-          const fieldErrors = validateField(processedValue || '', field.validators);
+          const fieldErrors = validateField(processedValue || '', field.validators, context);
           errors.push(...fieldErrors);
         }
       }
@@ -317,6 +319,7 @@ export const BatchImportModal: React.FC<Props> = ({
       />
 
       <div className="space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+        {children}
         {/* Header */}
         <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100">
           <div className="flex items-center gap-2">

@@ -267,7 +267,7 @@ export const MOCK_ACCOUNTS: BankAccount[] = [
     lastReconciled: '2023-11-30',
     accountNumber: '1234567890',
     bankName: 'Maybank',
-    accountType: 'Checking',
+    accountType: 'Current',
   },
   {
     id: 'ba2',

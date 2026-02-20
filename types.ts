@@ -786,7 +786,7 @@ export interface BankAccount {
   lastReconciled: string;
   accountNumber?: string;
   bankName?: string;
-  accountType?: 'Checking' | 'Savings' | 'Investment' | 'Credit Card' | 'Cash' | 'Other';
+  accountType?: 'Current' | 'Savings' | 'Investment' | 'Fixed Deposit' | 'Cash' | 'Other';
 }
 
 /** 付款申请状态（Story 2.1） */
