@@ -604,7 +604,7 @@ interface ExecutionDetailModalProps {
 
 const ExecutionDetailModal: React.FC<ExecutionDetailModalProps> = ({ execution, onClose }) => {
   return (
-    <Modal isOpen={true} onClose={onClose} title={`Execution Details: ${execution.workflowName}`} size="lg">
+    <Modal isOpen={true} onClose={onClose} title={`Execution Details: ${execution.workflowName}`} size="lg" drawerOnMobile>
       <div className="space-y-6">
         {/* Summary */}
         <div className="grid grid-cols-2 gap-4">
@@ -727,6 +727,7 @@ const WorkflowDetailModal: React.FC<WorkflowDetailModalProps> = ({
       onClose={onClose}
       title={workflow.name}
       size="lg"
+      drawerOnMobile
     >
       <div className="space-y-4">
         {workflow.description && (
@@ -936,6 +937,7 @@ const CreateWorkflowModal: React.FC<CreateWorkflowModalProps> = ({ onClose, onSu
         onClose={onClose}
         title="Create New Workflow"
         size="xl"
+        drawerOnMobile
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
@@ -1212,6 +1214,7 @@ const WorkflowStepModal: React.FC<WorkflowStepModalProps> = ({ step, members, on
       onClose={onClose}
       title={`Configure Step: ${step.order}`}
       size="lg"
+      drawerOnMobile
     >
       <div className="space-y-4">
         <Select
@@ -1505,7 +1508,7 @@ const CreateRuleModal: React.FC<CreateRuleModalProps> = ({ onClose, onSuccess })
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} title="Create Automation Rule" size="lg">
+    <Modal isOpen={true} onClose={onClose} title="Create Automation Rule" size="lg" drawerOnMobile>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Rule Name"
@@ -1609,7 +1612,7 @@ const RuleConfigModal: React.FC<RuleConfigModalProps> = ({
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} title="Configure Automation Rule" size="lg">
+    <Modal isOpen={true} onClose={onClose} title="Configure Automation Rule" size="lg" drawerOnMobile>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Rule Name"
@@ -1698,7 +1701,7 @@ const GlobalSettingsModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Global Automation Settings">
+    <Modal isOpen={isOpen} onClose={onClose} title="Global Automation Settings" drawerOnMobile>
       <form onSubmit={handleSave} className="space-y-4">
         <div>
           <h4 className="font-semibold text-slate-900 mb-2">Execution limits</h4>

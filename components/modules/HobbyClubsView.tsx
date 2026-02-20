@@ -24,7 +24,7 @@ export const HobbyClubsView: React.FC = () => {
     const handleCreateClub = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
-        
+
         try {
             const newClub: Omit<HobbyClub, 'id' | 'membersCount'> = {
                 name: formData.get('name') as string,
@@ -32,7 +32,7 @@ export const HobbyClubsView: React.FC = () => {
                 lead: member?.name || '',
                 image: formData.get('image') as string || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.get('name') as string)}&background=0097D7&color=fff&size=200`,
             };
-            
+
             await createClub(newClub);
             setIsModalOpen(false);
             e.currentTarget.reset();
@@ -44,9 +44,9 @@ export const HobbyClubsView: React.FC = () => {
     const handleUpdateClub = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!selectedClub) return;
-        
+
         const formData = new FormData(e.currentTarget);
-        
+
         try {
             await updateClub(selectedClub.id, {
                 name: formData.get('name') as string,
@@ -76,16 +76,16 @@ export const HobbyClubsView: React.FC = () => {
 
     return (
         <div className="space-y-6">
-             <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900">Hobby Clubs</h2>
                     <p className="text-slate-500">Connect with members beyond formal projects.</p>
                 </div>
-                <Button onClick={() => setIsModalOpen(true)}><Plus size={16} className="mr-2"/> Start New Club</Button>
+                <Button onClick={() => setIsModalOpen(true)}><Plus size={16} className="mr-2" /> Start New Club</Button>
             </div>
 
             <Card noPadding>
-                <div className="px-6 pt-4">
+                <div className="px-4 md:px-6 pt-4">
                     <Tabs
                         tabs={['Clubs', 'Activities']}
                         activeTab={activeTab === 'clubs' ? 'Clubs' : 'Activities'}
@@ -95,130 +95,136 @@ export const HobbyClubsView: React.FC = () => {
                 <div className="p-6">
                     {activeTab === 'clubs' ? (
                         <LoadingState loading={loading} error={error} empty={clubs.length === 0} emptyMessage="No hobby clubs found">
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {clubs.map(club => (
-                        <Card key={club.id} noPadding className="hover:shadow-lg transition-shadow">
-                            <div className="h-32 bg-slate-200 relative">
-                                <img src={club.image} alt={club.name} className="w-full h-full object-cover" />
-                                <div className="absolute top-4 right-4">
-                                    <Badge variant="neutral">{club.category}</Badge>
-                                </div>
-                            </div>
-                            <div className="p-6">
-                                <div className="flex items-start justify-between mb-2">
-                                    <h3 className="text-lg font-bold text-slate-900">{club.name}</h3>
-                                    {isOwner(club) && (
-                                        <div className="flex gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedClub(club);
-                                                    setEditModalOpen(true);
-                                                }}
-                                            >
-                                                <Edit size={14} />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleDeleteClub(club.id)}
-                                            >
-                                                <Trash2 size={14} className="text-red-600" />
-                                            </Button>
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {clubs.map(club => (
+                                    <Card key={club.id} noPadding className="hover:shadow-lg transition-shadow">
+                                        <div className="h-32 bg-slate-200 relative">
+                                            <img src={club.image} alt={club.name} className="w-full h-full object-cover" />
+                                            <div className="absolute top-4 right-4">
+                                                <Badge variant="neutral">{club.category}</Badge>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
-                                
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="text-sm text-slate-500">
-                                        <span className="block text-xs uppercase tracking-wide">Members</span>
-                                        <div className="mt-1">
-                                            <AvatarGroup count={club.membersCount} />
-                                        </div>
-                                    </div>
-                                    <div className="text-right text-sm text-slate-500">
-                                         <span className="block text-xs uppercase tracking-wide">Lead</span>
-                                         <span className="font-medium text-slate-800">{club.lead}</span>
-                                    </div>
-                                </div>
+                                        <div className="p-6">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <h3 className="text-lg font-bold text-slate-900">{club.name}</h3>
+                                                {isOwner(club) && (
+                                                    <div className="flex gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setSelectedClub(club);
+                                                                setEditModalOpen(true);
+                                                            }}
+                                                        >
+                                                            <Edit size={14} />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteClub(club.id)}
+                                                        >
+                                                            <Trash2 size={14} className="text-red-600" />
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                {club.nextActivity && (
-                                    <div className="bg-blue-50 p-3 rounded-lg flex items-start gap-3 mb-4">
-                                        <Calendar size={16} className="text-jci-blue mt-0.5" />
-                                        <div>
-                                            <span className="block text-xs text-blue-600 font-bold uppercase">Next Activity</span>
-                                            <span className="text-sm font-medium text-slate-900">{club.nextActivity}</span>
-                                        </div>
-                                    </div>
-                                )}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="text-sm text-slate-500">
+                                                    <span className="block text-xs uppercase tracking-wide">Members</span>
+                                                    <div className="mt-1">
+                                                        <AvatarGroup count={club.membersCount} />
+                                                    </div>
+                                                </div>
+                                                <div className="text-right text-sm text-slate-500">
+                                                    <span className="block text-xs uppercase tracking-wide">Lead</span>
+                                                    <span className="font-medium text-slate-800">{club.lead}</span>
+                                                </div>
+                                            </div>
 
-                                <div className="flex gap-2">
-                                    {isOwner(club) ? (
-                                        <>
-                                            <Button 
-                                                variant="outline" 
-                                                className="flex-1" 
-                                                onClick={() => {
-                                                    setSelectedClub(club);
-                                                    setIsMembersModalOpen(true);
-                                                }}
-                                            >
-                                                <Users size={14} className="mr-2" />
-                                                Members
-                                            </Button>
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedClub(club);
-                                                    setIsActivityModalOpen(true);
-                                                }}
-                                            >
-                                                <Calendar size={14} />
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Button 
-                                                className="flex-1" 
-                                                onClick={() => joinClub(club.id)} 
-                                                disabled={!member}
-                                            >
-                                                Join Club
-                                            </Button>
-                                            <Button 
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedClub(club);
-                                                    setIsMembersModalOpen(true);
-                                                }}
-                                            >
-                                                <Users size={14} />
-                                            </Button>
-                                        </>
-                                    )}
-                                </div>
+                                            {club.nextActivity && (
+                                                <div className="bg-blue-50 p-3 rounded-lg flex items-start gap-3 mb-4">
+                                                    <Calendar size={16} className="text-jci-blue mt-0.5" />
+                                                    <div>
+                                                        <span className="block text-xs text-blue-600 font-bold uppercase">Next Activity</span>
+                                                        <span className="text-sm font-medium text-slate-900">{club.nextActivity}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="flex gap-2">
+                                                {isOwner(club) ? (
+                                                    <>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="flex-1"
+                                                            onClick={() => {
+                                                                setSelectedClub(club);
+                                                                setIsMembersModalOpen(true);
+                                                            }}
+                                                        >
+                                                            <Users size={14} className="mr-2" />
+                                                            Members
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setSelectedClub(club);
+                                                                setIsActivityModalOpen(true);
+                                                            }}
+                                                        >
+                                                            <Calendar size={14} />
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Button
+                                                            className="flex-1"
+                                                            onClick={() => joinClub(club.id)}
+                                                            disabled={!member}
+                                                        >
+                                                            Join Club
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setSelectedClub(club);
+                                                                setIsMembersModalOpen(true);
+                                                            }}
+                                                        >
+                                                            <Users size={14} />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </Card>
+                                ))}
                             </div>
-                        </Card>
-                    ))}
-                </div>
-            </LoadingState>
+                        </LoadingState>
                     ) : (
                         <ClubActivitiesTab clubs={clubs} />
                     )}
                 </div>
             </Card>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Start New Hobby Club">
+            <Modal
+                isOpen={isCreateModalOpen}
+                onClose={() => setCreateModalOpen(false)}
+                title="Create Hobby Club"
+                size="lg"
+                drawerOnMobile
+            >
                 <form onSubmit={handleCreateClub} className="space-y-4">
                     <Input name="name" label="Club Name" placeholder="e.g. Chess Club" required />
                     <Select name="category" label="Category" options={[
-                        {label: 'Sports', value: 'Sports'},
-                        {label: 'Social', value: 'Social'},
-                        {label: 'Professional', value: 'Professional'},
-                        {label: 'Arts', value: 'Arts'}
+                        { label: 'Sports', value: 'Sports' },
+                        { label: 'Social', value: 'Social' },
+                        { label: 'Professional', value: 'Professional' },
+                        { label: 'Arts', value: 'Arts' }
                     ]} required />
                     <Input name="image" label="Image URL" type="url" placeholder="https://..." />
                     <div className="pt-4">
@@ -228,14 +234,23 @@ export const HobbyClubsView: React.FC = () => {
             </Modal>
 
             {selectedClub && (
-                <Modal isOpen={isEditModalOpen} onClose={() => { setEditModalOpen(false); setSelectedClub(null); }} title="Edit Hobby Club">
+                <Modal
+                    isOpen={isEditModalOpen}
+                    onClose={() => {
+                        setEditModalOpen(false);
+                        setSelectedClub(null);
+                    }}
+                    title="Edit Hobby Club"
+                    size="lg"
+                    drawerOnMobile
+                >
                     <form onSubmit={handleUpdateClub} className="space-y-4">
                         <Input name="name" label="Club Name" defaultValue={selectedClub.name} required />
                         <Select name="category" label="Category" options={[
-                            {label: 'Sports', value: 'Sports'},
-                            {label: 'Social', value: 'Social'},
-                            {label: 'Professional', value: 'Professional'},
-                            {label: 'Arts', value: 'Arts'}
+                            { label: 'Sports', value: 'Sports' },
+                            { label: 'Social', value: 'Social' },
+                            { label: 'Professional', value: 'Professional' },
+                            { label: 'Arts', value: 'Arts' }
                         ]} defaultValue={selectedClub.category} required />
                         <Input name="image" label="Image URL" type="url" defaultValue={selectedClub.image} />
                         <div className="pt-4">
@@ -247,7 +262,16 @@ export const HobbyClubsView: React.FC = () => {
 
             {/* Activity Modal */}
             {selectedClub && (
-                <Modal isOpen={isActivityModalOpen} onClose={() => { setIsActivityModalOpen(false); setSelectedClub(null); }} title={`Schedule Activity - ${selectedClub.name}`}>
+                <Modal
+                    isOpen={isActivityModalOpen}
+                    onClose={() => {
+                        setIsActivityModalOpen(false);
+                        setSelectedClub(null);
+                    }}
+                    title="Schedule Activity"
+                    size="lg"
+                    drawerOnMobile
+                >
                     <form onSubmit={async (e) => {
                         e.preventDefault();
                         if (!selectedClub) return;
@@ -301,7 +325,7 @@ interface ClubActivitiesTabProps {
 
 const ClubActivitiesTab: React.FC<ClubActivitiesTabProps> = ({ clubs }) => {
     const { showToast } = useToast();
-    
+
     return (
         <div className="space-y-4">
             <h3 className="text-lg font-bold text-slate-900">Club Activities</h3>
@@ -368,7 +392,7 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
     const isOwner = currentMember && club.lead === currentMember.name;
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Members - ${club.name}`} size="lg">
+        <Modal isOpen={isOpen} onClose={onClose} title={`Members - ${club.name}`} size="lg" drawerOnMobile>
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <p className="text-sm text-slate-600">Total Members: {club.membersCount || 0}</p>
@@ -376,7 +400,7 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
                         <Badge variant="info">Club Leader</Badge>
                     )}
                 </div>
-                
+
                 <LoadingState loading={loadingMembers} error={null} empty={clubMembers.length === 0} emptyMessage="No members found">
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                         {clubMembers.map(member => (

@@ -215,6 +215,21 @@ export const StatCard: React.FC<{
   </Card>
 );
 
+export const StatCardsContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`
+    flex overflow-x-auto pb-4 gap-4 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:pb-0
+    snap-x snap-mandatory scrollbar-hide
+    -mx-4 px-4 md:mx-0 md:px-0
+    ${className}
+  `}>
+    {React.Children.map(children, (child) => (
+      <div className="flex-shrink-0 w-[80%] md:w-auto snap-start">
+        {child}
+      </div>
+    ))}
+  </div>
+);
+
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '' }) => {
   return (
     <div className={`border-b border-slate-200 ${className}`}>
@@ -271,6 +286,8 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   /** When false, modal body does not scroll; inner content handles scroll (avoids double scrollbar) */
   scrollInBody?: boolean;
+  /** Whether to show as a bottom drawer on mobile */
+  drawerOnMobile?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md', scrollInBody = true }) => {
@@ -306,7 +323,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in md:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -314,18 +331,21 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       aria-modal="true"
       aria-labelledby="modal-title"
     >
-      <div className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} overflow-hidden flex flex-col max-h-[90vh] animate-scale-in`}>
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+      <div className={`
+        bg-white shadow-2xl w-full ${sizeClasses[size]} overflow-hidden flex flex-col max-h-screen md:max-h-[90vh] md:rounded-xl animate-scale-in
+        ${drawerOnMobile ? 'fixed bottom-0 rounded-t-2xl md:relative md:rounded-xl' : 'rounded-xl max-w-[95vw] md:max-w-full'}
+      `}>
+        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
           <h3 id="modal-title" className="font-bold text-slate-800">{title}</h3>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-200 rounded transition-all duration-200 button-press"
+            className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded transition-all duration-200 button-press"
             aria-label="Close"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className={`p-6 flex-1 min-h-0 flex flex-col ${scrollInBody ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`p-4 md:p-6 flex-1 min-h-0 flex flex-col ${scrollInBody ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           {children}
         </div>
       </div>

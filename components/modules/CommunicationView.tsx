@@ -43,7 +43,7 @@ export const CommunicationView: React.FC = () => {
     const [analyzingPosts, setAnalyzingPosts] = useState<Set<string>>(new Set());
     const [selectedSentimentDetail, setSelectedSentimentDetail] = useState<string | null>(null);
     const [sentimentSummary, setSentimentSummary] = useState<any>(null);
-    
+
     // Auto-analyze sentiment for all posts when they load
     useEffect(() => {
         const analyzeAllPosts = async () => {
@@ -79,7 +79,7 @@ export const CommunicationView: React.FC = () => {
             const negativeCount = analyses.filter((a: any) => a.overallSentiment === 'negative').length;
             const neutralCount = analyses.filter((a: any) => a.overallSentiment === 'neutral').length;
             const avgScore = analyses.reduce((sum: number, a: any) => sum + (a.sentimentScore || 0), 0) / analyses.length;
-            
+
             setSentimentSummary({
                 total: analyses.length,
                 positive: positiveCount,
@@ -91,10 +91,10 @@ export const CommunicationView: React.FC = () => {
             });
         }
     }, [sentimentAnalysis]);
-    
+
     const analyzePostSentiment = async (postId: string, content: string) => {
         if (analyzingPosts.has(postId)) return;
-        
+
         setAnalyzingPosts(prev => new Set(prev).add(postId));
         try {
             const analysis = await AIPredictionService.analyzeSentiment(content, 'post', postId);
@@ -135,7 +135,7 @@ export const CommunicationView: React.FC = () => {
                             // Handle new post
                         }
                     }}>
-                        <Send size={16} className="mr-2"/> 
+                        <Send size={16} className="mr-2" />
                         {activeTab === 'Announcements' ? 'New Announcement' : 'New Post'}
                     </Button>
                 </div>
@@ -144,7 +144,7 @@ export const CommunicationView: React.FC = () => {
             <div className="grid lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     <Card noPadding>
-                        <div className="px-6">
+                        <div className="px-4 md:px-6">
                             <Tabs tabs={['Newsfeed', 'Announcements', 'Mentions', 'Messages']} activeTab={activeTab} onTabChange={setActiveTab} />
                         </div>
                         <div className="divide-y divide-slate-100">
@@ -224,83 +224,83 @@ export const CommunicationView: React.FC = () => {
                             ) : (
                                 <LoadingState loading={loading} error={error} empty={posts.length === 0} emptyMessage="No posts yet. Be the first to share!">
                                     {posts.map(post => (
-                                    <div key={post.id} className="p-6 hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                {post.author.avatar ? (
-                                                    <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" />
-                                                ) : (
-                                                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">BOT</div>
-                                                )}
-                                                <div>
-                                                    <h4 className="font-bold text-slate-900 text-sm">{post.author.name}</h4>
-                                                    <p className="text-xs text-slate-500">{post.author.role} • {formatRelativeTime(post.timestamp)}</p>
+                                        <div key={post.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    {post.author.avatar ? (
+                                                        <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">BOT</div>
+                                                    )}
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-900 text-sm">{post.author.name}</h4>
+                                                        <p className="text-xs text-slate-500">{post.author.role} • {formatRelativeTime(post.timestamp)}</p>
+                                                    </div>
                                                 </div>
+                                                <button className="text-slate-400 hover:text-slate-600"><MoreHorizontal size={16} /></button>
                                             </div>
-                                            <button className="text-slate-400 hover:text-slate-600"><MoreHorizontal size={16} /></button>
-                                        </div>
-                                        
-                                        <div className="pl-0 sm:pl-13 sm:ml-13 mb-4">
-                                            <p className="text-slate-700 text-sm leading-relaxed">{post.content}</p>
-                                            {post.type === 'Announcement' && (
-                                                <div className="mt-3">
-                                                    <Badge variant="info">Announcement</Badge>
-                                                </div>
-                                            )}
-                                            <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                                {analyzingPosts.has(post.id) ? (
-                                                    <Badge variant="neutral" className="text-xs">
-                                                        <span className="animate-pulse">Analyzing...</span>
-                                                    </Badge>
-                                                ) : sentimentAnalysis[post.id] ? (
-                                                    <>
-                                                        <button
-                                                            onClick={() => setSelectedSentimentDetail(post.id)}
-                                                            className="cursor-pointer"
-                                                        >
-                                                            <Badge 
-                                                                variant={
-                                                                    sentimentAnalysis[post.id].overallSentiment === 'positive' ? 'success' :
-                                                                    sentimentAnalysis[post.id].overallSentiment === 'negative' ? 'error' : 'neutral'
-                                                                }
-                                                                className="text-xs hover:opacity-80 transition-opacity"
-                                                            >
-                                                                {sentimentAnalysis[post.id].overallSentiment === 'positive' ? '😊 Positive' :
-                                                                 sentimentAnalysis[post.id].overallSentiment === 'negative' ? '😟 Negative' : '😐 Neutral'}
-                                                                {sentimentAnalysis[post.id].sentimentScore !== undefined && (
-                                                                    <span className="ml-1">
-                                                                        ({sentimentAnalysis[post.id].sentimentScore > 0 ? '+' : ''}{Math.round(sentimentAnalysis[post.id].sentimentScore)})
-                                                                    </span>
-                                                                )}
-                                                            </Badge>
-                                                        </button>
-                                                        {sentimentAnalysis[post.id].keyTopics && sentimentAnalysis[post.id].keyTopics.length > 0 && (
-                                                            <div className="flex gap-1 flex-wrap">
-                                                                {sentimentAnalysis[post.id].keyTopics.slice(0, 3).map((topic: string, idx: number) => (
-                                                                    <Badge key={idx} variant="neutral" className="text-xs">
-                                                                        #{topic}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : null}
-                                            </div>
-                                        </div>
 
-                                        <div className="flex items-center gap-6 text-slate-500 text-sm">
-                                            <button
-                                                className="flex items-center gap-2 hover:text-jci-blue"
-                                                onClick={() => likePost(post.id)}
-                                                disabled={!member}
-                                            >
-                                                <ThumbsUp size={16} /> {post.likes || 0} Likes
-                                            </button>
-                                            <button className="flex items-center gap-2 hover:text-jci-blue"><MessageSquare size={16} /> {post.comments || 0} Comments</button>
+                                            <div className="pl-0 sm:pl-13 sm:ml-13 mb-4">
+                                                <p className="text-slate-700 text-sm leading-relaxed">{post.content}</p>
+                                                {post.type === 'Announcement' && (
+                                                    <div className="mt-3">
+                                                        <Badge variant="info">Announcement</Badge>
+                                                    </div>
+                                                )}
+                                                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                                    {analyzingPosts.has(post.id) ? (
+                                                        <Badge variant="neutral" className="text-xs">
+                                                            <span className="animate-pulse">Analyzing...</span>
+                                                        </Badge>
+                                                    ) : sentimentAnalysis[post.id] ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => setSelectedSentimentDetail(post.id)}
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <Badge
+                                                                    variant={
+                                                                        sentimentAnalysis[post.id].overallSentiment === 'positive' ? 'success' :
+                                                                            sentimentAnalysis[post.id].overallSentiment === 'negative' ? 'error' : 'neutral'
+                                                                    }
+                                                                    className="text-xs hover:opacity-80 transition-opacity"
+                                                                >
+                                                                    {sentimentAnalysis[post.id].overallSentiment === 'positive' ? '😊 Positive' :
+                                                                        sentimentAnalysis[post.id].overallSentiment === 'negative' ? '😟 Negative' : '😐 Neutral'}
+                                                                    {sentimentAnalysis[post.id].sentimentScore !== undefined && (
+                                                                        <span className="ml-1">
+                                                                            ({sentimentAnalysis[post.id].sentimentScore > 0 ? '+' : ''}{Math.round(sentimentAnalysis[post.id].sentimentScore)})
+                                                                        </span>
+                                                                    )}
+                                                                </Badge>
+                                                            </button>
+                                                            {sentimentAnalysis[post.id].keyTopics && sentimentAnalysis[post.id].keyTopics.length > 0 && (
+                                                                <div className="flex gap-1 flex-wrap">
+                                                                    {sentimentAnalysis[post.id].keyTopics.slice(0, 3).map((topic: string, idx: number) => (
+                                                                        <Badge key={idx} variant="neutral" className="text-xs">
+                                                                            #{topic}
+                                                                        </Badge>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-6 text-slate-500 text-sm">
+                                                <button
+                                                    className="flex items-center gap-2 hover:text-jci-blue"
+                                                    onClick={() => likePost(post.id)}
+                                                    disabled={!member}
+                                                >
+                                                    <ThumbsUp size={16} /> {post.likes || 0} Likes
+                                                </button>
+                                                <button className="flex items-center gap-2 hover:text-jci-blue"><MessageSquare size={16} /> {post.comments || 0} Comments</button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </LoadingState>
+                                    ))}
+                                </LoadingState>
                             )}
                         </div>
                     </Card>
@@ -323,7 +323,7 @@ export const CommunicationView: React.FC = () => {
                                         <div className="text-xs text-slate-600">Analyzed</div>
                                     </div>
                                 </div>
-                                
+
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
@@ -335,7 +335,7 @@ export const CommunicationView: React.FC = () => {
                                         </span>
                                     </div>
                                     <ProgressBar progress={sentimentSummary.positivePercentage} color="bg-green-500" />
-                                    
+
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
                                             <span className="text-slate-700">Neutral</span>
@@ -345,7 +345,7 @@ export const CommunicationView: React.FC = () => {
                                         </span>
                                     </div>
                                     <ProgressBar progress={(sentimentSummary.neutral / sentimentSummary.total) * 100} color="bg-slate-400" />
-                                    
+
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
                                             <TrendingDown className="text-red-600" size={16} />
@@ -367,9 +367,8 @@ export const CommunicationView: React.FC = () => {
                                 {notifications.map(notif => (
                                     <div
                                         key={notif.id}
-                                        className={`p-3 rounded-lg border text-sm cursor-pointer transition-colors ${
-                                            notif.read ? 'bg-white border-slate-100' : 'bg-blue-50 border-blue-100'
-                                        }`}
+                                        className={`p-3 rounded-lg border text-sm cursor-pointer transition-colors ${notif.read ? 'bg-white border-slate-100' : 'bg-blue-50 border-blue-100'
+                                            }`}
                                         onClick={() => !notif.read && markNotificationAsRead(notif.id)}
                                     >
                                         <div className="flex justify-between items-start mb-1">
@@ -383,12 +382,12 @@ export const CommunicationView: React.FC = () => {
                         </LoadingState>
                     </Card>
 
-                     <Card title="Quick Links" className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
+                    <Card title="Quick Links" className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
                         <div className="space-y-2">
                             <button className="w-full text-left p-2 hover:bg-white/10 rounded flex items-center gap-2 text-sm">
                                 <FileText size={16} className="text-slate-400" /> Policy Documents
                             </button>
-                             <button className="w-full text-left p-2 hover:bg-white/10 rounded flex items-center gap-2 text-sm">
+                            <button className="w-full text-left p-2 hover:bg-white/10 rounded flex items-center gap-2 text-sm">
                                 <FileText size={16} className="text-slate-400" /> Branding Guidelines
                             </button>
                         </div>
@@ -403,6 +402,7 @@ export const CommunicationView: React.FC = () => {
                     onClose={() => setSelectedSentimentDetail(null)}
                     title="Sentiment Analysis Details"
                     size="lg"
+                    drawerOnMobile
                 >
                     <div className="space-y-6">
                         {(() => {
@@ -413,14 +413,14 @@ export const CommunicationView: React.FC = () => {
                                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="font-semibold text-slate-900">Overall Sentiment</h4>
-                                            <Badge 
+                                            <Badge
                                                 variant={
                                                     analysis.overallSentiment === 'positive' ? 'success' :
-                                                    analysis.overallSentiment === 'negative' ? 'error' : 'neutral'
+                                                        analysis.overallSentiment === 'negative' ? 'error' : 'neutral'
                                                 }
                                             >
                                                 {analysis.overallSentiment === 'positive' ? '😊 Positive' :
-                                                 analysis.overallSentiment === 'negative' ? '😟 Negative' : '😐 Neutral'}
+                                                    analysis.overallSentiment === 'negative' ? '😟 Negative' : '😐 Neutral'}
                                             </Badge>
                                         </div>
                                         <div className="text-3xl font-bold text-slate-900">
@@ -442,8 +442,8 @@ export const CommunicationView: React.FC = () => {
                                                         </div>
                                                         <ProgressBar progress={score} color={
                                                             emotion === 'joy' || emotion === 'trust' ? 'bg-green-500' :
-                                                            emotion === 'fear' || emotion === 'anger' || emotion === 'sadness' ? 'bg-red-500' :
-                                                            'bg-blue-500'
+                                                                emotion === 'fear' || emotion === 'anger' || emotion === 'sadness' ? 'bg-red-500' :
+                                                                    'bg-blue-500'
                                                         } />
                                                     </div>
                                                 ))}
@@ -510,7 +510,7 @@ export const CommunicationView: React.FC = () => {
                 members={members}
                 onSave={async (data) => {
                     if (!member) return;
-                    
+
                     try {
                         const postData: Omit<NewsPost, 'id' | 'timestamp'> = {
                             author: { name: member.name, avatar: member.avatar, role: member.role },
@@ -540,7 +540,7 @@ export const CommunicationView: React.FC = () => {
                                 },
                                 member.id
                             );
-                            
+
                             if (result.emailsSent > 0 || result.notificationsSent > 0) {
                                 showToast(
                                     `Announcement created: ${result.emailsSent} emails sent, ${result.notificationsSent} notifications sent`,
@@ -550,7 +550,7 @@ export const CommunicationView: React.FC = () => {
                                 showToast('Announcement created', 'success');
                             }
                         }
-                        
+
                         setIsAnnouncementModalOpen(false);
                         setSelectedAnnouncement(null);
                     } catch (err) {
@@ -693,6 +693,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, 
             onClose={onClose}
             title={announcement ? 'Edit Announcement' : 'Create Announcement'}
             size="lg"
+            drawerOnMobile
         >
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Input

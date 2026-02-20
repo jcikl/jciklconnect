@@ -62,9 +62,9 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) =>
             const recs: Recommendation[] = personalizedRecs
                 .filter(rec => rec.type !== 'business_opportunity') // Filter out unsupported types
                 .map(rec => ({
-                    type: rec.type === 'hobby_club' ? 'club' : rec.type === 'mentorship' ? 'mentor' : 
-                          rec.type === 'project' ? 'project' : rec.type === 'event' ? 'event' :
-                          rec.type === 'training' ? 'training' : rec.type === 'role' ? 'role' : 'club',
+                    type: rec.type === 'hobby_club' ? 'club' : rec.type === 'mentorship' ? 'mentor' :
+                        rec.type === 'project' ? 'project' : rec.type === 'event' ? 'event' :
+                            rec.type === 'training' ? 'training' : rec.type === 'role' ? 'role' : 'club',
                     id: rec.itemId,
                     title: rec.itemName,
                     description: rec.reasons.join('. '),
@@ -154,13 +154,13 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) =>
             </div>
 
             <Card noPadding>
-                <div className="px-6 pt-4">
+                <div className="px-4 md:px-6 pt-4">
                     <Tabs
                         tabs={['Churn Prediction', 'Personalized Recommendations', 'Event & Project Predictions']}
                         activeTab={
                             activeTab === 'churn' ? 'Churn Prediction' :
-                            activeTab === 'recommendations' ? 'Personalized Recommendations' :
-                            'Event & Project Predictions'
+                                activeTab === 'recommendations' ? 'Personalized Recommendations' :
+                                    'Event & Project Predictions'
                         }
                         onTabChange={(tab) => {
                             if (tab === 'Churn Prediction') setActiveTab('churn');
@@ -202,6 +202,7 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) =>
                 <MemberChurnDetailModal
                     memberId={selectedMemberId}
                     onClose={() => setSelectedMemberId(null)}
+                    drawerOnMobile
                 />
             )}
         </div>
@@ -222,7 +223,7 @@ const ChurnPredictionView: React.FC<{
         <LoadingState loading={loading} error={null} empty={churnData.length === 0} emptyMessage="No members at risk identified">
             <div className="space-y-6">
                 {/* Risk Summary */}
-                <div className="grid grid-cols-3 gap-4">
+                <StatCardsContainer>
                     <Card>
                         <div className="text-center">
                             <div className="text-2xl font-bold text-red-600">{highRisk.length}</div>
@@ -241,7 +242,7 @@ const ChurnPredictionView: React.FC<{
                             <div className="text-sm text-slate-500">Low Risk</div>
                         </div>
                     </Card>
-                </div>
+                </StatCardsContainer>
 
                 {/* Members at Risk */}
                 <div>
@@ -363,8 +364,8 @@ const RecommendationsView: React.FC<{
                                             <p className="text-xs text-blue-600 mb-3">{rec.reason}</p>
                                             <div className="flex items-center justify-between">
                                                 <Badge variant="info">Score: {rec.score}</Badge>
-                                                <Button 
-                                                    size="sm" 
+                                                <Button
+                                                    size="sm"
                                                     variant="outline"
                                                     onClick={() => {
                                                         if (onNavigate) {
@@ -424,50 +425,50 @@ const PredictionsView: React.FC<{
                             {eventPredictions.map((pred, index) => {
                                 const relatedEvent = events.find(e => e.type === pred.eventType);
                                 return (
-                                <Card key={index}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h4 className="font-bold text-slate-900">
-                                                {relatedEvent ? relatedEvent.title : pred.eventType}
-                                            </h4>
-                                            <p className="text-sm text-slate-500">
-                                                Predicted Attendance: <strong>{pred.predictedAttendance}</strong> members
-                                            </p>
-                                            {pred.optimalDate && (
-                                                <p className="text-xs text-blue-600 mt-1">
-                                                    Optimal Date: {formatDate(new Date(pred.optimalDate))}
+                                    <Card key={index}>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 className="font-bold text-slate-900">
+                                                    {relatedEvent ? relatedEvent.title : pred.eventType}
+                                                </h4>
+                                                <p className="text-sm text-slate-500">
+                                                    Predicted Attendance: <strong>{pred.predictedAttendance}</strong> members
                                                 </p>
-                                            )}
+                                                {pred.optimalDate && (
+                                                    <p className="text-xs text-blue-600 mt-1">
+                                                        Optimal Date: {formatDate(new Date(pred.optimalDate))}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-sm text-slate-500">Confidence</div>
+                                                <div className="text-lg font-bold text-slate-900">{pred.confidence}%</div>
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-sm text-slate-500">Confidence</div>
-                                            <div className="text-lg font-bold text-slate-900">{pred.confidence}%</div>
+                                        <div className="space-y-2 mb-4">
+                                            <div className="flex justify-between text-xs text-slate-600">
+                                                <span>Historical Average: {pred.factors.historicalAverage}</span>
+                                                <span>Member Interest: {pred.factors.memberInterest}</span>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-slate-600">
+                                                <span>Time Factor: {pred.factors.timeOfYear.toFixed(1)}x</span>
+                                                <span>Competing Events: {pred.factors.competingEvents}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="space-y-2 mb-4">
-                                        <div className="flex justify-between text-xs text-slate-600">
-                                            <span>Historical Average: {pred.factors.historicalAverage}</span>
-                                            <span>Member Interest: {pred.factors.memberInterest}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-slate-600">
-                                            <span>Time Factor: {pred.factors.timeOfYear.toFixed(1)}x</span>
-                                            <span>Competing Events: {pred.factors.competingEvents}</span>
-                                        </div>
-                                    </div>
-                                    {pred.recommendations.length > 0 && (
-                                        <div className="pt-4 border-t">
-                                            <div className="text-xs font-medium text-slate-700 mb-2">Recommendations:</div>
-                                            <ul className="space-y-1">
-                                                {pred.recommendations.map((rec, idx) => (
-                                                    <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
-                                                        <Lightbulb size={14} className="text-yellow-500 mt-0.5 flex-shrink-0" />
-                                                        {rec}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </Card>
+                                        {pred.recommendations.length > 0 && (
+                                            <div className="pt-4 border-t">
+                                                <div className="text-xs font-medium text-slate-700 mb-2">Recommendations:</div>
+                                                <ul className="space-y-1">
+                                                    {pred.recommendations.map((rec, idx) => (
+                                                        <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
+                                                            <Lightbulb size={14} className="text-yellow-500 mt-0.5 flex-shrink-0" />
+                                                            {rec}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </Card>
                                 );
                             })}
                         </div>
@@ -482,73 +483,72 @@ const PredictionsView: React.FC<{
                             {projectPredictions.map((pred) => {
                                 const relatedProject = projects.find(p => p.id === pred.projectId);
                                 return (
-                                <Card key={pred.projectId}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h4 className="font-bold text-slate-900">
-                                                {relatedProject ? relatedProject.name : `Project ${pred.projectId}`}
-                                            </h4>
-                                            <p className="text-sm text-slate-500">
-                                                Success Probability: <strong>{pred.successProbability}%</strong>
-                                            </p>
-                                            {pred.predictedCompletionDate && (
-                                                <p className="text-xs text-blue-600 mt-1">
-                                                    Predicted Completion: {formatDate(new Date(pred.predictedCompletionDate))}
+                                    <Card key={pred.projectId}>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 className="font-bold text-slate-900">
+                                                    {relatedProject ? relatedProject.name : `Project ${pred.projectId}`}
+                                                </h4>
+                                                <p className="text-sm text-slate-500">
+                                                    Success Probability: <strong>{pred.successProbability}%</strong>
                                                 </p>
-                                            )}
-                                        </div>
-                                        <Badge variant={pred.riskLevel === 'Low' ? 'success' : pred.riskLevel === 'Medium' ? 'warning' : 'error'}>
-                                            {pred.riskLevel} Risk
-                                        </Badge>
-                                    </div>
-                                    <div className="grid grid-cols-5 gap-2 mb-4">
-                                        {Object.entries(pred.factors).map(([key, value]) => (
-                                            <div key={key} className="text-center">
-                                                <div className="text-xs text-slate-500 mb-1 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                                                <ProgressBar progress={value} color="bg-jci-blue" />
-                                                <div className="text-xs font-medium text-slate-700 mt-1">{value}%</div>
+                                                {pred.predictedCompletionDate && (
+                                                    <p className="text-xs text-blue-600 mt-1">
+                                                        Predicted Completion: {formatDate(new Date(pred.predictedCompletionDate))}
+                                                    </p>
+                                                )}
                                             </div>
-                                        ))}
-                                    </div>
-                                    {pred.risks.length > 0 && (
-                                        <div className="pt-4 border-t mb-4">
-                                            <div className="text-xs font-medium text-slate-700 mb-2">Identified Risks:</div>
-                                            <ul className="space-y-2">
-                                                {pred.risks.map((risk, idx) => (
-                                                    <li key={idx} className="text-xs">
-                                                        <div className="flex items-start gap-2">
-                                                            <AlertTriangle
-                                                                size={14}
-                                                                className={`mt-0.5 flex-shrink-0 ${
-                                                                    risk.severity === 'High' ? 'text-red-500' :
-                                                                    risk.severity === 'Medium' ? 'text-yellow-500' :
-                                                                    'text-blue-500'
-                                                                }`}
-                                                            />
-                                                            <div>
-                                                                <div className="font-medium text-slate-700">{risk.description}</div>
-                                                                <div className="text-slate-500 mt-1">Mitigation: {risk.mitigation}</div>
+                                            <Badge variant={pred.riskLevel === 'Low' ? 'success' : pred.riskLevel === 'Medium' ? 'warning' : 'error'}>
+                                                {pred.riskLevel} Risk
+                                            </Badge>
+                                        </div>
+                                        <div className="grid grid-cols-5 gap-2 mb-4">
+                                            {Object.entries(pred.factors).map(([key, value]) => (
+                                                <div key={key} className="text-center">
+                                                    <div className="text-xs text-slate-500 mb-1 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                                                    <ProgressBar progress={value} color="bg-jci-blue" />
+                                                    <div className="text-xs font-medium text-slate-700 mt-1">{value}%</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {pred.risks.length > 0 && (
+                                            <div className="pt-4 border-t mb-4">
+                                                <div className="text-xs font-medium text-slate-700 mb-2">Identified Risks:</div>
+                                                <ul className="space-y-2">
+                                                    {pred.risks.map((risk, idx) => (
+                                                        <li key={idx} className="text-xs">
+                                                            <div className="flex items-start gap-2">
+                                                                <AlertTriangle
+                                                                    size={14}
+                                                                    className={`mt-0.5 flex-shrink-0 ${risk.severity === 'High' ? 'text-red-500' :
+                                                                        risk.severity === 'Medium' ? 'text-yellow-500' :
+                                                                            'text-blue-500'
+                                                                        }`}
+                                                                />
+                                                                <div>
+                                                                    <div className="font-medium text-slate-700">{risk.description}</div>
+                                                                    <div className="text-slate-500 mt-1">Mitigation: {risk.mitigation}</div>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {pred.recommendations.length > 0 && (
-                                        <div className="pt-4 border-t">
-                                            <div className="text-xs font-medium text-slate-700 mb-2">Recommendations:</div>
-                                            <ul className="space-y-1">
-                                                {pred.recommendations.map((rec, idx) => (
-                                                    <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
-                                                        <Lightbulb size={14} className="text-yellow-500 mt-0.5 flex-shrink-0" />
-                                                        {rec}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </Card>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {pred.recommendations.length > 0 && (
+                                            <div className="pt-4 border-t">
+                                                <div className="text-xs font-medium text-slate-700 mb-2">Recommendations:</div>
+                                                <ul className="space-y-1">
+                                                    {pred.recommendations.map((rec, idx) => (
+                                                        <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
+                                                            <Lightbulb size={14} className="text-yellow-500 mt-0.5 flex-shrink-0" />
+                                                            {rec}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </Card>
                                 );
                             })}
                         </div>
@@ -559,11 +559,11 @@ const PredictionsView: React.FC<{
     );
 };
 
-// Member Churn Detail Modal Component
 const MemberChurnDetailModal: React.FC<{
     memberId: string;
     onClose: () => void;
-}> = ({ memberId, onClose }) => {
+    drawerOnMobile?: boolean;
+}> = ({ memberId, onClose, drawerOnMobile }) => {
     const [risk, setRisk] = useState<ChurnRiskFactors | null>(null);
     const [loading, setLoading] = useState(true);
     const { members } = useMembers();
@@ -590,7 +590,7 @@ const MemberChurnDetailModal: React.FC<{
     if (!member) return null;
 
     return (
-        <Modal isOpen={true} onClose={onClose} title={`Churn Risk Analysis: ${member.name}`} size="lg">
+        <Modal isOpen={true} onClose={onClose} title={`Churn Risk Analysis: ${member.name}`} size="lg" drawerOnMobile={drawerOnMobile}>
             {loading ? (
                 <div className="text-center py-10">Loading risk analysis...</div>
             ) : risk ? (

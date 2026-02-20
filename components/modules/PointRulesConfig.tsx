@@ -115,11 +115,11 @@ export const PointRulesConfig: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900">Point Rules Configuration</h2>
           <p className="text-slate-500">Configure how points are awarded for different activities.</p>
         </div>
-        <Button onClick={() => { 
-          setEditingRule(null); 
-          setConditions({}); 
+        <Button onClick={() => {
+          setEditingRule(null);
+          setConditions({});
           setSelectedCategory('');
-          setIsModalOpen(true); 
+          setIsModalOpen(true);
         }}>
           <Plus size={16} className="mr-2" /> Create Rule
         </Button>
@@ -179,6 +179,7 @@ export const PointRulesConfig: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingRule(null); setConditions({}); }}
         title={editingRule ? 'Edit Point Rule' : 'Create Point Rule'}
+        drawerOnMobile
       >
         <form onSubmit={handleSaveRule} className="space-y-4">
           <Select
@@ -282,10 +283,10 @@ export const PointRulesConfig: React.FC = () => {
             <Button
               variant="ghost"
               type="button"
-              onClick={() => { 
-                setIsModalOpen(false); 
-                setEditingRule(null); 
-                setConditions({}); 
+              onClick={() => {
+                setIsModalOpen(false);
+                setEditingRule(null);
+                setConditions({});
                 setSelectedCategory('');
               }}
             >

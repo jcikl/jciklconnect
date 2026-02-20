@@ -17,12 +17,12 @@ export const TemplatesView: React.FC = () => {
   const [selectedActivityPlanTemplate, setSelectedActivityPlanTemplate] = useState<ActivityPlanTemplate | null>(null);
   const [selectedBudgetTemplate, setSelectedBudgetTemplate] = useState<EventBudgetTemplate | null>(null);
   const [activeTab, setActiveTab] = useState<'events' | 'activityPlans' | 'budgets'>('events');
-  const { 
-    eventTemplates, 
-    activityPlanTemplates, 
+  const {
+    eventTemplates,
+    activityPlanTemplates,
     eventBudgetTemplates,
-    loading, 
-    error, 
+    loading,
+    error,
     createEventTemplate,
     updateEventTemplate,
     deleteEventTemplate,
@@ -104,7 +104,7 @@ export const TemplatesView: React.FC = () => {
     const formData = new FormData(e.currentTarget);
     const categoriesJson = formData.get('budgetCategories') as string;
     let budgetCategories: Array<{ category: string; estimatedAmount: number; description?: string }> = [];
-    
+
     try {
       budgetCategories = JSON.parse(categoriesJson || '[]');
     } catch {
@@ -163,13 +163,13 @@ export const TemplatesView: React.FC = () => {
       </div>
 
       <Card noPadding>
-        <div className="px-6 pt-4">
+        <div className="px-4 md:px-6 pt-4">
           <Tabs
             tabs={['Event Templates', 'Activity Plan Templates', 'Budget Templates']}
             activeTab={
               activeTab === 'events' ? 'Event Templates' :
-              activeTab === 'activityPlans' ? 'Activity Plan Templates' :
-              'Budget Templates'
+                activeTab === 'activityPlans' ? 'Activity Plan Templates' :
+                  'Budget Templates'
             }
             onTabChange={(tab) => {
               if (tab === 'Event Templates') setActiveTab('events');
@@ -395,13 +395,13 @@ export const TemplatesView: React.FC = () => {
 
       {/* Event Template Modal */}
       <Modal
-        isOpen={isEventModalOpen}
         onClose={() => {
           setIsEventModalOpen(false);
           setSelectedEventTemplate(null);
         }}
         title={selectedEventTemplate ? 'Edit Event Template' : 'Create Event Template'}
         size="lg"
+        drawerOnMobile
       >
         <form onSubmit={handleEventTemplateSubmit} className="space-y-4">
           <Input
@@ -496,13 +496,13 @@ export const TemplatesView: React.FC = () => {
 
       {/* Activity Plan Template Modal */}
       <Modal
-        isOpen={isActivityPlanModalOpen}
         onClose={() => {
           setIsActivityPlanModalOpen(false);
           setSelectedActivityPlanTemplate(null);
         }}
         title={selectedActivityPlanTemplate ? 'Edit Activity Plan Template' : 'Create Activity Plan Template'}
         size="lg"
+        drawerOnMobile
       >
         <form onSubmit={handleActivityPlanTemplateSubmit} className="space-y-4">
           <Input
@@ -583,8 +583,8 @@ export const TemplatesView: React.FC = () => {
           setIsBudgetModalOpen(false);
           setSelectedBudgetTemplate(null);
         }}
-        template={selectedBudgetTemplate}
-        onSubmit={handleBudgetTemplateSubmit}
+        onSubmit={handleEventTemplateSubmit}
+        drawerOnMobile
       />
     </div>
   );
@@ -592,13 +592,13 @@ export const TemplatesView: React.FC = () => {
 
 // Budget Template Modal Component
 interface BudgetTemplateModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen: boolean; // Added missing prop
   template: EventBudgetTemplate | null;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  drawerOnMobile?: boolean;
 }
 
-const BudgetTemplateModal: React.FC<BudgetTemplateModalProps> = ({ isOpen, onClose, template, onSubmit }) => {
+const BudgetTemplateModal: React.FC<BudgetTemplateModalProps> = ({ isOpen, onClose, template, onSubmit, drawerOnMobile }) => {
   const [categories, setCategories] = useState<Array<{ category: string; estimatedAmount: number; description?: string }>>(
     template?.budgetCategories || []
   );
@@ -629,6 +629,7 @@ const BudgetTemplateModal: React.FC<BudgetTemplateModalProps> = ({ isOpen, onClo
       onClose={onClose}
       title={template ? 'Edit Budget Template' : 'Create Budget Template'}
       size="lg"
+      drawerOnMobile={drawerOnMobile}
     >
       <form onSubmit={(e) => {
         const form = e.currentTarget;

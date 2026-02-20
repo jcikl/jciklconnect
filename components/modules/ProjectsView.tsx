@@ -341,11 +341,14 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
       {!selectedProject ? (
         <Card noPadding>
-          <div className="px-6 pt-4">
+          <div className="px-4 md:px-6 pt-4">
             <Tabs
-              tabs={['Active Projects', 'Templates']}
-              activeTab={activeTab === 'projects' ? 'Active Projects' : 'Templates'}
-              onTabChange={(tab) => setActiveTab(tab === 'Active Projects' ? 'projects' : 'templates')}
+              tabs={['Events', 'Templates']}
+              activeTab={activeTab === 'projects' ? 'Events' : 'Templates'}
+              onTabChange={(tab) => {
+                setActiveTab(tab === 'Events' ? 'projects' : 'templates');
+                setSelectedProjectId(null);
+              }}
             />
           </div>
           <div className="p-6">
@@ -540,6 +543,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
         }}
         title="Start New Project"
         size="lg"
+        drawerOnMobile
       >
         <form onSubmit={handleCreateProject} className="space-y-4">
           <p className="text-sm text-slate-500 mb-4 bg-blue-50 p-3 rounded text-blue-800">
@@ -679,7 +683,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
 
       {/* Create/Edit Event Template Modal */}
-      <Modal isOpen={isTemplateModalOpen} onClose={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }} title={selectedTemplate ? "Edit Template" : "Create Event Template"} size="lg">
+      <Modal isOpen={isTemplateModalOpen} onClose={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }} title={selectedTemplate ? "Edit Template" : "Create Event Template"} size="lg" drawerOnMobile>
         <form onSubmit={handleCreateTemplate} className="space-y-4">
           <Input name="name" label="Template Name" placeholder="e.g. Monthly Networking Event" defaultValue={selectedTemplate?.name} required />
           <Textarea name="description" label="Description" placeholder="Template description..." defaultValue={selectedTemplate?.description} rows={3} />
@@ -1365,6 +1369,7 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
           setShowStatusHistory(false);
         }}
         title={selectedTask ? 'Task Details' : 'Create New Task'}
+        drawerOnMobile
       >
         {selectedTask ? (
           <div className="space-y-4">

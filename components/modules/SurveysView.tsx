@@ -65,7 +65,7 @@ export const SurveysView: React.FC = () => {
     const handleMoveQuestion = (questionId: string, direction: 'up' | 'down') => {
         const index = questions.findIndex(q => q.id === questionId);
         if (index === -1) return;
-        
+
         const newIndex = direction === 'up' ? index - 1 : index + 1;
         if (newIndex < 0 || newIndex >= questions.length) return;
 
@@ -77,12 +77,12 @@ export const SurveysView: React.FC = () => {
     const handleCreateSurvey = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
-        
+
         if (questions.length === 0) {
             showToast('Please add at least one question to the survey', 'error');
             return;
         }
-        
+
         try {
             await createSurvey({
                 title: formData.get('title') as string,
@@ -163,20 +163,20 @@ export const SurveysView: React.FC = () => {
 
     return (
         <div className="space-y-6">
-             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900">Feedback & Surveys</h2>
                     <p className="text-slate-500">Pulse checks, satisfaction surveys, and polls.</p>
                 </div>
                 {canManage && (
                     <Button onClick={() => setCreateModalOpen(true)} disabled={!member}>
-                        <Plus size={16} className="mr-2"/> Create Survey
+                        <Plus size={16} className="mr-2" /> Create Survey
                     </Button>
                 )}
             </div>
 
             <Card noPadding>
-                <div className="px-6 pt-4">
+                <div className="px-4 md:px-6 pt-4">
                     <Tabs
                         tabs={['Surveys', 'Results']}
                         activeTab={activeTab === 'surveys' ? 'Surveys' : 'Results'}
@@ -200,7 +200,7 @@ export const SurveysView: React.FC = () => {
                                         </div>
                                         <h3 className="text-lg font-bold text-slate-900 mb-2">{survey.title}</h3>
                                         <p className="text-sm text-slate-600 mb-6 flex-1">{survey.description}</p>
-                                        
+
                                         <div className="bg-slate-50 rounded-lg p-3 mb-4 flex items-center justify-between">
                                             <div className="text-xs text-slate-500">
                                                 <span className="block font-semibold text-slate-700">{survey.responsesCount || 0}</span>
@@ -219,11 +219,11 @@ export const SurveysView: React.FC = () => {
                                                     onClick={() => setSelectedSurvey(survey)}
                                                     disabled={!member}
                                                 >
-                                                    Take Survey <ArrowRight size={14} className="ml-2"/>
+                                                    Take Survey <ArrowRight size={14} className="ml-2" />
                                                 </Button>
                                             ) : (
-                                                <Button 
-                                                    variant="outline" 
+                                                <Button
+                                                    variant="outline"
                                                     className="w-full"
                                                     onClick={() => {
                                                         setAnalyticsSurveyId(survey.id);
@@ -231,7 +231,7 @@ export const SurveysView: React.FC = () => {
                                                         loadAnalytics(survey.id);
                                                     }}
                                                 >
-                                                    <BarChart2 size={14} className="mr-2"/> View Results
+                                                    <BarChart2 size={14} className="mr-2" /> View Results
                                                 </Button>
                                             )}
                                             {canManage && (
@@ -326,7 +326,7 @@ export const SurveysView: React.FC = () => {
             <Modal isOpen={isCreateModalOpen} onClose={() => {
                 setCreateModalOpen(false);
                 setQuestions([]);
-            }} title="Create Survey" size="xl">
+            }} title="Create Survey" size="xl" drawerOnMobile>
                 <form onSubmit={handleCreateSurvey} className="space-y-6">
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold text-slate-900">Basic Information</h3>
@@ -348,7 +348,7 @@ export const SurveysView: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-slate-900">Questions</h3>
                             <Button type="button" variant="outline" size="sm" onClick={handleAddQuestion}>
-                                <Plus size={16} className="mr-2"/> Add Question
+                                <Plus size={16} className="mr-2" /> Add Question
                             </Button>
                         </div>
 
@@ -446,6 +446,7 @@ export const SurveysView: React.FC = () => {
                         setShowQuestionModal(false);
                         setEditingQuestion(null);
                     }}
+                    drawerOnMobile
                 />
             )}
 
@@ -477,6 +478,7 @@ export const SurveysView: React.FC = () => {
                         setSelectedChannels(['in-app']);
                     }}
                     onDistribute={handleDistributeSurvey}
+                    drawerOnMobile
                 />
             )}
         </div>
@@ -495,11 +497,11 @@ const SurveyResponseModal: React.FC<{
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Validate required questions
         const requiredQuestions = survey.questions.filter(q => q.required);
         const missingRequired = requiredQuestions.filter(q => !answers[q.id] || answers[q.id] === '');
-        
+
         if (missingRequired.length > 0) {
             showToast('Please answer all required questions', 'error');
             return;
@@ -518,7 +520,7 @@ const SurveyResponseModal: React.FC<{
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} title={survey.title} size="lg">
+        <Modal isOpen={true} onClose={onClose} title={survey.title} size="lg" drawerOnMobile>
             <form onSubmit={handleSubmit} className="space-y-6">
                 <p className="text-sm text-slate-600">{survey.description}</p>
 
@@ -566,11 +568,10 @@ const SurveyResponseModal: React.FC<{
                                             key={rating}
                                             type="button"
                                             onClick={() => handleAnswerChange(question.id, rating)}
-                                            className={`p-3 rounded-lg border-2 transition-all ${
-                                                answers[question.id] === rating
-                                                    ? 'border-jci-blue bg-blue-50 text-jci-blue'
-                                                    : 'border-slate-200 hover:border-slate-300'
-                                            }`}
+                                            className={`p-3 rounded-lg border-2 transition-all ${answers[question.id] === rating
+                                                ? 'border-jci-blue bg-blue-50 text-jci-blue'
+                                                : 'border-slate-200 hover:border-slate-300'
+                                                }`}
                                         >
                                             <Star size={24} fill={answers[question.id] === rating ? 'currentColor' : 'none'} />
                                             <span className="block text-xs mt-1">{rating}</span>
@@ -936,9 +937,10 @@ interface QuestionEditorModalProps {
     question: SurveyQuestion;
     onSave: (question: SurveyQuestion) => void;
     onClose: () => void;
+    drawerOnMobile?: boolean;
 }
 
-const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ question, onSave, onClose }) => {
+const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ question, onSave, onClose, drawerOnMobile }) => {
     const [questionText, setQuestionText] = useState(question.question);
     const [questionType, setQuestionType] = useState<SurveyQuestion['type']>(question.type);
     const [required, setRequired] = useState(question.required);
@@ -994,7 +996,7 @@ const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ question, onS
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} title="Edit Question" size="lg">
+        <Modal isOpen={true} onClose={onClose} title="Edit Question" size="lg" drawerOnMobile={drawerOnMobile}>
             <div className="space-y-4">
                 <Input
                     label="Question Text"
@@ -1299,6 +1301,7 @@ interface SurveyDistributionModalProps {
     onChannelsChange: (channels: ('email' | 'in-app' | 'link')[]) => void;
     onClose: () => void;
     onDistribute: (survey: Survey) => Promise<void>;
+    drawerOnMobile?: boolean;
 }
 
 const SurveyDistributionModal: React.FC<SurveyDistributionModalProps> = ({
@@ -1307,6 +1310,7 @@ const SurveyDistributionModal: React.FC<SurveyDistributionModalProps> = ({
     onChannelsChange,
     onClose,
     onDistribute,
+    drawerOnMobile,
 }) => {
     const { showToast } = useToast();
     const [isDistributing, setIsDistributing] = useState(false);
@@ -1334,7 +1338,7 @@ const SurveyDistributionModal: React.FC<SurveyDistributionModalProps> = ({
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} title={`Distribute Survey: ${survey.title}`} size="lg">
+        <Modal isOpen={true} onClose={onClose} title={`Distribute Survey: ${survey.title}`} size="lg" drawerOnMobile={drawerOnMobile}>
             <div className="space-y-6">
                 <div>
                     <p className="text-sm text-slate-600 mb-4">

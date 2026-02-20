@@ -114,7 +114,7 @@ export const MemberBenefitsView: React.FC = () => {
       </div>
 
       <Card noPadding>
-        <div className="px-6 pt-4">
+        <div className="px-4 md:px-6 pt-4">
           <Tabs
             tabs={['All Benefits', 'My Benefits']}
             activeTab={activeTab === 'all' ? 'All Benefits' : 'My Benefits'}
@@ -245,6 +245,7 @@ export const MemberBenefitsView: React.FC = () => {
         }}
         title={selectedBenefit ? 'Edit Benefit' : 'Create New Benefit'}
         size="lg"
+        drawerOnMobile
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
@@ -541,7 +542,7 @@ const UsageHistoryModal: React.FC<UsageHistoryModalProps> = ({ isOpen, onClose, 
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Usage History - ${benefit.name}`} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Usage History - ${benefit.name}`} size="lg" drawerOnMobile>
       <LoadingState loading={loading} error={null} empty={usageHistory.length === 0} emptyMessage="No usage history found">
         <div className="space-y-3 max-h-96 overflow-y-auto">
           {usageHistory.map(usage => {

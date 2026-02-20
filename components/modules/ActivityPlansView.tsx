@@ -163,14 +163,14 @@ export const ActivityPlansView: React.FC = () => {
       </div>
 
       <Card noPadding>
-        <div className="px-6 pt-4">
+        <div className="">
           <Tabs
             tabs={['All', 'Draft', 'Submitted', 'Approved', 'Rejected']}
             activeTab={
               activeTab === 'all' ? 'All' :
-              activeTab === 'draft' ? 'Draft' :
-              activeTab === 'submitted' ? 'Submitted' :
-              activeTab === 'approved' ? 'Approved' : 'Rejected'
+                activeTab === 'draft' ? 'Draft' :
+                  activeTab === 'submitted' ? 'Submitted' :
+                    activeTab === 'approved' ? 'Approved' : 'Rejected'
             }
             onTabChange={(tab) => {
               if (tab === 'All') setActiveTab('all');
@@ -180,6 +180,7 @@ export const ActivityPlansView: React.FC = () => {
               else setActiveTab('rejected');
               setCurrentPage(1);
             }}
+            className="px-4 md:px-6"
           />
         </div>
         <div className="p-6">
@@ -197,7 +198,7 @@ export const ActivityPlansView: React.FC = () => {
                         )}
                       </div>
                       <p className="text-sm text-slate-600 mb-4">{plan.description}</p>
-                      
+
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div className="flex items-center gap-2 text-slate-600">
                           <Calendar size={16} />
@@ -317,13 +318,13 @@ export const ActivityPlansView: React.FC = () => {
 
       {/* Create/Edit Activity Plan Modal */}
       <Modal
-        isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedPlan(null);
         }}
         title={selectedPlan ? 'Edit Activity Plan' : 'Create Activity Plan'}
         size="lg"
+        drawerOnMobile
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
@@ -433,6 +434,7 @@ export const ActivityPlansView: React.FC = () => {
             setSelectedPlan(null);
           }}
           title="Review Activity Plan"
+          drawerOnMobile
         >
           <form onSubmit={handleReview} className="space-y-4">
             <div className="p-4 bg-slate-50 rounded-lg mb-4">
@@ -482,6 +484,7 @@ export const ActivityPlansView: React.FC = () => {
             setSelectedPlan(null);
           }}
           title="Create New Version"
+          drawerOnMobile
         >
           <form onSubmit={handleCreateVersion} className="space-y-4">
             <p className="text-sm text-slate-600 mb-4">

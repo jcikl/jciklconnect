@@ -72,7 +72,7 @@ export const EventsView: React.FC = () => {
         </div>
       </div>
 
-      <Card noPadding>
+      <Card noPadding className="overflow-hidden">
         {viewMode === 'calendar' ? (
           <EventCalendar
             events={events}
@@ -81,7 +81,7 @@ export const EventsView: React.FC = () => {
           />
         ) : (
           <>
-            <div className="px-6 pt-4">
+            <div className="px-4 md:px-6 pt-4">
               <Tabs
                 tabs={['Upcoming', 'Completed']}
                 activeTab={activeTab}
@@ -149,7 +149,7 @@ const EventRow: React.FC<{
 
   return (
     <div
-      className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:bg-slate-50 transition-colors cursor-pointer"
+      className="p-4 md:p-6 flex flex-row items-start sm:items-center gap-4 md:gap-6 hover:bg-slate-50 transition-colors cursor-pointer active:bg-slate-100"
       onClick={onClick}
     >
       {/* Date Box */}
@@ -161,24 +161,24 @@ const EventRow: React.FC<{
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <Badge variant="neutral">{event.type}</Badge>
+          <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{event.type}</Badge>
           {event.predictedDemand === 'High' && (
-            <Badge variant="jci"><BrainCircuit size={10} className="mr-1 inline" /> High Demand AI</Badge>
+            <Badge variant="jci" className="text-[10px] px-1.5 py-0"><BrainCircuit size={10} className="mr-1 inline" /> AI</Badge>
           )}
         </div>
-        <h3 className="text-lg font-bold text-slate-900 mb-1">{event.title}</h3>
-        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+        <h3 className="text-base md:text-lg font-bold text-slate-900 mb-1 truncate leading-snug">{event.title}</h3>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-1 sm:gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-1">
-            <Clock size={14} />
+            <Clock size={12} className="text-slate-400" />
             <span>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <MapPin size={14} />
-            <span>{event.location}</span>
+          <div className="flex items-center gap-1 min-w-0">
+            <MapPin size={12} className="text-slate-400 flex-shrink-0" />
+            <span className="truncate">{event.location}</span>
           </div>
           <div className="flex items-center gap-1">
-            <Users size={14} />
-            <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
+            <Users size={12} className="text-slate-400" />
+            <span>{event.attendees} registered</span>
           </div>
         </div>
       </div>
@@ -304,7 +304,7 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   return (
     <>
-      <Modal isOpen={true} onClose={onClose} title={event.title} size="lg">
+      <Modal isOpen={true} onClose={onClose} title={event.title} size="lg" drawerOnMobile>
         <Tabs
           tabs={availableTabs}
           activeTab={
@@ -629,7 +629,7 @@ const EventBudgetEditModal: React.FC<EventBudgetEditModalProps> = ({
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} title={`Edit Budget: ${event.title}`} size="lg">
+    <Modal isOpen={true} onClose={onClose} title={`Edit Budget: ${event.title}`} size="lg" drawerOnMobile>
       <div className="space-y-4">
         <Input
           label="Allocated Budget"
@@ -827,7 +827,7 @@ const EventFeedbackModal: React.FC<EventFeedbackModalProps> = ({ event, onClose 
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} title={`Feedback: ${event.title}`} size="lg">
+    <Modal isOpen={true} onClose={onClose} title={`Feedback: ${event.title}`} size="lg" drawerOnMobile>
       <form onSubmit={handleSubmitFeedback} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Overall Rating *</label>

@@ -29,12 +29,12 @@ export const ActivitiesView: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 pt-4 border-b border-slate-200">
+        <div className="px-4 md:px-6 pt-4 border-b border-slate-200">
           <Tabs
             tabs={['Activity Plans', 'Events', 'Projects']}
             activeTab={
               activeTab === 'plans' ? 'Activity Plans' :
-              activeTab === 'events' ? 'Events' : 'Projects'
+                activeTab === 'events' ? 'Events' : 'Projects'
             }
             onTabChange={(tab) => {
               if (tab === 'Activity Plans') setActiveTab('plans');

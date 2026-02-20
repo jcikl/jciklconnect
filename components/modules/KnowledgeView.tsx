@@ -41,22 +41,22 @@ export const KnowledgeView: React.FC = () => {
     // Filter documents based on search term and category
     const filteredDocuments = useMemo(() => {
         let filtered = documents || [];
-        
+
         // Filter by search term
         if (searchTerm.trim()) {
             const searchLower = searchTerm.toLowerCase();
-            filtered = filtered.filter(doc => 
+            filtered = filtered.filter(doc =>
                 doc.name.toLowerCase().includes(searchLower) ||
                 doc.description?.toLowerCase().includes(searchLower) ||
                 doc.category.toLowerCase().includes(searchLower)
             );
         }
-        
+
         // Filter by category
         if (selectedCategory !== 'all') {
             filtered = filtered.filter(doc => doc.category === selectedCategory);
         }
-        
+
         return filtered;
     }, [documents, searchTerm, selectedCategory]);
 
@@ -100,7 +100,7 @@ export const KnowledgeView: React.FC = () => {
 
     return (
         <div className="space-y-6">
-             <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900">Knowledge & Learning</h2>
                     <p className="text-slate-500">Training, certifications, and document archives.</p>
@@ -109,10 +109,10 @@ export const KnowledgeView: React.FC = () => {
                     {(isBoard || isAdmin) && (
                         <>
                             <Button variant="outline" onClick={() => setIsPathModalOpen(true)}>
-                                <Plus size={16} className="mr-2"/> New Learning Path
+                                <Plus size={16} className="mr-2" /> New Learning Path
                             </Button>
                             <Button variant="outline" onClick={() => setIsDocModalOpen(true)}>
-                                <FileText size={16} className="mr-2"/> Upload Document
+                                <FileText size={16} className="mr-2" /> Upload Document
                             </Button>
                         </>
                     )}
@@ -120,7 +120,7 @@ export const KnowledgeView: React.FC = () => {
             </div>
 
             <Card noPadding>
-                <div className="px-6 pt-4">
+                <div className="px-4 md:px-6 pt-4">
                     <Tabs
                         tabs={['Learning Paths', 'Documents', 'My Certificates']}
                         activeTab={activeTab === 'learning' ? 'Learning Paths' : activeTab === 'documents' ? 'Documents' : 'My Certificates'}
@@ -228,7 +228,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                             </div>
                             <h3 className="font-bold text-lg text-slate-900 mb-2">{path.name}</h3>
                             <p className="text-sm text-slate-600 mb-4">{path.description}</p>
-                            
+
                             <div className="space-y-2 mb-4">
                                 <div className="flex items-center justify-between text-xs text-slate-500">
                                     <span>Duration</span>
@@ -321,10 +321,10 @@ interface DocumentsTabProps {
     categories?: string[];
 }
 
-const DocumentsTab: React.FC<DocumentsTabProps> = ({ 
-    documents, 
-    loading, 
-    onSelectDocument, 
+const DocumentsTab: React.FC<DocumentsTabProps> = ({
+    documents,
+    loading,
+    onSelectDocument,
     canManage,
     searchTerm = '',
     onSearchChange,
@@ -377,39 +377,39 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
 
             <LoadingState loading={loading} error={null} empty={documents.length === 0} emptyMessage="No documents found">
                 <div className="space-y-2">
-                {documents.map(doc => (
-                    <div
-                        key={doc.id}
-                        className="p-4 hover:bg-slate-50 rounded-lg flex items-center justify-between group cursor-pointer transition-colors border border-slate-100"
-                        onClick={() => onSelectDocument(doc)}
-                    >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="p-2 bg-blue-50 text-jci-blue rounded flex-shrink-0">
-                                <FileText size={18} />
+                    {documents.map(doc => (
+                        <div
+                            key={doc.id}
+                            className="p-4 hover:bg-slate-50 rounded-lg flex items-center justify-between group cursor-pointer transition-colors border border-slate-100"
+                            onClick={() => onSelectDocument(doc)}
+                        >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="p-2 bg-blue-50 text-jci-blue rounded flex-shrink-0">
+                                    <FileText size={18} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
+                                    <p className="text-xs text-slate-500">
+                                        {doc.category} • {doc.size || 'N/A'} • {formatDate(doc.uploadedDate)}
+                                        {doc.versionCount && doc.versionCount > 1 && (
+                                            <span className="ml-2 flex items-center gap-1">
+                                                <GitBranch size={10} />
+                                                {doc.versionCount} versions
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
-                                <p className="text-xs text-slate-500">
-                                    {doc.category} • {doc.size || 'N/A'} • {formatDate(doc.uploadedDate)}
-                                    {doc.versionCount && doc.versionCount > 1 && (
-                                        <span className="ml-2 flex items-center gap-1">
-                                            <GitBranch size={10} />
-                                            {doc.versionCount} versions
-                                        </span>
-                                    )}
-                                </p>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <Button variant="ghost" size="sm">
+                                    <Eye size={14} />
+                                </Button>
+                                <Button variant="ghost" size="sm">
+                                    <Download size={14} />
+                                </Button>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <Button variant="ghost" size="sm">
-                                <Eye size={14} />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                                <Download size={14} />
-                            </Button>
-                        </div>
-                    </div>
-                ))}
+                    ))}
                 </div>
             </LoadingState>
         </div>
@@ -476,7 +476,7 @@ const LearningPathDetailModal: React.FC<LearningPathDetailModalProps> = ({
     member,
 }) => {
     return (
-        <Modal isOpen={true} onClose={onClose} title={path.name} size="lg">
+        <Modal isOpen={true} onClose={onClose} title={path.name} size="lg" drawerOnMobile>
             <div className="space-y-6">
                 <div>
                     <p className="text-slate-600">{path.description}</p>
@@ -525,21 +525,19 @@ const LearningPathDetailModal: React.FC<LearningPathDetailModalProps> = ({
                                 return (
                                     <div
                                         key={moduleId}
-                                        className={`flex items-center gap-3 p-3 rounded-lg border ${
-                                            isCompleted
-                                                ? 'bg-green-50 border-green-200'
-                                                : isCurrent
+                                        className={`flex items-center gap-3 p-3 rounded-lg border ${isCompleted
+                                            ? 'bg-green-50 border-green-200'
+                                            : isCurrent
                                                 ? 'bg-blue-50 border-blue-200'
                                                 : 'bg-slate-50 border-slate-200'
-                                        }`}
+                                            }`}
                                     >
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                                            isCompleted
-                                                ? 'bg-green-500 text-white'
-                                                : isCurrent
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${isCompleted
+                                            ? 'bg-green-500 text-white'
+                                            : isCurrent
                                                 ? 'bg-blue-500 text-white'
                                                 : 'bg-slate-300 text-slate-600'
-                                        }`}>
+                                            }`}>
                                             {isCompleted ? <CheckCircle size={16} /> : index + 1}
                                         </div>
                                         <div className="flex-1">
@@ -669,7 +667,7 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} title={documentWithVersions.name} size="lg">
+        <Modal isOpen={true} onClose={onClose} title={documentWithVersions.name} size="lg" drawerOnMobile>
             <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -705,11 +703,10 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
                             {documentWithVersions.versions.map((version) => (
                                 <div
                                     key={version.id}
-                                    className={`p-4 rounded-lg border transition-all ${
-                                        version.isCurrent 
-                                            ? 'border-jci-blue bg-blue-50 shadow-sm' 
-                                            : 'border-slate-200 hover:border-slate-300'
-                                    }`}
+                                    className={`p-4 rounded-lg border transition-all ${version.isCurrent
+                                        ? 'border-jci-blue bg-blue-50 shadow-sm'
+                                        : 'border-slate-200 hover:border-slate-300'
+                                        }`}
                                 >
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex items-center gap-2">
@@ -736,8 +733,8 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
                                         )}
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button 
-                                            variant="ghost" 
+                                        <Button
+                                            variant="ghost"
                                             size="sm"
                                             onClick={() => handleDownloadVersion(version)}
                                         >
@@ -745,8 +742,8 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
                                             Download
                                         </Button>
                                         {canManage && !version.isCurrent && (
-                                            <Button 
-                                                variant="outline" 
+                                            <Button
+                                                variant="outline"
                                                 size="sm"
                                                 onClick={() => version.id && handleRestoreVersion(version.id)}
                                                 isLoading={isRestoring === version.id}
@@ -771,8 +768,8 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
 
                 <div className="flex gap-3 pt-4 border-t">
                     {documentWithVersions.currentVersion && (
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             className="flex-1"
                             onClick={() => documentWithVersions.currentVersion && handleDownloadVersion(documentWithVersions.currentVersion)}
                         >

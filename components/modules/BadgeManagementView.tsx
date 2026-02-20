@@ -158,11 +158,13 @@ export const BadgeManagementView: React.FC = () => {
         )}
       </div>
 
-      <Tabs
-        tabs={['All Badges', 'My Badges']}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      <div className="px-4 md:px-0">
+        <Tabs
+          tabs={['All Badges', 'My Badges']}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+      </div>
 
       {activeTab === 'All Badges' ? (
         <LoadingState loading={loading} error={error} empty={badges.length === 0} emptyMessage="No badges defined yet">
@@ -259,10 +261,10 @@ export const BadgeManagementView: React.FC = () => {
       {/* Create Badge Modal */}
       {canManage && (
         <Modal
-          isOpen={isCreateModalOpen}
           onClose={() => setCreateModalOpen(false)}
           title="Create Badge"
           size="lg"
+          drawerOnMobile
         >
           <form onSubmit={handleCreateBadge} className="space-y-4">
             <Input name="name" label="Badge Name" placeholder="e.g., First Steps" required />
@@ -340,6 +342,7 @@ export const BadgeManagementView: React.FC = () => {
           }}
           title="Edit Badge"
           size="lg"
+          drawerOnMobile
         >
           <form onSubmit={handleUpdateBadge} className="space-y-4">
             <Input name="name" label="Badge Name" defaultValue={selectedBadge.name} required />
@@ -425,6 +428,7 @@ export const BadgeManagementView: React.FC = () => {
             setAwardReason('');
           }}
           title={`Award Badge: ${selectedBadge.name}`}
+          drawerOnMobile
         >
           <div className="space-y-4">
             <div className="text-center">

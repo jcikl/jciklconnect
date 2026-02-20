@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  FileText, BarChart3, TrendingUp, Users, Calendar, DollarSign, 
-  Download, Filter, Plus, Edit, Trash2, Eye, RefreshCw, 
+import {
+  FileText, BarChart3, TrendingUp, Users, Calendar, DollarSign,
+  Download, Filter, Plus, Edit, Trash2, Eye, RefreshCw,
   PieChart, LineChart, Activity, Target, Award, Package
 } from 'lucide-react';
 import { Card, Button, Badge, Modal, useToast, Tabs, StatCard } from '../ui/Common';
@@ -15,7 +15,7 @@ import { FinanceService } from '../../services/financeService';
 import { usePoints } from '../../hooks/usePoints';
 import { formatCurrency } from '../../utils/formatUtils';
 import { formatDate } from '../../utils/dateUtils';
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, LineChart as RechartsLineChart, Line
 } from 'recharts';
@@ -30,12 +30,12 @@ export const ReportsView: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
-  
+
   const { members } = useMembers();
   const { events } = useEvents();
   const { projects } = useProjects();
   const [transactions, setTransactions] = useState<any[]>([]);
-  
+
   useEffect(() => {
     FinanceService.getAllTransactions().then(setTransactions).catch(() => setTransactions([]));
   }, []);
@@ -45,20 +45,20 @@ export const ReportsView: React.FC = () => {
     const currentYear = new Date().getFullYear();
     const yearStart = new Date(currentYear, 0, 1);
     const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59);
-    
+
     const yearEvents = events.filter(e => {
       const eventDate = new Date(e.date);
       return eventDate >= yearStart && eventDate <= yearEnd;
     });
-    
+
     const yearTransactions = transactions.filter(t => {
       const txDate = new Date(t.date);
       return txDate >= yearStart && txDate <= yearEnd;
     });
-    
+
     const totalIncome = yearTransactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
     const totalExpenses = yearTransactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    
+
     return {
       totalMembers: members.length,
       activeProjects: projects.filter(p => p.status === 'Active').length,
@@ -67,8 +67,8 @@ export const ReportsView: React.FC = () => {
       totalIncome,
       totalExpenses,
       netBalance: totalIncome - totalExpenses,
-      averageAttendance: yearEvents.length > 0 
-        ? yearEvents.reduce((sum, e) => sum + (e.attendees || 0), 0) / yearEvents.length 
+      averageAttendance: yearEvents.length > 0
+        ? yearEvents.reduce((sum, e) => sum + (e.attendees || 0), 0) / yearEvents.length
         : 0,
     };
   }, [members, events, projects, transactions]);
@@ -116,7 +116,7 @@ export const ReportsView: React.FC = () => {
 
   const handleExportReport = async (format: 'CSV' | 'JSON' | 'PDF' | 'Excel') => {
     if (!selectedReport) return;
-    
+
     try {
       const options: ReportOptions = {
         startDate: startDate ? new Date(startDate) : undefined,
@@ -147,10 +147,10 @@ export const ReportsView: React.FC = () => {
       }
 
       if (format === 'CSV' || format === 'JSON') {
-        const content = format === 'CSV' 
+        const content = format === 'CSV'
           ? ReportService.convertToCSV(report)
           : JSON.stringify(report, null, 2);
-        
+
         const blob = new Blob([content], { type: format === 'CSV' ? 'text/csv' : 'application/json' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -197,7 +197,7 @@ export const ReportsView: React.FC = () => {
 
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCardsContainer>
           <StatCard
             title="Total Members"
             value={dashboardStats.totalMembers.toString()}
@@ -222,7 +222,7 @@ export const ReportsView: React.FC = () => {
             icon={<DollarSign size={24} />}
             trend={dashboardStats.netBalance >= 0 ? 1 : -1}
           />
-        </div>
+        </StatCardsContainer>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card title="Event Attendance">
@@ -253,7 +253,7 @@ export const ReportsView: React.FC = () => {
             </ResponsiveContainer>
           </Card>
         </div>
-      </div>
+      </div >
     );
   };
 
@@ -271,15 +271,15 @@ export const ReportsView: React.FC = () => {
       </div>
 
       <Card noPadding>
-        <div className="px-6 pt-4">
+        <div className="px-4 md:px-6 pt-4">
           <Tabs
             tabs={['Dashboard', 'Financial', 'Membership', 'Engagement', 'Projects', 'Custom']}
             activeTab={
               activeTab === 'dashboard' ? 'Dashboard' :
-              activeTab === 'financial' ? 'Financial' :
-              activeTab === 'membership' ? 'Membership' :
-              activeTab === 'engagement' ? 'Engagement' :
-              activeTab === 'projects' ? 'Projects' : 'Custom'
+                activeTab === 'financial' ? 'Financial' :
+                  activeTab === 'membership' ? 'Membership' :
+                    activeTab === 'engagement' ? 'Engagement' :
+                      activeTab === 'projects' ? 'Projects' : 'Custom'
             }
             onTabChange={(tab) => {
               if (tab === 'Dashboard') setActiveTab('dashboard');
@@ -354,6 +354,7 @@ export const ReportsView: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         title="Generate Report"
         size="lg"
+        drawerOnMobile
       >
         <form onSubmit={(e) => { e.preventDefault(); handleGenerateReport(); }} className="space-y-4">
           <Select
@@ -401,6 +402,7 @@ export const ReportsView: React.FC = () => {
           onClose={() => { setIsViewModalOpen(false); setSelectedReport(null); }}
           title={selectedReport.title}
           size="xl"
+          drawerOnMobile
         >
           <div className="space-y-4">
             <div className="flex justify-between items-center pb-4 border-b">
@@ -434,4 +436,3 @@ export const ReportsView: React.FC = () => {
     </div>
   );
 };
-

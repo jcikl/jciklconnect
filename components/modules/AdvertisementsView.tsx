@@ -18,15 +18,15 @@ interface AdImageProps {
 
 const AdImage: React.FC<AdImageProps> = ({ imageUrl, title }) => {
   const [imageError, setImageError] = React.useState(false);
-  
+
   if (!imageUrl || imageError) {
     return <ImageIcon className="text-slate-400" size={32} />;
   }
-  
+
   return (
-    <img 
-      src={imageUrl} 
-      alt={title} 
+    <img
+      src={imageUrl}
+      alt={title}
       className="w-full h-full object-cover"
       onError={() => setImageError(true)}
     />
@@ -114,7 +114,7 @@ export const AdvertisementsView: React.FC = () => {
     const totalClicks = filteredAdsForAnalytics.reduce((sum, ad) => sum + ad.clicks, 0);
     const totalBudget = filteredAdsForAnalytics.reduce((sum, ad) => sum + (ad.budget || 0), 0);
     const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
-    
+
     return {
       totalImpressions,
       totalClicks,
@@ -143,13 +143,13 @@ export const AdvertisementsView: React.FC = () => {
       </div>
 
       <Card noPadding>
-        <div className="px-6 pt-4">
+        <div className="px-4 md:px-6 pt-4">
           <Tabs
             tabs={['Advertisements', 'Promotion Packages', 'Analytics']}
             activeTab={
-              activeTab === 'ads' ? 'Advertisements' : 
-              activeTab === 'packages' ? 'Promotion Packages' : 
-              'Analytics'
+              activeTab === 'ads' ? 'Advertisements' :
+                activeTab === 'packages' ? 'Promotion Packages' :
+                  'Analytics'
             }
             onTabChange={(tab) => {
               if (tab === 'Advertisements') setActiveTab('ads');
@@ -305,6 +305,7 @@ export const AdvertisementsView: React.FC = () => {
         }}
         title={selectedAd ? 'Edit Advertisement' : 'Create Advertisement'}
         size="lg"
+        drawerOnMobile
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
@@ -314,7 +315,7 @@ export const AdvertisementsView: React.FC = () => {
             defaultValue={selectedAd?.title}
             required
           />
-          
+
           <Textarea
             name="description"
             label="Description"
@@ -455,6 +456,7 @@ export const AdvertisementsView: React.FC = () => {
           advertisement={selectedAdForAnalytics}
           calculateCTR={calculateCTR}
           calculateROI={calculateROI}
+          drawerOnMobile
         />
       )}
     </div>
@@ -495,7 +497,7 @@ const AdvertisementAnalyticsTab: React.FC<AdvertisementAnalyticsTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <StatCardsContainer>
         <Card className="bg-blue-50 border-blue-100">
           <div className="flex items-center gap-3">
             <Eye className="text-blue-600" size={24} />
@@ -532,7 +534,7 @@ const AdvertisementAnalyticsTab: React.FC<AdvertisementAnalyticsTabProps> = ({
             </div>
           </div>
         </Card>
-      </div>
+      </StatCardsContainer>
 
       {/* Filter */}
       <div className="flex items-center gap-2">
@@ -628,6 +630,7 @@ interface AdvertisementAnalyticsModalProps {
     totalSpent: number;
     estimatedValue: number;
   };
+  drawerOnMobile?: boolean;
 }
 
 const AdvertisementAnalyticsModal: React.FC<AdvertisementAnalyticsModalProps> = ({
@@ -636,12 +639,13 @@ const AdvertisementAnalyticsModal: React.FC<AdvertisementAnalyticsModalProps> = 
   advertisement,
   calculateCTR,
   calculateROI,
+  drawerOnMobile,
 }) => {
   const ctr = calculateCTR(advertisement);
   const roi = calculateROI(advertisement);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Analytics - ${advertisement.title}`} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Analytics - ${advertisement.title}`} size="lg" drawerOnMobile={drawerOnMobile}>
       <div className="space-y-6">
         {/* Performance Metrics */}
         <div className="grid grid-cols-2 gap-4">

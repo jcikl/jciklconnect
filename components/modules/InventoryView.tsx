@@ -303,7 +303,7 @@ export const InventoryView: React.FC = () => {
         </div>
 
         <Card noPadding>
-          <div className="px-6 pt-4">
+          <div className="px-4 md:px-6 pt-4">
             <Tabs
               tabs={['Items', 'Maintenance', 'Alerts', 'Depreciation', 'Financial History']}
               activeTab={
@@ -532,7 +532,7 @@ export const InventoryView: React.FC = () => {
 
       {/* Stock Adjustment Modal */}
       {selectedItem && (
-        <Modal isOpen={isAdjustmentModalOpen} onClose={() => { setAdjustmentModalOpen(false); setSelectedItem(null); }} title={`Stock Adjustment: ${selectedItem.name}`}>
+        <Modal isOpen={isAdjustmentModalOpen} onClose={() => { setAdjustmentModalOpen(false); setSelectedItem(null); }} title={`Stock Adjustment: ${selectedItem.name}`} drawerOnMobile>
           <form onSubmit={async (e) => {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
@@ -590,6 +590,7 @@ export const InventoryView: React.FC = () => {
           onClose={() => { setStockCardModalOpen(false); setSelectedItem(null); setStockMovements([]); }}
           title={`Stock Card: ${selectedItem.name}`}
           size="xl"
+          drawerOnMobile
         >
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-4 mb-4">
@@ -652,7 +653,7 @@ export const InventoryView: React.FC = () => {
       )}
 
       {/* Add Item Modal */}
-      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Add Inventory Item">
+      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Add Inventory Item" drawerOnMobile>
         <form onSubmit={handleAddItem} className="space-y-4">
           <Input name="name" label="Item Name" placeholder="e.g. Projector" required />
           <Select name="category" label="Category" options={[
@@ -764,7 +765,7 @@ export const InventoryView: React.FC = () => {
 
       {/* Edit Item Modal */}
       {selectedItem && (
-        <Modal isOpen={isEditModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null); }} title="Edit Inventory Item">
+        <Modal isOpen={isEditModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null); }} title="Edit Inventory Item" drawerOnMobile>
           <form onSubmit={handleEditItem} className="space-y-4">
             <Input name="name" label="Item Name" defaultValue={selectedItem.name} required />
             <Select name="category" label="Category" options={[
@@ -890,7 +891,7 @@ export const InventoryView: React.FC = () => {
 
       {/* Check Out Modal */}
       {selectedItem && (
-        <Modal isOpen={isCheckOutModalOpen} onClose={() => { setCheckOutModalOpen(false); setSelectedItem(null); }} title="Check Out Item">
+        <Modal isOpen={isCheckOutModalOpen} onClose={() => { setCheckOutModalOpen(false); setSelectedItem(null); }} title="Check Out Item" drawerOnMobile>
           <form onSubmit={handleCheckOut} className="space-y-4">
             <p className="text-sm text-slate-600 mb-4">Checking out: <strong>{selectedItem.name}</strong></p>
             <Select name="memberId" label="Assign To" options={[
@@ -932,6 +933,7 @@ export const InventoryView: React.FC = () => {
               showToast('Failed to save maintenance schedule', 'error');
             }
           }}
+          drawerOnMobile
         />
       )}
     </div>
@@ -1185,6 +1187,7 @@ interface MaintenanceScheduleModalProps {
   items: InventoryItem[];
   members: any[];
   onSave: (schedule: Omit<MaintenanceSchedule, 'id'>) => Promise<string | void>;
+  drawerOnMobile?: boolean;
 }
 
 const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
@@ -1194,6 +1197,7 @@ const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
   items,
   members,
   onSave,
+  drawerOnMobile,
 }) => {
   const [formData, setFormData] = useState({
     itemId: schedule?.itemId || '',
@@ -1219,7 +1223,7 @@ const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={schedule ? 'Edit Maintenance Schedule' : 'Create Maintenance Schedule'}>
+    <Modal isOpen={isOpen} onClose={onClose} title={schedule ? 'Edit Maintenance Schedule' : 'Create Maintenance Schedule'} drawerOnMobile={drawerOnMobile}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Select
           label="Item"

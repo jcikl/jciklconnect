@@ -1,7 +1,7 @@
 // Messaging View - 1-to-1, group, and project-specific messaging
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  MessageSquare, Send, Plus, Users, Search, MoreVertical, 
+import {
+  MessageSquare, Send, Plus, Users, Search, MoreVertical,
   UserPlus, Hash, Briefcase, Paperclip, Image as ImageIcon, X
 } from 'lucide-react';
 import { Card, Button, Badge, Modal, useToast } from '../ui/Common';
@@ -23,7 +23,7 @@ export const MessagingView: React.FC = () => {
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   const { member } = useAuth();
   const { members, loading: membersLoading } = useMembers();
   const { projects, loading: projectsLoading } = useProjects();
@@ -76,9 +76,9 @@ export const MessagingView: React.FC = () => {
     try {
       const participants = conversationType === 'project' && selectedProjectId
         ? (() => {
-            const project = projects.find(p => p.id === selectedProjectId);
-            return project?.team || [];
-          })()
+          const project = projects.find(p => p.id === selectedProjectId);
+          return project?.team || [];
+        })()
         : [...selectedParticipants, member.id];
 
       const conversationId = await createConversation(
@@ -89,7 +89,7 @@ export const MessagingView: React.FC = () => {
       );
 
       // Select the new conversation
-      const newConversation = conversations.find(c => c.id === conversationId) || 
+      const newConversation = conversations.find(c => c.id === conversationId) ||
         { id: conversationId, type: conversationType, participants, name: groupName, projectId: selectedProjectId } as Conversation;
       await selectConversation(newConversation);
 
@@ -180,9 +180,8 @@ export const MessagingView: React.FC = () => {
                   return (
                     <div
                       key={conv.id}
-                      className={`p-4 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-jci-blue/10 border-l-4 border-l-jci-blue' : 'hover:bg-slate-50'
-                      }`}
+                      className={`p-4 cursor-pointer transition-colors ${isSelected ? 'bg-jci-blue/10 border-l-4 border-l-jci-blue' : 'hover:bg-slate-50'
+                        }`}
                       onClick={() => selectConversation(conv)}
                     >
                       <div className="flex items-start gap-3">
@@ -279,7 +278,7 @@ export const MessagingView: React.FC = () => {
                   {messages.map((message, index) => {
                     const isOwnMessage = message.senderId === member?.id;
                     const showAvatar = index === 0 || messages[index - 1].senderId !== message.senderId;
-                    
+
                     return (
                       <div
                         key={message.id || index}
@@ -303,11 +302,10 @@ export const MessagingView: React.FC = () => {
                             </div>
                           )}
                           <div
-                            className={`inline-block px-4 py-2 rounded-2xl max-w-[70%] ${
-                              isOwnMessage
+                            className={`inline-block px-4 py-2 rounded-2xl max-w-[70%] ${isOwnMessage
                                 ? 'bg-jci-blue text-white'
                                 : 'bg-slate-100 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
                           </div>
@@ -369,6 +367,7 @@ export const MessagingView: React.FC = () => {
         }}
         title="New Conversation"
         size="lg"
+        drawerOnMobile
       >
         <div className="space-y-4">
           <Select

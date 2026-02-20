@@ -68,7 +68,7 @@ export const DataImportExportView: React.FC = () => {
     try {
       setIsImporting(true);
       const fileContent = await importFile.text();
-      
+
       // Parse the file content based on file type
       let data: any[];
       if (importFile.name.endsWith('.json')) {
@@ -77,13 +77,13 @@ export const DataImportExportView: React.FC = () => {
         // For CSV, we'd need to parse it - for now, assume JSON format
         data = JSON.parse(fileContent);
       }
-      
+
       // Get current user ID (in real app, this would come from auth context)
       const userId = 'current-user-id';
-      
+
       const result = await DataImportExportService.importData(data, importType, userId, importFile.name);
       setImportResult(result);
-      
+
       if (result.successfulRows > 0) {
         showToast(`Successfully imported ${result.successfulRows} records`, 'success');
       }
@@ -107,7 +107,7 @@ export const DataImportExportView: React.FC = () => {
       </div>
 
       <Card noPadding>
-        <div className="px-6 pt-4">
+        <div className="px-4 md:px-6 pt-4">
           <Tabs
             tabs={['Export Data', 'Import Data']}
             activeTab={activeTab === 'export' ? 'Export Data' : 'Import Data'}

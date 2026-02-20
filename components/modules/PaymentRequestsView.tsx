@@ -222,138 +222,141 @@ export const PaymentRequestsView: React.FC = () => {
         Submit a payment request with purpose and amount. The system will generate a reference number (e.g. PR-default-lo-20250216-001). Use this reference in your bank transfer memo for reconciliation. You can also select a member to auto-fill their details.
       </FirstUseBanner>
 
-      <Card className="p-6">
-        <Tabs
-          tabs={[
-            { id: 'my', label: 'My Applications' },
-            ...(canViewFinance ? [{ id: 'all', label: 'All Applications (Finance)' }] : []),
-          ]}
-          activeTab={activeTab}
-          onTabChange={(id) => setActiveTab(id as 'my' | 'all')}
-        />
-        <div className="mt-4 flex justify-end mb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={activeTab === 'my' ? loadMyList : loadFinanceList}
-            disabled={activeTab === 'my' ? loading : financeLoading}
-          >
-            <RefreshCw size={14} className="mr-1" /> Refresh
-          </Button>
-        </div>
-        {activeTab === 'my' && (
-          <>
-            {loading ? (
-              <LoadingState loading={true}><span /></LoadingState>
-            ) : myList.length === 0 ? (
-              <p className="text-slate-500">No applications yet</p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {myList.map((pr) => (
-                  <li key={pr.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <span className="font-medium">{pr.referenceNumber}</span>
-                      <span className="text-slate-500 ml-2">{pr.purpose}</span>
-                      {pr.activityRef && <span className="text-slate-400 text-sm ml-2">Activity: {pr.activityRef}</span>}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span>{formatCurrency(pr.amount)}</span>
-                      <StatusBadge status={pr.status} />
-                      {pr.status === 'submitted' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleCancel(pr.id)}
-                          disabled={actioningId !== null}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <X size={14} className="mr-1" /> Cancel
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-        {activeTab === 'all' && canViewFinance && (
-          <>
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              <div className="flex-1 flex gap-2">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    placeholder="Search by reference (e.g. PR-default-lo-20250216-001)"
-                    value={searchRef}
-                    onChange={(e) => setSearchRef(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && loadFinanceList()}
-                    className="block w-full rounded-lg border-slate-300 shadow-sm py-2 pl-3 pr-10 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                    aria-label="Search by reference number"
-                  />
-                  <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+      <Card className="p-0 border-none shadow-none md:p-6 md:border md:shadow-sm">
+        <div className="px-4 md:px-0 pt-4">
+          <Tabs
+            tabs={[
+              { id: 'my', label: 'My Applications' },
+              ...(canViewFinance ? [{ id: 'all', label: 'All Applications (Finance)' }] : []),
+            ]}
+            activeTab={activeTab}
+            onTabChange={(id) => setActiveTab(id as 'my' | 'all')}
+          />
+          <div className="mt-4 flex justify-end mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={activeTab === 'my' ? loadMyList : loadFinanceList}
+              disabled={activeTab === 'my' ? loading : financeLoading}
+            >
+              <RefreshCw size={14} className="mr-1" /> Refresh
+            </Button>
+          </div>
+          {activeTab === 'my' && (
+            <>
+              {loading ? (
+                <LoadingState loading={true}><span /></LoadingState>
+              ) : myList.length === 0 ? (
+                <p className="text-slate-500">No applications yet</p>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {myList.map((pr) => (
+                    <li key={pr.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="font-medium">{pr.referenceNumber}</span>
+                        <span className="text-slate-500 ml-2">{pr.purpose}</span>
+                        {pr.activityRef && <span className="text-slate-400 text-sm ml-2">Activity: {pr.activityRef}</span>}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span>{formatCurrency(pr.amount)}</span>
+                        <StatusBadge status={pr.status} />
+                        {pr.status === 'submitted' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCancel(pr.id)}
+                            disabled={actioningId !== null}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X size={14} className="mr-1" /> Cancel
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+          {activeTab === 'all' && canViewFinance && (
+            <>
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="flex-1 flex gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="Search by reference (e.g. PR-default-lo-20250216-001)"
+                      value={searchRef}
+                      onChange={(e) => setSearchRef(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && loadFinanceList()}
+                      className="block w-full rounded-lg border-slate-300 shadow-sm py-2 pl-3 pr-10 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                      aria-label="Search by reference number"
+                    />
+                    <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                  <div className="w-36 shrink-0">
+                    <Select
+                      label=""
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
+                      options={[
+                        { value: '', label: 'All statuses' },
+                        { value: 'submitted', label: 'Pending' },
+                        { value: 'approved', label: 'Approved' },
+                        { value: 'rejected', label: 'Rejected' },
+                        { value: 'cancelled', label: 'Cancelled' },
+                        { value: 'draft', label: 'Draft' },
+                      ]}
+                      className="w-full"
+                      aria-label="Filter by status"
+                    />
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={loadFinanceList} disabled={financeLoading}>
+                    <Search size={14} className="mr-1" /> Search
+                  </Button>
                 </div>
-                <div className="w-36 shrink-0">
-                  <Select
-                    label=""
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
-                    options={[
-                      { value: '', label: 'All statuses' },
-                      { value: 'submitted', label: 'Pending' },
-                      { value: 'approved', label: 'Approved' },
-                      { value: 'rejected', label: 'Rejected' },
-                      { value: 'cancelled', label: 'Cancelled' },
-                      { value: 'draft', label: 'Draft' },
-                    ]}
-                    className="w-full"
-                    aria-label="Filter by status"
-                  />
-                </div>
-                <Button size="sm" variant="secondary" onClick={loadFinanceList} disabled={financeLoading}>
-                  <Search size={14} className="mr-1" /> Search
-                </Button>
               </div>
-            </div>
-            {financeLoading ? (
-              <LoadingState loading={true}><span /></LoadingState>
-            ) : financeList.length === 0 ? (
-              <p className="text-slate-500">No applications</p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {financeList.map((pr) => (
-                  <li key={pr.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <span className="font-medium">{pr.referenceNumber}</span>
-                      {dedupIds.has(pr.id) && (
-                        <Badge variant="warning" className="ml-2 text-xs">Possible duplicate</Badge>
-                      )}
-                      <span className="text-slate-500 ml-2">{pr.purpose}</span>
-                      {pr.activityRef && <span className="text-slate-400 text-sm ml-2">Activity: {pr.activityRef}</span>}
-                      {pr.applicantName && <span className="text-slate-400 text-sm ml-2">Applicant: {pr.applicantName}</span>}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span>{formatCurrency(pr.amount)}</span>
-                      <StatusBadge status={pr.status} />
-                      {pr.status === 'submitted' && (
-                        <span className="flex gap-1">
-                          <Button size="sm" variant="secondary" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null}><CheckCircle size={14} className="mr-1" /> Approve</Button>
-                          <Button size="sm" variant="secondary" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null}><XCircle size={14} className="mr-1" /> Reject</Button>
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
+              {financeLoading ? (
+                <LoadingState loading={true}><span /></LoadingState>
+              ) : financeList.length === 0 ? (
+                <p className="text-slate-500">No applications</p>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {financeList.map((pr) => (
+                    <li key={pr.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="font-medium">{pr.referenceNumber}</span>
+                        {dedupIds.has(pr.id) && (
+                          <Badge variant="warning" className="ml-2 text-xs">Possible duplicate</Badge>
+                        )}
+                        <span className="text-slate-500 ml-2">{pr.purpose}</span>
+                        {pr.activityRef && <span className="text-slate-400 text-sm ml-2">Activity: {pr.activityRef}</span>}
+                        {pr.applicantName && <span className="text-slate-400 text-sm ml-2">Applicant: {pr.applicantName}</span>}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span>{formatCurrency(pr.amount)}</span>
+                        <StatusBadge status={pr.status} />
+                        {pr.status === 'submitted' && (
+                          <span className="flex gap-1">
+                            <Button size="sm" variant="secondary" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null}><CheckCircle size={14} className="mr-1" /> Approve</Button>
+                            <Button size="sm" variant="secondary" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null}><XCircle size={14} className="mr-1" /> Reject</Button>
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
       </Card>
 
       <Modal
         isOpen={submitModalOpen}
         onClose={() => !submitting && setSubmitModalOpen(false)}
         title="Submit Payment Request"
+        drawerOnMobile
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <MemberSelector

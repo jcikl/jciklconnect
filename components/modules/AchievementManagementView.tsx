@@ -20,16 +20,16 @@ export const AchievementManagementView: React.FC = () => {
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [milestones, setMilestones] = useState<AchievementMilestone[]>([]);
-  
-  const { 
-    achievements, 
-    memberAchievements, 
-    memberProgress, 
-    loading, 
-    error, 
-    createAchievement, 
-    updateAchievement, 
-    awardAchievement, 
+
+  const {
+    achievements,
+    memberAchievements,
+    memberProgress,
+    loading,
+    error,
+    createAchievement,
+    updateAchievement,
+    awardAchievement,
     loadMemberAchievements,
     loadMemberProgress,
     calculateProgress
@@ -249,7 +249,7 @@ export const AchievementManagementView: React.FC = () => {
             {memberAchievements.map((award) => {
               const achievement = achievements.find(a => a.id === award.achievementId);
               if (!achievement) return null;
-              
+
               return (
                 <Card key={award.id} className={`hover:shadow-lg transition-shadow border-2 ${getTierColor(achievement.tier)}`}>
                   <div className="text-5xl mb-4">{achievement.icon}</div>
@@ -295,6 +295,7 @@ export const AchievementManagementView: React.FC = () => {
           onClose={() => setCreateModalOpen(false)}
           title="Create Achievement"
           size="lg"
+          drawerOnMobile
         >
           <form onSubmit={handleCreateAchievement} className="space-y-4">
             <Input name="name" label="Achievement Name" placeholder="e.g., First Steps" required />
@@ -354,7 +355,7 @@ export const AchievementManagementView: React.FC = () => {
                 { label: 'Monthly', value: 'monthly' },
               ]}
             />
-            
+
             {/* Milestones Section */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -427,11 +428,11 @@ export const AchievementManagementView: React.FC = () => {
         <Modal
           isOpen={isEditModalOpen}
           onClose={() => {
-            setEditModalOpen(false);
             setSelectedAchievement(null);
           }}
           title="Edit Achievement"
           size="lg"
+          drawerOnMobile
         >
           <form onSubmit={handleUpdateAchievement} className="space-y-4">
             <Input name="name" label="Achievement Name" defaultValue={selectedAchievement.name} required />
@@ -495,7 +496,7 @@ export const AchievementManagementView: React.FC = () => {
                 { label: 'Monthly', value: 'monthly' },
               ]}
             />
-            
+
             {/* Milestones Section */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -576,6 +577,7 @@ export const AchievementManagementView: React.FC = () => {
             setSelectedMemberId('');
           }}
           title={`Award Achievement: ${selectedAchievement.name}`}
+          drawerOnMobile
         >
           <div className="space-y-4">
             <div className="text-center">

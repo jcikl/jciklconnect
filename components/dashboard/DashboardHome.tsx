@@ -4,7 +4,7 @@ import {
   Calendar, Briefcase, Bell, Award, Sparkles, AlertTriangle, CheckCircle,
   TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog
 } from 'lucide-react';
-import { Card, StatCard, Badge, Button, useToast } from '../ui/Common';
+import { Card, StatCard, StatCardsContainer, Badge, Button, useToast } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useEvents } from '../../hooks/useEvents';
@@ -320,7 +320,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <StatCardsContainer>
         <StatCard
           title="Total Points"
           value={(member.points || 0).toLocaleString()}
@@ -345,7 +345,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           icon={<Bell size={20} />}
           subtext="Unread messages"
         />
-      </div>
+      </StatCardsContainer>
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">

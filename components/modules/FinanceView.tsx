@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers } from 'lucide-react';
-import { Card, Button, Badge, ProgressBar, StatCard, Modal, useToast, Tabs, Drawer } from '../ui/Common';
+import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { LoadingState } from '../ui/Loading';
@@ -358,8 +358,7 @@ export const FinanceView: React.FC = () => {
             (tx.status || '').toLowerCase(),
             tx.date.toLowerCase(),
             String(tx.amount),
-            String(tx.income || ''),
-            String(tx.expense || ''),
+            tx.type.toLowerCase(),
             (tx.purpose || '').toLowerCase()
           ];
 
@@ -1077,17 +1076,19 @@ export const FinanceView: React.FC = () => {
         </div>
       </div>
 
-      <Tabs
-        tabs={['Dashboard', 'Transactions', 'Project Account', 'Membership', 'Administrative', 'Reconciliation', 'Cross-Account & Errors']}
-        activeTab={moduleTab}
-        onTabChange={setModuleTab}
-      />
+      <div className="px-4 md:px-6">
+        <Tabs
+          tabs={['Dashboard', 'Transactions', 'Project Account', 'Membership', 'Administrative', 'Reconciliation', 'Cross-Account & Errors']}
+          activeTab={moduleTab}
+          onTabChange={setModuleTab}
+        />
+      </div>
 
       {moduleTab === 'Dashboard' && (
         <div className="space-y-6">
           {/* Stat Cards */}
           <LoadingState loading={loading} error={error}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatCardsContainer>
               <StatCard
                 title="Total Cash on Hand"
                 value={formatCurrency(accounts.reduce((acc, curr) => acc + curr.balance, 0), accounts[0]?.currency || 'USD')}
@@ -1107,7 +1108,7 @@ export const FinanceView: React.FC = () => {
                 icon={<AlertCircle size={20} />}
                 subtext={`${transactions.filter(t => t.status === 'Pending' && t.type === 'Expense').length} expenses need approval`}
               />
-            </div>
+            </StatCardsContainer>
           </LoadingState>
 
           <div className="grid lg:grid-cols-3 gap-6">
@@ -2054,7 +2055,7 @@ export const FinanceView: React.FC = () => {
       )
       }
 
-      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setRecordFormMemberId(''); setRecordFormYear(new Date().getFullYear()); setRecordFormProjectId(''); }} title="Record Transaction">
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setRecordFormMemberId(''); setRecordFormYear(new Date().getFullYear()); setRecordFormProjectId(''); }} title="Record Transaction" drawerOnMobile>
         <form onSubmit={handleAddTransaction} className="space-y-6">
           <TransactionForm
             mode="create"
@@ -2088,7 +2089,7 @@ export const FinanceView: React.FC = () => {
 
       {/* Edit Transaction Modal */}
       {editingTransaction && (
-        <Modal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingTransaction(null); setEditingMembershipFilterYear(null); setEditingMembershipMemberId(''); setEditingMembershipYear(new Date().getFullYear()); setEditingAdministrativeYear(new Date().getFullYear()); setEditingAdministrativePurposeBase(''); }} title="Edit Transaction">
+        <Modal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingTransaction(null); setEditingMembershipFilterYear(null); setEditingMembershipMemberId(''); setEditingMembershipYear(new Date().getFullYear()); setEditingAdministrativeYear(new Date().getFullYear()); setEditingAdministrativePurposeBase(''); }} title="Edit Transaction" drawerOnMobile>
           <form onSubmit={handleUpdateTransaction} className="space-y-6">
             <TransactionForm
               mode="edit"
@@ -2436,7 +2437,7 @@ export const FinanceView: React.FC = () => {
       />
 
       {/* Add Administrative Project ID Modal (行政费户口) */}
-      <Modal isOpen={isAddAdministrativeProjectOpen} onClose={() => setIsAddAdministrativeProjectOpen(false)} title="Add Admin Account">
+      <Modal isOpen={isAddAdministrativeProjectOpen} onClose={() => setIsAddAdministrativeProjectOpen(false)} title="Add Admin Account" drawerOnMobile>
         <form onSubmit={(e) => {
           e.preventDefault();
           const name = (new FormData(e.currentTarget).get('projectId') as string)?.trim();
@@ -2587,7 +2588,7 @@ const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Financial Reports" size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Financial Reports" size="xl" drawerOnMobile>
       <div className="space-y-6">
         {/* Report Filters */}
         <div className="flex flex-wrap gap-4 items-end">
@@ -2900,7 +2901,7 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Bank Account">
+    <Modal isOpen={isOpen} onClose={onClose} title="Add Bank Account" drawerOnMobile>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Input name="bankName" label="Bank" placeholder="e.g. Maybank, CIMB" required />
@@ -3009,7 +3010,7 @@ const BankReconciliationModal: React.FC<BankReconciliationModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Reconcile Bank Account" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Reconcile Bank Account" size="lg" drawerOnMobile>
       <form onSubmit={handleReconcile} className="space-y-4">
         <Select
           label="Select Bank Account"
@@ -3110,7 +3111,7 @@ const DuesRenewalModal: React.FC<DuesRenewalModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Initiate Annual Dues Renewal" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Initiate Annual Dues Renewal" size="lg" drawerOnMobile>
       <form onSubmit={handleRenew} className="space-y-4">
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start gap-3">

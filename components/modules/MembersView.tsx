@@ -470,7 +470,7 @@ export const MembersView: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Profile</h2>
         </div>
-        <MemberDetail member={currentMember} onBack={() => {}} isSelfView />
+        <MemberDetail member={currentMember} onBack={() => { }} isSelfView />
       </div>
     );
   }
@@ -501,7 +501,7 @@ export const MembersView: React.FC = () => {
           </div>
 
           <Card noPadding>
-            <div className="px-6 pt-4">
+            <div className="px-4 md:px-6 pt-4">
               <Tabs
                 tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking']}
                 activeTab={
@@ -583,7 +583,7 @@ export const MembersView: React.FC = () => {
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} />
       )}
 
-      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Register New Member" size="xl">
+      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Register New Member" size="xl" drawerOnMobile>
         <form onSubmit={handleAddMember} className="space-y-4">
           <div className="bg-blue-50 p-4 rounded-lg mb-4">
             <p className="text-xs text-blue-700 flex items-start gap-2">
@@ -716,7 +716,7 @@ export const MembersView: React.FC = () => {
       />
 
       {/* Export Modal – Export Data (migrated from Import/Export tab) */}
-      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="Export Data">
+      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="Export Data" drawerOnMobile>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Data Type</label>
@@ -758,6 +758,7 @@ export const MembersView: React.FC = () => {
             setLastImportResult(null);
           }}
           title="Import Results"
+          drawerOnMobile
         >
           <div className="space-y-4">
             <div className={`p-4 rounded-lg flex items-center gap-3 ${lastImportResult.status === 'success' ? 'bg-green-50 border border-green-100' :
@@ -919,7 +920,8 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
 const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void }> = ({ members, onSelect }) => {
   return (
     <Card noPadding>
-      <div className="overflow-x-auto">
+      {/* Desktop View */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-50/50">
@@ -978,6 +980,59 @@ const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void 
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile View */}
+      <div className="md:hidden divide-y divide-slate-100">
+        {members.map(member => (
+          <div
+            key={member.id}
+            className="p-4 active:bg-slate-50 transition-colors"
+            onClick={() => onSelect(member.id)}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-3">
+                <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
+                <div>
+                  <div className="font-bold text-slate-900">{member.name}</div>
+                  <div className="text-xs text-slate-500">{member.email}</div>
+                </div>
+              </div>
+              <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Tier / Points</span>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-sm font-bold ${member.tier === 'Platinum' ? 'text-purple-600' : member.tier === 'Gold' ? 'text-amber-600' : 'text-slate-600'}`}>
+                    {member.tier}
+                  </span>
+                  <span className="text-xs text-slate-500">{member.points} pts</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Status</span>
+                <div>
+                  {member.churnRisk === 'High' && <Badge variant="error">At Risk</Badge>}
+                  {member.churnRisk === 'Low' && <Badge variant="success">Stable</Badge>}
+                  {member.churnRisk === 'Medium' && <Badge variant="warning">Monitor</Badge>}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">Engagement</span>
+                <span className="text-xs font-bold text-slate-700">{member.attendanceRate}%</span>
+              </div>
+              <ProgressBar
+                progress={member.attendanceRate}
+                color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </Card>
   );

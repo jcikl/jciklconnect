@@ -250,7 +250,7 @@ export const PointsRuleEditor: React.FC<PointsRuleEditorProps> = ({
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="font-medium text-slate-900">Basic Information</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Rule Name *
@@ -300,7 +300,7 @@ export const PointsRuleEditor: React.FC<PointsRuleEditorProps> = ({
           {/* Point Configuration */}
           <div className="space-y-4">
             <h3 className="font-medium text-slate-900">Point Configuration</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Point Value *
@@ -446,6 +446,7 @@ export const PointsRuleEditor: React.FC<PointsRuleEditorProps> = ({
         isOpen={showTestModal}
         onClose={() => setShowTestModal(false)}
         title="Test Points Rule"
+        drawerOnMobile
       >
         <div className="space-y-4">
           <div>
@@ -495,7 +496,7 @@ export const PointsRuleEditor: React.FC<PointsRuleEditorProps> = ({
                 <p className="text-sm">
                   <span className="font-medium">Points Awarded:</span> {testResult.pointsAwarded}
                 </p>
-                
+
                 {testResult.conditionResults.length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-1">Condition Results:</p>
@@ -508,7 +509,7 @@ export const PointsRuleEditor: React.FC<PointsRuleEditorProps> = ({
                             <AlertCircle size={12} className="text-red-600" />
                           )}
                           <span>
-                            {result.field} {result.operator} {JSON.stringify(result.expectedValue)} 
+                            {result.field} {result.operator} {JSON.stringify(result.expectedValue)}
                             (actual: {JSON.stringify(result.actualValue)})
                           </span>
                         </div>
