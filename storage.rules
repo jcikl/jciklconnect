@@ -1,0 +1,167 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isMember() {
+      return isAuthenticated() && 
+             exists(/databases/(default)/documents/members/$(request.auth.uid));
+    }
+    
+    function isBoard() {
+      return isAuthenticated() && 
+             exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
+             get(/databases/(default)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
+             get(/databases/(default)/documents/members/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+    
+    function isValidImageFile() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidDocumentFile() {
+      return request.resource.contentType in [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'text/csv'
+      ];
+    }
+    
+    function isValidFileSize(maxSizeMB) {
+      return request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+    
+    // Member profile images
+    match /members/{memberId}/profile/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(memberId) && 
+                      isValidImageFile() && 
+                      isValidFileSize(5); // 5MB limit
+      allow delete: if isOwner(memberId) || isBoard();
+    }
+    
+    // Event images and documents
+    match /events/{eventId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isMember() && 
+                      (isValidImageFile() || isValidDocumentFile()) && 
+                      isValidFileSize(10); // 10MB limit
+      allow delete: if isBoard();
+    }
+    
+    // Project documents and images
+    match /projects/{projectId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isMember() && 
+                      (isValidImageFile() || isValidDocumentFile()) && 
+                      isValidFileSize(10); // 10MB limit
+      allow delete: if isBoard();
+    }
+    
+    // Communication/post attachments
+    match /communication/{postId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isMember() && 
+                      (isValidImageFile() || isValidDocumentFile()) && 
+                      isValidFileSize(5); // 5MB limit
+      allow delete: if isBoard();
+    }
+    
+    // Document storage for official documents
+    match /documents/{documentId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard() && 
+                      (isValidImageFile() || isValidDocumentFile()) && 
+                      isValidFileSize(20); // 20MB limit for official documents
+      allow delete: if isBoard();
+    }
+    
+    // Badge and achievement images
+    match /badges/{badgeId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard() && 
+                      isValidImageFile() && 
+                      isValidFileSize(2); // 2MB limit for badge images
+      allow delete: if isBoard();
+    }
+    
+    match /achievements/{achievementId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard() && 
+                      isValidImageFile() && 
+                      isValidFileSize(2); // 2MB limit for achievement images
+      allow delete: if isBoard();
+    }
+    
+    // Business profile images and documents
+    match /business-profiles/{profileId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isMember() && 
+                      (isValidImageFile() || isValidDocumentFile()) && 
+                      isValidFileSize(10); // 10MB limit
+      allow delete: if isBoard();
+    }
+    
+    // Advertisement images
+    match /advertisements/{adId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard() && 
+                      isValidImageFile() && 
+                      isValidFileSize(5); // 5MB limit
+      allow delete: if isBoard();
+    }
+    
+    // Template files
+    match /templates/{templateId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard() && 
+                      (isValidImageFile() || isValidDocumentFile()) && 
+                      isValidFileSize(10); // 10MB limit
+      allow delete: if isBoard();
+    }
+    
+    // Temporary uploads (for processing)
+    match /temp/{userId}/{fileName} {
+      allow read, write: if isOwner(userId) && 
+                            (isValidImageFile() || isValidDocumentFile()) && 
+                            isValidFileSize(20); // 20MB limit for temp files
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    // System backups (admin only)
+    match /backups/{allPaths=**} {
+      allow read, write, delete: if isAdmin();
+    }
+    
+    // Reports and exports
+    match /reports/{reportId}/{fileName} {
+      allow read: if isBoard();
+      allow write: if isBoard() && 
+                      isValidDocumentFile() && 
+                      isValidFileSize(50); // 50MB limit for reports
+      allow delete: if isBoard();
+    }
+    
+    // Default: deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

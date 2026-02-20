@@ -1,4 +1,4 @@
-import { Member, Event, Project, UserRole, MemberTier, DashboardStats, Notification, Transaction, BankAccount, InventoryItem, BusinessProfile, AutomationRule, HobbyClub, TrainingModule, Document, NewsPost, Task, Election, Proposal, Survey } from '../types';
+import { Member, Event, Project, UserRole, MemberTier, DashboardStats, Notification, Transaction, BankAccount, PaymentRequest, InventoryItem, BusinessProfile, AutomationRule, HobbyClub, TrainingModule, Document, NewsPost, Task, Survey, DuesRenewalTransaction, MembershipType, ProjectFinancialAccount, ProjectTransaction, BudgetCategory, AlertThreshold } from '../types';
 
 export const CURRENT_USER: Member = {
   id: 'u1',
@@ -25,7 +25,8 @@ export const CURRENT_USER: Member = {
     { year: '2023', role: 'Secretary', description: 'Managed chapter administration.' }
   ],
   mentorId: 'u4',
-  menteeIds: ['u3']
+  menteeIds: ['u3'],
+  membershipType: 'Full'
 };
 
 export const MOCK_STATS: DashboardStats = {
@@ -37,13 +38,78 @@ export const MOCK_STATS: DashboardStats = {
   duesCollectedPercentage: 78,
 };
 
+/** admin@jcikl.com 完整会员数据（dev login 使用） */
+export const MOCK_DEV_ADMIN: Member = {
+  id: 'dev-admin-001',
+  name: 'Admin User',
+  email: 'admin@jcikl.com',
+  role: UserRole.ADMIN,
+  tier: MemberTier.PLATINUM,
+  points: 5000,
+  joinDate: '2020-01-15',
+  avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=0097D7&color=fff',
+  skills: ['Leadership', 'Management', 'Development', 'Public Speaking'],
+  churnRisk: 'Low',
+  attendanceRate: 100,
+  duesStatus: 'Paid',
+  badges: [
+    { id: 'b-admin-1', name: 'Chapter Admin', icon: '🛡️', description: 'System administrator' },
+    { id: 'b-admin-2', name: 'Leadership', icon: '⭐', description: 'Board member' },
+  ],
+  bio: 'JCI Local Organization administrator. Passionate about community development and digital transformation.',
+  phone: '+60 12-345 6789',
+  alternatePhone: '+60 12-345 6788',
+  membershipType: 'Full',
+  duesYear: 2024,
+  duesPaidDate: '2024-01-10',
+  mentorId: undefined,
+  menteeIds: ['u1', 'u2', 'u3'],
+  careerHistory: [
+    { year: '2020', role: 'Member', description: 'Joined the chapter' },
+    { year: '2021', role: 'VP Technology', description: 'Led digital initiatives' },
+    { year: '2022', role: 'Secretary', description: 'Chapter administration' },
+    { year: '2023', role: 'Admin', description: 'System administration' },
+  ],
+  // Basic Information
+  fullName: 'Admin User',
+  idNumber: 'A12345678',
+  gender: 'Male',
+  ethnicity: 'Chinese',
+  nationality: 'Malaysia',
+  dateOfBirth: '1990-05-20',
+  hobbies: ['Leadership', 'Public Speaking', 'Reading', 'Travelling'],
+  // Professional & Business
+  companyName: 'JCI Local Organization',
+  companyWebsite: 'https://jci.local',
+  departmentAndPosition: 'Administration / System Admin',
+  industry: 'Non-Profit',
+  acceptInternationalBusiness: 'Yes',
+  businessCategory: ['Community Service'],
+  // Contact Information
+  address: '123 JCI Street, Kuala Lumpur, Malaysia',
+  linkedin: 'https://linkedin.com/in/admin-user',
+  facebook: 'https://facebook.com/admin.user',
+  instagram: 'https://instagram.com/admin.user',
+  wechat: 'admin_wechat',
+  emergencyContactName: 'Emergency Contact',
+  emergencyContactPhone: '+60 12-999 8888',
+  emergencyContactRelationship: 'Spouse',
+  // Apparel & Items
+  cutStyle: 'Unisex',
+  tshirtSize: 'L',
+  jacketSize: 'L',
+  embroideredName: 'Admin',
+  tshirtStatus: 'Received',
+};
+
 export const MOCK_MEMBERS: Member[] = [
   { ...CURRENT_USER },
+  { ...MOCK_DEV_ADMIN },
   {
     id: 'u2',
     name: 'Sarah Chen',
     email: 'sarah.c@jci.local',
-    role: UserRole.MEMBER,
+    role: UserRole.PROBATION_MEMBER,
     tier: MemberTier.SILVER,
     points: 850,
     joinDate: '2022-02-10',
@@ -57,7 +123,8 @@ export const MOCK_MEMBERS: Member[] = [
       { year: '2022', role: 'Member', description: 'Joined' },
       { year: '2023', role: 'Committee Chair', description: 'Finance Committee' }
     ],
-    mentorId: 'u4'
+    mentorId: 'u4',
+    membershipType: 'Probation'
   },
   {
     id: 'u3',
@@ -73,7 +140,8 @@ export const MOCK_MEMBERS: Member[] = [
     attendanceRate: 40,
     duesStatus: 'Overdue',
     badges: [],
-    mentorId: 'u1'
+    mentorId: 'u1',
+    membershipType: 'Probation'
   },
   {
     id: 'u4',
@@ -93,11 +161,12 @@ export const MOCK_MEMBERS: Member[] = [
       { id: 'b4', name: 'Mentor', icon: '🎓', description: 'Mentored 3 members' }
     ],
     careerHistory: [
-        { year: '2019', role: 'Member', description: 'Joined' },
-        { year: '2020', role: 'VP Community', description: 'Best VP Award' },
-        { year: '2021', role: 'President', description: 'Chapter of the Year' }
+      { year: '2019', role: 'Member', description: 'Joined' },
+      { year: '2020', role: 'VP Community', description: 'Best VP Award' },
+      { year: '2021', role: 'President', description: 'Chapter of the Year' }
     ],
-    menteeIds: ['u1', 'u2']
+    menteeIds: ['u1', 'u2'],
+    membershipType: 'Full'
   },
 ];
 
@@ -121,15 +190,304 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
 ];
 
 export const MOCK_TRANSACTIONS: Transaction[] = [
-  { id: 't1', date: '2023-12-01', description: 'Membership Dues - Batch 1', amount: 4500, type: 'Income', category: 'Dues', status: 'Cleared' },
-  { id: 't2', date: '2023-12-02', description: 'Venue Deposit - AGM', amount: -1200, type: 'Expense', category: 'Event', status: 'Cleared' },
-  { id: 't3', date: '2023-12-03', description: 'Sponsorship - Tech Corp', amount: 2000, type: 'Income', category: 'Sponsorship', status: 'Pending' },
-  { id: 't4', date: '2023-12-05', description: 'Marketing Materials', amount: -350, type: 'Expense', category: 'Project', status: 'Cleared' },
+  {
+    id: 't1',
+    date: '2023-12-01',
+    description: 'Membership Dues - Batch 1',
+    amount: 4500,
+    type: 'Income',
+    category: 'Membership',
+    status: 'Cleared',
+    bankAccountId: 'ba1',
+    referenceNumber: 'PR-default-lo-20231201-001',
+    paymentRequestId: 'pr-mock-001',
+    memberId: 'u1',
+  },
+  {
+    id: 't2',
+    date: '2026-12-02',
+    description: 'Venue Deposit - AGM',
+    purpose: 'AGM venue deposit',
+    amount: -1200,
+    type: 'Expense',
+    category: 'Administrative',
+    status: 'Cleared',
+    bankAccountId: 'ba1',
+    referenceNumber: 'PR-default-lo-20231202-001',
+    paymentRequestId: 'pr-mock-002',
+  },
+  {
+    id: 't3',
+    date: '2023-12-03',
+    description: 'Sponsorship - Tech Corp',
+    amount: 2000,
+    type: 'Income',
+    category: 'Projects & Activities',
+    status: 'Pending',
+    bankAccountId: 'ba1',
+    referenceNumber: 'PR-default-lo-20231203-001',
+  },
+  {
+    id: 't4',
+    date: '2023-12-05',
+    description: 'Marketing Materials',
+    purpose: 'Office supplies',
+    amount: -350,
+    type: 'Expense',
+    category: 'Projects & Activities',
+    status: 'Cleared',
+    bankAccountId: 'ba2',
+    referenceNumber: 'PR-default-lo-20231205-001',
+    paymentRequestId: 'pr-mock-003',
+  },
+  {
+    id: 't5',
+    date: '2025-12-06',
+    description: 'Dues - Sarah Chen',
+    amount: 300,
+    type: 'Income',
+    category: 'Membership',
+    status: 'Reconciled',
+    bankAccountId: 'ba1',
+    referenceNumber: 'PR-default-lo-20231206-002',
+    paymentRequestId: 'pr-mock-004',
+    memberId: 'u2',
+    reconciledAt: '2023-12-07',
+    reconciledBy: 'u1',
+  },
 ];
 
 export const MOCK_ACCOUNTS: BankAccount[] = [
-  { id: 'ba1', name: 'Main Operations', balance: 12450.50, currency: 'USD', lastReconciled: '2023-11-30' },
-  { id: 'ba2', name: 'Project Fund', balance: 5200.00, currency: 'USD', lastReconciled: '2023-11-30' },
+  {
+    id: 'ba1',
+    name: 'Main Operations',
+    balance: 12450.5,
+    initialBalance: 10000.0,
+    currency: 'MYR',
+    lastReconciled: '2023-11-30',
+    accountNumber: '1234567890',
+    bankName: 'Maybank',
+    accountType: 'Checking',
+  },
+  {
+    id: 'ba2',
+    name: 'Project Fund',
+    balance: 5200.0,
+    initialBalance: 5000.0,
+    currency: 'MYR',
+    lastReconciled: '2023-11-30',
+    accountNumber: '9876543210',
+    bankName: 'CIMB',
+    accountType: 'Savings',
+  },
+];
+
+const DEFAULT_LO_ID = 'default-lo';
+
+/** Payment Requests mock – references MOCK_MEMBERS (applicantId/applicantName) and aligns with MOCK_TRANSACTIONS (referenceNumber / paymentRequestId). */
+export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
+  {
+    id: 'pr-mock-001',
+    applicantId: 'u1',
+    applicantName: 'Alex Rivera',
+    amount: 4500,
+    purpose: 'Membership Dues - Batch 1',
+    activityRef: null,
+    referenceNumber: 'PR-default-lo-20231201-001',
+    status: 'approved',
+    loId: DEFAULT_LO_ID,
+    createdAt: '2023-12-01T09:00:00.000Z',
+    updatedAt: '2023-12-01T10:30:00.000Z',
+    updatedBy: 'u1',
+    reviewedBy: 'u1',
+    reviewedAt: '2023-12-01T10:30:00.000Z',
+  },
+  {
+    id: 'pr-mock-002',
+    applicantId: 'u1',
+    applicantName: 'Alex Rivera',
+    amount: 1200,
+    purpose: 'Venue Deposit - AGM',
+    activityRef: 'evt-agm-2023',
+    referenceNumber: 'PR-default-lo-20231202-001',
+    status: 'approved',
+    loId: DEFAULT_LO_ID,
+    createdAt: '2023-12-02T08:00:00.000Z',
+    updatedAt: '2023-12-02T14:00:00.000Z',
+    updatedBy: 'u1',
+    reviewedBy: 'u1',
+    reviewedAt: '2023-12-02T14:00:00.000Z',
+  },
+  {
+    id: 'pr-mock-003',
+    applicantId: 'u2',
+    applicantName: 'Sarah Chen',
+    amount: 2000,
+    purpose: 'Sponsorship - Tech Corp',
+    activityRef: 'Business Expo 2023',
+    referenceNumber: 'PR-default-lo-20231203-001',
+    status: 'submitted',
+    loId: DEFAULT_LO_ID,
+    createdAt: '2023-12-03T11:00:00.000Z',
+    updatedAt: '2023-12-03T11:00:00.000Z',
+    updatedBy: 'u2',
+    reviewedBy: null,
+    reviewedAt: null,
+  },
+  {
+    id: 'pr-mock-004',
+    applicantId: 'u2',
+    applicantName: 'Sarah Chen',
+    amount: 350,
+    purpose: 'Marketing Materials',
+    activityRef: 'Green City Project',
+    referenceNumber: 'PR-default-lo-20231205-001',
+    status: 'approved',
+    loId: DEFAULT_LO_ID,
+    createdAt: '2023-12-05T09:30:00.000Z',
+    updatedAt: '2023-12-05T16:00:00.000Z',
+    updatedBy: 'u2',
+    reviewedBy: 'u1',
+    reviewedAt: '2023-12-05T16:00:00.000Z',
+  },
+  {
+    id: 'pr-mock-005',
+    applicantId: 'u2',
+    applicantName: 'Sarah Chen',
+    amount: 300,
+    purpose: 'Dues - Sarah Chen',
+    activityRef: null,
+    referenceNumber: 'PR-default-lo-20231206-002',
+    status: 'approved',
+    loId: DEFAULT_LO_ID,
+    createdAt: '2025-12-06T10:00:00.000Z',
+    updatedAt: '2025-12-07T09:00:00.000Z',
+    updatedBy: 'u2',
+    reviewedBy: 'u1',
+    reviewedAt: '2025-12-07T09:00:00.000Z',
+  },
+  {
+    id: 'pr-mock-006',
+    applicantId: 'u3',
+    applicantName: 'Michael Ross',
+    amount: 500,
+    purpose: 'Workshop materials - Leadership 101',
+    activityRef: 'Leadership 101 Workshop',
+    referenceNumber: 'PR-default-lo-20231210-001',
+    status: 'submitted',
+    loId: DEFAULT_LO_ID,
+    createdAt: '2023-12-10T14:00:00.000Z',
+    updatedAt: '2023-12-10T14:00:00.000Z',
+    updatedBy: 'u3',
+    reviewedBy: null,
+    reviewedAt: null,
+  },
+  {
+    id: 'pr-mock-007',
+    applicantId: 'u4',
+    applicantName: 'Jessica Day',
+    amount: 800,
+    purpose: 'Catering - Board dinner',
+    activityRef: null,
+    referenceNumber: 'PR-default-lo-20231208-001',
+    status: 'rejected',
+    loId: DEFAULT_LO_ID,
+    createdAt: '2023-12-08T12:00:00.000Z',
+    updatedAt: '2023-12-09T10:00:00.000Z',
+    updatedBy: 'u4',
+    reviewedBy: 'u1',
+    reviewedAt: '2023-12-09T10:00:00.000Z',
+  },
+];
+
+/** 会费管理 mock：会费续费/新会员缴费记录，与 MOCK_MEMBERS 对应 */
+const DUES_YEAR = 2024;
+const DUE_DATE = `${DUES_YEAR}-03-31`;
+
+export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
+  {
+    id: 'dues-1',
+    memberId: 'u1',
+    membershipType: 'Full' as MembershipType,
+    duesYear: DUES_YEAR,
+    amount: 300,
+    status: 'paid',
+    dueDate: DUE_DATE,
+    paidDate: '2024-02-15',
+    isRenewal: true,
+    createdAt: '2024-01-10T09:00:00.000Z',
+    updatedAt: '2024-02-15T10:00:00.000Z',
+    remindersSent: 0,
+  },
+  {
+    id: 'dues-2',
+    memberId: 'u2',
+    membershipType: 'Full' as MembershipType,
+    duesYear: DUES_YEAR,
+    amount: 300,
+    status: 'paid',
+    dueDate: DUE_DATE,
+    paidDate: '2024-03-01',
+    isRenewal: true,
+    createdAt: '2024-01-10T09:00:00.000Z',
+    updatedAt: '2024-03-01T11:00:00.000Z',
+    remindersSent: 1,
+  },
+  {
+    id: 'dues-3',
+    memberId: 'u3',
+    membershipType: 'Probation' as MembershipType,
+    duesYear: DUES_YEAR,
+    amount: 350,
+    status: 'pending',
+    dueDate: DUE_DATE,
+    isRenewal: false,
+    createdAt: '2024-01-12T09:00:00.000Z',
+    updatedAt: '2024-01-12T09:00:00.000Z',
+    remindersSent: 2,
+    lastReminderDate: '2024-03-10',
+  },
+  {
+    id: 'dues-4',
+    memberId: 'u4',
+    membershipType: 'Full' as MembershipType,
+    duesYear: DUES_YEAR,
+    amount: 300,
+    status: 'paid',
+    dueDate: DUE_DATE,
+    paidDate: '2024-01-20',
+    isRenewal: true,
+    createdAt: '2024-01-10T09:00:00.000Z',
+    updatedAt: '2024-01-20T09:00:00.000Z',
+    remindersSent: 0,
+  },
+  {
+    id: 'dues-5',
+    memberId: 'u1',
+    membershipType: 'Full' as MembershipType,
+    duesYear: 2025,
+    amount: 300,
+    status: 'pending',
+    dueDate: '2025-03-31',
+    isRenewal: true,
+    createdAt: '2025-01-05T09:00:00.000Z',
+    updatedAt: '2025-01-05T09:00:00.000Z',
+    remindersSent: 0,
+  },
+  {
+    id: 'dues-6',
+    memberId: 'u2',
+    membershipType: 'Full' as MembershipType,
+    duesYear: 2025,
+    amount: 300,
+    status: 'overdue',
+    dueDate: '2025-03-31',
+    isRenewal: true,
+    createdAt: '2025-01-05T09:00:00.000Z',
+    updatedAt: '2025-01-05T09:00:00.000Z',
+    remindersSent: 3,
+    lastReminderDate: '2025-04-05',
+  },
 ];
 
 export const MOCK_INVENTORY: InventoryItem[] = [
@@ -180,65 +538,157 @@ export const MOCK_TASKS: Task[] = [
   { id: 't5', projectId: 'p3', title: 'Collect laptops', status: 'Done', priority: 'Medium', dueDate: '2023-11-20', assignee: 'Michael Ross' },
 ];
 
-export const MOCK_ELECTIONS: Election[] = [
-  {
-    id: 'el1',
-    title: '2024 Board Election',
-    status: 'Active',
-    endDate: '2023-12-20',
-    candidates: [
-      { id: 'c1', name: 'Sarah Chen', position: 'VP Membership', avatar: 'https://i.pravatar.cc/150?u=sarah' },
-      { id: 'c2', name: 'Michael Ross', position: 'VP Membership', avatar: 'https://i.pravatar.cc/150?u=michael' },
-      { id: 'c3', name: 'Alex Rivera', position: 'Secretary', avatar: 'https://i.pravatar.cc/150?u=alex' }
-    ]
-  },
-  {
-    id: 'el2',
-    title: 'Local President 2024',
-    status: 'Completed',
-    endDate: '2023-11-15',
-    candidates: [
-      { id: 'c4', name: 'Jessica Day', position: 'President', avatar: 'https://i.pravatar.cc/150?u=jessica' }
-    ]
-  }
-];
-
-export const MOCK_PROPOSALS: Proposal[] = [
-  {
-    id: 'pr1',
-    title: 'Increase Annual Dues by 10%',
-    description: 'To cover rising venue costs and inflation, we propose increasing annual membership dues from $150 to $165 effective Jan 1st.',
-    submittedBy: 'Jessica Day (Treasurer)',
-    status: 'Voting',
-    votes: { for: 45, against: 12, abstain: 5 }
-  },
-  {
-    id: 'pr2',
-    title: 'Adopt New Logo for Local Chapter',
-    description: 'Update our local logo to align with the new national branding guidelines released last month.',
-    submittedBy: 'Alex Rivera',
-    status: 'Approved',
-    votes: { for: 80, against: 2, abstain: 0 }
-  }
-];
-
 export const MOCK_SURVEYS: Survey[] = [
   {
     id: 's1',
     title: 'Member Satisfaction Survey 2023',
     description: 'Help us improve by sharing your feedback on this year\'s events and projects.',
     status: 'Active',
-    deadline: '2023-12-31',
-    responses: 82,
-    targetAudience: 'All Members'
+    startDate: '2023-01-01',
+    endDate: '2023-12-31',
+    responsesCount: 82,
+    targetAudience: 'All Members',
+    questions: [],
+    createdBy: 'admin',
+    createdAt: '2023-01-01'
   },
   {
     id: 's2',
     title: 'Project Preference Poll',
     description: 'Which community project should we prioritize for Q1 2024?',
     status: 'Closed',
-    deadline: '2023-11-30',
-    responses: 115,
-    targetAudience: 'Active Members'
+    startDate: '2023-11-01',
+    endDate: '2023-11-30',
+    responsesCount: 115,
+    targetAudience: 'All Members',
+    questions: [],
+    createdBy: 'admin',
+    createdAt: '2023-11-01'
+  }
+];
+
+export const MOCK_PROJECT_FINANCIAL_ACCOUNTS: ProjectFinancialAccount[] = [
+  {
+    id: 'pa1',
+    projectId: 'p1',
+    projectName: 'Youth Mentorship 2024',
+    budget: 5000,
+    startingBalance: 5000,
+    currentBalance: 3900,
+    totalIncome: 1000,
+    totalExpenses: 2100,
+    budgetCategories: [
+      { id: 'cat1', name: 'Venue', allocatedAmount: 1500, spentAmount: 1200, color: '#4F46E5' },
+      { id: 'cat2', name: 'Marketing', allocatedAmount: 1000, spentAmount: 500, color: '#10B981' },
+      { id: 'cat3', name: 'Catering', allocatedAmount: 2000, spentAmount: 400, color: '#F59E0B' },
+      { id: 'cat4', name: 'Admin', allocatedAmount: 500, spentAmount: 0, color: '#6B7280' }
+    ],
+    alertThresholds: [
+      { id: 'at1', type: 'budget_warning', threshold: 80, enabled: true, notificationMethod: 'both' }
+    ],
+    createdAt: '2023-12-01T10:00:00Z',
+    updatedAt: '2024-01-15T14:30:00Z',
+    createdBy: 'u4'
+  },
+  {
+    id: 'pa2',
+    projectId: 'p2',
+    projectName: 'Business Expo',
+    budget: 15000,
+    startingBalance: 15000,
+    currentBalance: 16500,
+    totalIncome: 2000,
+    totalExpenses: 500,
+    budgetCategories: [
+      { id: 'cat5', name: 'Booth Construction', allocatedAmount: 8000, spentAmount: 0, color: '#3B82F6' },
+      { id: 'cat6', name: 'Guest Speakers', allocatedAmount: 4000, spentAmount: 500, color: '#8B5CF6' },
+      { id: 'cat7', name: 'Promotion', allocatedAmount: 3000, spentAmount: 0, color: '#EC4899' }
+    ],
+    alertThresholds: [],
+    createdAt: '2023-11-15T09:00:00Z',
+    updatedAt: '2023-12-20T11:00:00Z',
+    createdBy: 'u1'
+  },
+  {
+    id: 'pa3',
+    projectId: 'p3',
+    projectName: 'Tech for Good',
+    budget: 2000,
+    startingBalance: 2000,
+    currentBalance: 50,
+    totalIncome: 0,
+    totalExpenses: 1950,
+    budgetCategories: [
+      { id: 'cat8', name: 'Hardware Parts', allocatedAmount: 1500, spentAmount: 1450, color: '#EF4444' },
+      { id: 'cat9', name: 'Logistics', allocatedAmount: 500, spentAmount: 500, color: '#F97316' }
+    ],
+    alertThresholds: [
+      { id: 'at2', type: 'budget_exceeded', threshold: 100, enabled: true, notificationMethod: 'in_app' }
+    ],
+    createdAt: '2023-10-20T08:00:00Z',
+    updatedAt: '2023-12-30T16:00:00Z',
+    createdBy: 'u3'
+  }
+];
+
+export const MOCK_PROJECT_TRANSACTIONS: ProjectTransaction[] = [
+  {
+    id: 'pt1',
+    projectId: 'p1',
+    financialAccountId: 'pa1',
+    type: 'income',
+    amount: 1000,
+    categoryId: undefined,
+    description: 'Corporate Sponsorship - Matrix Ltd',
+    date: '2024-01-05',
+    createdBy: 'u4',
+    createdAt: '2024-01-05T11:00:00Z'
+  },
+  {
+    id: 'pt2',
+    projectId: 'p1',
+    financialAccountId: 'pa1',
+    type: 'expense',
+    amount: 1200,
+    categoryId: 'cat1',
+    description: 'Early Bird Venue Payment',
+    date: '2024-01-10',
+    createdBy: 'u4',
+    createdAt: '2024-01-10T15:00:00Z'
+  },
+  {
+    id: 'pt3',
+    projectId: 'p1',
+    financialAccountId: 'pa1',
+    type: 'expense',
+    amount: 400,
+    categoryId: 'cat3',
+    description: 'Refreshments for committee meeting',
+    date: '2024-01-12',
+    createdBy: 'u4',
+    createdAt: '2024-01-12T17:30:00Z'
+  },
+  {
+    id: 'pt4',
+    projectId: 'p2',
+    financialAccountId: 'pa2',
+    type: 'income',
+    amount: 2000,
+    description: 'Booth Rental Deposit - Vendor A',
+    date: '2023-12-01',
+    createdBy: 'u1',
+    createdAt: '2023-12-01T14:00:00Z'
+  },
+  {
+    id: 'pt5',
+    projectId: 'p2',
+    financialAccountId: 'pa2',
+    type: 'expense',
+    amount: 500,
+    categoryId: 'cat6',
+    description: 'Speaker Honorarium Downpayment',
+    date: '2023-12-15',
+    createdBy: 'u1',
+    createdAt: '2023-12-15T10:00:00Z'
   }
 ];

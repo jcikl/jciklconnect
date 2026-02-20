@@ -1,129 +1,258 @@
-import React, { useState } from 'react';
-import { Building2, Globe, ExternalLink, Search, Mail, Send, Plus } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast } from '../ui/Common';
-import { Input, Select } from '../ui/Form';
-import { MOCK_BUSINESSES, MOCK_MEMBERS } from '../../services/mockData';
+import React, { useState, useMemo } from 'react';
+import { Building2, Globe, Search, Send, MapPin, Users, Network } from 'lucide-react';
+import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { LoadingState } from '../ui/Loading';
+import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
+import { useMembers } from '../../hooks/useMembers';
 import { BusinessProfile } from '../../types';
 
 export const BusinessDirectoryView: React.FC = () => {
-  const [businesses, setBusinesses] = useState<BusinessProfile[]>(MOCK_BUSINESSES);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
-  const [isListModalOpen, setListModalOpen] = useState(false);
+  const [isDetailModalOpen, setDetailModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'directory' | 'international'>('directory');
+
+  const { businesses, loading, error } = useBusinessDirectory();
+  const { members } = useMembers(); // Used to find owner name
   const { showToast } = useToast();
 
-  const handleListBusiness = (e: React.FormEvent) => {
-      e.preventDefault();
-      const newBiz: BusinessProfile = {
-          id: `bp${Date.now()}`,
-          memberId: 'u1',
-          companyName: 'New Business',
-          industry: 'Other',
-          description: 'A new listing.',
-          website: 'www.example.com',
-          offer: '10% off for JCI',
-          logo: 'https://placehold.co/100?text=Logo'
-      };
-      setBusinesses([...businesses, newBiz]);
-      setListModalOpen(false);
-      showToast('Business listed successfully', 'success');
-  }
+  const filteredBusinesses = useMemo(() => {
+    if (!searchTerm) return businesses;
+    const lowerSearch = searchTerm.toLowerCase();
+    return businesses.filter(biz =>
+      biz.companyName.toLowerCase().includes(lowerSearch) ||
+      biz.industry.toLowerCase().includes(lowerSearch) ||
+      biz.description?.toLowerCase().includes(lowerSearch)
+    );
+  }, [businesses, searchTerm]);
 
   const handleContact = () => {
-      setSelectedBiz(null);
-      showToast('Inquiry sent to owner', 'success');
-  }
+    setDetailModalOpen(false);
+    setSelectedBiz(null);
+    showToast('Inquiry sent to owner', 'success');
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Member Business Directory</h2>
-          <p className="text-slate-500">Support local member businesses and partners.</p>
+          <p className="text-slate-500">Support local member businesses and global JCI network connections.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
-             <div className="relative flex-1 md:w-64">
-                <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input type="text" placeholder="Search services..." className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm" />
-             </div>
-            <Button onClick={() => setListModalOpen(true)}><Plus size={16} className="mr-2"/> List My Business</Button>
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Search services..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {businesses.map(biz => {
-            const owner = MOCK_MEMBERS.find(m => m.id === biz.memberId);
-            return (
-                <div key={biz.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
-                    <div className="h-24 bg-gradient-to-r from-slate-100 to-slate-200 relative">
-                        <div className="absolute -bottom-6 left-6 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
-                            <img src={biz.logo} alt="Logo" className="w-full h-full object-cover rounded" />
-                        </div>
-                        <div className="absolute top-4 right-4">
-                            <Badge variant="neutral">{biz.industry}</Badge>
-                        </div>
-                    </div>
-                    <div className="pt-8 px-6 pb-6 flex-1 flex flex-col">
-                        <h3 className="text-lg font-bold text-slate-900">{biz.companyName}</h3>
-                        <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
-                            Owned by <span className="font-medium text-jci-blue">{owner?.name || 'Unknown'}</span>
-                        </p>
-                        <p className="text-sm text-slate-600 mb-4 flex-1">{biz.description}</p>
-                        
-                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
-                            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">JCI Member Deal</span>
-                            <p className="text-sm font-medium text-blue-900">{biz.offer}</p>
-                        </div>
-
-                        <div className="flex gap-2 mt-auto">
-                            <Button variant="outline" size="sm" className="flex-1"><Globe size={14} className="mr-2"/> Website</Button>
-                            <Button variant="secondary" size="sm" className="flex-1" onClick={() => setSelectedBiz(biz)}>Contact</Button>
-                        </div>
-                    </div>
-                </div>
-            )
-        })}
+      {/* Education/Instruction Card */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+        <Building2 className="text-blue-600 mt-1" size={20} />
+        <div>
+          <h4 className="font-semibold text-blue-900">List Your Business</h4>
+          <p className="text-sm text-blue-800 mt-1">
+            To list your business in the directory, simply update your "Professional & Business" information in your Member Profile.
+            Once you add a Company Name, your business will automatically appear here.
+          </p>
+        </div>
       </div>
 
-      <Modal isOpen={!!selectedBiz} onClose={() => setSelectedBiz(null)} title={`Contact ${selectedBiz?.companyName}`}>
+      <Card noPadding>
+        <div className="px-6 pt-4">
+          <Tabs
+            tabs={['Business Directory', 'International Network']}
+            activeTab={activeTab === 'directory' ? 'Business Directory' : 'International Network'}
+            onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
+          />
+        </div>
+        <div className="p-6">
+          {activeTab === 'directory' ? (
+            <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredBusinesses.map(biz => {
+                  const owner = members.find(m => m.id === biz.memberId);
+                  return (
+                    <Card key={biz.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
+                      <div className="h-24 bg-gradient-to-r from-slate-100 to-slate-200 relative">
+                        <div className="absolute -bottom-6 left-6 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
+                          <img
+                            src={biz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.companyName)}&background=0097D7&color=fff`}
+                            alt="Logo"
+                            className="w-full h-full object-cover rounded"
+                          />
+                        </div>
+                        <div className="absolute top-4 right-4">
+                          <Badge variant="neutral">{biz.industry}</Badge>
+                        </div>
+                      </div>
+                      <div className="pt-8 px-6 pb-6 flex-1 flex flex-col">
+                        <h3 className="text-lg font-bold text-slate-900">{biz.companyName}</h3>
+                        <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                          Owned by <span className="font-medium text-jci-blue">{owner?.name || 'Unknown'}</span>
+                        </p>
+                        <p className="text-sm text-slate-600 mb-4 flex-1 line-clamp-3">{biz.description}</p>
+
+                        {biz.offer && (
+                          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">JCI Member Deal</span>
+                            <p className="text-sm font-medium text-blue-900">{biz.offer}</p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 mt-auto">
+                          {biz.website && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => window.open(biz.website.startsWith('http') ? biz.website : `https://${biz.website}`, '_blank')}
+                            >
+                              <Globe size={14} className="mr-2" /> Website
+                            </Button>
+                          )}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setSelectedBiz(biz);
+                              setDetailModalOpen(true);
+                            }}
+                          >
+                            Contact
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </LoadingState>
+          ) : (
+            <InternationalNetworkTab businesses={filteredBusinesses} />
+          )}
+        </div>
+      </Card>
+
+      {/* Contact Modal */}
+      {selectedBiz && (
+        <Modal isOpen={isDetailModalOpen} onClose={() => { setDetailModalOpen(false); setSelectedBiz(null); }} title={`Contact ${selectedBiz.companyName}`}>
           <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                  Connect with this business directly. Mention you are a JCI member to redeem the special offer: 
-                  <span className="font-bold text-slate-900 ml-1">{selectedBiz?.offer}</span>
-              </p>
-              
-              <Input label="Subject" placeholder="Inquiry about services..." />
+            <div className="flex items-center gap-4 mb-4">
+              <img
+                src={selectedBiz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedBiz.companyName)}&background=0097D7&color=fff`}
+                alt={selectedBiz.companyName}
+                className="w-16 h-16 rounded-lg"
+              />
               <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Message</label>
-                  <textarea className="w-full border-slate-300 rounded-lg shadow-sm focus:border-jci-blue focus:ring-jci-blue sm:text-sm p-3 border h-32" placeholder="Hi, I'm interested in..." defaultValue={`Hi, I'm a fellow JCI member and interested in...`}></textarea>
+                <h3 className="font-bold text-slate-900">{selectedBiz.companyName}</h3>
+                <p className="text-sm text-slate-500">{selectedBiz.industry}</p>
               </div>
-
-              <div className="pt-2">
-                  <Button className="w-full" onClick={handleContact}>
-                      <Send size={16} className="mr-2"/> Send Inquiry
-                  </Button>
+            </div>
+            <p className="text-sm text-slate-600">{selectedBiz.description}</p>
+            {selectedBiz.offer && (
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">JCI Member Deal</span>
+                <p className="text-sm font-medium text-blue-900 mt-1">{selectedBiz.offer}</p>
               </div>
+            )}
+            <div className="flex gap-2 pt-4">
+              {selectedBiz.website && (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => window.open(selectedBiz.website!.startsWith('http') ? selectedBiz.website : `https://${selectedBiz.website}`, '_blank')}
+                >
+                  <Globe size={16} className="mr-2" /> Visit Website
+                </Button>
+              )}
+              <Button className="flex-1" onClick={handleContact}>
+                <Send size={16} className="mr-2" /> Send Inquiry
+              </Button>
+            </div>
           </div>
-      </Modal>
+        </Modal>
+      )}
+    </div>
+  );
+};
 
-      <Modal isOpen={isListModalOpen} onClose={() => setListModalOpen(false)} title="List Your Business">
-          <form onSubmit={handleListBusiness} className="space-y-4">
-              <Input label="Company Name" required />
-              <div className="grid grid-cols-2 gap-4">
-                  <Select label="Industry" options={[
-                      {label:'Consulting', value:'Consulting'},
-                      {label:'Events', value:'Events'},
-                      {label:'Retail', value:'Retail'},
-                      {label:'Technology', value:'Technology'}
-                  ]} />
-                  <Input label="Website" placeholder="https://" />
+// International Network Tab Component
+interface InternationalNetworkTabProps {
+  businesses: BusinessProfile[];
+}
+
+const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ businesses }) => {
+  const businessesWithConnections = businesses.filter(b =>
+    b.internationalConnections && b.internationalConnections.length > 0
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">Global JCI Network Connections</h3>
+          <p className="text-sm text-slate-500">Connect your business with JCI chapters worldwide</p>
+        </div>
+      </div>
+
+      {businessesWithConnections.length === 0 ? (
+        <div className="text-center py-12 bg-slate-50 rounded-lg">
+          <Network size={48} className="mx-auto mb-4 text-slate-300" />
+          <h4 className="text-lg font-bold text-slate-900 mb-2">No International Connections Yet</h4>
+          <p className="text-slate-600 mb-4">Business connections will appear here.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {businessesWithConnections.map(business => (
+            <Card key={business.id} className="hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  {business.logo && (
+                    <img src={business.logo} alt={business.companyName} className="w-12 h-12 rounded-lg" />
+                  )}
+                  <div>
+                    <h4 className="font-bold text-slate-900">{business.companyName}</h4>
+                    <p className="text-sm text-slate-500">{business.industry}</p>
+                  </div>
+                </div>
               </div>
-              <Input label="Description" placeholder="What do you do?" />
-              <Input label="JCI Member Deal" placeholder="e.g. 15% discount" required />
-              <div className="pt-4">
-                  <Button className="w-full" type="submit">Submit Listing</Button>
+
+              <div className="space-y-3">
+                {business.internationalConnections?.map((connection, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={16} className="text-slate-400" />
+                        <span className="font-semibold text-slate-900">{connection.jciChapter}</span>
+                        <Badge variant="neutral">{connection.country}</Badge>
+                      </div>
+                      <Badge variant="info">{connection.connectionType}</Badge>
+                    </div>
+                    {connection.contactPerson && (
+                      <p className="text-sm text-slate-600 mb-1">
+                        <Users size={14} className="inline mr-1" />
+                        Contact: {connection.contactPerson}
+                      </p>
+                    )}
+                    {connection.notes && (
+                      <p className="text-xs text-slate-500 mt-2">{connection.notes}</p>
+                    )}
+                  </div>
+                ))}
               </div>
-          </form>
-      </Modal>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

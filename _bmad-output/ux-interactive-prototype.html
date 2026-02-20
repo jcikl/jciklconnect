@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JCI LO — 可点击原型</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            jci: { blue: '#0097D7', lightblue: '#6EC4E8', navy: '#1C3F94', teal: '#00B5B5' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .nav-link { cursor: pointer; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div class="min-h-screen flex">
+    <!-- 侧栏 -->
+    <aside class="w-56 bg-jci-navy text-white p-4">
+      <h2 class="font-bold text-lg mb-4">JCI LO</h2>
+      <nav class="space-y-2">
+        <a class="nav-link block py-2 px-3 rounded hover:bg-jci-blue/50" data-screen="home">首页</a>
+        <a class="nav-link block py-2 px-3 rounded hover:bg-jci-blue/50" data-screen="list">付款申请</a>
+        <a class="nav-link block py-2 px-3 rounded hover:bg-jci-blue/50" data-screen="form">新建申请</a>
+        <a class="nav-link block py-2 px-3 rounded hover:bg-jci-blue/50" data-screen="reconcile">对账</a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 p-6">
+      <!-- 首页 -->
+      <section id="home" class="screen active">
+        <h1 class="text-2xl font-bold text-jci-navy mb-6">欢迎，陈姐（组织财政）</h1>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="nav-link bg-white rounded-lg shadow p-6 text-center" data-screen="list">
+            <div class="text-3xl mb-2">💰</div>
+            <div class="font-medium">付款申请</div>
+            <div class="text-sm text-gray-500">12 条待审</div>
+          </div>
+          <div class="nav-link bg-white rounded-lg shadow p-6 text-center" data-screen="reconcile">
+            <div class="text-3xl mb-2">📋</div>
+            <div class="font-medium">对账</div>
+            <div class="text-sm text-gray-500">本月对账</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-6 text-center opacity-75">
+            <div class="text-3xl mb-2">👥</div>
+            <div class="font-medium">会员主档</div>
+            <div class="text-sm text-gray-500">管理维护</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 付款申请列表 -->
+      <section id="list" class="screen">
+        <div class="flex justify-between items-center mb-4">
+          <h1 class="text-2xl font-bold text-jci-navy">付款申请</h1>
+          <button class="nav-link px-4 py-2 bg-jci-blue text-white rounded" data-screen="form">新建申请</button>
+        </div>
+        <div class="flex gap-2 mb-4">
+          <input type="text" placeholder="搜索编号..." class="border rounded px-3 py-2 w-48">
+          <select class="border rounded px-3 py-2">
+            <option>全部状态</option>
+            <option>待审</option>
+            <option>已批</option>
+            <option>已拒</option>
+          </select>
+          <span class="text-sm text-gray-500 self-center">共 12 条</span>
+        </div>
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100">
+              <tr><th class="py-2 text-left px-4">编号</th><th class="py-2 text-left px-4">申请人</th><th class="py-2 text-left px-4">金额</th><th class="py-2 text-left px-4">用途</th><th class="py-2 text-left px-4">状态</th></tr>
+            </thead>
+            <tbody>
+              <tr class="border-t hover:bg-gray-50"><td class="py-3 px-4 font-mono text-jci-blue">ACT-2025-02-001-M</td><td class="px-4">小琳</td><td class="px-4">¥500</td><td class="px-4">迎新活动费</td><td class="px-4"><span class="px-2 py-1 rounded text-xs bg-amber-100 text-amber-800">待审</span></td></tr>
+              <tr class="border-t hover:bg-gray-50"><td class="py-3 px-4 font-mono text-jci-blue">ACT-2025-02-002-M</td><td class="px-4">阿明</td><td class="px-4">¥200</td><td class="px-4">场地押金</td><td class="px-4"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">已批</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 新建申请表单（选会员即带出） -->
+      <section id="form" class="screen">
+        <h1 class="text-2xl font-bold text-jci-navy mb-6">新建付款申请</h1>
+        <div class="bg-white rounded-lg shadow p-6 max-w-xl">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">选择会员 *</label>
+            <input type="text" value="小琳" placeholder="搜索姓名或届别..." class="w-full border rounded px-3 py-2">
+            <p class="text-xs text-jci-teal mt-1">✓ 已从主档带出</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="block text-sm text-gray-500">姓名</label><p class="font-medium">小琳</p></div>
+            <div><label class="block text-sm text-gray-500">届别</label><p class="font-medium">2024</p></div>
+            <div><label class="block text-sm text-gray-500">联络方式</label><p class="font-medium">+60 12-xxx xxxx</p></div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">活动 *</label>
+            <select class="w-full border rounded px-3 py-2"><option>2025 迎新活动</option></select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">金额 *</label>
+            <input type="number" class="border rounded px-3 py-2 w-32" value="500">
+          </div>
+          <div class="flex gap-2">
+            <button class="nav-link px-4 py-2 border rounded" data-screen="list">取消</button>
+            <button class="px-4 py-2 bg-jci-blue text-white rounded" onclick="alert('提交成功！编号：ACT-2025-02-003-M')">提交</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 对账 -->
+      <section id="reconcile" class="screen">
+        <h1 class="text-2xl font-bold text-jci-navy mb-6">对账</h1>
+        <div class="flex gap-2 mb-4">
+          <input type="text" placeholder="输入参考编号..." class="border rounded px-3 py-2 w-64">
+          <button class="px-4 py-2 bg-jci-blue text-white rounded">搜索</button>
+          <span class="text-sm text-gray-500 self-center">时间范围</span>
+          <input type="date" class="border rounded px-3 py-2">
+          <span class="self-center">-</span>
+          <input type="date" class="border rounded px-3 py-2">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-medium mb-2">银行流水</h3>
+            <div class="text-sm space-y-2">
+              <div class="flex justify-between py-2 border-b"><span>02-15 ¥500 ACT-02-001</span><button class="text-jci-blue">匹配</button></div>
+              <div class="flex justify-between py-2 border-b"><span>02-14 ¥200 ACT-02-002</span><button class="text-jci-blue">匹配</button></div>
+            </div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-medium mb-2">业务记录</h3>
+            <div class="text-sm space-y-2">
+              <div class="py-2 border-b">ACT-2025-02-001 小琳 ¥500 迎新活动费</div>
+              <div class="py-2 border-b">ACT-2025-02-002 阿明 ¥200 场地押金</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    document.querySelectorAll('.nav-link[data-screen]').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(el.dataset.screen).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
