@@ -17,6 +17,7 @@ import {
   trimPreprocessor,
 } from '../../../shared/batchImport/batchImportUtils';
 import { FinanceService } from '../../../../services/financeService';
+import { addAdministrativeProjectId } from '../../../../utils/administrativeProjectsStorage';
 
 export const bankTransactionImportConfig: BatchImportConfig = {
   name: 'Bank Transactions',
@@ -99,13 +100,13 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       key: 'projectTitle',
       label: 'Project Title',
       required: false,
-      aliases: ['Project', 'Project Name', 'Activity'],
+      aliases: ['Project', 'Project Name', 'Activity', 'Admin Account', 'Account', '行政项目', '户口'],
       validators: [
         (val, context) => {
-          // Only validate if category is Projects & Activities
           const category = context?.row?.category;
+          // Only validate system existence if category is Projects & Activities
           if (category !== 'Projects & Activities') {
-            return null; // No validation needed for other categories
+            return null;
           }
 
           if (!val || String(val).trim() === '') {
@@ -128,7 +129,7 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       key: 'purpose',
       label: 'Purpose',
       required: false,
-      aliases: ['Purpose', 'Goal', 'Target'],
+      aliases: ['Purpose', 'Goal', 'Target', '用途'],
       validators: [],
       preprocessor: trimPreprocessor,
     },
@@ -141,7 +142,7 @@ export const bankTransactionImportConfig: BatchImportConfig = {
     { key: 'income', label: 'Income', width: 80 },
     { key: 'expense', label: 'Expense', width: 80 },
     { key: 'category', label: 'Category', width: 120 },
-    { key: 'projectTitle', label: 'Project', width: 150 },
+    { key: 'projectTitle', label: 'Account/Project', width: 150 },
     { key: 'purpose', label: 'Purpose', width: 140 },
     { key: 'valid', label: 'Status', width: 80 },
   ],
@@ -166,9 +167,10 @@ export const bankTransactionImportConfig: BatchImportConfig = {
 
   sampleFileName: 'Bank_Statement_Import_Template.csv',
   sampleData: [
-    ['Date', 'Description', 'Reference #', 'Income', 'Expense', 'Category', 'Project Title', 'Purpose'],
+    ['Date', 'Description', 'Reference #', 'Income', 'Expense', 'Category', 'Account/Project', 'Purpose'],
     ['2026-02-15', 'Membership Fees - John Doe', 'MBR-2026-001', '500', '0', 'Membership', '', 'Dues 2026'],
     ['2026-02-16', 'Venue Rental - Grand Hotel', 'EXP-2026-042', '0', '1200', 'Projects & Activities', 'Convention 2026', 'Venue Deposit'],
+    ['2026-02-17', 'Office Supplies', 'ADM-2026-001', '0', '50', 'Administrative', 'Secretariat', 'Stationery'],
   ],
 
   // Import function - called for each valid row
@@ -177,8 +179,8 @@ export const bankTransactionImportConfig: BatchImportConfig = {
     const projectTitle = row.projectTitle?.trim();
     const category = row.category;
 
-    // Only look up project ID if it's a project transaction
     if (category === 'Projects & Activities' && projectTitle && context?.projects) {
+      // Look up existing project ID
       const match = context.projects.find((p: any) =>
         (p.name?.toLowerCase() === projectTitle.toLowerCase()) ||
         (p.title?.toLowerCase() === projectTitle.toLowerCase())
@@ -187,6 +189,15 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       if (match) {
         projectId = match.id;
       }
+    } else if (category === 'Administrative' && projectTitle) {
+      // For Administrative, the projectTitle is the Admin Account name
+      projectId = projectTitle;
+      // Add to persistent list if it doesn't exist
+      addAdministrativeProjectId(projectTitle);
+    } else if (category === 'Membership') {
+      // For Membership, generate standard project ID like "2024 membership"
+      const year = row.date ? new Date(row.date).getFullYear() : new Date().getFullYear();
+      projectId = `${year} membership`;
     }
 
     const income = row.income || 0;

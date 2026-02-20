@@ -344,12 +344,40 @@ export const FinanceView: React.FC = () => {
         return false;
       }
 
-      // Search term
-      if (txSearchTerm &&
-        !tx.description.toLowerCase().includes(txSearchTerm.toLowerCase()) &&
-        !(tx.category && tx.category.toLowerCase().includes(txSearchTerm.toLowerCase())) &&
-        !transactionSplits[tx.id]?.some(s => s.category.toLowerCase().includes(txSearchTerm.toLowerCase()))) {
-        return false;
+      // Search term (Multi-keyword fuzzy search)
+      if (txSearchTerm) {
+        const terms = txSearchTerm.toLowerCase().split(/\s+/).filter(t => t !== '');
+
+        // Every term must match at least one field (AND logic across terms)
+        const isMatch = terms.every(term => {
+          // 1. Basic fields from parent transaction
+          const parentFields = [
+            tx.description.toLowerCase(),
+            (tx.referenceNumber || '').toLowerCase(),
+            (tx.category || '').toLowerCase(),
+            (tx.status || '').toLowerCase(),
+            tx.date.toLowerCase(),
+            String(tx.amount),
+            String(tx.income || ''),
+            String(tx.expense || ''),
+            (tx.purpose || '').toLowerCase()
+          ];
+
+          const parentMatch = parentFields.some(field => field.includes(term));
+          if (parentMatch) return true;
+
+          // 2. Search in splits if applicable
+          const splitMatch = transactionSplits[tx.id]?.some(s =>
+            s.category.toLowerCase().includes(term) ||
+            s.description.toLowerCase().includes(term) ||
+            s.purpose?.toLowerCase().includes(term) ||
+            String(s.amount).includes(term)
+          );
+
+          return splitMatch;
+        });
+
+        if (!isMatch) return false;
       }
 
       return true;
@@ -637,6 +665,7 @@ export const FinanceView: React.FC = () => {
       setSummary(summ);
       setInventoryItems(inventory);
       setProjects(projList);
+      setAdministrativeProjectIds(getAdministrativeProjectIds());
 
       const mappedMembers = memberList.map(m => ({
         id: m.id,
