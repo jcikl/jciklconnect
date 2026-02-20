@@ -151,6 +151,10 @@ export const projectImportConfig: BatchImportConfig = {
             },
         ];
 
+        // Fall back to proposedDate when eventStartDate is not explicitly set,
+        // so that date-dependent features (Finance year filter, Events view) work correctly.
+        const eventStartDate = row.eventStartDate || row.proposedDate || undefined;
+
         await ProjectsService.createProject({
             name: row.title,
             title: row.title,
@@ -162,7 +166,7 @@ export const projectImportConfig: BatchImportConfig = {
             level: row.level as any || 'Local',
             pillar: row.pillar as any || 'Community',
             targetAudience: row.targetAudience || '',
-            eventStartDate: row.eventStartDate || undefined,
+            eventStartDate,
             status: 'Planning',
             submittedBy: member?.id || '',
             committee: defaultCommittee,

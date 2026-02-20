@@ -194,18 +194,34 @@ export const TransactionForm: React.FC<Props> = ({
               ) : editingTransaction?.category === 'Membership' ? (
                 <Input name="year" label="Year" type="number" value={String(editingMembershipYear)} onChange={(e) => { const val = parseInt(e.target.value, 10) || new Date().getFullYear(); setEditingMembershipYear?.(val); setEditingModalYear?.(String(val)); }} placeholder="e.g. 2024" />
               ) : (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Year</label>
-                  <Combobox options={[...new Set(['All', String(new Date().getFullYear()), ...projectYears.map(y => String(y))])]} value={editingModalYear || 'All'} onChange={(v) => setEditingModalYear?.(v)} placeholder="Select or type year..." />
-                </div>
+                <Select
+                  name="year"
+                  label="Year"
+                  value={editingModalYear || 'All'}
+                  onChange={(e) => setEditingModalYear?.(e.target.value)}
+                  options={[
+                    { label: 'All Years', value: 'All' },
+                    ...([...new Set([new Date().getFullYear(), ...projectYears])]
+                      .sort((a, b) => b - a)
+                      .map(y => ({ label: String(y), value: String(y) })))
+                  ]}
+                />
               )
             ) : recordFormCategory === 'Membership' ? (
               <Input name="year" label="Year" type="number" value={recordFormYear ? String(recordFormYear) : ''} onChange={(e: any) => setRecordFormYear?.(parseInt(e.target.value, 10))} placeholder="e.g. 2024" />
             ) : (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Year</label>
-                <Combobox options={[...new Set(['All', String(new Date().getFullYear()), ...projectYears.map(y => String(y))])]} value={editingModalYear || 'All'} onChange={(v) => setEditingModalYear?.(v)} placeholder="Select or type year..." />
-              </div>
+              <Select
+                name="year"
+                label="Year"
+                value={editingModalYear || 'All'}
+                onChange={(e) => setEditingModalYear?.(e.target.value)}
+                options={[
+                  { label: 'All Years', value: 'All' },
+                  ...([...new Set([new Date().getFullYear(), ...projectYears])]
+                    .sort((a, b) => b - a)
+                    .map(y => ({ label: String(y), value: String(y) })))
+                ]}
+              />
             )}
           </div>
 

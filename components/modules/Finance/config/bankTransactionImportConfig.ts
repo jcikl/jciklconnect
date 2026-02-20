@@ -137,10 +137,12 @@ export const bankTransactionImportConfig: BatchImportConfig = {
   tableColumns: [
     { key: 'date', label: 'Date', width: 100 },
     { key: 'description', label: 'Description', width: 180 },
+    { key: 'referenceNumber', label: 'Reference #', width: 140 },
     { key: 'income', label: 'Income', width: 80 },
     { key: 'expense', label: 'Expense', width: 80 },
     { key: 'category', label: 'Category', width: 120 },
     { key: 'projectTitle', label: 'Project', width: 150 },
+    { key: 'purpose', label: 'Purpose', width: 140 },
     { key: 'valid', label: 'Status', width: 80 },
   ],
 

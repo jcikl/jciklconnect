@@ -364,7 +364,7 @@ export const BatchImportModal: React.FC<Props> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={`Batch Import: ${config.name}`}
-      size="xl"
+      size="2xl"
       scrollInBody={false}
     >
       {/* Hidden file input - Always present so Upload button works */}
