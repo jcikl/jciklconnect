@@ -11,6 +11,7 @@ interface EventCalendarViewProps {
   onEventClick?: (event: Event) => void;
   onDateClick?: (date: Date) => void;
   onEventUpdate?: (eventId: string, updates: Partial<Event>) => Promise<void>;
+  readonly?: boolean;
 }
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -20,6 +21,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
   onEventClick,
   onDateClick,
   onEventUpdate,
+  readonly = false
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
@@ -121,6 +123,10 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
 
   // Handle event drag start
   const handleEventDragStart = (e: React.DragEvent, event: Event) => {
+    if (readonly) {
+      e.preventDefault();
+      return;
+    }
     setDraggedEvent(event);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', event.id);
@@ -128,6 +134,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
 
   // Handle date drop
   const handleDateDrop = async (e: React.DragEvent, targetDate: Date) => {
+    if (readonly) return;
     e.preventDefault();
     if (!draggedEvent) return;
 
@@ -159,6 +166,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
 
   // Handle drag over
   const handleDragOver = (e: React.DragEvent) => {
+    if (readonly) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
@@ -236,7 +244,12 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
           <Card title="Upcoming Events">
             <div className="space-y-4">
               {events
-                .filter(e => new Date(e.date) >= new Date())
+                .filter(e => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const eventDate = new Date(e.date);
+                  return eventDate >= today;
+                })
                 .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                 .slice(0, 10)
                 .map(event => (
@@ -285,12 +298,17 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                     </div>
                   </div>
                 ))}
-              {events.filter(e => new Date(e.date) >= new Date()).length === 0 && (
-                <div className="text-center py-8 text-slate-500">
-                  <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />
-                  <p>No upcoming events</p>
-                </div>
-              )}
+              {events.filter(e => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const eventDate = new Date(e.date);
+                return eventDate >= today;
+              }).length === 0 && (
+                  <div className="text-center py-8 text-slate-500">
+                    <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />
+                    <p>No upcoming events</p>
+                  </div>
+                )}
             </div>
           </Card>
         </div>
@@ -340,14 +358,14 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                           {dayEvents.slice(0, 2).map(event => (
                             <div
                               key={event.id}
-                              draggable
+                              draggable={!readonly}
                               onDragStart={(e) => handleEventDragStart(e, event)}
-                              className="text-xs p-1 rounded bg-jci-blue/10 text-jci-blue hover:bg-jci-blue/20 cursor-move truncate"
+                              className={`text-xs p-1 rounded bg-jci-blue/10 text-jci-blue hover:bg-jci-blue/20 truncate ${readonly ? 'cursor-pointer' : 'cursor-move'}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onEventClick?.(event);
                               }}
-                              title={`${formatTime(new Date(event.date))} ${event.title} - Drag to move`}
+                              title={`${formatTime(new Date(event.date))} ${event.title}${!readonly ? ' - Drag to move' : ''}`}
                             >
                               {formatTime(new Date(event.date))} {event.title}
                             </div>
@@ -398,14 +416,14 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                             {dayEvents.map(event => (
                               <div
                                 key={event.id}
-                                draggable
+                                draggable={!readonly}
                                 onDragStart={(e) => handleEventDragStart(e, event)}
-                                className="text-xs p-2 rounded bg-jci-blue/10 text-jci-blue hover:bg-jci-blue/20 cursor-move"
+                                className={`text-xs p-2 rounded bg-jci-blue/10 text-jci-blue hover:bg-jci-blue/20 ${readonly ? 'cursor-pointer' : 'cursor-move'}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onEventClick?.(event);
                                 }}
-                                title={`${formatTime(new Date(event.date))} ${event.title} - Drag to move`}
+                                title={`${formatTime(new Date(event.date))} ${event.title}${!readonly ? ' - Drag to move' : ''}`}
                               >
                                 <div className="font-semibold truncate">{event.title}</div>
                                 <div className="text-slate-600">{formatTime(new Date(event.date))}</div>
@@ -458,14 +476,14 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                             {hourEvents.map(event => (
                               <div
                                 key={event.id}
-                                draggable
+                                draggable={!readonly}
                                 onDragStart={(e) => handleEventDragStart(e, event)}
-                                className="p-3 rounded-lg bg-jci-blue/10 border border-jci-blue/20 hover:bg-jci-blue/20 cursor-move mb-2"
+                                className={`p-3 rounded-lg bg-jci-blue/10 border border-jci-blue/20 hover:bg-jci-blue/20 mb-2 ${readonly ? 'cursor-pointer' : 'cursor-move'}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onEventClick?.(event);
                                 }}
-                                title={`${event.title} - Drag to move to different time`}
+                                title={`${event.title}${!readonly ? ' - Drag to move to different time' : ''}`}
                               >
                                 <div className="font-semibold text-slate-900">{event.title}</div>
                                 <div className="text-sm text-slate-600 mt-1">

@@ -360,57 +360,6 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
           </div>
         </section>
 
-        <section className="py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue mx-auto mb-4"></div>
-                <p className="text-slate-600">Loading events...</p>
-              </div>
-            ) : publicEvents.length === 0 ? (
-              <div className="text-center py-12">
-                <Calendar size={48} className="mx-auto mb-4 text-slate-300" />
-                <h3 className="text-xl font-bold text-slate-900 mb-2">No upcoming events</h3>
-                <p className="text-slate-600">Check back soon for new events!</p>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {publicEvents.map(event => (
-                  <Card key={event.id} className="hover:shadow-lg transition-shadow">
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <Badge variant={event.type === 'Training' ? 'info' : event.type === 'Social' ? 'success' : 'neutral'}>
-                          {event.type}
-                        </Badge>
-                        <span className="text-sm text-slate-500">
-                          {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">{event.title}</h3>
-                      {event.description && (
-                        <p className="text-slate-600 text-sm mb-4 line-clamp-2">{event.description}</p>
-                      )}
-                      <div className="flex items-center justify-between text-sm text-slate-500 mb-4">
-                        <span>{event.attendees} attendees</span>
-                        {event.location && <span>{event.location}</span>}
-                      </div>
-                      <Button
-                        className="w-full"
-                        onClick={() => {
-                          setSelectedEvent(event);
-                          setIsRegistrationModalOpen(true);
-                        }}
-                      >
-                        Register Now
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* Public Activity Calendar View */}
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -426,9 +375,17 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
               <EventCalendarView
                 events={allPublishedEvents}
+                readonly={true}
                 onEventClick={(event) => {
-                  setSelectedEvent(event);
-                  setIsRegistrationModalOpen(true);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const eventDate = new Date(event.date);
+                  if (eventDate >= today) {
+                    setSelectedEvent(event);
+                    setIsRegistrationModalOpen(true);
+                  } else {
+                    showToast('Registration is not available for past events.', 'info');
+                  }
                 }}
               />
             </div>
