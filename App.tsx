@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -332,16 +332,18 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
     notes: '',
   });
   const { showToast } = useToast();
-  const upcomingEvents = events.filter(e => {
+  const upcomingEvents = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const eventDate = new Date(e.date);
-    return eventDate >= today;
-  });
-  // Show all upcoming events except private meetings (for event cards)
-  const publicEvents = upcomingEvents.filter(e => e.type !== 'Meeting');
-  // All published events except private meetings (for Activity Calendar)
-  const allPublishedEvents = events.filter(e => e.type !== 'Meeting');
+    return events.filter(e => {
+      const eventDate = e.date ? new Date(e.date) : null;
+      if (!eventDate) return false;
+      return eventDate >= today;
+    });
+  }, [events]);
+
+  const publicEvents = upcomingEvents;
+  const allPublishedEvents = events;
 
   return (
     <div className="min-h-screen bg-slate-50">
