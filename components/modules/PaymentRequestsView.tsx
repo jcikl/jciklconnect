@@ -222,8 +222,8 @@ export const PaymentRequestsView: React.FC = () => {
         Submit a payment request with purpose and amount. The system will generate a reference number (e.g. PR-default-lo-20250216-001). Use this reference in your bank transfer memo for reconciliation. You can also select a member to auto-fill their details.
       </FirstUseBanner>
 
-      <Card className="p-0 border-none shadow-none md:p-6 md:border md:shadow-sm">
-        <div className="px-4 md:px-0 pt-4">
+      <Card>
+        <div>
           <Tabs
             tabs={[
               { id: 'my', label: 'My Applications' },

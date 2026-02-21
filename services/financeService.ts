@@ -317,6 +317,24 @@ export class FinanceService {
     }
   }
 
+  // Get ALL transaction splits in bulk
+  static async getAllTransactionSplits(): Promise<TransactionSplit[]> {
+    if (isDevMode()) {
+      return [];
+    }
+    try {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.TRANSACTION_SPLITS));
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+      } as TransactionSplit));
+    } catch (error) {
+      console.error('Error fetching all transaction splits:', error);
+      throw error;
+    }
+  }
+
   // Update transaction split
   static async updateTransactionSplit(
     splitId: string,
@@ -420,17 +438,16 @@ export class FinanceService {
       } as Transaction));
 
       // Also get transactions that have splits of this type
-      const allTransactions = await this.getAllTransactions();
-      const splitTxIds = allTransactions.filter(t => t.isSplit && t.splitIds && t.splitIds.length > 0).map(t => t.id);
+      const [allTransactions, allSplits] = await Promise.all([
+        this.getAllTransactions(),
+        this.getAllTransactionSplits()
+      ]);
 
-      const transactionsWithSplits: Transaction[] = [];
-      for (const txId of splitTxIds) {
-        const splits = await this.getTransactionSplits(txId);
-        if (splits.some(split => split.category === filter)) {
-          const tx = allTransactions.find(t => t.id === txId);
-          if (tx) transactionsWithSplits.push(tx);
-        }
-      }
+      const parentIdsWithMatchingSplits = new Set(
+        allSplits.filter(split => split.category === filter).map(s => s.parentTransactionId)
+      );
+
+      const transactionsWithSplits = allTransactions.filter(t => parentIdsWithMatchingSplits.has(t.id));
 
       // Combine and deduplicate
       const combined = [...transactions, ...transactionsWithSplits];
@@ -906,12 +923,12 @@ export class FinanceService {
 
       // Flatten transactions: regular transactions (excluding isSplit) + split children
       const flattenedTransactions: Transaction[] = [];
-      const splitTxIds = transactions.filter(t => t.isSplit && t.splitIds && t.splitIds.length > 0).map(t => t.id);
-
+      const allSplits = await this.getAllTransactionSplits();
       const splitsMap: Record<string, TransactionSplit[]> = {};
-      for (const txId of splitTxIds) {
-        splitsMap[txId] = await this.getTransactionSplits(txId);
-      }
+      allSplits.forEach(s => {
+        if (!splitsMap[s.parentTransactionId]) splitsMap[s.parentTransactionId] = [];
+        splitsMap[s.parentTransactionId].push(s);
+      });
 
       transactions.forEach(tx => {
         if (tx.isSplit && tx.splitIds && tx.splitIds.length > 0) {

@@ -161,3 +161,206 @@ export const ADMINISTRATIVE_PROJECT_IDS = ['National Due', 'Maintenance', 'Profe
 /** Administrative purpose options */
 export const ADMINISTRATIVE_PURPOSES = ['National Due', 'Utilities', 'Audit Fee', 'Water Fee', 'Electricity'] as const;
 
+export const INDUSTRY_OPTIONS = [
+  'Advertising, Marketing & Media',
+  'Agriculture & Animals',
+  'Architecture, Engineering & Construction',
+  'Art, Entertainment & Design',
+  'Automotive & Accessories',
+  'Food & Beverages',
+  'Computers & IT',
+  'Consulting & Professional Services',
+  'Education & Training',
+  'Event & Hospitality',
+  'Finance & Insurance',
+  'Health, Wellness & Beauty',
+  'Legal & Accounting',
+  'Manufacturing',
+  'Retail & E-Commerce',
+  'Real Estate & Property Services',
+  'Transport & Logistics',
+  'Travel & Tourism'
+] as const;
+
+
+/** Join Us Survey Questions and Mappings */
+export const JOIN_US_SURVEY_QUESTIONS = [
+  {
+    id: 'Q1',
+    title: '如果你参加一个30人的聚会，你通常希望：',
+    options: [
+      {
+        label: '学习如何成为全场焦点，提升表达底气',
+        value: 'A',
+        mapping: {
+          direction: 'Individual',
+          category: 'Skill Development',
+          items: ['Effective Communications', 'Public Speaking', 'JCIM Inspire', 'Mentorship', 'Local Academy']
+        }
+      },
+      {
+        label: '结识2-3位能直接在事业上帮到我或合作的人',
+        value: 'B',
+        mapping: {
+          direction: 'Business',
+          category: 'Programs',
+          items: ['JIB', 'CYEA', 'BCP', 'Networking Events', 'BSP Supercharge']
+        }
+      },
+      {
+        label: '观察别人是如何组织这场活动的，学习管理经验',
+        value: 'C',
+        mapping: {
+          direction: 'Community',
+          category: 'Projects',
+          items: ['Project Management', 'Leadership Toolkit', 'Leaders School Program', 'Chairperson roles']
+        }
+      },
+      {
+        label: '认识一些不同背景的朋友，单纯跳出原有圈子',
+        value: 'D',
+        mapping: {
+          direction: 'International',
+          category: 'Events',
+          items: ['Conference', 'Twin Chapter', 'Area/National/Overseas Conferences', 'International Networking']
+        }
+      }
+    ]
+  },
+  {
+    id: 'Q2',
+    title: '在目前的工作或生活中，哪种感觉最让你困扰？',
+    options: [
+      {
+        label: '有想法但说不出来，或者说服不了别人',
+        value: 'A',
+        mapping: {
+          direction: 'Individual',
+          category: 'Skill Development',
+          items: ['Effective Meetings', 'Leadership', 'Training', 'Explore/Discover workshop', 'Leadership Summit']
+        }
+      },
+      {
+        label: '每天重复劳动，感觉视野越来越窄',
+        value: 'B',
+        mapping: {
+          direction: 'International',
+          category: 'Projects',
+          items: ['Zero Waste Campaign', 'SDA', 'UN SDGs', 'International Cross-border CSR', 'Area Academy']
+        }
+      },
+      {
+        label: '朋友圈太单一，遇到问题找不到专业人士请教',
+        value: 'C',
+        mapping: {
+          direction: 'Business',
+          category: 'Programs',
+          items: ['JIB', 'CYE', 'BSP', 'Business growth platform', 'Networking Relationship capital']
+        }
+      },
+      {
+        label: '想做点有意义的事，但不知道从哪开始上手',
+        value: 'D',
+        mapping: {
+          direction: 'Community',
+          category: 'Projects',
+          items: ['Community-based', 'Zero Waste', 'Blood Donation', 'SDA', 'R&R workshop']
+        }
+      }
+    ]
+  },
+  {
+    id: 'Q3',
+    title: '如果有一个周末，你更愿意如何度过？',
+    options: [
+      {
+        label: '参加一场能拿证书、有干货的实战训练营',
+        value: 'A',
+        mapping: {
+          direction: 'Individual',
+          category: 'Skill Development',
+          items: ['Workshops', 'Skill mastery', 'JCIM Empower', 'Leadership Series', 'Skills-based training']
+        }
+      },
+      {
+        label: '策划并执行一个能落地、看得到社会反馈的小项目',
+        value: 'B',
+        mapping: {
+          direction: 'Community',
+          category: 'Projects',
+          items: ['Result-oriented action', 'Leaders School', 'SDA project execution', 'Zero Waste']
+        }
+      },
+      {
+        label: '与一群创业者或高管共进晚餐，交换商业信息',
+        value: 'C',
+        mapping: {
+          direction: 'Business',
+          category: 'Programs',
+          items: ['Networking', 'CYEA', 'Startup Pitch Night', 'JIB Biz Matching', 'BSP']
+        }
+      },
+      {
+        label: '出发去另一个城市或国家，看看外面的世界',
+        value: 'D',
+        mapping: {
+          direction: 'International',
+          category: 'Events',
+          items: ['Conferences', 'Twin Chapter exchange', 'ASPAC', 'World Congress', 'National Convention']
+        }
+      }
+    ]
+  },
+  {
+    id: 'Q4',
+    title: '加入JCI一年后，你最希望别人怎么评价你？',
+    options: [
+      {
+        label: '“你现在的谈吐和自信程度判若两人。”',
+        value: 'A',
+        mapping: {
+          direction: 'Individual',
+          category: 'Skill Development',
+          items: ['Discover', 'Explore', 'Personal Transformation', 'TOYM', 'Public Speaking series']
+        }
+      },
+      {
+        label: '“你的事业因为这个平台得到了实际的增长。”',
+        value: 'B',
+        mapping: {
+          direction: 'Business',
+          category: 'Programs',
+          items: ['Business growth & matching', 'JIB', 'CYEA', 'BSP Supercharge']
+        }
+      },
+      {
+        label: '“你成功带领团队完成了一个了不起的挑战。”',
+        value: 'C',
+        mapping: {
+          direction: 'Community',
+          category: 'Projects',
+          items: ['Leadership & Execution', 'Project Chairperson', 'Leaders School', 'National platform recognition']
+        }
+      },
+      {
+        label: '“你的眼界变高了，看问题的维度完全不一样。”',
+        value: 'D',
+        mapping: {
+          direction: 'International',
+          category: 'Events',
+          items: ['Scale & Ideas', 'National/International Leadership Summit', 'Global CYE']
+        }
+      }
+    ]
+  },
+  {
+    id: 'Q5',
+    title: '你每周愿意为这个“更好的自己”拨出多少小时？',
+    options: [
+      { label: '2小时（轻度参与）', value: 'A', mapping: { direction: 'None', category: 'Engagement', items: ['Casual'] } },
+      { label: '5小时（积极分子）', value: 'B', mapping: { direction: 'None', category: 'Engagement', items: ['Active'] } },
+      { label: '10小时以上（核心骨干潜力）', value: 'C', mapping: { direction: 'None', category: 'Engagement', items: ['Core'] } }
+    ]
+  }
+];
+

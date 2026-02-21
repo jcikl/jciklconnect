@@ -16,4 +16,3 @@ export const isDevMode = (): boolean => {
 
 // Alias for consistency
 export const checkDevMode = isDevMode;
-

@@ -6,7 +6,8 @@ import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
 
-export const useEvents = () => {
+export const useEvents = (options?: { publicMode?: boolean }) => {
+  const publicMode = options?.publicMode ?? false;
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +16,7 @@ export const useEvents = () => {
 
   const loadEvents = async () => {
     const inDevMode = isDevMode() || isDevModeFromAuth;
-    if (!member && !inDevMode) {
+    if (!publicMode && !member && !inDevMode) {
       setEvents([]);
       setLoading(false);
       setError(null);
@@ -28,17 +29,24 @@ export const useEvents = () => {
       setEvents(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load events';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
+      if (publicMode) {
+        // In public mode, silently fail — Firestore rules may block unauthenticated reads
+        console.warn('[Public Events] Could not fetch events:', errorMessage);
+        setEvents([]);
+        setError(null);
+      } else {
+        setError(errorMessage);
+        showToast(errorMessage, 'error');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!publicMode && authLoading) return;
     const inDevMode = isDevMode() || isDevModeFromAuth;
-    if (!member && !inDevMode) {
+    if (!publicMode && !member && !inDevMode) {
       setEvents([]);
       setLoading(false);
       setError(null);
@@ -46,7 +54,7 @@ export const useEvents = () => {
     }
     loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [member, authLoading, isDevModeFromAuth]);
+  }, [member, authLoading, isDevModeFromAuth, publicMode]);
 
   const createEvent = async (eventData: Omit<Event, 'id'>) => {
     try {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Tabs } from '../ui/Common';
 import { Member, UserRole, MemberTier } from '../../types';
-import { MEMBER_SELF_EDITABLE_FIELDS } from '../../config/constants';
+import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS } from '../../config/constants';
 
 interface MemberEditFormProps {
   member: Member;
@@ -163,10 +163,10 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
 
     const filteredUpdates = selfEditableOnly
       ? (Object.fromEntries(
-          Object.entries(updates).filter(([k]) =>
-            (MEMBER_SELF_EDITABLE_FIELDS as readonly string[]).includes(k)
-          )
-        ) as Partial<Member>)
+        Object.entries(updates).filter(([k]) =>
+          (MEMBER_SELF_EDITABLE_FIELDS as readonly string[]).includes(k)
+        )
+      ) as Partial<Member>)
       : updates;
 
     onSubmit(filteredUpdates);
@@ -175,22 +175,22 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   return (
     <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 space-y-0">
       <div className="shrink-0">
-      <Tabs
-        tabs={['Basic Information', 'Professional & Business', 'Contact Information', 'Membership & Status', 'Apparel & Items']}
-        activeTab={
-          activeTab === 'basic' ? 'Basic Information' :
-            activeTab === 'membership' ? 'Membership & Status' :
-              activeTab === 'professional' ? 'Professional & Business' :
-                activeTab === 'contact' ? 'Contact Information' : 'Apparel & Items'
-        }
-        onTabChange={(tab) => {
-          if (tab === 'Basic Information') setActiveTab('basic');
-          else if (tab === 'Membership & Status') setActiveTab('membership');
-          else if (tab === 'Professional & Business') setActiveTab('professional');
-          else if (tab === 'Contact Information') setActiveTab('contact');
-          else if (tab === 'Apparel & Items') setActiveTab('apparel');
-        }}
-      />
+        <Tabs
+          tabs={['Basic Information', 'Professional & Business', 'Contact Information', 'Membership & Status', 'Apparel & Items']}
+          activeTab={
+            activeTab === 'basic' ? 'Basic Information' :
+              activeTab === 'membership' ? 'Membership & Status' :
+                activeTab === 'professional' ? 'Professional & Business' :
+                  activeTab === 'contact' ? 'Contact Information' : 'Apparel & Items'
+          }
+          onTabChange={(tab) => {
+            if (tab === 'Basic Information') setActiveTab('basic');
+            else if (tab === 'Membership & Status') setActiveTab('membership');
+            else if (tab === 'Professional & Business') setActiveTab('professional');
+            else if (tab === 'Contact Information') setActiveTab('contact');
+            else if (tab === 'Apparel & Items') setActiveTab('apparel');
+          }}
+        />
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-2 py-4">
@@ -353,7 +353,19 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
             </div>
             <div className="flex items-center gap-3">
               <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Industry</label>
-              <input name="industry" value={formValues.industry} onChange={(e) => handleChange('industry', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <input
+                name="industry"
+                list="industry-options"
+                value={formValues.industry}
+                onChange={(e) => handleChange('industry', e.target.value)}
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                placeholder="Select or type industry..."
+              />
+              <datalist id="industry-options">
+                {INDUSTRY_OPTIONS.map(opt => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
             </div>
             <div className="flex items-center gap-3">
               <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Department & Position</label>

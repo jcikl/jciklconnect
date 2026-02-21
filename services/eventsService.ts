@@ -29,8 +29,8 @@ export class EventsService {
     const data = d.data() ?? {};
     // Use eventStartDate as primary date, fallback to date for backward compatibility
     const dateVal = data.eventStartDate ?? data.date;
-    const dateStr = (dateVal && typeof dateVal === 'object' && 'toDate' in dateVal) 
-      ? (dateVal as Timestamp).toDate().toISOString() 
+    const dateStr = (dateVal && typeof dateVal === 'object' && 'toDate' in dateVal)
+      ? (dateVal as Timestamp).toDate().toISOString()
       : (typeof dateVal === 'string' ? dateVal : '');
     const endDateVal = data.eventEndDate ?? data.endDate;
     const endDateStr = (endDateVal && typeof endDateVal === 'object' && 'toDate' in endDateVal)

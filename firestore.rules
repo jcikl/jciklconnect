@@ -67,7 +67,7 @@ service cloud.firestore {
            (canReadOrgMembers() && (resource == null || resourceInMyLo(resource.data))))));
       
       allow create: if isAuthenticated() && 
-                       request.auth.uid == memberId &&
+                       (request.auth.uid == memberId || getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY']) &&
                        request.resource.data.name is string &&
                        request.resource.data.email is string &&
                        request.resource.data.role is string;
@@ -115,7 +115,8 @@ service cloud.firestore {
     
     // Projects collection
     match /projects/{projectId} {
-      allow read: if isAuthenticated();
+      // Public read for published/Active projects (guest events page); auth required for others
+      allow read: if isAuthenticated() || resource.data.status == 'Active';
       // Allow create/update/delete for authenticated users (will be restricted by app logic)
       allow create, update, delete: if isAuthenticated();
     }

@@ -31,7 +31,7 @@ const PENDING_USE_TEMPLATE_KEY = 'jci_pending_use_template_id';
 export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isProposalModalOpen, setProposalModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'projects' | 'templates'>('projects');
+  const [activeTab, setActiveTab] = useState<'projects' | 'past-projects' | 'templates'>('projects');
   const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EventTemplate | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EventTemplate | null>(null);
@@ -48,7 +48,19 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
+  const [isBatchStatusModalOpen, setIsBatchStatusModalOpen] = useState(false);
   const [batchOperationProgress, setBatchOperationProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const displayedProjects = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (activeTab === 'past-projects') {
+      return projects.filter(p => p.eventStartDate && p.eventStartDate < today);
+    }
+    if (activeTab === 'projects') {
+      return projects.filter(p => !p.eventStartDate || p.eventStartDate >= today);
+    }
+    return [];
+  }, [projects, activeTab]);
 
   const handleBatchDelete = async () => {
     if (selectedProjectIds.size === 0) return;
@@ -73,9 +85,9 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
     }
   };
 
-  const handleBatchApprove = async () => {
+  const handleBatchStatusUpdate = async (newStatus: Project['status']) => {
     if (selectedProjectIds.size === 0) return;
-    if (!window.confirm(`Are you sure you want to approve ${selectedProjectIds.size} selected events?`)) return;
+    if (!window.confirm(`Are you sure you want to set status to ${newStatus} for ${selectedProjectIds.size} selected events?`)) return;
 
     const idsToUpdate = Array.from(selectedProjectIds);
     setBatchOperationProgress({ current: 0, total: idsToUpdate.length });
@@ -84,25 +96,26 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
       // Process in parallel with progress updates
       await Promise.all(idsToUpdate.map(async (id) => {
         const proj = projects.find(p => p.id === id);
-        if (proj && proj.status !== 'Approved' && proj.status !== 'Active') {
-          await updateProject(id, { ...proj, status: 'Approved' });
+        if (proj) {
+          await updateProject(id, { status: newStatus });
         }
         setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
       }));
 
       setSelectedProjectIds(new Set());
-      showToast(`Successfully approved ${idsToUpdate.length} events`, 'success');
+      setIsBatchStatusModalOpen(false);
+      showToast(`Successfully updated status for ${idsToUpdate.length} events`, 'success');
     } catch (err) {
-      showToast('Some events could not be approved', 'error');
+      showToast('Some events could not be updated', 'error');
     } finally {
       setBatchOperationProgress(null);
     }
   };
 
   const handleSelectAll = useCallback(() => {
-    const allIds = projects.map(p => p.id).filter(id => !!id) as string[];
+    const allIds = displayedProjects.map(p => p.id).filter(id => !!id) as string[];
     setSelectedProjectIds(new Set(allIds));
-  }, [projects]);
+  }, [displayedProjects]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -113,7 +126,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
           activeElement?.tagName === 'TEXTAREA' ||
           (activeElement as HTMLElement)?.isContentEditable;
 
-        if (!isInput && activeTab === 'projects' && !selectedProjectId) {
+        if (!isInput && (activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId) {
           e.preventDefault();
           handleSelectAll();
         }
@@ -343,18 +356,20 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
         <Card noPadding>
           <div className="px-4 md:px-6 pt-4">
             <Tabs
-              tabs={['Events', 'Templates']}
-              activeTab={activeTab === 'projects' ? 'Events' : 'Templates'}
+              tabs={['Ongoing Events', 'Past Events', 'Templates']}
+              activeTab={activeTab === 'projects' ? 'Ongoing Events' : activeTab === 'past-projects' ? 'Past Events' : 'Templates'}
               onTabChange={(tab) => {
-                setActiveTab(tab === 'Events' ? 'projects' : 'templates');
+                if (tab === 'Ongoing Events') setActiveTab('projects');
+                else if (tab === 'Past Events') setActiveTab('past-projects');
+                else setActiveTab('templates');
                 setSelectedProjectId(null);
               }}
             />
           </div>
           <div className="p-6">
-            {activeTab === 'projects' ? (
+            {(activeTab === 'projects' || activeTab === 'past-projects') ? (
               <ProjectGrid
-                projects={projects}
+                projects={displayedProjects}
                 loading={loading}
                 error={error}
                 onSelect={setSelectedProjectId}
@@ -471,7 +486,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
       )}
 
       {/* Floating Batch Action Bar */}
-      {activeTab === 'projects' && !selectedProjectId && projects.length > 0 && selectedProjectIds.size > 2 && (
+      {(activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId && displayedProjects.length > 0 && selectedProjectIds.size > 1 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-slate-700 backdrop-blur-md bg-slate-900/90">
             <div className="flex items-center gap-2 border-r border-slate-700 pr-6">
@@ -512,11 +527,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleBatchApprove}
-                      className="text-green-400 hover:bg-green-500/20 text-xs py-1"
+                      onClick={() => setIsBatchStatusModalOpen(true)}
+                      className="text-blue-400 hover:bg-blue-500/20 text-xs py-1"
                     >
-                      <CheckCircle size={14} className="mr-1" />
-                      Batch Approve
+                      <Settings size={14} className="mr-1" />
+                      Batch Status
                     </Button>
                     <Button
                       variant="danger"
@@ -727,6 +742,38 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
           // Reload is handled by hook's listener usually, but projects state is reactive
         }}
       />
+
+      {/* Batch Status Update Modal */}
+      <Modal
+        isOpen={isBatchStatusModalOpen}
+        onClose={() => setIsBatchStatusModalOpen(false)}
+        title="Batch Update Status"
+        size="md"
+        drawerOnMobile
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Apply a new status to the {selectedProjectIds.size} selected events.
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            {(['Planning', 'Draft', 'Under Review', 'Approved', 'Active', 'Completed', 'Cancelled'] as Project['status'][]).map((status) => (
+              <Button
+                key={status}
+                variant="outline"
+                className="justify-start"
+                onClick={() => handleBatchStatusUpdate(status)}
+              >
+                {status === 'Active' ? 'Published' : status === 'Planning' ? 'Draft / Unpublished' : status}
+              </Button>
+            ))}
+          </div>
+          <div className="pt-2">
+            <Button variant="ghost" className="w-full" onClick={() => setIsBatchStatusModalOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div >
   )
 }

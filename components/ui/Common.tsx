@@ -281,16 +281,27 @@ export const AvatarGroup: React.FC<{ count: number; limit?: number }> = ({ count
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: string | React.ReactNode;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   /** When false, modal body does not scroll; inner content handles scroll (avoids double scrollbar) */
   scrollInBody?: boolean;
   /** Whether to show as a bottom drawer on mobile */
   drawerOnMobile?: boolean;
+  /** Visual variant for the modal header */
+  variant?: 'default' | 'jci';
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md', scrollInBody = true }) => {
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = 'md',
+  scrollInBody = true,
+  drawerOnMobile = false,
+  variant = 'default'
+}) => {
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (isOpen && e.key === 'Escape') onClose();
@@ -331,15 +342,36 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       aria-modal="true"
       aria-labelledby="modal-title"
     >
-      <div className={`
-        bg-white shadow-2xl w-full ${sizeClasses[size]} overflow-hidden flex flex-col max-h-screen md:max-h-[90vh] md:rounded-xl animate-scale-in
-        ${drawerOnMobile ? 'fixed bottom-0 rounded-t-2xl md:relative md:rounded-xl' : 'rounded-xl max-w-[95vw] md:max-w-full'}
-      `}>
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
-          <h3 id="modal-title" className="font-bold text-slate-800">{title}</h3>
+      <div
+        className={`
+          bg-white shadow-2xl w-full overflow-hidden flex flex-col max-h-screen md:max-h-[90vh] md:rounded-xl animate-scale-in
+          ${drawerOnMobile
+            ? 'fixed bottom-0 rounded-t-2xl md:relative md:rounded-xl ' + sizeClasses[size]
+            : 'rounded-xl max-w-[95vw] ' + sizeClasses[size]}
+        `}
+        style={!drawerOnMobile ? { maxWidth: size === 'sm' ? '448px' : size === 'md' ? '512px' : undefined } : {}}
+      >
+        <div className={`
+          flex justify-between items-center sticky top-0 z-10 
+          ${variant === 'jci'
+            ? 'flex-none bg-gradient-to-r from-jci-blue via-sky-600 to-blue-700 px-6 py-5 text-white shadow-md'
+            : 'p-4 border-b border-slate-100 bg-slate-50'}
+        `}>
+          <div id="modal-title" className={variant === 'jci' ? 'flex-1' : 'font-bold text-slate-800'}>
+            {typeof title === 'string' ? (
+              <h3 className={variant === 'jci' ? 'text-xl font-bold uppercase tracking-tight' : ''}>{title}</h3>
+            ) : (
+              title
+            )}
+          </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded transition-all duration-200 button-press"
+            className={`
+              rounded transition-all duration-200 button-press
+              ${variant === 'jci'
+                ? 'text-white/80 hover:text-white hover:bg-white/20'
+                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'}
+            `}
             aria-label="Close"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>

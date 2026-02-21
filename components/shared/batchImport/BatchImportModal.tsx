@@ -329,7 +329,7 @@ export const BatchImportModal: React.FC<Props> = ({
           setAutoMatchInfo(
             `⚠️ ${unmatchedCount} column(s) need manual adjustment`
           );
-          setShowMapping(true);
+          setShowMapping(false);
         }
       }
     }

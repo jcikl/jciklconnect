@@ -11,6 +11,7 @@ import { UserRole, Member, MemberTier, ProbationTask } from '../../types';
 import { MembersService } from '../../services/membersService';
 import { MEMBER_SELF_EDITABLE_FIELDS } from '../../config/constants';
 import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
+import { INDUSTRY_OPTIONS } from '../../config/constants';
 import { HobbyClubsService } from '../../services/hobbyClubsService';
 import { HobbyClub } from '../../types';
 import { DataImportExportService } from '../../services/dataImportExportService';
@@ -42,10 +43,10 @@ const COUNTRIES = [
   'United States', 'United Kingdom', 'Canada', 'Germany', 'France', 'Other'
 ];
 
-/** 会费状态文案（Story 8.1） */
-const DUES_STATUS_LABEL: Record<string, string> = { Paid: '已缴', Pending: '应缴', Overdue: '逾期' };
+/** Dues status labels (Story 8.1) */
+const DUES_STATUS_LABEL: Record<string, string> = { Paid: 'Paid', Pending: 'Pending', Overdue: 'Overdue' };
 
-/** 我的主档：仅展示本人并可编辑 MEMBER_SELF_EDITABLE_FIELDS（Story 1.3）；会费状态与活动参与/筹委经历（Story 8.1） */
+/** My Profile: Only shows self and allows editing MEMBER_SELF_EDITABLE_FIELDS (Story 1.3); Dues status and participation history (Story 8.1) */
 const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Member>) => Promise<void> }> = ({ member, onSave }) => {
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
@@ -98,22 +99,22 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
         (updates as Record<string, unknown>)[key] = form[key]?.trim() || null;
       });
       await onSave(updates);
-      showToast('主档已更新', 'success');
+      showToast('Profile updated', 'success');
     } catch (err) {
-      showToast(err instanceof Error ? err.message : '更新失败', 'error');
+      showToast(err instanceof Error ? err.message : 'Update failed', 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const labels: Record<string, string> = {
-    phone: '电话', alternatePhone: '备用电话', email: '邮箱', address: '地址',
-    linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', wechat: '微信',
-    emergencyContactName: '紧急联络人', emergencyContactPhone: '紧急联络电话', emergencyContactRelationship: '与本人关系',
-    cutStyle: '剪裁款式', tshirtSize: 'T恤尺码', jacketSize: '外套尺码', embroideredName: '绣名',
+    phone: 'Phone', alternatePhone: 'Alt Phone', email: 'Email', address: 'Address',
+    linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram', wechat: 'WeChat',
+    emergencyContactName: 'Emergency Contact', emergencyContactPhone: 'Emergency Phone', emergencyContactRelationship: 'Relationship',
+    cutStyle: 'Cut Style', tshirtSize: 'T-Shirt Size', jacketSize: 'Jacket Size', embroideredName: 'Embroidered Name',
   };
 
-  const statusLabel = (s: string) => (s === 'registered' ? '报名' : s === 'paid' ? '已缴费' : '已签到');
+  const statusLabel = (s: string) => (s === 'registered' ? 'Registered' : s === 'paid' ? 'Paid' : 'Checked In');
 
   return (
     <div className="space-y-6">
@@ -134,35 +135,35 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
               )}
             </div>
           ))}
-          <Button type="submit" disabled={saving}>{saving ? '保存中…' : '保存'}</Button>
+          <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </form>
       </Card>
 
       {/* Story 8.1：会费状态与活动参与、筹委经历 */}
       <Card className="p-6">
-        <h3 className="font-semibold text-slate-800 mb-4">会费状态与参与记录</h3>
+        <h3 className="font-semibold text-slate-800 mb-4">Dues Status & Participation History</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <span className="text-slate-500 text-sm">会费状态</span>
+            <span className="text-slate-500 text-sm">Dues Status</span>
             <p className="font-medium">{DUES_STATUS_LABEL[member.duesStatus] ?? member.duesStatus ?? '—'}</p>
           </div>
           <div>
-            <span className="text-slate-500 text-sm">会费年度</span>
+            <span className="text-slate-500 text-sm">Dues Year</span>
             <p className="font-medium">{member.duesYear ?? '—'}</p>
           </div>
           <div>
-            <span className="text-slate-500 text-sm">最近缴交日</span>
+            <span className="text-slate-500 text-sm">Last Payment Date</span>
             <p className="font-medium">{member.duesPaidDate ?? '—'}</p>
           </div>
         </div>
         {loadingExtra ? (
-          <p className="text-slate-500 text-sm">加载参与记录…</p>
+          <p className="text-slate-500 text-sm">Loading records...</p>
         ) : (
           <>
             <div className="mb-4">
-              <h4 className="text-sm font-medium text-slate-600 mb-2 flex items-center gap-2"><CalendarCheck size={16} /> 活动参与记录</h4>
+              <h4 className="text-sm font-medium text-slate-600 mb-2 flex items-center gap-2"><CalendarCheck size={16} /> Activity Participation History</h4>
               {participations.length === 0 ? (
-                <p className="text-slate-500 text-sm">暂无参与记录</p>
+                <p className="text-slate-500 text-sm">No records found</p>
               ) : (
                 <ul className="divide-y divide-slate-100 text-sm">
                   {participations.slice(0, 20).map((r) => (
@@ -171,20 +172,20 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
                       <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'}>{statusLabel(r.status)}</Badge>
                     </li>
                   ))}
-                  {participations.length > 20 && <li className="py-2 text-slate-500">共 {participations.length} 条，仅显示最近 20 条</li>}
+                  {participations.length > 20 && <li className="py-2 text-slate-500">Total {participations.length}, showing latest 20</li>}
                 </ul>
               )}
             </div>
             <div>
-              <h4 className="text-sm font-medium text-slate-600 mb-2 flex items-center gap-2"><UserCog size={16} /> 筹委经历</h4>
+              <h4 className="text-sm font-medium text-slate-600 mb-2 flex items-center gap-2"><UserCog size={16} /> Committee Experience</h4>
               {organizerEvents.length === 0 ? (
-                <p className="text-slate-500 text-sm">暂无筹委经历</p>
+                <p className="text-slate-500 text-sm">No records found</p>
               ) : (
                 <ul className="divide-y divide-slate-100 text-sm">
                   {organizerEvents.slice(0, 10).map((e) => (
                     <li key={e.id} className="py-2 text-slate-700">{e.title}（{e.date?.slice(0, 10)}）</li>
                   ))}
-                  {organizerEvents.length > 10 && <li className="py-2 text-slate-500">共 {organizerEvents.length} 场，仅显示最近 10 场</li>}
+                  {organizerEvents.length > 10 && <li className="py-2 text-slate-500">Total {organizerEvents.length}, showing latest 10</li>}
                 </ul>
               )}
             </div>
@@ -463,7 +464,7 @@ export const MembersView: React.FC = () => {
     }
   };
 
-  // 会员本人或访客：仅见 Member Detail View（Profile 详情页）
+  // Self-view or Guest view: only show profile detail
   if (!canManageMembers && currentMember) {
     return (
       <div className="space-y-6">
@@ -657,7 +658,17 @@ export const MembersView: React.FC = () => {
                 <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Professional Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <Input name="companyName" label="Company Name" />
-                  <Input name="industry" label="Industry" />
+                  <Input
+                    name="industry"
+                    label="Industry"
+                    list="register-industry-options"
+                    placeholder="Select or type..."
+                  />
+                  <datalist id="register-industry-options">
+                    {INDUSTRY_OPTIONS.map(opt => (
+                      <option key={opt} value={opt} />
+                    ))}
+                  </datalist>
                   <div className="col-span-2">
                     <Input name="skills" label="Skills (comma-separated)" placeholder="Leadership, Networking, Marketing..." />
                   </div>

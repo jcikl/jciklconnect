@@ -23,8 +23,8 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
   );
 };
 
-const Button: React.FC<{ onClick?: () => void; type?: 'button' | 'submit'; disabled?: boolean; className?: string; children: React.ReactNode }> = ({ onClick, type = 'button', disabled, className = '', children }) => (
-  <button onClick={onClick} type={type} disabled={disabled} className={`px-4 py-2 rounded ${className}`}>
+const Button: React.FC<{ onClick?: () => void; type?: 'button' | 'submit'; disabled?: boolean; className?: string; title?: string; children: React.ReactNode }> = ({ onClick, type = 'button', disabled, className = '', title, children }) => (
+  <button onClick={onClick} type={type} disabled={disabled} className={`px-4 py-2 rounded ${className}`} title={title}>
     {children}
   </button>
 );
@@ -112,18 +112,18 @@ export function TransactionSplitModal({
       if (split.category === 'Projects & Activities') {
         const projects = filteredProjectOptionsBySplit[index] || [];
         const grouped: Record<number, string[]> = {};
-        
+
         projects.forEach(p => {
           const year = p.year || 0;
           if (!grouped[year]) grouped[year] = [];
           grouped[year].push(p.name);
         });
-        
+
         const sortedYears = Object.keys(grouped)
           .map(y => parseInt(y, 10))
           .sort((a, b) => b - a)
           .filter(y => y > 0);
-        
+
         result[index] = sortedYears.map(year => ({
           label: String(year),
           options: grouped[year].sort()
@@ -178,12 +178,12 @@ export function TransactionSplitModal({
     const loadPurposesForProjects = async () => {
       const projectIds = splits.map(s => s.projectId).filter(Boolean);
       const newPurposes: Record<string, string[]> = {};
-      
+
       for (const projectId of projectIds) {
         if (!purposesByProject[projectId]) {
           try {
             const purposes = new Set<string>();
-            
+
             // Get projectTrx transactions for this project (using purpose field)
             try {
               const ptTrx = await projectFinancialService.getAllProjectTrackerTransactions();
@@ -191,13 +191,13 @@ export function TransactionSplitModal({
                 if (t.projectId === projectId && t.purpose) purposes.add(t.purpose);
               });
             } catch (e) { console.error('Failed to load PT purposes', e); }
-            
+
             // Get all transactions for this project
             const allTx = await FinanceService.getAllTransactions();
             allTx.forEach(t => {
               if (t.projectId === projectId && t.purpose) purposes.add(t.purpose);
             });
-            
+
             // Get split transactions for this project
             const splitTx = allTx.filter(t => t.isSplit && t.splitIds);
             for (const t of splitTx) {
@@ -206,9 +206,9 @@ export function TransactionSplitModal({
                 splits.forEach(s => {
                   if (s.projectId === projectId && s.purpose) purposes.add(s.purpose);
                 });
-              } catch (e) {}
+              } catch (e) { }
             }
-            
+
             newPurposes[projectId] = Array.from(purposes).sort();
           } catch (e) {
             console.error('Failed to load purposes for project', projectId, e);
@@ -218,12 +218,12 @@ export function TransactionSplitModal({
           newPurposes[projectId] = purposesByProject[projectId];
         }
       }
-      
+
       if (Object.keys(newPurposes).length > 0) {
         setPurposesByProject(prev => ({ ...prev, ...newPurposes }));
       }
     };
-    
+
     loadPurposesForProjects();
   }, [splits.map(s => s.projectId).join(',')]);
 
@@ -231,11 +231,11 @@ export function TransactionSplitModal({
   useEffect(() => {
     const loadAdminData = async () => {
       if (!isOpen) return;
-      
+
       try {
         const accounts = new Set<string>(adminProjectIds);
         const purposes = new Set<string>(administrativePurposes);
-        
+
         const allTx = await FinanceService.getAllTransactions();
         allTx.forEach(t => {
           if (t.category === 'Administrative') {
@@ -243,14 +243,14 @@ export function TransactionSplitModal({
             if (t.purpose) purposes.add(t.purpose);
           }
         });
-        
+
         setAdminAccounts(Array.from(accounts).sort());
         setAdminPurposes(Array.from(purposes).sort());
       } catch (e) {
         console.error('Failed to load admin data', e);
       }
     };
-    
+
     loadAdminData();
   }, [isOpen]);
 
@@ -283,6 +283,48 @@ export function TransactionSplitModal({
     if (splits.length > 1) {
       setSplits(splits.filter((_, i) => i !== index));
     }
+  };
+
+  const handleQuickSplit = () => {
+    const year = new Date().getFullYear();
+    const quickSplits: SplitItem[] = [
+      {
+        category: 'Membership',
+        year: year,
+        projectId: '',
+        memberId: '',
+        purpose: `${year} Full membership`,
+        paymentRequestId: '',
+        amount: 350,
+        description: `${year} Membership Fee`,
+        id: undefined
+      },
+      {
+        category: 'Administrative',
+        year: year,
+        projectId: 'JCI KL Pink Shirt',
+        memberId: '',
+        purpose: 'Uniform',
+        paymentRequestId: '',
+        amount: 75,
+        description: 'JCI KL Pink Shirt',
+        id: undefined
+      },
+      {
+        category: 'Administrative',
+        year: year,
+        projectId: 'JCI KL Jacket',
+        memberId: '',
+        purpose: 'Uniform',
+        paymentRequestId: '',
+        amount: 75,
+        description: 'JCI KL Jacket',
+        id: undefined
+      }
+    ];
+    setSplits(quickSplits);
+    setEditForm({ ...quickSplits[0] });
+    setEditingIndex(0);
   };
 
   const startInlineEdit = (index: number) => {
@@ -319,7 +361,7 @@ export function TransactionSplitModal({
       newSplits[index].memberId = '';
       newSplits[index].purpose = '';
     }
-    
+
     // Auto-generate purpose for Membership category
     if (newSplits[index].category === 'Membership') {
       if (field === 'memberId' || field === 'year') {
@@ -394,13 +436,23 @@ export function TransactionSplitModal({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Split Allocations</h3>
-            <Button
-              onClick={handleAddSplit}
-              className="border border-gray-300 text-sm px-3 py-1 flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Split
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleQuickSplit}
+                className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-3 py-1 flex items-center gap-2 hover:bg-amber-100 transition-colors"
+                title="Quick split for ToyyibPay dues: 350 (Membership) + 75 (Pink Shirt) + 75 (Jacket)"
+              >
+                <Lightbulb className="w-3.5 h-3.5" />
+                ToyyibPay Dues Split
+              </Button>
+              <Button
+                onClick={handleAddSplit}
+                className="border border-gray-300 text-sm px-3 py-1 flex items-center gap-2 hover:bg-gray-50 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Split
+              </Button>
+            </div>
           </div>
 
           {/* Table */}
@@ -422,11 +474,11 @@ export function TransactionSplitModal({
                 {splits.map((split, index) => {
                   const isEditing = editingIndex === index;
                   const data = isEditing && editForm ? editForm : split;
-                  
+
                   return (
                     <tr key={index} className="border-t hover:bg-slate-50">
                       <td className="py-2 px-3 text-xs">{index + 1}</td>
-                      
+
                       {isEditing ? (
                         <>
                           <td className="py-1 px-2">

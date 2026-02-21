@@ -56,8 +56,10 @@ export const FinanceView: React.FC = () => {
   const [isRenewing, setIsRenewing] = useState(false);
   const [moduleTab, setModuleTab] = useState('Dashboard');
   const [txSearchTerm, setTxSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [txCategoryFilter, setTxCategoryFilter] = useState('All');
   const [bankAccountFilter, setBankAccountFilter] = useState('All');
+  const [transactionLimit, setTransactionLimit] = useState(50); // Initial display limit
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -93,8 +95,30 @@ export const FinanceView: React.FC = () => {
   const [uncompletedPRs, setUncompletedPRs] = useState<PaymentRequest[]>([]);
   const [editingModalYear, setEditingModalYear] = useState<string>('All');
   const [transactionSplits, setTransactionSplits] = useState<Record<string, TransactionSplit[]>>({});
+
+  const isTransactionInCategory = (tx: Transaction, category: string): boolean => {
+    if (tx.category === category) return true;
+    if (tx.isSplit && transactionSplits[tx.id]) {
+      return transactionSplits[tx.id].some(split => split.category === category);
+    }
+    return false;
+  };
+
   const [projectPurposes, setProjectPurposes] = useState<string[]>([]);
   const [projectAccountYearFilter, setProjectAccountYearFilter] = useState<number>(0); // 0 = All Years
+  const [adminAccountYearFilter, setAdminAccountYearFilter] = useState<number>(new Date().getFullYear());
+
+  const adminAccountYearOptions = useMemo(() => {
+    const years = new Set<number>();
+    transactions.forEach(t => {
+      if (isTransactionInCategory(t, 'Administrative')) {
+        years.add(new Date(t.date).getFullYear());
+      }
+    });
+    // Ensure current year is always an option
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [transactions, transactionSplits]);
   // Batch category editing state
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
   const [selectedSplitIds, setSelectedSplitIds] = useState<Set<string>>(new Set());
@@ -156,14 +180,6 @@ export const FinanceView: React.FC = () => {
   const { user } = useAuth();
 
   const UNASSIGNED_PROJECT_ID = 'UNASSIGNED_PROJECT'; // Consistent internal ID for uncategorized projects
-
-  const isTransactionInCategory = (tx: Transaction, category: string): boolean => {
-    if (tx.category === category) return true;
-    if (tx.isSplit && transactionSplits[tx.id]) {
-      return transactionSplits[tx.id].some(split => split.category === category);
-    }
-    return false;
-  };
 
   const projectTransactions = useMemo(() => {
     // Filter for Projects & Activities category
@@ -345,8 +361,8 @@ export const FinanceView: React.FC = () => {
       }
 
       // Search term (Multi-keyword fuzzy search)
-      if (txSearchTerm) {
-        const terms = txSearchTerm.toLowerCase().split(/\s+/).filter(t => t !== '');
+      if (debouncedSearchTerm) {
+        const terms = debouncedSearchTerm.toLowerCase().split(/\s+/).filter(t => t !== '');
 
         // Every term must match at least one field (AND logic across terms)
         const isMatch = terms.every(term => {
@@ -400,8 +416,49 @@ export const FinanceView: React.FC = () => {
       return { ...tx, runningBalance: rb };
     });
 
-    return [...withBalance].reverse();
-  }, [transactions, txCategoryFilter, txSearchTerm, bankAccountFilter, accounts, transactionSplits]);
+    // 4. Sort Newest -> Oldest for display and Apply limit
+    const totalTransactions = [...withBalance].reverse();
+    return totalTransactions.slice(0, transactionLimit);
+  }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, accounts, transactionSplits, transactionLimit]);
+
+  const hasMoreTransactions = useMemo(() => {
+    // We need to know if there are more than current limit
+    // To be efficient, we calculate this based on the filtered count
+    const filteredCount = transactions.filter(tx => {
+      if (txCategoryFilter !== 'All') {
+        if (txCategoryFilter === 'Uncategorized') {
+          const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+          const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+          const hasUncategorizedSplit = tx.isSplit && transactionSplits[tx.id]?.some(split => {
+            const sHasProjectId = split.projectId && split.projectId.trim() !== '';
+            const sHasPurpose = split.purpose && split.purpose.trim() !== '';
+            return !sHasProjectId || !sHasPurpose;
+          });
+          if (!hasUncategorizedSplit && (hasProjectId && hasPurpose)) return false;
+        } else if (!isTransactionInCategory(tx, txCategoryFilter)) return false;
+      }
+      if (bankAccountFilter !== 'All' && tx.bankAccountId !== bankAccountFilter) return false;
+      if (debouncedSearchTerm) {
+        const terms = debouncedSearchTerm.toLowerCase().split(/\s+/).filter(t => t !== '');
+        return terms.every(term => {
+          const parentFields = [tx.description.toLowerCase(), (tx.referenceNumber || '').toLowerCase(), (tx.category || '').toLowerCase(), (tx.status || '').toLowerCase(), tx.date.toLowerCase(), String(tx.amount), tx.type.toLowerCase(), (tx.purpose || '').toLowerCase()];
+          if (parentFields.some(field => field.includes(term))) return true;
+          return transactionSplits[tx.id]?.some(s => s.category.toLowerCase().includes(term) || s.description.toLowerCase().includes(term) || s.purpose?.toLowerCase().includes(term) || String(s.amount).includes(term));
+        });
+      }
+      return true;
+    }).length;
+
+    return filteredCount > transactionLimit;
+  }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, transactionSplits, transactionLimit]);
+
+  const dashboardStats = useMemo(() => {
+    return {
+      totalCash: accounts.reduce((acc, curr) => acc + curr.balance, 0),
+      pendingCount: transactions.filter(t => t.status === 'Pending').length,
+      pendingExpensesCount: transactions.filter(t => t.status === 'Pending' && t.type === 'Expense').length,
+    };
+  }, [accounts, transactions]);
 
   const handleSelectAllTransactions = React.useCallback(() => {
     const allVisibleTxIds = displayTransactions.map(t => t.id);
@@ -447,6 +504,14 @@ export const FinanceView: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSelectAllTransactions, moduleTab, displayTransactions.length]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(txSearchTerm);
+      setTransactionLimit(50); // Reset limit on search
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [txSearchTerm]);
 
   useEffect(() => {
     loadData();
@@ -675,16 +740,14 @@ export const FinanceView: React.FC = () => {
       }));
       setMembers(mappedMembers);
 
-      const splitTx = txs.filter(tx => tx.isSplit && tx.splitIds && tx.splitIds.length > 0);
+      const allSplits = await FinanceService.getAllTransactionSplits();
       const splitsMap: Record<string, TransactionSplit[]> = {};
-      await Promise.all(splitTx.map(async (tx) => {
-        try {
-          const splits = await FinanceService.getTransactionSplits(tx.id);
-          splitsMap[tx.id] = splits;
-        } catch (e) {
-          console.error('Failed to load splits for tx', tx.id, e);
+      allSplits.forEach(split => {
+        if (!splitsMap[split.parentTransactionId]) {
+          splitsMap[split.parentTransactionId] = [];
         }
-      }));
+        splitsMap[split.parentTransactionId].push(split);
+      });
       setTransactionSplits(splitsMap);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load financial data';
@@ -1091,7 +1154,7 @@ export const FinanceView: React.FC = () => {
             <StatCardsContainer>
               <StatCard
                 title="Total Cash on Hand"
-                value={formatCurrency(accounts.reduce((acc, curr) => acc + curr.balance, 0), accounts[0]?.currency || 'USD')}
+                value={formatCurrency(dashboardStats.totalCash, accounts[0]?.currency || 'USD')}
                 icon={<DollarSign size={20} />}
                 subtext="Across all accounts"
               />
@@ -1104,9 +1167,9 @@ export const FinanceView: React.FC = () => {
               />
               <StatCard
                 title="Pending Transactions"
-                value={transactions.filter(t => t.status === 'Pending').length.toString()}
+                value={dashboardStats.pendingCount.toString()}
                 icon={<AlertCircle size={20} />}
-                subtext={`${transactions.filter(t => t.status === 'Pending' && t.type === 'Expense').length} expenses need approval`}
+                subtext={`${dashboardStats.pendingExpensesCount} expenses need approval`}
               />
             </StatCardsContainer>
           </LoadingState>
@@ -1341,27 +1404,50 @@ export const FinanceView: React.FC = () => {
       {moduleTab === 'Administrative' && hasPermission('canViewFinance') && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {(() => {
-            const currentYear = new Date().getFullYear();
+            const activeYear = adminAccountYearFilter;
             const adminTransactions = transactions.filter(t => isTransactionInCategory(t, 'Administrative'));
-            const adminYTD = adminTransactions.filter(t => new Date(t.date).getFullYear() === currentYear);
-            const adminIncome = adminYTD.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
-            const adminExpenses = adminYTD.filter(t => t.type === 'Expense').reduce((s, t) => s + Math.abs(t.amount), 0);
+            const adminFiltered = activeYear === 0
+              ? adminTransactions
+              : adminTransactions.filter(t => new Date(t.date).getFullYear() === activeYear);
+
+            const adminIncome = adminFiltered.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+            const adminExpenses = adminFiltered.filter(t => t.type === 'Expense').reduce((s, t) => s + Math.abs(t.amount), 0);
             const adminNet = adminIncome - adminExpenses;
             const allAdminProjectIds = dynamicAdministrativeProjectIds;
             let adminByProjectId = allAdminProjectIds.map(projectId => {
-              const txList = adminYTD.filter(t => (t.projectId || '').trim() === projectId.trim());
+              const txList = adminFiltered.filter(t => (t.projectId || '').trim() === projectId.trim());
               const inc = txList.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
               const exp = txList.filter(t => t.type === 'Expense').reduce((s, t) => s + Math.abs(t.amount), 0);
               return { projectId, income: inc, expenses: exp, net: inc - exp };
             });
-            const uncategorized = adminYTD.filter(t => !(t.projectId || '').trim());
+            const uncategorized = adminFiltered.filter(t => !(t.projectId || '').trim());
             const uncatInc = uncategorized.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
             const uncatExp = uncategorized.filter(t => t.type === 'Expense').reduce((s, t) => s + Math.abs(t.amount), 0);
             adminByProjectId = [{ projectId: UNASSIGNED_PROJECT_ID, income: uncatInc, expenses: uncatExp, net: uncatInc - uncatExp }, ...adminByProjectId];
+
+            // Filter out accounts with no activity in the selected year
+            if (activeYear !== 0) {
+              adminByProjectId = adminByProjectId.filter(acc => acc.income !== 0 || acc.expenses !== 0);
+            }
+
             return (
               <>
                 <div className="lg:col-span-1 space-y-6">
-                  <Card title="Administrative Summary (YTD)">
+                  <Card title={`Administrative Summary ${activeYear === 0 ? '(All Time)' : `(${activeYear})`}`}>
+                    <div className="mb-4">
+                      <Select
+                        label="Filter by Year"
+                        value={adminAccountYearFilter.toString()}
+                        onChange={(e) => setAdminAccountYearFilter(parseInt(e.target.value, 10))}
+                        options={[
+                          { label: 'All Years', value: '0' },
+                          ...adminAccountYearOptions.map(year => ({
+                            label: year.toString(),
+                            value: year.toString()
+                          }))
+                        ]}
+                      />
+                    </div>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-slate-500">Income</span>
@@ -1375,7 +1461,7 @@ export const FinanceView: React.FC = () => {
                         <span className="text-sm font-medium text-slate-700">Net</span>
                         <span className={`font-semibold ${adminNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(adminNet)}</span>
                       </div>
-                      <p className="text-xs text-slate-400">{adminYTD.filter(t => t.type === 'Income').length} income / {adminYTD.filter(t => t.type === 'Expense').length} expense entries</p>
+                      <p className="text-xs text-slate-400">{adminFiltered.filter(t => t.type === 'Income').length} income / {adminFiltered.filter(t => t.type === 'Expense').length} expense entries</p>
                     </div>
                   </Card>
                   <Card
@@ -1423,11 +1509,16 @@ export const FinanceView: React.FC = () => {
                     )}
                   >
                     {(() => {
+                      const activeYear = adminAccountYearFilter;
+                      const adminTransactionsWithFilter = activeYear === 0
+                        ? adminTransactions
+                        : adminTransactions.filter(t => new Date(t.date).getFullYear() === activeYear);
+
                       const filteredAdminTx = adminProjectIdFilter
                         ? adminProjectIdFilter === UNASSIGNED_PROJECT_ID
-                          ? adminTransactions.filter(t => !(t.projectId || '').trim())
-                          : adminTransactions.filter(t => (t.projectId || '').trim() === adminProjectIdFilter)
-                        : adminTransactions;
+                          ? adminTransactionsWithFilter.filter(t => !(t.projectId || '').trim())
+                          : adminTransactionsWithFilter.filter(t => (t.projectId || '').trim() === adminProjectIdFilter)
+                        : adminTransactionsWithFilter;
                       return (
                         <LoadingState loading={loading} error={error} empty={filteredAdminTx.length === 0} emptyMessage={adminProjectIdFilter ? `No transactions for this account.` : "No admin transactions found. Use 'New Transaction' above to add one."}>
                           <div className="overflow-x-auto">
@@ -2049,6 +2140,18 @@ export const FinanceView: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              {hasMoreTransactions && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTransactionLimit(prev => prev + 100)}
+                    className="text-jci-blue hover:bg-jci-blue/10 font-medium"
+                  >
+                    Show More Transactions
+                  </Button>
+                </div>
+              )}
             </LoadingState>
           </Card>
         </div>
@@ -2333,7 +2436,7 @@ export const FinanceView: React.FC = () => {
       </Drawer>
 
       {/* Fixed Bottom Action Bar for Batch Selection */}
-      {moduleTab === 'Transactions' && displayTransactions.length > 0 && (selectedTxIds.size + selectedSplitIds.size) > 2 && (
+      {moduleTab === 'Transactions' && displayTransactions.length > 0 && (selectedTxIds.size + selectedSplitIds.size) > 1 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-6 bg-slate-900/95 backdrop-blur-sm px-6 py-3 rounded-full shadow-2xl border border-slate-700">
             <div className="flex items-center gap-3">

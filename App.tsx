@@ -117,40 +117,28 @@ const GuestHeader = ({
           <Link
             to="/events"
             onClick={() => handleNavigation('events')}
-            className={`font-medium transition-colors ${activePage === 'events'
-              ? 'text-jci-blue border-b-2 border-jci-blue pb-1'
-              : 'text-slate-600 hover:text-jci-blue'
-              }`}
+            className={`no-underline font-medium transition-colors ${activePage === 'events' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
           >
             Events
           </Link>
           <Link
             to="/projects"
             onClick={() => handleNavigation('projects')}
-            className={`font-medium transition-colors ${activePage === 'projects'
-              ? 'text-jci-blue border-b-2 border-jci-blue pb-1'
-              : 'text-slate-600 hover:text-jci-blue'
-              }`}
+            className={`no-underline font-medium transition-colors ${activePage === 'projects' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
           >
             Projects
           </Link>
           <Link
             to="/about"
             onClick={() => handleNavigation('about')}
-            className={`font-medium transition-colors ${activePage === 'about'
-              ? 'text-jci-blue border-b-2 border-jci-blue pb-1'
-              : 'text-slate-600 hover:text-jci-blue'
-              }`}
+            className={`no-underline font-medium transition-colors ${activePage === 'about' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
           >
             About
           </Link>
           <Link
             to="/enewsletters"
             onClick={() => handleNavigation('enewsletters')}
-            className={`font-medium transition-colors ${activePage === 'enewsletters'
-              ? 'text-jci-blue border-b-2 border-jci-blue pb-1'
-              : 'text-slate-600 hover:text-jci-blue'
-              }`}
+            className={`no-underline font-medium transition-colors ${activePage === 'enewsletters' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
           >
             E-Newsletters
           </Link>
@@ -333,7 +321,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   onRegister: () => void;
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => void;
 }) => {
-  const { events, loading } = useEvents();
+  const { events, loading } = useEvents({ publicMode: true });
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [guestRegistrationData, setGuestRegistrationData] = useState({
@@ -345,8 +333,10 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   });
   const { showToast } = useToast();
   const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status === 'Upcoming');
-  // Show all upcoming events except private meetings
+  // Show all upcoming events except private meetings (for event cards)
   const publicEvents = upcomingEvents.filter(e => e.type !== 'Meeting');
+  // All published events except private meetings (for Activity Calendar)
+  const allPublishedEvents = events.filter(e => e.type !== 'Meeting');
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -428,7 +418,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
             </div>
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
               <EventCalendarView
-                events={publicEvents}
+                events={allPublishedEvents}
                 onEventClick={(event) => {
                   setSelectedEvent(event);
                   setIsRegistrationModalOpen(true);

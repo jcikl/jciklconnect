@@ -4,6 +4,7 @@ import { Mail, Lock, User, AlertCircle, Phone, CheckCircle, ChevronRight, Chevro
 import { Modal, Button, useToast, ProgressBar } from '../ui/Common';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
+import { JOIN_US_SURVEY_QUESTIONS } from '../../config/constants';
 
 // Hobbies options from MembersView
 const HOBBY_OPTIONS = [
@@ -28,10 +29,10 @@ interface RegisterModalProps {
   onSwitchToLogin?: () => void;
 }
 
-export const RegisterModal: React.FC<RegisterModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSwitchToLogin 
+export const RegisterModal: React.FC<RegisterModalProps> = ({
+  isOpen,
+  onClose,
+  onSwitchToLogin
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
@@ -47,8 +48,8 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     // Step 2: Account Security
     password: '',
     confirmPassword: '',
-    // Step 3: Interests
-    areaOfInterest: '',
+    // Step 3: Profile & Survey
+    surveyAnswers: {} as Record<string, string>,
     selectedHobbies: [] as string[],
     // Step 4: Agreement
     agreeToTerms: false,
@@ -85,7 +86,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
   const validateStep = (step: number): boolean => {
     setError(null);
-    
+
     switch (step) {
       case 1:
         if (!formData.fullName.trim()) {
@@ -124,7 +125,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         }
         return true;
       case 3:
-        // Step 3 is optional, always valid
+        // Validate all survey questions are answered
+        const answeredCount = Object.keys(formData.surveyAnswers).length;
+        if (answeredCount < JOIN_US_SURVEY_QUESTIONS.length) {
+          setError(`Please answer all ${JOIN_US_SURVEY_QUESTIONS.length} assessment questions`);
+          return false;
+        }
         return true;
       case 4:
         if (!formData.agreeToTerms) {
@@ -158,7 +164,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateStep(currentStep)) {
       return;
     }
@@ -187,6 +193,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         },
       };
 
+      // Diagnose Persona and Tags
+      const { personaType, tendencyTags } = diagnosePersona(formData.surveyAnswers);
+
       await signUp(
         formData.email,
         formData.password,
@@ -197,8 +206,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           gender: formData.gender,
           dateOfBirth: formData.dateOfBirth,
           nationality: formData.nationality,
-          areaOfInterest: formData.areaOfInterest,
-          hobbies: formData.selectedHobbies,
+          selectedHobbies: formData.selectedHobbies,
+          surveyAnswers: formData.surveyAnswers,
+          personaType,
+          tendencyTags,
           agreementSignatures,
         }
       );
@@ -216,7 +227,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         nationality: 'Malaysia',
         password: '',
         confirmPassword: '',
-        areaOfInterest: '',
+        surveyAnswers: {},
         selectedHobbies: [],
         agreeToTerms: false,
         agreeToPrivacy: false,
@@ -228,6 +239,54 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Helper to diagnose persona and tags based on survey responses
+   */
+  const diagnosePersona = (answers: Record<string, string>) => {
+    const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+    const tags = new Set<string>();
+
+    // Q1-Q4 map to Directions A-D
+    JOIN_US_SURVEY_QUESTIONS.forEach(q => {
+      const answer = answers[q.id];
+      if (!answer) return;
+
+      if (['Q1', 'Q2', 'Q3', 'Q4'].includes(q.id)) {
+        counts[answer] = (counts[answer] || 0) + 1;
+      }
+
+      const option = q.options.find(opt => opt.value === answer);
+      if (option && option.mapping) {
+        if (option.mapping.direction !== 'None') tags.add(option.mapping.direction);
+        if (option.mapping.category !== 'Engagement') tags.add(option.mapping.category);
+        option.mapping.items.forEach(item => tags.add(item));
+      }
+    });
+
+    // Determine dominant direction
+    let dominant = 'A';
+    let max = -1;
+    // Tie-breaking priority: A > B > C > D
+    ['A', 'B', 'C', 'D'].forEach(key => {
+      if (counts[key] > max) {
+        max = counts[key];
+        dominant = key;
+      }
+    });
+
+    const personas: Record<string, string> = {
+      A: 'Learning-oriented (学习型)',
+      B: 'Practical-oriented (务实型)',
+      C: 'Backbone-oriented (骨干型)',
+      D: 'Explorer-oriented (探索型)'
+    };
+
+    return {
+      personaType: personas[dominant],
+      tendencyTags: Array.from(tags)
+    };
   };
 
   const stepTitles = [
@@ -300,7 +359,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                         checked={formData.gender === opt}
                         onChange={handleChange}
                         className="hidden peer"
-                        required
                       />
                       <span className="block px-3 py-2.5 rounded-lg text-sm font-medium border-2 border-slate-200 peer-checked:border-jci-blue peer-checked:bg-jci-blue/10 peer-checked:text-jci-blue text-slate-600 text-center transition-all">
                         {opt}
@@ -327,7 +385,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             />
           </div>
         );
-      
+
       case 2:
         return (
           <div className="space-y-4 animate-fade-in">
@@ -357,33 +415,79 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             />
           </div>
         );
-      
+
       case 3:
         return (
-          <div className="space-y-4 animate-fade-in">
-            <p className="text-sm text-slate-500 mb-4">
-              Help us personalize your JCI experience (optional).
-            </p>
-            <Select
-              name="areaOfInterest"
-              label="Area of Interest"
-              options={[
-                { label: 'Select your focus area...', value: '' },
-                { label: '🌱 Community Projects', value: 'projects' },
-                { label: '💼 Business Networking', value: 'business' },
-                { label: '📈 Personal Growth', value: 'growth' },
-                { label: '👑 Leadership Development', value: 'leadership' },
-                { label: '📚 Training & Education', value: 'training' },
-                { label: '🌍 International Relations', value: 'international' },
-              ]}
-              value={formData.areaOfInterest}
-              onChange={handleChange}
-            />
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+          <div className="space-y-6 animate-fade-in pr-1">
+            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-start gap-4 mb-4">
+              <div className="bg-blue-600 p-2 rounded-lg text-white shadow-md">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">Personalized Assessment</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Tell us more about your goals. We'll use this to match you with the best projects and growth opportunities.
+                </p>
+              </div>
+            </div>
+
+            {JOIN_US_SURVEY_QUESTIONS.map((q, idx) => (
+              <div key={q.id} className="space-y-4 p-1">
+                <div className="flex items-start gap-3">
+                  <span className="flex-none flex items-center justify-center w-6 h-6 rounded-full bg-jci-blue/10 text-[10px] font-bold text-jci-blue border border-jci-blue/20 mt-0.5">
+                    {idx + 1}
+                  </span>
+                  <h4 className="text-sm font-semibold text-slate-900 leading-snug">{q.title}</h4>
+                </div>
+                <div className="grid grid-cols-1 gap-2 ml-9">
+                  {q.options.map(opt => (
+                    <label
+                      key={opt.value}
+                      className={`
+                        relative flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all duration-200
+                        ${formData.surveyAnswers[q.id] === opt.value
+                          ? 'border-jci-blue bg-blue-50/50 shadow-sm ring-1 ring-jci-blue/20 scale-[1.01]'
+                          : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
+                        }
+                      `}
+                    >
+                      <input
+                        type="radio"
+                        name={q.id}
+                        value={opt.value}
+                        checked={formData.surveyAnswers[q.id] === opt.value}
+                        onChange={() => {
+                          setFormData({
+                            ...formData,
+                            surveyAnswers: { ...formData.surveyAnswers, [q.id]: opt.value }
+                          });
+                          if (error) setError(null);
+                        }}
+                        className="hidden"
+                      />
+                      <div className={`
+                        w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center transition-all
+                        ${formData.surveyAnswers[q.id] === opt.value ? 'border-jci-blue bg-jci-blue' : 'border-slate-300'}
+                      `}>
+                        {formData.surveyAnswers[q.id] === opt.value && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium leading-relaxed ${formData.surveyAnswers[q.id] === opt.value ? 'text-jci-blue' : 'text-slate-600'}`}>
+                        {opt.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <div className="pt-4 border-t border-slate-100">
+              <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Star size={16} className="text-amber-500" />
                 Hobbies & Interests (Optional)
               </label>
-              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
                 {HOBBY_OPTIONS.map(opt => (
                   <label key={opt} className="cursor-pointer">
                     <input
@@ -398,30 +502,36 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                       }}
                       className="hidden"
                     />
-                    <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 ${formData.selectedHobbies.includes(opt) ? 'bg-jci-blue text-white border-jci-blue shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-jci-blue/30'}`}>
+                    <span className={`
+                      inline-block px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 
+                      ${formData.selectedHobbies.includes(opt)
+                        ? 'bg-jci-blue text-white border-jci-blue shadow-md'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-jci-blue/30'
+                      }
+                    `}>
                       {opt}
                     </span>
                   </label>
                 ))}
               </div>
               {formData.selectedHobbies.length > 0 && (
-                <p className="text-xs text-jci-blue mt-2">
-                  {formData.selectedHobbies.length} selected
+                <p className="text-[10px] font-bold text-jci-blue mt-2 ml-1 uppercase tracking-widest">
+                  {formData.selectedHobbies.length} Items Selected
                 </p>
               )}
             </div>
           </div>
         );
-      
+
       case 4:
         return (
           <div className="space-y-4 animate-fade-in">
             <p className="text-sm text-slate-500 mb-4">
               Please review and accept our agreements to complete your registration.
             </p>
-            <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 rounded-xl space-y-3 max-h-56 overflow-y-auto border border-slate-200 shadow-inner">
-              <div className="bg-white p-3 rounded-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
+            <div className="space-y-4">
+              <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
+                <h4 className="font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
                   <Shield size={16} className="text-jci-blue" />
                   Code of Ethics
                 </h4>
@@ -429,8 +539,8 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   I commit to upholding integrity, respect, and service to the community.
                 </p>
               </div>
-              <div className="bg-white p-3 rounded-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
+              <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
+                <h4 className="font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
                   <Shield size={16} className="text-green-600" />
                   Privacy Policy
                 </h4>
@@ -438,8 +548,8 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   My data will be used only for JCI Kuala Lumpur operations.
                 </p>
               </div>
-              <div className="bg-white p-3 rounded-lg border border-slate-100">
-                <h4 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
+              <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
+                <h4 className="font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
                   <Users size={16} className="text-amber-600" />
                   Membership Agreement
                 </h4>
@@ -449,42 +559,40 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
             </div>
             <div className="space-y-2">
-              <label className={`relative items-start gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                formData.agreeToTerms 
-                  ? 'border-jci-blue bg-blue-50/50' 
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}>
+              <div className={`relative p-3 rounded-lg border-2 transition-all cursor-pointer ${formData.agreeToTerms
+                ? 'border-jci-blue bg-blue-50/50'
+                : 'border-slate-200 hover:border-slate-300'
+                }`}>
                 <Checkbox
                   checked={formData.agreeToTerms}
                   onChange={(e) => {
                     setFormData({ ...formData, agreeToTerms: e.target.checked });
                     if (error?.includes('Code of Ethics')) setError(null);
                   }}
+                  label={
+                    <span className="text-xs text-slate-700 leading-tight">
+                      I agree to the <span className="text-jci-blue font-semibold">Code of Ethics</span> and <span className="text-jci-blue font-semibold">Membership Agreement</span>
+                    </span>
+                  }
                 />
-                <div className="text-sm text-slate-700 flex-1">
-                  <span className="font-medium">I agree to the</span>{' '}
-                  <span className="text-jci-blue font-medium">Code of Ethics</span>
-                  {' '}and{''}
-                  <span className="text-jci-blue font-medium"> Membership Agreement</span>
-                </div>
-              </label>
-              <label className={`relative items-start gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                formData.agreeToPrivacy 
-                  ? 'border-green-400 bg-green-50/50' 
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}>
+              </div>
+              <div className={`relative p-3 rounded-lg border-2 transition-all cursor-pointer ${formData.agreeToPrivacy
+                ? 'border-green-400 bg-green-50/50'
+                : 'border-slate-200 hover:border-slate-300'
+                }`}>
                 <Checkbox
                   checked={formData.agreeToPrivacy}
                   onChange={(e) => {
                     setFormData({ ...formData, agreeToPrivacy: e.target.checked });
                     if (error?.includes('Privacy')) setError(null);
                   }}
+                  label={
+                    <span className="text-xs text-slate-700 leading-tight">
+                      I agree to the <span className="text-green-600 font-semibold">Privacy Policy</span>
+                    </span>
+                  }
                 />
-                <div className="text-sm text-slate-700 flex-1">
-                  <span className="font-medium">I agree to the</span>{' '}
-                  <span className="text-green-600 font-medium">Privacy Policy</span>
-                </div>
-              </label>
+              </div>
             </div>
             {formData.agreeToTerms && formData.agreeToPrivacy && (
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 flex items-center gap-3 animate-fade-in">
@@ -498,139 +606,136 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             )}
           </div>
         );
-      
+
       default:
         return null;
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="" size="lg">
-      {/* Custom JCI Header */}
-      <div className="bg-gradient-to-r from-jci-blue via-sky-600 to-blue-700 -mx-6 -mt-6 px-6 py-5 text-white rounded-t-xl">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="sm"
+      scrollInBody={false}
+      variant="jci"
+      title={
         <div className="flex items-center gap-4">
-          <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl shadow-lg">
-            <Users size={32} className="text-white" />
+          <div className="bg-white/20 backdrop-blur-sm p-2.5 rounded-xl shadow-lg flex-shrink-0">
+            <Users size={24} className="text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold">Join JCI Kuala Lumpur</h2>
-            <p className="text-blue-100 text-sm font-medium">Young Professionals Changing the World</p>
+            <h2 className="text-xl font-bold leading-tight">Join JCI Kuala Lumpur</h2>
+            <p className="text-blue-100 text-[10px] font-medium uppercase tracking-wider">Young Professionals Changing the World</p>
           </div>
         </div>
-      </div>
+      }
+    >
+      <div className="flex flex-col h-[650px] -mx-4 md:-mx-6 -mt-4 md:-mt-6 -mb-4 md:-mb-6 overflow-hidden">
+        <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col min-h-0">
+          {/* Fixed Progress & Highlight Section */}
+          <div className="flex-none px-6 py-4 space-y-4 bg-white border-b border-slate-50">
+            {/* Enhanced Progress Indicator */}
+            <div className="space-y-2.5">
+              <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-wider">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Step {currentStep} / {totalSteps}</span>
+                  <span className="text-jci-blue">{stepTitles[currentStep - 1]}</span>
+                </div>
+                <span className="text-slate-400">{Math.round((currentStep / totalSteps) * 100)}%</span>
+              </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5 mt-4">
-        {/* Enhanced Progress Indicator */}
-        <div className="space-y-3">
-          <div className="flex justify-between items-center text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-600 font-medium">Step {currentStep}</span>
-              <span className="text-jci-blue font-semibold">{stepTitles[currentStep - 1]}</span>
+              {/* Step Pills */}
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4].map((step) => (
+                  <React.Fragment key={step}>
+                    <button
+                      type="button"
+                      onClick={() => step < currentStep && setCurrentStep(step)}
+                      disabled={step > currentStep}
+                      className={`
+                        flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold transition-all duration-300
+                        ${step === currentStep
+                          ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30 scale-110'
+                          : step < currentStep
+                            ? 'bg-green-500 text-white cursor-pointer hover:scale-105'
+                            : 'bg-slate-100 text-slate-400'
+                        }
+                      `}
+                    >
+                      {step < currentStep ? <CheckCircle size={12} /> : step}
+                    </button>
+                    {step < totalSteps && (
+                      <div className={`flex-1 h-0.5 rounded-full transition-all duration-500 ${step < currentStep ? 'bg-green-500' : 'bg-slate-100'
+                        }`} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+
+              {/* Step highlight */}
+              {/*<div className="bg-amber-50/70 border border-amber-100/50 rounded-lg px-2.5 py-1.5 flex items-center gap-2">
+                <Sparkles size={12} className="text-amber-500" />
+                <p className="text-[10px] text-amber-700 font-medium">{stepHighlights[currentStep - 1]}</p>
+              </div>*/}
             </div>
-            <span className="text-xs text-slate-400">{Math.round((currentStep / totalSteps) * 100)}% complete</span>
           </div>
-          
-          {/* Step Pills */}
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map((step) => (
-              <React.Fragment key={step}>
-                <button
-                  type="button"
-                  onClick={() => step < currentStep && setCurrentStep(step)}
-                  disabled={step > currentStep}
-                  className={`
-                    flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all duration-300
-                    ${step === currentStep 
-                      ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30 scale-110' 
-                      : step < currentStep 
-                        ? 'bg-green-500 text-white cursor-pointer hover:scale-105'
-                        : 'bg-slate-100 text-slate-400'
-                    }
-                  `}
+
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar">
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2 mb-5 animate-shake">
+                <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={16} />
+                <p className="text-xs text-red-700 font-medium">{error}</p>
+              </div>
+            )}
+
+            <div className="min-h-[250px]">
+              {renderStepContent()}
+            </div>
+          </div>
+
+          {/* Fixed Footer (Navigation) */}
+          <div className="flex-none px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+            <div className="flex justify-between items-center">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handlePrevious}
+                disabled={currentStep === 1 || loading}
+                size="sm"
+                className={currentStep === 1 ? 'invisible' : 'text-slate-500'}
+              >
+                <ChevronLeft size={16} className="mr-1" />
+                Back
+              </Button>
+
+              <div className="flex gap-2">
+                <Button
+                  type="submit"
+                  isLoading={loading && currentStep === totalSteps}
+                  disabled={loading}
+                  className="min-w-[100px]"
+                  size="sm"
                 >
-                  {step < currentStep ? <CheckCircle size={16} /> : step}
-                </button>
-                {step < totalSteps && (
-                  <div className={`flex-1 h-1 rounded-full transition-all duration-500 ${
-                    step < currentStep ? 'bg-green-500' : 'bg-slate-100'
-                  }`} />
-                )}
-              </React.Fragment>
-            ))}
+                  {currentStep === totalSteps ? (
+                    <>
+                      <CheckCircle size={16} className="mr-1.5" />
+                      Join Now
+                    </>
+                  ) : (
+                    <>
+                      Continue
+                      <ChevronRight size={16} className="ml-1.5" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
-          
-          {/* Step highlight */}
-          <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
-            <Sparkles size={14} className="text-amber-500" />
-            <p className="text-xs text-amber-700">{stepHighlights[currentStep - 1]}</p>
-          </div>
-        </div>
-
-        {/* Error Message - Enhanced */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2 animate-shake">
-            <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={18} />
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
-
-        {/* Step Content */}
-        <div className="min-h-[280px]">
-          {renderStepContent()}
-        </div>
-
-        {/* Navigation Buttons - Enhanced */}
-        <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handlePrevious}
-            disabled={currentStep === 1 || loading}
-            className={currentStep === 1 ? 'invisible' : ''}
-          >
-            <ChevronLeft size={16} className="mr-1" />
-            Back
-          </Button>
-          
-          <div className="flex gap-2">
-            <Button
-              type="submit"
-              isLoading={loading && currentStep === totalSteps}
-              disabled={loading}
-              className="min-w-[100px]"
-            >
-              {currentStep === totalSteps ? (
-                <>
-                  <CheckCircle size={16} className="mr-1.5" />
-                  Join Now
-                </>
-              ) : (
-                <>
-                  Continue
-                  <ChevronRight size={16} className="ml-1.5" />
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {onSwitchToLogin && (
-          <div className="text-center text-sm text-slate-500 pt-3 border-t border-slate-100">
-            Already a member?{' '}
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onSwitchToLogin();
-              }}
-              className="text-jci-blue hover:text-sky-600 font-semibold transition-colors"
-            >
-              Sign in here
-            </button>
-          </div>
-        )}
-      </form>
+        </form>
+      </div>
     </Modal>
   );
 };
-

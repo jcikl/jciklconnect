@@ -320,6 +320,11 @@ export interface Member {
   jacketSize?: 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | '3XL' | '5XL' | '7XL'; // 夹克尺寸
   embroideredName?: string; // 刺绣名称
   tshirtStatus?: 'NA' | 'Requested' | 'Sent' | 'Delivered' | 'Received'; // T恤领取状态
+
+  // 5. 准会员调查 (Join Us Survey)
+  surveyAnswers?: Record<string, string>; // Q1-Q5 answers
+  personaType?: string; // Learning-oriented, Practical-oriented, etc.
+  tendencyTags?: string[]; // Directional, Category, and Activity tags
 }
 
 export interface BusinessProfile {

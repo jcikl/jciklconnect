@@ -25,7 +25,7 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 
 interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
+  label?: string | React.ReactNode;
   error?: string;
 }
 
@@ -289,7 +289,7 @@ export const Textarea: React.FC<TextareaProps> = ({ label, error, helperText, cl
 
 export const Checkbox: React.FC<CheckboxProps> = ({ label, error, className = '', ...props }) => {
   return (
-    <div className="w-full">
+    <div className="w-fit">
       <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"

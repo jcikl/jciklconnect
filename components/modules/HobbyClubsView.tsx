@@ -10,7 +10,7 @@ import { HobbyClub } from '../../types';
 import { Tabs } from '../ui/Common';
 
 export const HobbyClubsView: React.FC = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
@@ -34,7 +34,7 @@ export const HobbyClubsView: React.FC = () => {
             };
 
             await createClub(newClub);
-            setIsModalOpen(false);
+            setCreateModalOpen(false);
             e.currentTarget.reset();
         } catch (err) {
             // Error is handled in the hook
@@ -81,7 +81,7 @@ export const HobbyClubsView: React.FC = () => {
                     <h2 className="text-2xl font-bold text-slate-900">Hobby Clubs</h2>
                     <p className="text-slate-500">Connect with members beyond formal projects.</p>
                 </div>
-                <Button onClick={() => setIsModalOpen(true)}><Plus size={16} className="mr-2" /> Start New Club</Button>
+                <Button onClick={() => setCreateModalOpen(true)}><Plus size={16} className="mr-2" /> Start New Club</Button>
             </div>
 
             <Card noPadding>

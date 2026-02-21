@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
+import { Select, Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
 import { useEvents } from '../../hooks/useEvents';
 import { useProjects } from '../../hooks/useProjects';
@@ -13,7 +14,7 @@ import { ReportService, ReportOptions } from '../../services/reportService';
 import { AIPredictionService } from '../../services/aiPredictionService';
 import { useState, useEffect } from 'react';
 import { formatCurrency } from '../../utils/formatUtils';
-import { UserRole } from '../../types';
+import { UserRole, Member } from '../../types';
 import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -32,13 +33,15 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
   const [financialSummary, setFinancialSummary] = useState<any>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [loadingFinance, setLoadingFinance] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'reports'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'reports' | 'insights'>('overview');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState<'financial' | 'membership' | 'engagement' | 'projects'>('financial');
   const { showToast } = useToast();
   const [reportPeriod, setReportPeriod] = useState('Last Month');
   const [reportFormat, setReportFormat] = useState<'PDF' | 'Excel' | 'CSV' | 'JSON'>('CSV');
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
+  const [duesStatusFilter, setDuesStatusFilter] = useState<'All' | 'Paid' | 'Pending' | 'Overdue'>('All');
+  const [insightSearch, setInsightSearch] = useState('');
   const [aiInsights, setAiInsights] = useState<{
     churnRisk: any[];
     topRecommendations: any[];
@@ -342,6 +345,35 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
     }));
   }, [events]);
 
+  const memberInsightsGroups = useMemo(() => {
+    const groups: Record<number, Member[]> = {};
+    for (let i = 0; i < 12; i++) groups[i] = [];
+
+    const filtered = members.filter(m => {
+      const matchDues = duesStatusFilter === 'All' || m.duesStatus === duesStatusFilter;
+      const matchSearch = !insightSearch ||
+        (m.name ?? '').toLowerCase().includes(insightSearch.toLowerCase()) ||
+        (m.email ?? '').toLowerCase().includes(insightSearch.toLowerCase());
+      return matchDues && matchSearch;
+    });
+
+    filtered.forEach(m => {
+      if (m.dateOfBirth) {
+        const date = new Date(m.dateOfBirth);
+        if (!isNaN(date.getTime())) {
+          groups[date.getMonth()].push(m);
+        }
+      }
+    });
+
+    return groups;
+  }, [members, duesStatusFilter, insightSearch]);
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
   return (
     <div className="space-y-6">
       {/* Executive Summary Header */}
@@ -388,12 +420,17 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
       <Card noPadding>
         <div className="px-6 pt-4">
           <Tabs
-            tabs={['Overview', 'Analytics', 'Reports']}
-            activeTab={activeTab === 'overview' ? 'Overview' : activeTab === 'analytics' ? 'Analytics' : 'Reports'}
+            tabs={['Overview', 'Analytics', 'Reports', 'Member Insights']}
+            activeTab={
+              activeTab === 'overview' ? 'Overview' :
+                activeTab === 'analytics' ? 'Analytics' :
+                  activeTab === 'reports' ? 'Reports' : 'Member Insights'
+            }
             onTabChange={(tab) => {
               if (tab === 'Overview') setActiveTab('overview');
               else if (tab === 'Analytics') setActiveTab('analytics');
-              else setActiveTab('reports');
+              else if (tab === 'Reports') setActiveTab('reports');
+              else setActiveTab('insights');
             }}
           />
         </div>
@@ -1051,6 +1088,128 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                   </div>
                 </div>
               </Card>
+            </div>
+          )}
+
+          {activeTab === 'insights' && (
+            <div className="space-y-6">
+              {/* Filter Controls */}
+              <Card className="bg-slate-50/50">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Search members..."
+                      icon={<Search size={18} />}
+                      value={insightSearch}
+                      onChange={(e) => setInsightSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full md:w-64">
+                    <Select
+                      options={[
+                        { label: 'All Dues Status', value: 'All' },
+                        { label: 'Paid', value: 'Paid' },
+                        { label: 'Pending', value: 'Pending' },
+                        { label: 'Overdue', value: 'Overdue' },
+                      ]}
+                      value={duesStatusFilter}
+                      onChange={(e) => setDuesStatusFilter(e.target.value as any)}
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Monthly Birthday Grid */}
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {monthNames.map((month, index) => {
+                  const monthMembers = memberInsightsGroups[index];
+                  if (monthMembers.length === 0 && !insightSearch && duesStatusFilter === 'All') {
+                    // Still show the month even if empty if no filters are active? 
+                    // No, let's only show months with members to save space.
+                    return null;
+                  }
+
+                  if (monthMembers.length === 0) return null;
+
+                  return (
+                    <Card
+                      key={month}
+                      title={
+                        <div className="flex items-center gap-2">
+                          <Calendar className="text-jci-blue" size={18} />
+                          <span>{month}</span>
+                        </div>
+                      }
+                      className="h-full border-t-4 border-t-jci-blue"
+                      noPadding
+                    >
+                      <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
+                        {monthMembers.map(m => (
+                          <div key={m.id} className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-bold text-slate-900 group-hover:text-jci-blue transition-colors">{m.name}</h4>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <Badge variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'} className="text-[10px] px-1.5 py-0">
+                                    {m.duesStatus}
+                                  </Badge>
+                                  {m.duesYear && (
+                                    <span className="text-[10px] text-slate-400 font-medium">FY {m.duesYear}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="bg-jci-blue/10 p-1.5 rounded-lg">
+                                <Gift size={14} className="text-jci-blue" />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-50">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1 bg-pink-50 rounded-md">
+                                  <Cake size={12} className="text-pink-500" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Birthday</p>
+                                  <p className="text-xs font-semibold text-slate-700">{m.dateOfBirth ? new Date(m.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="p-1 bg-blue-50 rounded-md">
+                                  <Users size={12} className="text-jci-blue" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Joined</p>
+                                  <p className="text-xs font-semibold text-slate-700">{m.joinDate ? m.joinDate.split('-')[0] : 'N/A'}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {m.duesPaidDate && m.duesStatus === 'Paid' && (
+                              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-green-600 bg-green-50/50 p-1.5 rounded-lg border border-green-100/50">
+                                <CheckCircle size={10} />
+                                <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100">
+                        <p className="text-[10px] text-slate-400 font-medium">{monthMembers.length} {monthMembers.length === 1 ? 'member' : 'members'}</p>
+                      </div>
+                    </Card>
+                  );
+                })}
+
+                {Object.values(memberInsightsGroups).every(g => g.length === 0) && (
+                  <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                    <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                      <Users className="text-slate-400" size={24} />
+                    </div>
+                    <h3 className="text-slate-900 font-semibold">No members found</h3>
+                    <p className="text-slate-500 text-sm mt-1">Try adjusting your filters or search terms.</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
