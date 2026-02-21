@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, MapPin, Users, Clock, Download, Link as LinkIcon, Share2 } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { Event } from '../../types';
 import { formatDate, formatTime } from '../../utils/dateUtils';
 import { EventsService } from '../../services/eventsService';
@@ -25,6 +25,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [activeListTab, setActiveListTab] = useState('Upcoming');
   const [showICalModal, setShowICalModal] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<Event | null>(null);
   const { showToast } = useToast();
@@ -239,18 +240,35 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Left Column: Upcoming Events List */}
+        {/* Left Column: Events List */}
         <div className="w-full lg:w-1/3">
-          <Card title="Upcoming Events">
-            <div className="space-y-4">
+          <Card noPadding>
+            <div className="px-4 md:px-6 pt-4">
+              <Tabs
+                tabs={['Upcoming', 'Completed']}
+                activeTab={activeListTab}
+                onTabChange={setActiveListTab}
+              />
+            </div>
+            <div className="p-4 md:p-6 space-y-4 max-h-[800px] overflow-y-auto">
               {events
                 .filter(e => {
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   const eventDate = new Date(e.date);
-                  return eventDate >= today;
+                  if (activeListTab === 'Upcoming') {
+                    return eventDate >= today;
+                  } else {
+                    return eventDate < today;
+                  }
                 })
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .sort((a, b) => {
+                  if (activeListTab === 'Upcoming') {
+                    return new Date(a.date).getTime() - new Date(b.date).getTime();
+                  } else {
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                  }
+                })
                 .slice(0, 10)
                 .map(event => (
                   <div
@@ -285,16 +303,30 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                           <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEventClick?.(event);
-                        }}
-                      >
-                        Register Now
-                      </Button>
+                      {activeListTab === 'Upcoming' ? (
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick?.(event);
+                          }}
+                        >
+                          Register Now
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick?.(event);
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -302,11 +334,15 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 const eventDate = new Date(e.date);
-                return eventDate >= today;
+                if (activeListTab === 'Upcoming') {
+                  return eventDate >= today;
+                } else {
+                  return eventDate < today;
+                }
               }).length === 0 && (
                   <div className="text-center py-8 text-slate-500">
                     <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />
-                    <p>No upcoming events</p>
+                    <p>No {activeListTab.toLowerCase()} events</p>
                   </div>
                 )}
             </div>
