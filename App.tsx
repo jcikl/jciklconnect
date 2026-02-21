@@ -332,7 +332,12 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
     notes: '',
   });
   const { showToast } = useToast();
-  const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status === 'Upcoming');
+  const upcomingEvents = events.filter(e => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eventDate = new Date(e.date);
+    return eventDate >= today;
+  });
   // Show all upcoming events except private meetings (for event cards)
   const publicEvents = upcomingEvents.filter(e => e.type !== 'Meeting');
   // All published events except private meetings (for Activity Calendar)
