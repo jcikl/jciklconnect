@@ -3,7 +3,7 @@
 ## Overview
 The Member Batch Import feature allows you to quickly import multiple members with all their details by pasting TSV (Tab-Separated Values) data directly into the interface.
 
-## Supported Fields (19 Columns)
+## Supported Fields (20 Columns)
 
 ### Column Order
 
@@ -28,11 +28,12 @@ The Member Batch Import feature allows you to quickly import multiple members wi
 | 17 | **Instagram** | Instagram handle | ❌ No | Text |
 | 18 | **WeChat** | WeChat ID | ❌ No | Text |
 | 19 | **Hobbies** | Interests/hobbies | ❌ No | Comma-separated (e.g., "Golf,Reading,Yoga") |
+| 20 | **Join Date** | Join date | ❌ No | YYYY-MM-DD (default: Today) |
 
 ## How to Use
 
 ### Step 1: Prepare Your Data
-Create a spreadsheet (Excel, Google Sheets, etc.) with 19 columns in the exact order shown above.
+Create a spreadsheet (Excel, Google Sheets, etc.) with 20 columns in the exact order shown above.
 
 ### Step 2: Fill In Your Data
 - **Required fields**: Name and Email must be filled for each row
@@ -41,7 +42,7 @@ Create a spreadsheet (Excel, Google Sheets, etc.) with 19 columns in the exact o
 - **Hobbies**: Separate multiple hobbies with commas
 
 ### Step 3: Copy the Data
-1. Select all data rows (including all 19 columns)
+1. Select all data rows (including all 20 columns)
 2. Do NOT include the header row
 3. Copy the selection (Ctrl+C or Cmd+C)
 
@@ -53,7 +54,7 @@ Create a spreadsheet (Excel, Google Sheets, etc.) with 19 columns in the exact o
 1. Paste your data into the text area (Ctrl+V or Cmd+V)
 2. The system will automatically:
    - Remove any quotation marks
-   - Parse all 19 columns
+   - Parse all 20 columns
    - Validate required fields and formats
    - Show you a preview table with validation results
 
@@ -81,12 +82,12 @@ If your columns are in a different order:
 
 ## Example Data
 
-Here's a complete example with all 19 columns:
+Here's a complete example with all 20 columns:
 
 ```
-John Doe	john.doe@example.com	+60123456789	Regular	IC123456	1985-03-15	Male	123 Main St, KL	Jane Doe	+60129999999	Kuala Lumpur	Malaysia	Tech Corp	Senior Manager	https://linkedin.com/in/johndoe	https://facebook.com/johndoe	@johndoe	johndoe123	Golf,Reading,Networking
-Jane Smith	jane.smith@example.com	+60129876543	Probationary	IC789012	1990-07-22	Female	456 Oak Ave, PJ	John Smith	+60128888888	Petaling Jaya	Malaysia	Finance Ltd	Executive	https://linkedin.com/in/janesmith			janesmith456	Yoga,Cooking
-Bob Wilson	bob@example.com		Life	PASS654321	1975-12-01	Male	789 Pine Rd, Subang		+60127777777	Subang Jaya	Malaysia	Wilson Consulting	Director					Traveling,Photography
+John Doe	john.doe@example.com	+60123456789	Regular	IC123456	1985-03-15	Male	123 Main St, KL	Jane Doe	+60129999999	Kuala Lumpur	Malaysia	Tech Corp	Senior Manager	https://linkedin.com/in/johndoe	https://facebook.com/johndoe	@johndoe	johndoe123	Golf,Reading,Networking	2023-01-15
+Jane Smith	jane.smith@example.com	+60129876543	Probationary	IC789012	1990-07-22	Female	456 Oak Ave, PJ	John Smith	+60128888888	Petaling Jaya	Malaysia	Finance Ltd	Executive	https://linkedin.com/in/janesmith			janesmith456	Yoga,Cooking	2023-02-20
+Bob Wilson	bob@example.com		Life	PASS654321	1975-12-01	Male	789 Pine Rd, Subang		+60127777777	Subang Jaya	Malaysia	Wilson Consulting	Director					Traveling,Photography	2022-11-10
 ```
 
 ## Validation Rules
@@ -103,12 +104,12 @@ Bob Wilson	bob@example.com		Life	PASS654321	1975-12-01	Male	789 Pine Rd, Subang	
 ### Default Values
 - **Tier**: Regular (if empty)
 - **Nationality**: Malaysia (if empty)
-- **Join Date**: Today's date (automatically set)
+- **Join Date**: Today's date (if empty)
 - **Status**: Active (automatically set)
 
 ## Tips & Best Practices
 
-1. **Template First**: Create a template in Excel/Google Sheets with all 19 column headers
+1. **Template First**: Create a template in Excel/Google Sheets with all 20 column headers
 2. **Batch Size**: Import 50-100 members at a time for best performance
 3. **Empty Columns**: Leave cells empty for optional fields (don't use "N/A" or "-")
 4. **Quote Removal**: System automatically removes quotation marks - don't worry about CSV formatting
@@ -149,7 +150,7 @@ Bob Wilson	bob@example.com		Life	PASS654321	1975-12-01	Male	789 Pine Rd, Subang	
 #### No preview shown after pasting
 - **Check**: Ensure you're using Tab-separated values
 - **Solution**: Copy directly from Excel/Google Sheets (don't convert to CSV first)
-- **Tip**: Each row should have exactly 19 tab-separated columns
+- **Tip**: Each row should have exactly 20 tab-separated columns
 
 #### Columns misaligned
 - **Cause**: Column order doesn't match expected order
@@ -169,8 +170,8 @@ Only valid rows will be imported. Invalid rows will be skipped with error detail
 
 Create a spreadsheet with these headers:
 
-| Name | Email | Phone | Tier | National ID | DOB | Gender | Address | Emerg. Contact | Emerg. Phone | Region | Nationality | Company | Position | LinkedIn | Facebook | Instagram | WeChat | Hobbies |
-|------|-------|-------|------|-------------|-----|--------|---------|----------------|--------------|--------|-------------|---------|----------|----------|----------|-----------|--------|---------|
+| Name | Email | Phone | Tier | National ID | DOB | Gender | Address | Emerg. Contact | Emerg. Phone | Region | Nationality | Company | Position | LinkedIn | Facebook | Instagram | WeChat | Hobbies | Join Date |
+|------|-------|-------|------|-------------|-----|--------|---------|----------------|--------------|--------|-------------|---------|----------|----------|----------|-----------|--------|---------|-----------|
 
 Then fill in your data and copy (excluding the header row).
 
@@ -204,5 +205,6 @@ Default column mapping (0-indexed):
 - 16: Instagram
 - 17: WeChat
 - 18: Hobbies
+- 19: Join Date
 
 If your data has a different column order, use the Column Mapping feature to adjust.
