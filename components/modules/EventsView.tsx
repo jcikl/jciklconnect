@@ -5,7 +5,7 @@ import { LoadingState } from '../ui/Loading';
 import { useEvents } from '../../hooks/useEvents';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
-import { EventCalendar } from './EventCalendar';
+import { EventCalendarView } from './EventCalendarView';
 import { Event } from '../../types';
 import type { Member } from '../../types';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
@@ -72,45 +72,43 @@ export const EventsView: React.FC = () => {
         </div>
       </div>
 
-      <Card noPadding className="overflow-hidden">
-        {viewMode === 'calendar' ? (
-          <EventCalendar
-            events={events}
-            onEventClick={setSelectedEvent}
-            onEventUpdate={updateEvent}
-          />
-        ) : (
-          <>
-            <div className="px-4 md:px-6 pt-4">
-              <Tabs
-                tabs={['Upcoming', 'Completed']}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              />
-            </div>
+      {viewMode === 'calendar' ? (
+        <EventCalendarView
+          events={events}
+          onEventClick={setSelectedEvent}
+          onEventUpdate={updateEvent}
+        />
+      ) : (
+        <Card noPadding className="overflow-hidden">
+          <div className="px-4 md:px-6 pt-4">
+            <Tabs
+              tabs={['Upcoming', 'Completed']}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+          </div>
 
-            <LoadingState
-              loading={loading}
-              error={error}
-              empty={filteredEvents.length === 0}
-              emptyMessage="No events found in this category."
-            >
-              <div className="divide-y divide-slate-100">
-                {filteredEvents.map(event => (
-                  <EventRow
-                    key={event.id}
-                    event={event}
-                    member={member}
-                    onRegister={() => member && registerForEvent(event.id, member.id)}
-                    onCheckIn={() => member && markAttendance(event.id, member.id)}
-                    onClick={() => setSelectedEvent(event)}
-                  />
-                ))}
-              </div>
-            </LoadingState>
-          </>
-        )}
-      </Card>
+          <LoadingState
+            loading={loading}
+            error={error}
+            empty={filteredEvents.length === 0}
+            emptyMessage="No events found in this category."
+          >
+            <div className="divide-y divide-slate-100">
+              {filteredEvents.map(event => (
+                <EventRow
+                  key={event.id}
+                  event={event}
+                  member={member}
+                  onRegister={() => member && registerForEvent(event.id, member.id)}
+                  onCheckIn={() => member && markAttendance(event.id, member.id)}
+                  onClick={() => setSelectedEvent(event)}
+                />
+              ))}
+            </div>
+          </LoadingState>
+        </Card>
+      )}
 
       {/* Event Detail Modal */}
       {selectedEvent && (
