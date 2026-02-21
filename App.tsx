@@ -372,7 +372,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                 Login to Register
               </Button>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+            <div className="bg-white border p-4 border-slate-200 rounded-xl shadow-sm">
               <EventCalendarView
                 events={allPublishedEvents}
                 readonly={true}
