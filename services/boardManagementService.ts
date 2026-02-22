@@ -53,7 +53,7 @@ export class BoardManagementService {
       const boardMembersRef = collection(db, 'boardMembers');
       const q = query(boardMembersRef, where('isActive', '==', true));
       const snapshot = await getDocs(q);
-      
+
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -74,7 +74,7 @@ export class BoardManagementService {
       const boardMembersRef = collection(db, 'boardMembers');
       const q = query(boardMembersRef, where('term', '==', year));
       const snapshot = await getDocs(q);
-      
+
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -121,7 +121,7 @@ export class BoardManagementService {
 
       const transitionsRef = collection(db, 'boardTransitions');
       const docRef = await addDoc(transitionsRef, transitionData);
-      
+
       return {
         id: docRef.id,
         ...transitionData,
@@ -143,7 +143,7 @@ export class BoardManagementService {
       // Get the transition record
       const transitionRef = doc(db, 'boardTransitions', transitionId);
       const transitionDoc = await getDoc(transitionRef);
-      
+
       if (!transitionDoc.exists()) {
         throw new Error('Board transition not found');
       }
@@ -261,7 +261,7 @@ export class BoardManagementService {
       const transitionsRef = collection(db, 'boardTransitions');
       const q = query(transitionsRef, orderBy('transitionDate', 'desc'));
       const snapshot = await getDocs(q);
-      
+
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -288,7 +288,18 @@ export class BoardManagementService {
 
   /** Default board positions for each term (can be used by UI for dropdowns) */
   static getDefaultBoardPositions(): string[] {
-    return ['President', 'Vice President', 'Secretary', 'Treasurer', 'Director', 'Committee Chair'];
+    return [
+      'President',
+      'Immediate Past President',
+      'Secretary',
+      'Honorary Treasurer',
+      'Executive Vice President',
+      'Vice President (Individual)',
+      'Vice President (Business)',
+      'Vice President (Community)',
+      'Vice President (International Affairs)',
+      'Vice President (LOM)'
+    ];
   }
 
   /**
@@ -297,7 +308,7 @@ export class BoardManagementService {
    */
   static async setBoardForTerm(
     year: string,
-    assignments: Array<{ memberId: string; position: string }>,
+    assignments: Array<{ memberId: string; position: string; commissionDirectorIds?: string[] }>,
     updatedBy?: string
   ): Promise<void> {
     if (isDevMode()) {
@@ -325,7 +336,7 @@ export class BoardManagementService {
       const startDate = `${year}-01-01`;
       const endDate = `${year}-12-31`;
 
-      for (const { memberId, position } of assignments) {
+      for (const { memberId, position, commissionDirectorIds } of assignments) {
         if (!memberId || !position) continue;
 
         const permissions = this.getRolePermissions(position);
@@ -337,6 +348,7 @@ export class BoardManagementService {
           endDate,
           isActive: true,
           permissions,
+          commissionDirectorIds: commissionDirectorIds || [],
           createdAt: now,
           updatedAt: now,
         };
@@ -362,7 +374,7 @@ export class BoardManagementService {
     try {
       // Get all current board members
       const allMembers = await MembersService.getAllMembers();
-      const currentBoardMembers = allMembers.filter(m => 
+      const currentBoardMembers = allMembers.filter(m =>
         m.role === UserRole.BOARD || m.role === UserRole.ADMIN
       );
 
@@ -411,7 +423,7 @@ export class BoardManagementService {
       }
 
       console.log(`Board transition completed for year ${newYear}: ${transitioned} members transitioned, ${archived} positions archived`);
-      
+
       return {
         transitioned,
         archived,
@@ -480,8 +492,8 @@ export class BoardManagementService {
 
     try {
       const allMembers = await MembersService.getAllMembers();
-      return allMembers.filter(m => 
-        m.currentBoardYear === year && 
+      return allMembers.filter(m =>
+        m.currentBoardYear === year &&
         (m.role === UserRole.BOARD || m.role === UserRole.ADMIN)
       );
     } catch (error) {

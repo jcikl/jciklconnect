@@ -290,5 +290,25 @@ export class MembersService {
       throw error;
     }
   }
+
+  /** Batch update members */
+  static async batchUpdateMembers(memberIds: string[], updates: Partial<Member>): Promise<void> {
+    try {
+      await Promise.all(memberIds.map(id => this.updateMember(id, updates)));
+    } catch (error) {
+      console.error('Error in batch update:', error);
+      throw error;
+    }
+  }
+
+  /** Batch delete members */
+  static async batchDeleteMembers(memberIds: string[]): Promise<void> {
+    try {
+      await Promise.all(memberIds.map(id => this.deleteMember(id)));
+    } catch (error) {
+      console.error('Error in batch delete:', error);
+      throw error;
+    }
+  }
 }
 

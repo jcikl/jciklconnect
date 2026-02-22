@@ -168,18 +168,20 @@ export const INDUSTRY_OPTIONS = [
   'Art, Entertainment & Design',
   'Automotive & Accessories',
   'Food & Beverages',
-  'Computers & IT',
+  'Telecom, AI, Computers & IT',
   'Consulting & Professional Services',
   'Education & Training',
   'Event & Hospitality',
-  'Finance & Insurance',
-  'Health, Wellness & Beauty',
-  'Legal & Accounting',
-  'Manufacturing',
-  'Retail & E-Commerce',
+  'Crypto, Blockchain, Finance & Insurance',
+  'Health & Wellness',
+  'Legal, HR, Accounting & Tax',
+  'Manufacturing & Supply Chain',
+  'Wholesale, Retail & E-Commerce',
+  'Personal, Beauty & Sports',
   'Real Estate & Property Services',
   'Transport & Logistics',
-  'Travel & Tourism'
+  'Travel & Tourism',
+  'Other'
 ] as const;
 
 

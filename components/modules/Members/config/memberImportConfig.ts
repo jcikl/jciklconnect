@@ -392,7 +392,7 @@ export const memberImportConfig: BatchImportConfig = {
       hobbies: row.hobbies || [],
       // New extended fields
       joinDate: row.joinDate || new Date().toISOString().split('T')[0],
-      membershipType: row.membershipType || 'Full',
+      membershipType: row.membershipType || 'GUEST',
       introducer: row.introducer || '',
       fullName: row.fullName || row.name,
       ethnicity: row.ethnicity || '',

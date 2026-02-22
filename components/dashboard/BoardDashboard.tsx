@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
 import { Select, Input } from '../ui/Form';
@@ -12,7 +13,6 @@ import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { FinanceService } from '../../services/financeService';
 import { ReportService, ReportOptions } from '../../services/reportService';
 import { AIPredictionService } from '../../services/aiPredictionService';
-import { useState, useEffect } from 'react';
 import { formatCurrency } from '../../utils/formatUtils';
 import { UserRole, Member } from '../../types';
 import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
@@ -369,10 +369,35 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
     return groups;
   }, [members, duesStatusFilter, insightSearch]);
 
-  const monthNames = [
+  const birthdaysToday = useMemo(() => {
+    const today = new Date();
+    return members.filter(m => {
+      if (!m.dateOfBirth) return false;
+      const bday = new Date(m.dateOfBirth);
+      return bday.getDate() === today.getDate() && bday.getMonth() === today.getMonth();
+    });
+  }, [members]);
+
+  const monthNamesBase = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
+
+  const currentMonthIndex = new Date().getMonth();
+
+  // Create a rotated version of month names starting from current month
+  const rotatedMonths = useMemo(() => {
+    const months = [];
+    for (let i = 0; i < 12; i++) {
+      const idx = (currentMonthIndex + i) % 12;
+      months.push({
+        name: monthNamesBase[idx],
+        index: idx,
+        isCurrent: i === 0
+      });
+    }
+    return months;
+  }, [currentMonthIndex]);
 
   return (
     <div className="space-y-6">
@@ -518,33 +543,81 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                 <div className="lg:col-span-2 space-y-6">
                   {/* Member Engagement */}
                   <Card title="Member Engagement Metrics">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">Average Points per Member</p>
-                          <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.averagePoints}</p>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Average Points per Member</p>
+                            <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.averagePoints}</p>
+                          </div>
+                          <Award size={32} className="text-jci-blue" />
                         </div>
-                        <Award size={32} className="text-jci-blue" />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <AlertTriangle size={18} className="text-amber-600" />
+                              <span className="text-sm font-medium text-amber-700">High Risk Members</span>
+                            </div>
+                            <p className="text-2xl font-bold text-amber-900">{metrics.highRiskMembers}</p>
+                            <p className="text-xs text-amber-600 mt-1">Requires attention</p>
+                          </div>
+                          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <CheckCircle size={18} className="text-green-600" />
+                              <span className="text-sm font-medium text-green-700">Engagement Rate</span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-900">
+                              {metrics.totalMembers > 0 ? Math.round((metrics.activeMembers / metrics.totalMembers) * 100) : 0}%
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">Active participation</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle size={18} className="text-amber-600" />
-                            <span className="text-sm font-medium text-amber-700">High Risk Members</span>
-                          </div>
-                          <p className="text-2xl font-bold text-amber-900">{metrics.highRiskMembers}</p>
-                          <p className="text-xs text-amber-600 mt-1">Requires attention</p>
+
+                      <div className="border-l border-slate-100 pl-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <Cake size={16} className="text-pink-500" />
+                            Today's Birthdays
+                          </h4>
+                          <Badge variant="info" className="text-[10px]">
+                            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </Badge>
                         </div>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <CheckCircle size={18} className="text-green-600" />
-                            <span className="text-sm font-medium text-green-700">Engagement Rate</span>
+
+                        {birthdaysToday.length > 0 ? (
+                          <div className="space-y-3 max-h-[160px] overflow-y-auto pr-2">
+                            {birthdaysToday.map(member => (
+                              <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg bg-pink-50/50 border border-pink-100 group hover:bg-pink-50 transition-colors">
+                                <div className="w-10 h-10 rounded-full bg-white border-2 border-pink-200 flex items-center justify-center text-pink-500 font-bold overflow-hidden">
+                                  {member.avatar ? (
+                                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    member.name.charAt(0)
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{member.name}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-pink-600 font-semibold flex items-center gap-1">
+                                      <Gift size={10} /> Happy Birthday!
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="animate-bounce">
+                                  <Cake size={16} className="text-pink-400" />
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          <p className="text-2xl font-bold text-green-900">
-                            {metrics.totalMembers > 0 ? Math.round((metrics.activeMembers / metrics.totalMembers) * 100) : 0}%
-                          </p>
-                          <p className="text-xs text-green-600 mt-1">Active participation</p>
-                        </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-2">
+                              <Cake size={20} className="text-slate-300" />
+                            </div>
+                            <p className="text-xs text-slate-400 font-medium text-center px-4">No member birthdays recorded for today</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -1121,11 +1194,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
 
               {/* Monthly Birthday Grid */}
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {monthNames.map((month, index) => {
-                  const monthMembers = memberInsightsGroups[index];
+                {rotatedMonths.map((month) => {
+                  const monthMembers = memberInsightsGroups[month.index];
                   if (monthMembers.length === 0 && !insightSearch && duesStatusFilter === 'All') {
-                    // Still show the month even if empty if no filters are active? 
-                    // No, let's only show months with members to save space.
                     return null;
                   }
 
@@ -1133,65 +1204,111 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
 
                   return (
                     <Card
-                      key={month}
+                      key={month.name}
                       title={
-                        <div className="flex items-center gap-2">
-                          <Calendar className="text-jci-blue" size={18} />
-                          <span>{month}</span>
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="text-jci-blue" size={18} />
+                            <span className="font-bold">{month.name}</span>
+                          </div>
+                          {month.isCurrent && (
+                            <Badge variant="info" className="animate-pulse">
+                              Current Month
+                            </Badge>
+                          )}
                         </div>
                       }
-                      className="h-full border-t-4 border-t-jci-blue"
+                      className={`h-full border-t-4 ${month.isCurrent
+                        ? 'border-t-jci-blue bg-blue-50/30'
+                        : 'border-t-slate-200'
+                        }`}
                       noPadding
                     >
                       <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
-                        {monthMembers.map(m => (
-                          <div key={m.id} className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-bold text-slate-900 group-hover:text-jci-blue transition-colors">{m.name}</h4>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <Badge variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'} className="text-[10px] px-1.5 py-0">
-                                    {m.duesStatus}
-                                  </Badge>
-                                  {m.duesYear && (
-                                    <span className="text-[10px] text-slate-400 font-medium">FY {m.duesYear}</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="bg-jci-blue/10 p-1.5 rounded-lg">
-                                <Gift size={14} className="text-jci-blue" />
-                              </div>
-                            </div>
+                        {[...monthMembers].sort((a, b) => {
+                          const dateA = a.dateOfBirth ? new Date(a.dateOfBirth).getDate() : 0;
+                          const dateB = b.dateOfBirth ? new Date(b.dateOfBirth).getDate() : 0;
 
-                            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-50">
-                              <div className="flex items-center gap-2">
-                                <div className="p-1 bg-pink-50 rounded-md">
-                                  <Cake size={12} className="text-pink-500" />
-                                </div>
-                                <div>
-                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Birthday</p>
-                                  <p className="text-xs font-semibold text-slate-700">{m.dateOfBirth ? new Date(m.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="p-1 bg-blue-50 rounded-md">
-                                  <Users size={12} className="text-jci-blue" />
-                                </div>
-                                <div>
-                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Joined</p>
-                                  <p className="text-xs font-semibold text-slate-700">{m.joinDate ? m.joinDate.split('-')[0] : 'N/A'}</p>
-                                </div>
-                              </div>
-                            </div>
+                          if (month.isCurrent) {
+                            const today = new Date().getDate();
+                            const isFutureA = dateA >= today;
+                            const isFutureB = dateB >= today;
 
-                            {m.duesPaidDate && m.duesStatus === 'Paid' && (
-                              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-green-600 bg-green-50/50 p-1.5 rounded-lg border border-green-100/50">
-                                <CheckCircle size={10} />
-                                <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
+                            if (isFutureA && !isFutureB) return -1;
+                            if (!isFutureA && isFutureB) return 1;
+                          }
+                          return dateA - dateB;
+                        }).map(m => {
+                          const isBirthdayToday = m.dateOfBirth &&
+                            new Date(m.dateOfBirth).getDate() === new Date().getDate() &&
+                            new Date(m.dateOfBirth).getMonth() === new Date().getMonth();
+
+                          return (
+                            <div key={m.id} className={`p-3 rounded-xl border shadow-sm hover:shadow-md transition-all group ${isBirthdayToday
+                              ? 'bg-gradient-to-br from-jci-blue to-blue-600 text-white border-blue-400 shadow-lg scale-[1.03] z-10'
+                              : 'bg-white border-slate-100'
+                              }`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className={`font-bold transition-colors leading-none ${isBirthdayToday ? 'text-white' : 'text-slate-900 group-hover:text-jci-blue'
+                                      }`}>{m.name}</h4>
+                                    <Badge
+                                      variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
+                                      className={`text-[10px] px-1.5 py-0 ${isBirthdayToday ? 'bg-white text-jci-blue border-none' : ''}`}
+                                    >
+                                      {m.duesStatus}
+                                    </Badge>
+                                    {isBirthdayToday && (
+                                      <Badge variant="success" className="bg-pink-500 text-white border-none text-[10px] animate-bounce">
+                                        HAPPY BIRTHDAY! 🎂
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="mt-1">
+                                    {m.duesYear && (
+                                      <span className={`text-[10px] font-medium ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'}`}>FY {m.duesYear}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className={`p-1.5 rounded-lg ${isBirthdayToday ? 'bg-white/20' : 'bg-jci-blue/10'}`}>
+                                  <Gift size={14} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        ))}
+
+                              <div className={`grid grid-cols-2 gap-2 mt-3 pt-3 border-t ${isBirthdayToday ? 'border-white/20' : 'border-slate-50'}`}>
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-pink-50'} rounded-md`}>
+                                    <Cake size={12} className={isBirthdayToday ? 'text-white' : 'text-pink-500'} />
+                                  </div>
+                                  <div>
+                                    <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Birthday</p>
+                                    <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.dateOfBirth ? new Date(m.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-blue-50'} rounded-md`}>
+                                    <Users size={12} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
+                                  </div>
+                                  <div>
+                                    <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Joined</p>
+                                    <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.joinDate ? m.joinDate.split('-')[0] : 'N/A'}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {m.duesPaidDate && m.duesStatus === 'Paid' && (
+                                <div className={`mt-2 flex items-center gap-1.5 text-[10px] p-1.5 rounded-lg border ${isBirthdayToday
+                                  ? 'text-white bg-white/10 border-white/20'
+                                  : 'text-green-600 bg-green-50/50 border-green-100/50'
+                                  }`}>
+                                  <CheckCircle size={10} />
+                                  <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                       <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100">
                         <p className="text-[10px] text-slate-400 font-medium">{monthMembers.length} {monthMembers.length === 1 ? 'member' : 'members'}</p>

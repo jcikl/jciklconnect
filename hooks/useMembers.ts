@@ -90,6 +90,30 @@ export const useMembers = (loIdFilter?: string | null) => {
     }
   };
 
+  const batchUpdateMembers = async (memberIds: string[], updates: Partial<Member>) => {
+    try {
+      await MembersService.batchUpdateMembers(memberIds, updates);
+      await loadMembers();
+      showToast(`Successfully updated ${memberIds.length} members`, 'success');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update members';
+      showToast(errorMessage, 'error');
+      throw err;
+    }
+  };
+
+  const batchDeleteMembers = async (memberIds: string[]) => {
+    try {
+      await MembersService.batchDeleteMembers(memberIds);
+      await loadMembers();
+      showToast(`Successfully deleted ${memberIds.length} members`, 'success');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete members';
+      showToast(errorMessage, 'error');
+      throw err;
+    }
+  };
+
   return {
     members,
     loading,
@@ -98,6 +122,8 @@ export const useMembers = (loIdFilter?: string | null) => {
     createMember,
     updateMember,
     deleteMember,
+    batchUpdateMembers,
+    batchDeleteMembers,
   };
 };
 

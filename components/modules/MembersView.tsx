@@ -1,5 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Sparkles, ArrowLeft, Phone, Mail, Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users, TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw, Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin, Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog } from 'lucide-react';
+import * as React from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Trash2, Settings, X, ChevronDown, Sparkles, ArrowLeft, Phone, Mail,
+  Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users,
+  TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw,
+  Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
+  Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog
+} from 'lucide-react';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs } from '../ui/Common';
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MemberEditForm } from './MemberEditForm';
@@ -216,7 +223,13 @@ export const MembersView: React.FC = () => {
   const [lastImportResult, setLastImportResult] = useState<any | null>(null);
   const [addModalHobbies, setAddModalHobbies] = useState<string[]>([]);
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
-  const { members, loading, error, createMember, updateMember, loadMembers } = useMembers(loIdFilter);
+  const { members, loading, error, createMember, updateMember, deleteMember, batchUpdateMembers, batchDeleteMembers, loadMembers } = useMembers(loIdFilter);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchActionModalOpen, setIsBatchActionModalOpen] = useState(false);
+  const [batchActionType, setBatchActionType] = useState<'delete' | 'set' | null>(null);
+  const [batchSetField, setBatchSetField] = useState<string>('');
+  const [batchSetValue, setBatchSetValue] = useState<any>('');
+
   const { member: currentMember } = useAuth();
   const { isAdmin, isBoard, isOrganizationSecretary } = usePermissions();
   const { showToast } = useToast();
@@ -243,10 +256,51 @@ export const MembersView: React.FC = () => {
 
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === paginatedMembers.length && paginatedMembers.every(m => selectedIds.has(m.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedMembers.map(m => m.id)));
+    }
+  };
+
+  const isAllSelected = paginatedMembers.length > 0 && paginatedMembers.every(m => selectedIds.has(m.id));
+
   // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  // Handle Ctrl+A for Select All on current page
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        const activeElement = document.activeElement;
+        const isTyping = activeElement instanceof HTMLInputElement ||
+          activeElement instanceof HTMLTextAreaElement ||
+          (activeElement as HTMLElement)?.isContentEditable;
+
+        if (activeTab === 'directory' && !isTyping && paginatedMembers.length > 0) {
+          e.preventDefault();
+          const allIds = paginatedMembers.map(m => m.id);
+          setSelectedIds(new Set(allIds));
+          showToast(`Selected all ${allIds.length} members on current page`, 'info');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, paginatedMembers, showToast]);
 
   // Load statistics when statistics tab is active
   useEffect(() => {
@@ -538,7 +592,14 @@ export const MembersView: React.FC = () => {
                   </div>
 
                   <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
-                    <MemberTable members={paginatedMembers} onSelect={setSelectedMemberId} />
+                    <MemberTable
+                      members={paginatedMembers}
+                      onSelect={setSelectedMemberId}
+                      selectedIds={selectedIds}
+                      onToggleSelection={toggleSelection}
+                      onToggleAll={toggleAll}
+                      isAllSelected={isAllSelected}
+                    />
                     {filteredMembers.length > 0 && (
                       <div className="mt-4">
                         <Pagination
@@ -583,6 +644,102 @@ export const MembersView: React.FC = () => {
       ) : (
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} />
       )}
+
+      {selectedIds.size > 1 && (
+        <BatchActionBar
+          selectedCount={selectedIds.size}
+          onClear={() => setSelectedIds(new Set())}
+          onBatchDelete={() => {
+            setBatchActionType('delete');
+            setIsBatchActionModalOpen(true);
+          }}
+          onBatchSet={() => {
+            setBatchActionType('set');
+            setIsBatchActionModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Batch Action Modal */}
+      <Modal
+        isOpen={isBatchActionModalOpen}
+        onClose={() => setIsBatchActionModalOpen(false)}
+        title={batchActionType === 'delete' ? 'Confirm Batch Delete' : 'Batch Set Fields'}
+      >
+        <div className="space-y-4">
+          {batchActionType === 'delete' ? (
+            <>
+              <p className="text-slate-600">Are you sure you want to delete <span className="font-bold text-red-600">{selectedIds.size}</span> members? This action cannot be undone.</p>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setIsBatchActionModalOpen(false)}>Cancel</Button>
+                <Button variant="danger" onClick={async () => {
+                  await batchDeleteMembers(Array.from(selectedIds));
+                  setSelectedIds(new Set());
+                  setIsBatchActionModalOpen(false);
+                }}>Delete Members</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">Field to Set</label>
+                <Select
+                  options={[
+                    { label: 'Select field...', value: '' },
+                    { label: 'Introducer', value: 'introducer' },
+                    { label: 'Cut Style', value: 'cutStyle' },
+                    { label: 'T-Shirt Size', value: 'tshirtSize' },
+                    { label: 'Jacket Size', value: 'jacketSize' },
+                    { label: 'Role', value: 'role' },
+                  ]}
+                  value={batchSetField}
+                  onChange={(e) => {
+                    setBatchSetField(e.target.value);
+                    setBatchSetValue('');
+                  }}
+                />
+              </div>
+
+              {batchSetField && (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-slate-700">Value</label>
+                  {batchSetField === 'introducer' ? (
+                    <Input value={batchSetValue} onChange={(e) => setBatchSetValue(e.target.value)} placeholder="Enter introducer name" />
+                  ) : batchSetField === 'role' ? (
+                    <Select
+                      options={Object.values(UserRole).map(r => ({ label: r, value: r }))}
+                      value={batchSetValue}
+                      onChange={(e) => setBatchSetValue(e.target.value)}
+                    />
+                  ) : batchSetField === 'cutStyle' ? (
+                    <Select
+                      options={['Unisex', 'Lady Cut'].map(v => ({ label: v, value: v }))}
+                      value={batchSetValue}
+                      onChange={(e) => setBatchSetValue(e.target.value)}
+                    />
+                  ) : (
+                    <Select
+                      options={['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(v => ({ label: v, value: v }))}
+                      value={batchSetValue}
+                      onChange={(e) => setBatchSetValue(e.target.value)}
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setIsBatchActionModalOpen(false)}>Cancel</Button>
+                <Button disabled={!batchSetField || !batchSetValue} onClick={async () => {
+                  const updates: Partial<Member> = { [batchSetField]: batchSetValue };
+                  await batchUpdateMembers(Array.from(selectedIds), updates);
+                  setSelectedIds(new Set());
+                  setIsBatchActionModalOpen(false);
+                }}>Apply Changes</Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
 
       <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Register New Member" size="xl" drawerOnMobile>
         <form onSubmit={handleAddMember} className="space-y-4">
@@ -927,8 +1084,65 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
   );
 };
 
+// Batch Action Bar Component
+const BatchActionBar: React.FC<{
+  selectedCount: number,
+  onClear: () => void,
+  onBatchDelete: () => void,
+  onBatchSet: () => void
+}> = ({ selectedCount, onClear, onBatchDelete, onBatchSet }) => {
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-white/10 backdrop-blur-md">
+        <div className="flex items-center gap-3 pr-6 border-r border-white/20">
+          <div className="w-8 h-8 rounded-full bg-jci-blue flex items-center justify-center font-bold text-sm">
+            {selectedCount}
+          </div>
+          <span className="text-sm font-medium whitespace-nowrap">Members selected</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onBatchSet}
+            className="text-white hover:bg-white/10"
+          >
+            <Settings size={16} className="mr-2" />
+            Batch Set
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onBatchDelete}
+            className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Trash2 size={16} className="mr-2" />
+            Delete
+          </Button>
+        </div>
+
+        <button
+          onClick={onClear}
+          className="p-1 hover:bg-white/10 rounded-full transition-colors ml-2"
+          title="Clear selection"
+        >
+          <X size={18} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Member Table Component
-const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void }> = ({ members, onSelect }) => {
+const MemberTable: React.FC<{
+  members: Member[],
+  onSelect: (id: string) => void,
+  selectedIds: Set<string>,
+  onToggleSelection: (id: string) => void,
+  onToggleAll: () => void,
+  isAllSelected: boolean
+}> = ({ members, onSelect, selectedIds, onToggleSelection, onToggleAll, isAllSelected }) => {
   return (
     <Card noPadding>
       {/* Desktop View */}
@@ -936,6 +1150,14 @@ const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void 
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-50/50">
+              <th className="px-6 py-4 w-10">
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
+                  checked={isAllSelected}
+                  onChange={onToggleAll}
+                />
+              </th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-500">Member</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-500">Role</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-500">Tier / Points</th>
@@ -946,7 +1168,18 @@ const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void 
           </thead>
           <tbody>
             {members.map(member => (
-              <tr key={member.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onSelect(member.id)}>
+              <tr
+                key={member.id}
+                className={`hover:bg-slate-50 transition-colors ${selectedIds.has(member.id) ? 'bg-blue-50/50' : ''}`}
+              >
+                <td className="px-6 py-4">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
+                    checked={selectedIds.has(member.id)}
+                    onChange={() => onToggleSelection(member.id)}
+                  />
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-3">
                     <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
@@ -985,7 +1218,7 @@ const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void 
                   )}
                 </td>
                 <td className="px-6 py-4">
-                  <Button variant="ghost" size="sm">View</Button>
+                  <Button variant="ghost" size="sm" onClick={() => onSelect(member.id)}>View</Button>
                 </td>
               </tr>
             ))}
@@ -998,11 +1231,18 @@ const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void 
         {members.map(member => (
           <div
             key={member.id}
-            className="p-4 active:bg-slate-50 transition-colors"
-            onClick={() => onSelect(member.id)}
+            className={`p-4 transition-colors ${selectedIds.has(member.id) ? 'bg-blue-50/50' : ''}`}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-3">
+                <div className="pr-1">
+                  <input
+                    type="checkbox"
+                    className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
+                    checked={selectedIds.has(member.id)}
+                    onChange={() => onToggleSelection(member.id)}
+                  />
+                </div>
                 <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
                 <div>
                   <div className="font-bold text-slate-900">{member.name}</div>
@@ -1041,6 +1281,16 @@ const MemberTable: React.FC<{ members: Member[], onSelect: (id: string) => void 
                 progress={member.attendanceRate}
                 color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'}
               />
+            </div>
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => onSelect(member.id)}
+              >
+                View Profile
+              </Button>
             </div>
           </div>
         ))}

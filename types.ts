@@ -194,6 +194,7 @@ export interface BoardMember {
   endDate?: string;
   isActive: boolean;
   permissions: string[];
+  commissionDirectorIds?: string[]; // IDs of members serving as Commission Directors under this position
   createdAt: string;
   updatedAt: string;
 }

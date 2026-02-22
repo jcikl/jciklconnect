@@ -24,11 +24,11 @@ import type {
   Member,
   MentorMatch,
 } from '../../../types';
-import { 
-  MentorshipService, 
-  MentorMatchSuggestion, 
+import {
+  MentorshipService,
+  MentorMatchSuggestion,
   MentorshipCriteria,
-  MentorshipStats 
+  MentorshipStats
 } from '../../../services/mentorshipService';
 import { MembersService } from '../../../services/membersService';
 import { useToast } from '../../ui/Common';
@@ -67,11 +67,11 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
 
       setMembers(allMembers);
       setMentorshipStats(stats);
-      
+
       // Filter unassigned mentees
-      const unassigned = allMembers.filter(m => 
-        !m.mentorId && 
-        m.role === 'MEMBER' && 
+      const unassigned = allMembers.filter(m =>
+        !m.mentorId &&
+        m.role === 'MEMBER' &&
         m.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setUnassignedMentees(unassigned);
@@ -86,7 +86,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
   const handleFindMatches = async (mentee: Member) => {
     setSelectedMentee(mentee);
     setMatchingLoading(true);
-    
+
     try {
       const matches = await MentorshipService.findPotentialMentors(mentee.id, matchingCriteria);
       setPotentialMatches(matches);
@@ -262,11 +262,10 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
               <button
                 key={id}
                 onClick={() => setActiveTab(id as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                  activeTab === id
+                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 <Icon size={16} />
                 {label}
@@ -315,8 +314,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                     {unassignedMentees.map((mentee) => (
                       <div key={mentee.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-3 mb-3">
-                          <img 
-                            src={mentee.avatar} 
+                          <img
+                            src={mentee.avatar || undefined}
                             alt={mentee.name}
                             className="w-10 h-10 rounded-full"
                           />
@@ -387,8 +386,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <img 
-                          src={selectedMentee.avatar} 
+                        <img
+                          src={selectedMentee.avatar || undefined}
                           alt={selectedMentee.name}
                           className="w-12 h-12 rounded-full"
                         />
@@ -417,9 +416,9 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                       <Forms.Select
                         label="Experience Level"
                         value={matchingCriteria.experience || ''}
-                        onChange={(e) => setMatchingCriteria(prev => ({ 
-                          ...prev, 
-                          experience: e.target.value as any 
+                        onChange={(e) => setMatchingCriteria(prev => ({
+                          ...prev,
+                          experience: e.target.value as any
                         }))}
                         options={[
                           { value: '', label: 'Any' },
@@ -437,9 +436,9 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                       <Forms.Select
                         label="Availability"
                         value={matchingCriteria.availability || ''}
-                        onChange={(e) => setMatchingCriteria(prev => ({ 
-                          ...prev, 
-                          availability: e.target.value as any 
+                        onChange={(e) => setMatchingCriteria(prev => ({
+                          ...prev,
+                          availability: e.target.value as any
                         }))}
                         options={[
                           { value: '', label: 'Any' },
@@ -486,8 +485,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                           <div key={match.mentor.id} className="border border-gray-200 rounded-lg p-4">
                             <div className="flex items-start justify-between">
                               <div className="flex items-start gap-4">
-                                <img 
-                                  src={match.mentor.avatar} 
+                                <img
+                                  src={match.mentor.avatar || undefined}
                                   alt={match.mentor.name}
                                   className="w-12 h-12 rounded-full"
                                 />
@@ -499,7 +498,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                                     </span>
                                   </div>
                                   <p className="text-sm text-gray-600 mb-2">{match.mentor.profession}</p>
-                                  
+
                                   <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
                                     <div>
                                       <span className="font-medium">Points:</span> {match.mentor.points}
@@ -531,9 +530,9 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                               <div className="flex flex-col gap-2">
                                 <button
                                   onClick={() => handleCreateMatch(
-                                    match.mentor.id, 
-                                    selectedMentee.id, 
-                                    match.matchScore, 
+                                    match.mentor.id,
+                                    selectedMentee.id,
+                                    match.matchScore,
                                     match.reasons
                                   )}
                                   className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors flex items-center gap-1"
