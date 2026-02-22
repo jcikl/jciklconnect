@@ -91,6 +91,8 @@ export interface BatchImportConfig {
   importer: (row: Partial<any>, context?: ImportContext) => Promise<void>;
   /** 导入成功后的回调 */
   onSuccess?: () => void;
+  /** 行后处理器，用于在验证后标记这行是新增还是更新等 */
+  rowPostProcessor?: (row: ImportRow, context?: ImportContext) => ImportRow;
 }
 
 export interface ImportRow {
@@ -104,6 +106,8 @@ export interface ImportRow {
   errors: string[];
   /** 是否有效 */
   valid: boolean;
+  /** （额外状态）当系统内已经存在记录时标记为更新 (Update) 而非新建 */
+  isUpdate?: boolean;
 }
 
 export interface BatchImportResult {

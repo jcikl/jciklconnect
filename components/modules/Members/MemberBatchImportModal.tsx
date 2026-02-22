@@ -1,6 +1,9 @@
 import React from 'react';
 import { BatchImportModal } from '../../shared/batchImport/BatchImportModal';
 import { memberImportConfig } from './config/memberImportConfig';
+import { useMembers } from '../../../hooks/useMembers';
+import { useAuth } from '../../../hooks/useAuth';
+import { DEFAULT_LO_ID } from '../../../config/constants';
 
 interface Props {
   isOpen: boolean;
@@ -18,12 +21,17 @@ export const MemberBatchImportModal: React.FC<Props> = ({
   onClose,
   onImported,
 }) => {
+  const { member } = useAuth();
+  const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
+  const { members } = useMembers(loId);
+
   return (
     <BatchImportModal
       isOpen={isOpen}
       onClose={onClose}
       config={memberImportConfig}
       onImported={onImported}
+      context={{ members }}
     />
   );
 };

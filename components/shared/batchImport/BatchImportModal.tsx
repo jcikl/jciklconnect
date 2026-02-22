@@ -171,15 +171,21 @@ export const BatchImportModal: React.FC<Props> = ({
         }
       }
 
-      return {
+      let rowObj: ImportRow = {
         index: idx,
         raw: line,
         parsed,
         errors,
         valid: errors.length === 0 && !config.fields.some(f => f.required && !parsed[f.key]),
       };
+
+      if (config.rowPostProcessor) {
+        rowObj = config.rowPostProcessor(rowObj, context);
+      }
+
+      return rowObj;
     });
-  }, [pastedText, columnMapping, config]);
+  }, [pastedText, columnMapping, config, context]);
 
   const parsedRows = parsedTsvRows;
   const validRows = useMemo(() => parsedRows.filter(r => r.valid), [parsedRows]);
@@ -597,12 +603,19 @@ export const BatchImportModal: React.FC<Props> = ({
                           >
                             {col.key === 'valid' ? (
                               row.valid ? (
-                                <span className="inline-flex items-center gap-1 text-green-600">
-                                  <CheckCircle size={12} />
-                                  Valid
-                                </span>
+                                row.isUpdate ? (
+                                  <span className="inline-flex items-center gap-1 text-blue-600 font-medium">
+                                    <CheckCircle size={12} />
+                                    Updated
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-green-600 font-medium">
+                                    <CheckCircle size={12} />
+                                    Valid
+                                  </span>
+                                )
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-red-600">
+                                <span className="inline-flex items-center gap-1 text-red-600 font-medium">
                                   <AlertCircle size={12} />
                                   Error
                                 </span>

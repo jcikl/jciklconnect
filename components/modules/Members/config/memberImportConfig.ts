@@ -357,8 +357,20 @@ export const memberImportConfig: BatchImportConfig = {
   autoMatchThreshold: 0.85, // 85% similarity required
 
   // Import function - called for each valid row
-  importer: async (row) => {
-    await MembersService.createMember({
+  importer: async (row, context) => {
+    // If it's an update, we should update instead of create
+    const email = row.email?.toLowerCase();
+
+    let existingId = row._existingId;
+
+    if (!existingId && email && context?.members && Array.isArray(context.members)) {
+      const existing = context.members.find((m: any) => m.email?.toLowerCase() === email);
+      if (existing) {
+        existingId = existing.id;
+      }
+    }
+
+    const payload = {
       name: row.name,
       email: row.email,
       phone: row.phone || '',
@@ -398,13 +410,27 @@ export const memberImportConfig: BatchImportConfig = {
       // System-set fields
       status: 'Active',
       role: 'MEMBER',
-      points: 0,
-      avatar: '',
-      skills: [],
-      churnRisk: 'Low',
-      attendanceRate: 0,
-      duesStatus: 'Pending',
-      badges: [],
-    } as Parameters<typeof MembersService.createMember>[0]);
+      ...(!existingId && { points: 0, avatar: '', skills: [], churnRisk: 'Low', attendanceRate: 0, duesStatus: 'Pending', badges: [] })
+    } as Parameters<typeof MembersService.createMember>[0];
+
+    if (existingId) {
+      await MembersService.updateMember(existingId, payload);
+    } else {
+      await MembersService.createMember(payload);
+    }
   },
+
+  rowPostProcessor: (row, context) => {
+    if (row.valid && context?.members && Array.isArray(context.members)) {
+      const email = row.parsed?.email?.toLowerCase?.();
+      if (email) {
+        const existing = context.members.find((m: any) => m.email?.toLowerCase() === email);
+        if (existing) {
+          row.isUpdate = true;
+          row.parsed._existingId = existing.id; // optimization to prevent duplicate searching later
+        }
+      }
+    }
+    return row;
+  }
 };
