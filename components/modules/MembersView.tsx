@@ -125,7 +125,7 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
 
   return (
     <div className="space-y-6">
-      <Card className="p-6">
+      <Card className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div><span className="text-slate-500">姓名</span><p className="font-medium">{member.name}</p></div>
           <div><span className="text-slate-500">角色</span><p className="font-medium">{member.role}</p></div>
@@ -147,7 +147,7 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
       </Card>
 
       {/* Story 8.1：会费状态与活动参与、筹委经历 */}
-      <Card className="p-6">
+      <Card className="p-4">
         <h3 className="font-semibold text-slate-800 mb-4">Dues Status & Participation History</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
@@ -576,7 +576,7 @@ export const MembersView: React.FC = () => {
                 }}
               />
             </div>
-            <div className="p-6">
+            <div className="p-4">
               {activeTab === 'directory' && (
                 <>
 

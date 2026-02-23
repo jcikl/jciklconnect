@@ -257,8 +257,8 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
                 key={id}
                 onClick={() => setActiveTab(id as any)}
                 className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
               >
                 <Icon size={16} />
@@ -268,7 +268,7 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
           </nav>
         </div>
 
-        <div className="p-6">
+        <div className="p-4">
           {/* Current Board Tab */}
           {activeTab === 'current' && (
             <div className="space-y-4">
@@ -393,10 +393,10 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
                           </span>
                         </div>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${transition.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : transition.status === 'in_progress'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
+                          ? 'bg-green-100 text-green-800'
+                          : transition.status === 'in_progress'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
                           }`}>
                           {transition.status}
                         </span>

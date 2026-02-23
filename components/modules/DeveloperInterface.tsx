@@ -1,6 +1,6 @@
 // Developer Interface - API Documentation, Webhook Management, and Integration Tools
 import React, { useState } from 'react';
-import { 
+import {
   Code, Webhook as WebhookIcon, Key, BookOpen, Terminal, FileText, Copy, CheckCircle,
   ExternalLink, AlertCircle, Settings, Eye, EyeOff, Plus, Trash2, Edit,
   Play, Activity, Shield, Globe
@@ -95,8 +95,8 @@ export const DeveloperInterface: React.FC = () => {
             tabs={['API Documentation', 'Webhooks', 'API Keys', 'Integration Logs']}
             activeTab={
               activeTab === 'api' ? 'API Documentation' :
-              activeTab === 'webhooks' ? 'Webhooks' :
-              activeTab === 'keys' ? 'API Keys' : 'Integration Logs'
+                activeTab === 'webhooks' ? 'Webhooks' :
+                  activeTab === 'keys' ? 'API Keys' : 'Integration Logs'
             }
             onTabChange={(tab) => {
               if (tab === 'API Documentation') setActiveTab('api');
@@ -107,7 +107,7 @@ export const DeveloperInterface: React.FC = () => {
           />
         </div>
 
-        <div className="p-6">
+        <div className="p-4">
           {activeTab === 'api' && <APIDocumentationTab />}
           {activeTab === 'webhooks' && (
             <WebhooksTab
@@ -209,11 +209,10 @@ const APIDocumentationTab: React.FC = () => {
           {endpoints.map(endpoint => (
             <div
               key={endpoint.id}
-              className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                selectedEndpoint === endpoint.id
+              className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedEndpoint === endpoint.id
                   ? 'border-jci-blue bg-blue-50'
                   : 'border-slate-200 hover:border-slate-300'
-              }`}
+                }`}
               onClick={() => setSelectedEndpoint(selectedEndpoint === endpoint.id ? null : endpoint.id)}
             >
               <div className="flex items-center justify-between">

@@ -188,7 +188,7 @@ export const SurveysView: React.FC = () => {
                         }}
                     />
                 </div>
-                <div className="p-6">
+                <div className="p-4">
                     {activeTab === 'surveys' ? (
                         <LoadingState loading={loading} error={error} empty={surveys.length === 0} emptyMessage="No surveys available">
                             <div className="grid md:grid-cols-2 gap-6">

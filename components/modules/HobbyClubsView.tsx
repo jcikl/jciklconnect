@@ -92,7 +92,7 @@ export const HobbyClubsView: React.FC = () => {
                         onTabChange={(tab) => setActiveTab(tab === 'Clubs' ? 'clubs' : 'activities')}
                     />
                 </div>
-                <div className="p-6">
+                <div className="p-4">
                     {activeTab === 'clubs' ? (
                         <LoadingState loading={loading} error={error} empty={clubs.length === 0} emptyMessage="No hobby clubs found">
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -104,7 +104,7 @@ export const HobbyClubsView: React.FC = () => {
                                                 <Badge variant="neutral">{club.category}</Badge>
                                             </div>
                                         </div>
-                                        <div className="p-6">
+                                        <div className="p-4">
                                             <div className="flex items-start justify-between mb-2">
                                                 <h3 className="text-lg font-bold text-slate-900">{club.name}</h3>
                                                 {isOwner(club) && (

@@ -263,8 +263,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 key={id}
                 onClick={() => setActiveTab(id as any)}
                 className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
               >
                 <Icon size={16} />
@@ -274,7 +274,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
           </nav>
         </div>
 
-        <div className="p-6">
+        <div className="p-4">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="space-y-6">

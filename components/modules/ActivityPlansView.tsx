@@ -183,7 +183,7 @@ export const ActivityPlansView: React.FC = () => {
             className="px-4 md:px-6"
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           <LoadingState loading={loading} error={error} empty={filteredPlans.length === 0} emptyMessage="No activity plans found">
             <div className="space-y-4">
               {paginatedPlans.map(plan => (

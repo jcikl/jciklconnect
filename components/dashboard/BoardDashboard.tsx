@@ -459,7 +459,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
             }}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           {activeTab === 'overview' && (
             <>
               {/* Member Metrics Row */}

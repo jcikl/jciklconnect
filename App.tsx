@@ -543,7 +543,7 @@ const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activeProjects.map(project => (
                   <Card key={project.id} className="hover:shadow-lg transition-shadow">
-                    <div className="p-6">
+                    <div className="p-4">
                       <div className="flex items-start justify-between mb-4">
                         <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
                           {project.status}
@@ -769,7 +769,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
             <h2 className="text-3xl font-bold text-slate-900 mb-12 text-center">What We Do</h2>
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
-                <div className="p-6">
+                <div className="p-4">
                   <div className="w-12 h-12 bg-jci-blue/10 text-jci-blue rounded-lg flex items-center justify-center mb-4">
                     <Users size={24} />
                   </div>
@@ -781,7 +781,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 </div>
               </Card>
               <Card>
-                <div className="p-6">
+                <div className="p-4">
                   <div className="w-12 h-12 bg-jci-blue/10 text-jci-blue rounded-lg flex items-center justify-center mb-4">
                     <Briefcase size={24} />
                   </div>
@@ -793,7 +793,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 </div>
               </Card>
               <Card>
-                <div className="p-6">
+                <div className="p-4">
                   <div className="w-12 h-12 bg-jci-blue/10 text-jci-blue rounded-lg flex items-center justify-center mb-4">
                     <Sparkles size={24} />
                   </div>
@@ -805,7 +805,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 </div>
               </Card>
               <Card>
-                <div className="p-6">
+                <div className="p-4">
                   <div className="w-12 h-12 bg-jci-blue/10 text-jci-blue rounded-lg flex items-center justify-center mb-4">
                     <Award size={24} />
                   </div>
@@ -931,7 +931,7 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {yearGroup.items.map((item, index) => (
                       <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer">
-                        <div className="p-6">
+                        <div className="p-4">
                           <div className="flex items-center justify-between mb-3">
                             <Badge variant="info">{item.issue}</Badge>
                           </div>

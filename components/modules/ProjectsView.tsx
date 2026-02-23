@@ -366,7 +366,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
               }}
             />
           </div>
-          <div className="p-6">
+          <div className="p-4">
             {(activeTab === 'projects' || activeTab === 'past-projects') ? (
               <ProjectGrid
                 projects={displayedProjects}
@@ -1640,7 +1640,7 @@ const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, onUpdate
             }}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           {activeTab === 'committee' && (
             <ProjectCommitteeTab
               project={project}

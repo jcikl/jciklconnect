@@ -114,7 +114,7 @@ export const DataImportExportView: React.FC = () => {
             onTabChange={(tab) => setActiveTab(tab === 'Export Data' ? 'export' : 'import')}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           {activeTab === 'export' ? (
             <div className="space-y-6">
               <div>

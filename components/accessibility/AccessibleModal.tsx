@@ -69,13 +69,13 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
     if (isOpen) {
       // 保存当前焦点元素
       previousActiveElement.current = document.activeElement as HTMLElement;
-      
+
       // 阻止背景滚动
       document.body.style.overflow = 'hidden';
-      
+
       // 向屏幕阅读器宣布模态框打开
       announce(`对话框已打开：${title}`, 'assertive');
-      
+
       // 设置初始焦点
       setTimeout(() => {
         if (initialFocus?.current) {
@@ -90,12 +90,12 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
     } else {
       // 恢复背景滚动
       document.body.style.overflow = '';
-      
+
       // 恢复之前的焦点
       if (previousActiveElement.current) {
         previousActiveElement.current.focus();
       }
-      
+
       // 向屏幕阅读器宣布模态框关闭
       announce('对话框已关闭', 'assertive');
     }
@@ -117,11 +117,11 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
       aria-describedby={ariaDescribedBy || descriptionId.current}
     >
       {/* 背景覆盖层 */}
-      <div 
+      <div
         className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
         aria-hidden="true"
       />
-      
+
       {/* 模态框内容 */}
       <div
         ref={modalRef as React.RefObject<HTMLDivElement>}
@@ -135,7 +135,7 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
       >
         {/* 标题栏 */}
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 
+          <h2
             id={titleId.current}
             className="text-xl font-semibold text-slate-900"
           >
@@ -156,9 +156,9 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
         </div>
 
         {/* 内容区域 */}
-        <div 
+        <div
           id={descriptionId.current}
-          className="p-6"
+          className="p-4"
         >
           {children}
         </div>
@@ -210,13 +210,13 @@ export const AccessibleConfirmDialog: React.FC<AccessibleConfirmDialogProps> = (
       ariaDescribedBy="confirm-dialog-message"
     >
       <div className="space-y-4">
-        <p 
+        <p
           id="confirm-dialog-message"
           className="text-slate-600"
         >
           {message}
         </p>
-        
+
         <div className="flex justify-end space-x-3">
           <button
             onClick={onCancel}

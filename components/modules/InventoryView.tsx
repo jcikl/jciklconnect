@@ -322,7 +322,7 @@ export const InventoryView: React.FC = () => {
             />
           </div>
 
-          <div className="p-6">
+          <div className="p-4">
             {activeTab === 'items' && (
               <div className="space-y-4">
                 <div className="mb-4">

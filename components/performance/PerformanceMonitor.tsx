@@ -16,8 +16,8 @@ interface PerformanceMetrics {
   errorRate: number;
 }
 
-export const PerformanceMonitor: React.FC<{ 
-  isVisible: boolean; 
+export const PerformanceMonitor: React.FC<{
+  isVisible: boolean;
   onClose: () => void;
 }> = ({ isVisible, onClose }) => {
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
@@ -51,11 +51,11 @@ export const PerformanceMonitor: React.FC<{
 
       // 计算性能指标
       const totalCacheEntries = apiStats.totalEntries + userStats.totalEntries + staticStats.totalEntries;
-      const cacheHitRate = totalCacheEntries > 0 ? 
+      const cacheHitRate = totalCacheEntries > 0 ?
         ((apiStats.totalEntries - apiStats.expiredEntries) / totalCacheEntries) * 100 : 0;
 
       // 获取内存使用情况（如果支持）
-      const memoryUsage = (performance as any).memory ? 
+      const memoryUsage = (performance as any).memory ?
         (performance as any).memory.usedJSHeapSize / 1024 / 1024 : 0;
 
       setMetrics(prev => ({
@@ -76,7 +76,7 @@ export const PerformanceMonitor: React.FC<{
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-4xl max-h-[80vh] overflow-y-auto">
-        <div className="p-6">
+        <div className="p-4">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-slate-900 flex items-center">
               <Activity className="mr-2" />
@@ -213,7 +213,7 @@ export const PerformanceMonitor: React.FC<{
                   </span>
                 </div>
               )}
-              
+
               {metrics.cacheHitRate < 50 && (
                 <div className="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <Zap className="h-5 w-5 text-blue-500 mr-2" />

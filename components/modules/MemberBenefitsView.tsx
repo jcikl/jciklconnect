@@ -121,7 +121,7 @@ export const MemberBenefitsView: React.FC = () => {
             onTabChange={(tab) => setActiveTab(tab === 'All Benefits' ? 'all' : 'my')}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits available">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {displayBenefits.map(benefit => (

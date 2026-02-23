@@ -10,7 +10,7 @@ const LoadingFallback = () => (
 
 // 简单的占位符组件，避免导入错误
 const PlaceholderComponent = ({ title }: { title: string }) => (
-  <div className="p-6">
+  <div className="p-4">
     <h1 className="text-2xl font-bold text-slate-900 mb-4">{title}</h1>
     <p className="text-slate-600">此模块正在开发中...</p>
   </div>

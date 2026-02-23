@@ -178,7 +178,7 @@ export const TemplatesView: React.FC = () => {
             }}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           {activeTab === 'events' && (
             <LoadingState loading={loading} error={error} empty={eventTemplates.length === 0} emptyMessage="No event templates found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

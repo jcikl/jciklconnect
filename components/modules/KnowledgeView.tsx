@@ -131,7 +131,7 @@ export const KnowledgeView: React.FC = () => {
                         }}
                     />
                 </div>
-                <div className="p-6">
+                <div className="p-4">
                     {activeTab === 'learning' && (
                         <LearningPathsTab
                             paths={paths}

@@ -169,7 +169,7 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) =>
                         }}
                     />
                 </div>
-                <div className="p-6">
+                <div className="p-4">
                     {activeTab === 'churn' && (
                         <ChurnPredictionView
                             churnData={churnData}

@@ -291,7 +291,7 @@ export const ReportsView: React.FC = () => {
             }}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           <LoadingState loading={loading} error={null}>
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'financial' && (

@@ -158,7 +158,7 @@ export const AdvertisementsView: React.FC = () => {
             }}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           {activeTab === 'ads' ? (
             <LoadingState loading={loading} error={error} empty={advertisements.length === 0} emptyMessage="No advertisements found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

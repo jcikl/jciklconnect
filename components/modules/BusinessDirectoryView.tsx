@@ -73,7 +73,7 @@ export const BusinessDirectoryView: React.FC = () => {
             onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
           />
         </div>
-        <div className="p-6">
+        <div className="p-4">
           {activeTab === 'directory' ? (
             <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

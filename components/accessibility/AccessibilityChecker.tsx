@@ -38,7 +38,7 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
     setIsScanning(true);
     setScanProgress(0);
     const foundIssues: AccessibilityIssue[] = [];
-    
+
     const target = targetElement || document.body;
     const allElements = target.querySelectorAll('*');
     const totalElements = allElements.length;
@@ -49,16 +49,16 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
 
       // 检查 ARIA 问题
       await checkAriaIssues(element, foundIssues);
-      
+
       // 检查键盘导航问题
       checkKeyboardIssues(element, foundIssues);
-      
+
       // 检查颜色对比度问题
       checkColorContrastIssues(element, foundIssues);
-      
+
       // 检查结构问题
       checkStructureIssues(element, foundIssues);
-      
+
       // 检查内容问题
       checkContentIssues(element, foundIssues);
 
@@ -78,7 +78,7 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
 
     // 检查按钮是否有可访问的名称
     if (tagName === 'button') {
-      const hasAccessibleName = 
+      const hasAccessibleName =
         element.textContent?.trim() ||
         element.getAttribute('aria-label') ||
         element.getAttribute('aria-labelledby') ||
@@ -141,7 +141,7 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
       const link = element as HTMLAnchorElement;
       const text = link.textContent?.trim();
       const ariaLabel = link.getAttribute('aria-label');
-      
+
       if ((!text || ['点击这里', '更多', '阅读更多', 'click here', 'more'].includes(text.toLowerCase())) && !ariaLabel) {
         issues.push({
           type: 'warning',
@@ -205,14 +205,14 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
         const rgbToHex = (rgb: string): string => {
           const match = rgb.match(/\d+/g);
           if (!match) return '#000000';
-          
+
           const [r, g, b] = match.map(Number);
           return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
         };
 
         const foregroundHex = rgbToHex(color);
         const backgroundHex = rgbToHex(backgroundColor);
-        
+
         const contrast = checkContrast(foregroundHex, backgroundHex);
         const isLargeText = fontSize >= 18 || (fontSize >= 14 && computedStyle.fontWeight === 'bold');
         const requiredRatio = isLargeText ? 3 : 4.5;
@@ -239,7 +239,7 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
     if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
       const level = parseInt(tagName.charAt(1));
       const previousHeading = element.previousElementSibling;
-      
+
       if (previousHeading && ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(previousHeading.tagName.toLowerCase())) {
         const prevLevel = parseInt(previousHeading.tagName.charAt(1));
         if (level > prevLevel + 1) {
@@ -271,12 +271,12 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
 
   const checkContentIssues = (element: HTMLElement, issues: AccessibilityIssue[]) => {
     const text = element.textContent?.trim();
-    
+
     if (text) {
       // 检查是否使用了颜色作为唯一的信息传达方式
       const style = window.getComputedStyle(element);
       const color = style.color;
-      
+
       if (text.includes('红色') || text.includes('绿色') || text.includes('蓝色')) {
         issues.push({
           type: 'warning',
@@ -353,7 +353,7 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+        <div className="p-4">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-slate-900 flex items-center">
               <Eye className="mr-2" />
@@ -375,7 +375,7 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
                 <span className="text-sm text-slate-600">{Math.round(scanProgress)}%</span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-2">
-                <div 
+                <div
                   className="bg-jci-blue h-2 rounded-full transition-all duration-300"
                   style={{ width: `${scanProgress}%` }}
                 />
@@ -444,11 +444,11 @@ export const AccessibilityChecker: React.FC<AccessibilityCheckerProps> = ({
                   <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center">
                     {getCategoryIcon(category as AccessibilityIssue['category'])}
                     <span className="ml-2">
-                      {categoryNames[category as keyof typeof categoryNames]} 
+                      {categoryNames[category as keyof typeof categoryNames]}
                       ({categoryIssues.length})
                     </span>
                   </h3>
-                  
+
                   <div className="space-y-2">
                     {categoryIssues.map((issue, index) => (
                       <Card key={index} className="p-4">

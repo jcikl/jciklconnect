@@ -26,8 +26,8 @@ interface OptimizedMembersListProps {
   className?: string;
 }
 
-export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({ 
-  className = '' 
+export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({
+  className = ''
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -77,7 +77,7 @@ export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({
 
     // 状态过滤
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(member => 
+      filtered = filtered.filter(member =>
         member.status.toLowerCase() === filterStatus.toLowerCase()
       );
     }
@@ -133,8 +133,8 @@ export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({
       render: (member) => (
         <div className="w-8 h-8 bg-jci-blue rounded-full flex items-center justify-center text-white text-sm font-medium">
           {member.avatar ? (
-            <img 
-              src={member.avatar} 
+            <img
+              src={member.avatar}
               alt={member.name}
               className="w-8 h-8 rounded-full object-cover"
             />
@@ -168,10 +168,10 @@ export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({
       header: '状态',
       width: 100,
       render: (member) => (
-        <Badge 
+        <Badge
           variant={
-            member.status === 'Active' ? 'success' : 
-            member.status === 'Pending' ? 'warning' : 'error'
+            member.status === 'Active' ? 'success' :
+              member.status === 'Pending' ? 'warning' : 'error'
           }
         >
           {member.status}
@@ -230,7 +230,7 @@ export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({
 
   return (
     <Card className={`${className}`}>
-      <div className="p-6">
+      <div className="p-4">
         {/* 搜索和过滤栏 */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
@@ -243,7 +243,7 @@ export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-jci-blue focus:border-transparent"
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="text-slate-400 w-4 h-4" />
             <select
@@ -280,7 +280,7 @@ export const OptimizedMembersList: React.FC<OptimizedMembersListProps> = ({
             rowHeight={60}
             containerHeight={600}
             headerClassName="bg-slate-50 border-b border-slate-200"
-            rowClassName={(_, index) => 
+            rowClassName={(_, index) =>
               index % 2 === 0 ? 'bg-white' : 'bg-slate-50'
             }
             onEndReached={hasMore ? loadMoreMembers : undefined}
