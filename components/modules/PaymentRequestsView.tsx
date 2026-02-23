@@ -213,13 +213,13 @@ export const PaymentRequestsView: React.FC = () => {
 
     // Column 1: Logo
     if (img.complete && img.naturalWidth > 0) {
-      const logoH = 22;
+      const logoH = 16;
       const logoW = (img.naturalWidth * logoH) / img.naturalHeight;
       doc.addImage(img, 'PNG', 15, 12, logoW, logoH);
     }
 
     // Column 2: Logo Organisation Info (Starts at infoX)
-    const infoX = 70;
+    const infoX = 55;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
 
@@ -241,18 +241,18 @@ export const PaymentRequestsView: React.FC = () => {
     // Organization Details
     doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
     doc.setFontSize(8);
-    doc.text("25-3-2, Jalan 3/50, Off, Jln Gombak, Diamond Square, 53000 Kuala Lumpur", infoX, 22);
-    doc.text("Patron: JCI Senator Dato’ Seri Dr Derek Goh BBM(L)", infoX, 27);
+    doc.text("25-3-2, Jalan 3/50, Off, Jln Gombak, Diamond Square, 53000 Kuala Lumpur", infoX, 21);
+    doc.text("Patron: JCI Senator Dato’ Seri Dr Derek Goh BBM(L)", infoX, 24);
 
     doc.setTextColor(jciBlue[0], jciBlue[1], jciBlue[2]);
-    doc.text("www.jcikl.cc", infoX, 32, { link: { url: "https://www.jcikl.cc" } } as any);
-    doc.text("\u2022", infoX + 18, 32);
-    doc.text("www.jcimalaysia.cc", infoX + 21, 32, { link: { url: "https://www.jcimalaysia.cc" } } as any);
-    doc.text("\u2022", infoX + 46, 32);
-    doc.text("www.jci.cc", infoX + 49, 32, { link: { url: "https://www.jci.cc" } } as any);
+    doc.text("www.jcikl.cc", infoX, 28, { link: { url: "https://www.jcikl.cc" } } as any);
+    doc.text("\u2022", infoX + 18, 28);
+    doc.text("www.jcimalaysia.cc", infoX + 21, 28, { link: { url: "https://www.jcimalaysia.cc" } } as any);
+    doc.text("\u2022", infoX + 46, 28);
+    doc.text("www.jci.cc", infoX + 49, 28, { link: { url: "https://www.jci.cc" } } as any);
 
     // --- 2. MAIN TITLE ---
-    let y = 45;
+    let y = 40;
     doc.setTextColor(textMain[0], textMain[1], textMain[2]);
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
