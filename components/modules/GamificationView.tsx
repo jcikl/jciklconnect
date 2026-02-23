@@ -148,7 +148,7 @@ export const GamificationView: React.FC = () => {
             {member && (
               <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-8">
                 <div className="relative">
-                  <img src={member.avatar} alt="Profile" className="w-24 h-24 rounded-full border-4 border-white/30 shadow-xl" />
+                  <img src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0097D7&color=fff`} alt="Profile" className="w-24 h-24 rounded-full border-4 border-white/30 shadow-xl" />
                   <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full border border-white">
                     {member.tier}
                   </div>
@@ -289,7 +289,7 @@ export const GamificationView: React.FC = () => {
                         <div className={`w-6 text-center font-bold ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-amber-600' : 'text-slate-400'}`}>
                           {index + 1}
                         </div>
-                        <img src={member.avatar} alt={member.name} className="w-8 h-8 rounded-full bg-slate-200" />
+                        <img src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0097D7&color=fff`} alt={member.name} className="w-8 h-8 rounded-full bg-slate-200" />
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{member.name}</p>
                           <p className="text-xs text-slate-500">{member.tier}</p>

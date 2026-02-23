@@ -803,12 +803,21 @@ export class FinanceService {
   }
 
   // Get all bank accounts with dynamic balance
-  static async getAllBankAccounts(): Promise<BankAccount[]> {
+  static async getAllBankAccounts(includeBalance: boolean = true): Promise<BankAccount[]> {
     if (isDevMode()) {
       return MOCK_ACCOUNTS;
     }
 
     try {
+      if (!includeBalance) {
+        const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
+        return accountsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
+        } as BankAccount));
+      }
+
       const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
         getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
         getDocs(collection(db, COLLECTIONS.TRANSACTIONS))

@@ -60,28 +60,33 @@ service cloud.firestore {
     // Members collection: 组织财政/活动财政/会员 boundary; multi-LO: read by same loId or self.
     // Any logged-in user with a member doc (MEMBER/BOARD/ADMIN) can read all members (for directory, leaderboard).
     match /members/{memberId} {
-      allow read: if isAuthenticated() && 
-        (request.auth.uid == memberId || 
-         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-          (getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'] ||
-           (canReadOrgMembers() && (resource == null || resourceInMyLo(resource.data))))));
+      // 1. Allow user to read their own document (by UID or Email claim)
+      allow get: if isAuthenticated() && (
+        request.auth.uid == memberId || 
+        (resource != null && resource.data.email == request.auth.token.email)
+      );
+      
+      // 2. Allow searching for your own record by email during linking/login
+      // This is critical for the getMemberByEmail function in membersService
+      allow list: if isAuthenticated() && (
+        (request.query.limit <= 5 && request.query.filters.email == request.auth.token.email) ||
+        isMember()
+      );
+
+      // 3. Allow full read if user is an established member (MEMBER, BOARD, ADMIN)
+      allow read: if isMember();
       
       allow create: if isAuthenticated() && 
-                       (request.auth.uid == memberId || getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY']) &&
+                       (request.auth.uid == memberId || isBoard()) &&
                        request.resource.data.name is string &&
                        request.resource.data.email is string &&
                        request.resource.data.role is string;
       
       allow update: if isAuthenticated() && 
         (request.auth.uid == memberId || 
-         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY'] &&
-          (resource == null || resourceInMyLo(resource.data))));
+         (isBoard() && (resource == null || resourceInMyLo(resource.data))));
       
-      allow delete: if isAuthenticated() && 
-                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'ADMIN' &&
-                       (resource == null || resourceInMyLo(resource.data));
+      allow delete: if isAdmin() || (isAuthenticated() && resource != null && resource.data.email == request.auth.token.email);
     }
     
     // Communication/Posts collection
@@ -584,6 +589,12 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                      getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Finance: bank accounts (PaymentRequestsView — "Claim From" dropdown for all members)
+    match /bankAccounts/{docId} {
+      allow read: if isMember();
       allow create, update, delete: if isBoard();
     }
     

@@ -15,7 +15,9 @@ export const useMembers = (loIdFilter?: string | null) => {
 
   const loadMembers = useCallback(async () => {
     const inDevMode = isDevMode() || isDevModeFromAuth;
-    if (!currentMember && !inDevMode) {
+    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role);
+
+    if (!inDevMode && !isFullMember) {
       setMembers([]);
       setLoading(false);
       setError(null);
@@ -33,12 +35,14 @@ export const useMembers = (loIdFilter?: string | null) => {
     } finally {
       setLoading(false);
     }
-  }, [loIdFilter, currentMember?.loId, isDevModeFromAuth, showToast]);
+  }, [loIdFilter, currentMember, isDevModeFromAuth, showToast]);
 
   useEffect(() => {
     if (authLoading) return;
     const inDevMode = isDevMode() || isDevModeFromAuth;
-    if (!currentMember && !inDevMode) {
+    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role);
+
+    if (!inDevMode && !isFullMember) {
       setMembers([]);
       setLoading(false);
       setError(null);

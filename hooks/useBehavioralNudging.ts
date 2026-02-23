@@ -13,7 +13,7 @@ export const useBehavioralNudging = () => {
   const { showToast } = useToast();
 
   const loadNudges = useCallback(async () => {
-    if (!member || isDevMode()) {
+    if (!member) {
       setLoading(false);
       return;
     }

@@ -2,7 +2,8 @@
 import React from 'react';
 import {
   Calendar, Briefcase, Bell, Award, Sparkles, AlertTriangle, CheckCircle,
-  TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog
+  TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
+  CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift, ChevronDown, Search, LogOut
 } from 'lucide-react';
 import { Card, StatCard, StatCardsContainer, Badge, Button, useToast } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
@@ -34,7 +35,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   onNavigate
 }) => {
   const { showToast } = useToast();
-  const { member } = useAuth();
+  const { member, signOut } = useAuth();
   const { isBoard, isAdmin, isDeveloper, hasPermission, isOrganizationFinance, isActivityFinance, isOrganizationSecretary } = usePermissions();
   const { events, loading: eventsLoading } = useEvents();
   const { projects, loading: projectsLoading } = useProjects();
@@ -49,6 +50,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [loadingRecommendedEvents, setLoadingRecommendedEvents] = useState(false);
   const [myRegistrationEventIds, setMyRegistrationEventIds] = useState<string[]>([]);
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
+  const [eventTab, setEventTab] = useState<'upcoming' | 'past'>('upcoming');
 
   // Load member's event registrations (for guest dashboard: Activity Timeline + Upcoming Registered)
   useEffect(() => {
@@ -105,7 +107,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }, [member]);
 
   // Calculate stats from real data
-  const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status === 'Upcoming');
+  const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status !== 'Cancelled');
   const myProjects = projects.filter(p => p.lead === member?.id);
   const pendingTasks = myProjects.length; // Simplified - would need to fetch tasks
   const unreadNotifications = notifications.filter(n => !n.read);
@@ -213,142 +215,261 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Behavioral Nudges */}
-      {nudges.length > 0 && (
-        <div className="space-y-3">
-          {nudges.slice(0, 3).map(nudge => (
-            <NudgeBanner
-              key={nudge.id}
-              nudge={nudge}
-              onDismiss={dismissNudge}
-            />
-          ))}
-        </div>
-      )}
 
-      {/* AI Insight Header */}
-      <div className="bg-gradient-to-r from-jci-navy to-jci-blue rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10"></div>
-        <div className="relative z-10 flex justify-between items-center">
-          <div>
-            <div className="flex items-center space-x-2 mb-2">
-              <Sparkles className="text-yellow-400" size={20} />
-              <span className="font-semibold text-yellow-100 uppercase text-xs tracking-wider">AI Insight</span>
+      {/* Refined Header Section - Edge-to-Edge with bottom rounding only */}
+      <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-8 pb-4 sm:pb-6 lg:pb-8 px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8">
+        {/* Decorative Background Pattern */}
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+
+        <div className="relative z-10 space-y-8">
+          {/* Top Row: Avatar & Status | Notifications */}
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <img
+                  src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
+                  alt="Avatar"
+                  className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
+                />
+                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
+              </div>
+              <div className="cursor-pointer group">
+                <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
+                  <span>{member.name}</span>
+                </div>
+                <p className="font-medium text-sm tracking-wide">{member.role}</p>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Good afternoon, {member.name}!</h2>
-            {loadingRecommendations ? (
-              <p className="text-blue-100 max-w-xl">Loading personalized recommendations...</p>
-            ) : topRecommendation ? (
-              <p className="text-blue-100 max-w-xl">
-                Based on your profile and activity, we recommend{' '}
-                <strong>{topRecommendation.itemName}</strong>.
-                {topRecommendation.reasons.length > 0 && (
-                  <> {topRecommendation.reasons[0]}</>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={onOpenNotifications}
+                className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              >
+                <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+                {unreadNotifications.length > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
+                    {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+                  </span>
                 )}
-                {topRecommendation.matchScore >= 80 && (
-                  <> ({topRecommendation.matchScore}% match)</>
-                )}
-              </p>
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    await signOut();
+                    // Navigation is handled by the useEffect in App.tsx
+                    showToast('Logged out successfully', 'success');
+                  } catch (error) {
+                    showToast('Failed to logout', 'error');
+                  }
+                }}
+                className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+                title="Sign Out"
+              >
+                <LogOut size={20} className="group-hover:scale-110 transition-transform" />
+              </button>
+            </div>
+          </div>
+
+          {/* Greeting & AI Recommendation */}
+          <div className="space-y-3">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+              What would you <br /> prefer to do today?
+            </h2>
+            {topRecommendation ? (
+              <div
+                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all"
+                onClick={() => {
+                  if (topRecommendation.actionUrl) {
+                    // Convert URL path to ViewType if possible
+                    const view = topRecommendation.actionUrl.replace('/', '').toUpperCase();
+                    onNavigate?.(view);
+                  }
+                }}
+              >
+                <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+                <p className="text-sm font-medium text-blue-50">
+                  AI Suggests: <span className="underline decoration-yellow-400/50 underline-offset-4">{topRecommendation.itemName}</span>
+                </p>
+              </div>
+            ) : nudges.length > 0 ? (
+              <div
+                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all"
+                onClick={() => {
+                  if (nudges[0].actionUrl) {
+                    const view = nudges[0].actionUrl.replace('/', '').toUpperCase();
+                    onNavigate?.(view);
+                  }
+                }}
+              >
+                <Zap size={16} className="text-amber-400 animate-pulse" />
+                <p className="text-sm font-medium text-blue-50">
+                  {nudges[0].title}
+                </p>
+              </div>
             ) : (
-              <p className="text-blue-100 max-w-xl">
-                Welcome back! Check out upcoming events and projects to get involved.
-              </p>
+              <p className="text-blue-100/70 font-medium">Ready to make an impact? Check out the latest.</p>
             )}
           </div>
-          <div className="hidden md:block">
-            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
-              <p className="text-sm text-blue-100 mb-1">Current Tier</p>
-              <div className="flex items-center space-x-2">
-                <Award className="text-yellow-400" size={24} />
-                <span className="text-2xl font-bold">{member.tier}</span>
-              </div>
+
+          {/* Search Bar */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+              <Search size={20} className="text-slate-400 group-focus-within:text-jci-blue transition-colors" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search events, members, or projects..."
+              className="w-full bg-white text-slate-800 rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/20 outline-none transition-all placeholder:text-slate-400 placeholder:font-medium text-base"
+            />
+            <div className="absolute inset-y-0 right-5 flex items-center">
+              <div className="w-px h-6 bg-slate-200 mr-5" />
+              <button className="text-slate-400 hover:text-jci-blue transition-colors p-1">
+                <Zap size={20} />
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Role-Based Quick Entries */}
-      <Card title="Your Quick Entries" className="border-l-4 border-l-jci-teal">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {(
-            <Button
-              variant="outline"
-              className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => onNavigate?.('PAYMENT_REQUESTS')}
-            >
-              <FileText size={20} className="text-jci-teal" />
-              <span className="text-xs">{hasPermission('canViewFinance') ? 'Payment Requests' : 'My Applications'}</span>
-            </Button>
-          )}
-          {hasPermission('canViewFinance') && (
-            <Button
-              variant="outline"
-              className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => onNavigate?.('FINANCE')}
-            >
-              <DollarSign size={20} className="text-jci-teal" />
-              <span className="text-xs">{isActivityFinance ? 'Activity Finance' : 'Finances'}</span>
-            </Button>
-          )}
-          {(isOrganizationSecretary || isBoard || isAdmin || isDeveloper) && (
-            <Button
-              variant="outline"
-              className="flex flex-col items-center gap-2 h-auto py-4"
-              onClick={() => onNavigate?.('MEMBERS')}
-            >
-              <UserCog size={20} className="text-jci-teal" />
-              <span className="text-xs">Member Profiles</span>
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            className="flex flex-col items-center gap-2 h-auto py-4"
-            onClick={() => onNavigate?.('EVENTS')}
-          >
-            <Calendar size={20} className="text-jci-blue" />
-            <span className="text-xs">Events</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="flex flex-col items-center gap-2 h-auto py-4"
-            onClick={() => onNavigate?.('PROJECTS')}
-          >
-            <Briefcase size={20} className="text-jci-blue" />
-            <span className="text-xs">Projects</span>
-          </Button>
+      {/* Horizontal Circular Shortcuts (6x1) */}
+      <div className="flex items-center py-4 space-x-6 overflow-x-auto no-scrollbar scroll-smooth">
+        <div className="flex flex-col items-center gap-2 group cursor-pointer flex-shrink-0" onClick={() => onNavigate?.('PROJECTS')}>
+          <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600 border border-green-100 group-hover:bg-green-100 transition-colors shadow-sm">
+            <Briefcase size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">My Projects</span>
         </div>
-      </Card>
-
-      {/* Stats Grid */}
-      <StatCardsContainer>
-        <StatCard
-          title="Total Points"
-          value={(member.points || 0).toLocaleString()}
-          icon={<Award size={20} />}
-          subtext={rankPercentile > 0 ? `Top ${rankPercentile}% of members` : 'Ranking...'}
-        />
-        <StatCard
-          title="Upcoming Events"
-          value={upcomingEvents.length.toString()}
-          icon={<Calendar size={20} />}
-          subtext={`${events.filter(e => e.attendees > 0 && e.status === 'Upcoming').length} Registered`}
-        />
-        <StatCard
-          title="My Projects"
-          value={myProjects.length.toString()}
-          icon={<Briefcase size={20} />}
-          subtext={`${myProjects.filter(p => p.status === 'Active').length} Active`}
-        />
-        <StatCard
-          title="Notifications"
-          value={unreadNotifications.length.toString()}
-          icon={<Bell size={20} />}
-          subtext="Unread messages"
-        />
-      </StatCardsContainer>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer flex-shrink-0" onClick={() => onNavigate?.('MEMBERS')}>
+          <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100 group-hover:bg-purple-100 transition-colors shadow-sm">
+            <Users size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Find Mentor</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer flex-shrink-0" onClick={() => onNavigate?.('GAMIFICATION')}>
+          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 group-hover:bg-amber-100 transition-colors shadow-sm">
+            <Target size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Set Goals</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer flex-shrink-0" onClick={() => onNavigate?.('SURVEYS')}>
+          <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 group-hover:bg-rose-100 transition-colors shadow-sm">
+            <CheckSquare size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Survey</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer flex-shrink-0" onClick={() => onNavigate?.('CLUBS')}>
+          <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 border border-pink-100 group-hover:bg-pink-100 transition-colors shadow-sm">
+            <Heart size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Hobby Clubs</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer flex-shrink-0" onClick={() => onNavigate?.('KNOWLEDGE')}>
+          <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 group-hover:bg-indigo-100 transition-colors shadow-sm">
+            <BookOpen size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Knowledge</span>
+        </div>
+      </div>
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
+        <Card noPadding>
+          <div className="px-6 pt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-slate-900">Events</h3>
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+                <button
+                  onClick={() => setEventTab('upcoming')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${eventTab === 'upcoming' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Upcoming
+                </button>
+                <button
+                  onClick={() => setEventTab('past')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${eventTab === 'past' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Past
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            {eventsLoading ? (
+              <div className="text-center py-8 text-slate-400 text-sm">Loading events...</div>
+            ) : (eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length === 0 ? (
+              <div className="text-center py-8 text-slate-400 font-medium">
+                <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-sm">No {eventTab} events</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date()))
+                  .sort((a, b) => eventTab === 'upcoming' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 5)
+                  .map(event => {
+                    const isRecommended = recommendedEvents.some(re => re.id === event.id);
+                    return (
+                      <div key={event.id} className="flex items-center space-x-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors">
+                        <div className={`w-12 h-12 ${eventTab === 'upcoming' ? 'bg-blue-50 text-jci-blue' : 'bg-slate-100 text-slate-500'} rounded-lg flex flex-col items-center justify-center flex-shrink-0 shadow-sm border border-slate-100`}>
+                          <span className="text-[10px] font-bold uppercase">{new Date(event.date).toLocaleString('default', { month: 'short' })}</span>
+                          <span className="text-lg font-bold leading-none">{new Date(event.date).getDate()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-slate-900 truncate">{event.title}</h4>
+                            {isRecommended && <Badge variant="jci" className="bg-purple-100 text-purple-600 border-none px-1.5 py-0 text-[10px]">Recommended</Badge>}
+                          </div>
+                          <p className="text-xs text-slate-500">{event.type} • {event.attendees} Attending</p>
+                        </div>
+                        {event.predictedDemand === 'High' && eventTab === 'upcoming' && (
+                          <Badge variant="jci">Hot</Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                {((eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length > 5 && onNavigate) && (
+                  <Button variant="ghost" className="w-full mt-2 text-sm text-jci-blue hover:bg-blue-50" onClick={() => onNavigate('EVENTS')}>
+                    View All {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length} Events
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Achievement Progress */}
+        <Card title="Achievement Progress">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Award className="text-amber-500" size={20} />
+                <span className="text-sm font-medium">First Event</span>
+              </div>
+              <Badge variant="success">Completed</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="text-blue-500" size={20} />
+                <span className="text-sm font-medium">100 Points</span>
+              </div>
+              <span className="text-xs text-slate-500">75/100</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2">
+              <div className="bg-jci-blue h-2 rounded-full" style={{ width: '75%' }}></div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="text-green-500" size={20} />
+                <span className="text-sm font-medium">Recruit Member</span>
+              </div>
+              <span className="text-xs text-slate-500">0/1</span>
+            </div>
+          </div>
+        </Card>
+
         <div className="lg:col-span-2 space-y-6">
           {(isBoard || isAdmin || isDeveloper) && (
             <MemberGrowthChart members={members} />
@@ -382,195 +503,20 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </div>
             )}
           </Card>
-
-          {/* Personalized Recommendations */}
-          {recommendations.length > 0 && (
-            <Card title="Recommended for You" className="border-l-4 border-l-purple-500">
-              <div className="space-y-3">
-                {recommendations.slice(0, 5).map((rec, idx) => (
-                  <div
-                    key={rec.itemId}
-                    className="p-4 rounded-lg border border-slate-200 hover:border-purple-300 hover:shadow-md transition-all bg-gradient-to-r from-white to-purple-50/30"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant={rec.priority === 'High' ? 'error' : rec.priority === 'Medium' ? 'warning' : 'neutral'} className="text-xs">
-                            {rec.type === 'project' ? 'Project' :
-                              rec.type === 'event' ? 'Event' :
-                                rec.type === 'training' ? 'Training' :
-                                  rec.type === 'hobby_club' ? 'Club' : 'Opportunity'}
-                          </Badge>
-                          <span className="text-xs text-slate-500">{rec.matchScore}% match</span>
-                        </div>
-                        <h4 className="font-semibold text-slate-900 mb-1">{rec.itemName}</h4>
-                        {rec.reasons.length > 0 && (
-                          <p className="text-sm text-slate-600 mb-2">{rec.reasons[0]}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (onNavigate && rec.actionUrl) {
-                            // Extract view type from actionUrl
-                            const urlParts = rec.actionUrl.split('/');
-                            const viewType = urlParts[urlParts.length - 1].toUpperCase();
-                            onNavigate(viewType);
-                          } else if (rec.actionUrl) {
-                            window.location.href = rec.actionUrl;
-                          }
-                        }}
-                        className="flex-1"
-                      >
-                        {rec.type === 'project' ? 'View Project' :
-                          rec.type === 'event' ? 'Register' :
-                            rec.type === 'training' ? 'Start Learning' :
-                              rec.type === 'hobby_club' ? 'Join Club' : 'Learn More'}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Quick Actions */}
-          <Card title="Quick Actions">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Button
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-4"
-                onClick={() => onNavigate?.('EVENTS')}
-              >
-                <Calendar size={20} className="text-jci-blue" />
-                <span className="text-xs">Register Event</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-4"
-                onClick={() => onNavigate?.('PROJECTS')}
-              >
-                <Briefcase size={20} className="text-jci-blue" />
-                <span className="text-xs">New Project</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-4"
-                onClick={() => onNavigate?.('MEMBERS')}
-              >
-                <Users size={20} className="text-jci-blue" />
-                <span className="text-xs">Find Mentor</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="flex flex-col items-center gap-2 h-auto py-4"
-                onClick={() => onNavigate?.('GAMIFICATION')}
-              >
-                <Target size={20} className="text-jci-blue" />
-                <span className="text-xs">Set Goals</span>
-              </Button>
-            </div>
-          </Card>
         </div>
 
         <div className="space-y-6">
-          <PointsDistributionChart pointHistory={pointHistory} />
-
-          {recommendedEvents.length > 0 && (
-            <Card title="推荐活动（基于参与历史）">
-              <p className="text-xs text-slate-500 mb-2">根据您过往参与类型推荐，减少无关打扰</p>
-              {loadingRecommendedEvents ? (
-                <div className="text-center py-4 text-slate-400 text-sm">加载中…</div>
-              ) : (
-                <div className="space-y-2">
-                  {recommendedEvents.map((event) => (
-                    <div key={event.id} className="flex items-center space-x-3 pb-2 border-b border-slate-50 last:border-0 text-sm">
-                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex flex-col items-center justify-center text-jci-blue flex-shrink-0">
-                        <span className="text-xs font-bold">{new Date(event.date).getDate()}</span>
-                        <span className="text-xs">{new Date(event.date).toLocaleString('default', { month: 'short' })}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-slate-900 truncate">{event.title}</p>
-                        <p className="text-xs text-slate-500">{event.type}</p>
-                      </div>
-                      {onNavigate && (
-                        <Button variant="ghost" size="sm" onClick={() => onNavigate('EVENTS')}>查看</Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
-
-          <Card title="Upcoming Events">
-            {eventsLoading ? (
-              <div className="text-center py-8 text-slate-400 text-sm">Loading events...</div>
-            ) : upcomingEvents.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
-                <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">No upcoming events</p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-4">
-                  {upcomingEvents.slice(0, 3).map(event => (
-                    <div key={event.id} className="flex items-center space-x-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors">
-                      <div className="w-12 h-12 bg-blue-50 rounded-lg flex flex-col items-center justify-center text-jci-blue flex-shrink-0">
-                        <span className="text-xs font-bold uppercase">{new Date(event.date).toLocaleString('default', { month: 'short' })}</span>
-                        <span className="text-lg font-bold leading-none">{new Date(event.date).getDate()}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-semibold text-slate-900 truncate">{event.title}</h4>
-                        <p className="text-xs text-slate-500">{event.type} • {event.attendees} Attending</p>
-                      </div>
-                      {event.predictedDemand === 'High' && (
-                        <Badge variant="jci">Hot</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {upcomingEvents.length > 3 && (
-                  <Button variant="ghost" className="w-full mt-4 text-sm">View All {upcomingEvents.length} Events</Button>
-                )}
-              </>
-            )}
-          </Card>
-
-          {/* Achievement Progress */}
-          <Card title="Achievement Progress">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Award className="text-amber-500" size={20} />
-                  <span className="text-sm font-medium">First Event</span>
-                </div>
-                <Badge variant="success">Completed</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Target className="text-blue-500" size={20} />
-                  <span className="text-sm font-medium">100 Points</span>
-                </div>
-                <span className="text-xs text-slate-500">75/100</span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
-                <div className="bg-jci-blue h-2 rounded-full" style={{ width: '75%' }}></div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="text-green-500" size={20} />
-                  <span className="text-sm font-medium">Recruit Member</span>
-                </div>
-                <span className="text-xs text-slate-500">0/1</span>
-              </div>
+          <div className="relative" style={{ minHeight: 320, minWidth: 0 }}>
+            <div className="absolute top-4 right-6 z-10 flex flex-col items-end">
+              <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Points</span>
+              <span className="text-2xl font-bold text-jci-blue leading-none">{(member.points || 0).toLocaleString()}</span>
+              {rankPercentile > 0 && <span className="text-[10px] text-slate-400 mt-1">Top {rankPercentile}%</span>}
             </div>
-          </Card>
+            <PointsDistributionChart pointHistory={pointHistory} />
+          </div>
         </div>
       </div>
+
     </div>
   );
 };

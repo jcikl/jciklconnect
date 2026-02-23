@@ -77,18 +77,22 @@ export const PaymentRequestsView: React.FC = () => {
   useEffect(() => {
     const loadSelectData = async () => {
       try {
-        const [prjList, accounts] = await Promise.all([
-          ProjectsService.getAllProjects(),
-          FinanceService.getAllBankAccounts(),
-        ]);
+        const prjList = await ProjectsService.getAllProjects();
         setProjects(prjList);
+      } catch (err) {
+        console.error('Failed to load projects:', err);
+      }
+
+      // Load bank accounts for the "Claim From" dropdown in the form
+      try {
+        const accounts = await FinanceService.getAllBankAccounts(false);
         setBankAccounts(accounts);
       } catch (err) {
-        console.error('Failed to load select data:', err);
+        console.error('Failed to load bank accounts:', err);
       }
     };
-    loadSelectData();
-  }, []);
+    if (member) loadSelectData();
+  }, [member]);
 
   // Pre-fill applicant details
   useEffect(() => {
@@ -816,7 +820,7 @@ export const PaymentRequestsView: React.FC = () => {
                 value={formClaimFromBankAccountId}
                 onChange={(e) => setFormClaimFromBankAccountId(e.target.value)}
                 options={[
-                  { value: '', label: 'Select JCI Bank Account...' },
+                  { value: '', label: 'Select Bank Account...' },
                   ...bankAccounts.map(a => ({ value: a.id, label: a.name })),
                 ]}
                 required

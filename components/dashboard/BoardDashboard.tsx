@@ -402,45 +402,21 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
   return (
     <div className="space-y-6">
       {/* Executive Summary Header */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Executive Dashboard</h2>
-            <p className="text-slate-300">Real-time insights into LO health and performance</p>
-            <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-              <Clock size={14} />
-              <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
-              {autoRefreshEnabled && (
-                <Badge variant="success" className="text-xs ml-2">Auto-refresh enabled</Badge>
-              )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="hidden md:flex gap-4">
+            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
+              <p className="text-xs text-slate-300 mb-1">Active Members</p>
+              <p className="text-2xl font-bold">{metrics.activeMembers}</p>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex gap-4">
-              <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
-                <p className="text-xs text-slate-300 mb-1">Active Members</p>
-                <p className="text-2xl font-bold">{metrics.activeMembers}</p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
-                <p className="text-xs text-slate-300 mb-1">Active Projects</p>
-                <p className="text-2xl font-bold">{metrics.activeProjects}</p>
-              </div>
+            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
+              <p className="text-xs text-slate-300 mb-1">Active Projects</p>
+              <p className="text-2xl font-bold">{metrics.activeProjects}</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                loadFinancialData();
-                showToast('Dashboard refreshed', 'success');
-              }}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            >
-              <RefreshCw size={16} className="mr-2" />
-              Refresh
-            </Button>
           </div>
         </div>
       </div>
+
 
       <Card noPadding>
         <div className="px-6 pt-4">

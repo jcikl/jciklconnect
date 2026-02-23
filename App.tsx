@@ -1040,7 +1040,7 @@ const JCIKLApp: React.FC = () => {
 
   const { user, member, loading: authLoading, signOut, simulatedRole } = useAuth();
   const { showToast } = useToast();
-  const { isBoard, isAdmin, isDeveloper, isMember, isOrganizationSecretary, effectiveRole, hasPermission } = usePermissions();
+  const { isBoard, isAdmin, isDeveloper, isMember, isGuest, isOrganizationSecretary, effectiveRole, hasPermission } = usePermissions();
   const canViewLeads = isAdmin || isBoard || isOrganizationSecretary;
   const [leadList, setLeadList] = useState<{ id: string; name: string; email: string; phone?: string | null; interests?: string[] | null; createdAt: string }[]>([]);
   const [leadListLoading, setLeadListLoading] = useState(false);
@@ -1341,27 +1341,33 @@ const JCIKLApp: React.FC = () => {
                 onClick={() => { setView('DASHBOARD'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
-              <SidebarItem
-                icon={<Users size={18} />}
-                label={member?.role === UserRole.MEMBER || member?.role === UserRole.GUEST ? 'Profile' : 'Members'}
-                isActive={view === 'MEMBERS'}
-                onClick={() => { setView('MEMBERS'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
-              <SidebarItem
-                icon={<Calendar size={18} />}
-                label="Event List"
-                isActive={view === 'EVENTS'}
-                onClick={() => { setView('EVENTS'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
-              <SidebarItem
-                icon={<MessageSquare size={18} />}
-                label="Communication"
-                isActive={view === 'COMMUNICATION'}
-                onClick={() => { setView('COMMUNICATION'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
+              {!(isMember || isGuest) && (
+                <SidebarItem
+                  icon={<Users size={18} />}
+                  label={member?.role === UserRole.MEMBER || member?.role === UserRole.GUEST ? 'Profile' : 'Members'}
+                  isActive={view === 'MEMBERS'}
+                  onClick={() => { setView('MEMBERS'); setIsSidebarOpen(false); }}
+                  isCollapsed={isSidebarCollapsed}
+                />
+              )}
+              {!(isMember || isGuest) && (
+                <SidebarItem
+                  icon={<Calendar size={18} />}
+                  label="Event List"
+                  isActive={view === 'EVENTS'}
+                  onClick={() => { setView('EVENTS'); setIsSidebarOpen(false); }}
+                  isCollapsed={isSidebarCollapsed}
+                />
+              )}
+              {!(isMember || isGuest) && (
+                <SidebarItem
+                  icon={<MessageSquare size={18} />}
+                  label="Communication"
+                  isActive={view === 'COMMUNICATION'}
+                  onClick={() => { setView('COMMUNICATION'); setIsSidebarOpen(false); }}
+                  isCollapsed={isSidebarCollapsed}
+                />
+              )}
               <SidebarItem
                 icon={<Building2 size={18} />}
                 label="Directory"
@@ -1397,13 +1403,15 @@ const JCIKLApp: React.FC = () => {
                 <div className="pt-4 mt-4 border-t border-slate-100">
                   <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Workspace</p>
 
-                  <SidebarItem
-                    icon={<FolderKanban size={18} />}
-                    label="Events Management"
-                    isActive={view === 'PROJECTS'}
-                    onClick={() => { setView('PROJECTS'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
+                  {!(isMember || isGuest) && (
+                    <SidebarItem
+                      icon={<FolderKanban size={18} />}
+                      label="Events Management"
+                      isActive={view === 'PROJECTS'}
+                      onClick={() => { setView('PROJECTS'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
+                  )}
                   <SidebarItem
                     icon={<CheckSquare size={18} />}
                     label="Surveys"
@@ -1411,13 +1419,15 @@ const JCIKLApp: React.FC = () => {
                     onClick={() => { setView('SURVEYS'); setIsSidebarOpen(false); }}
                     isCollapsed={isSidebarCollapsed}
                   />
-                  <SidebarItem
-                    icon={<FileText size={18} />}
-                    label="Payment Requests"
-                    isActive={view === 'PAYMENT_REQUESTS'}
-                    onClick={() => { setView('PAYMENT_REQUESTS'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
+                  {!(isMember || isGuest) && (
+                    <SidebarItem
+                      icon={<FileText size={18} />}
+                      label="Payment Requests"
+                      isActive={view === 'PAYMENT_REQUESTS'}
+                      onClick={() => { setView('PAYMENT_REQUESTS'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
+                  )}
                   {hasPermission('canViewFinance') && (
                     <>
                       <SidebarItem
@@ -1436,13 +1446,15 @@ const JCIKLApp: React.FC = () => {
                       />
                     </>
                   )}
-                  <SidebarItem
-                    icon={<Award size={18} />}
-                    label="Gamification"
-                    isActive={view === 'GAMIFICATION'}
-                    onClick={() => { setView('GAMIFICATION'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
+                  {!(isMember || isGuest) && (
+                    <SidebarItem
+                      icon={<Award size={18} />}
+                      label="Gamification"
+                      isActive={view === 'GAMIFICATION'}
+                      onClick={() => { setView('GAMIFICATION'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
+                  )}
                 </div>
               )}
               {member?.role !== UserRole.GUEST && !isMember && (
@@ -1539,69 +1551,71 @@ const JCIKLApp: React.FC = () => {
           <h1 className="sr-only">
             {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Advertisements' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>
-          {/* Topbar */}
-          <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm flex-shrink-0">
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100"
-              aria-label="Open menu"
-            >
-              <Menu size={24} aria-hidden />
-            </button>
-
-            {/* Search */}
-            <div className="hidden md:flex items-center relative max-w-md w-full ml-4">
-              <Search className="absolute left-3 text-slate-400" size={18} />
-              <input
-                type="text"
-                placeholder="Search members, projects, or docs..."
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent rounded-lg focus:bg-white focus:ring-2 focus:ring-jci-blue focus:border-transparent outline-none transition-all text-sm"
-                aria-label="Search members, projects, or docs"
-              />
-            </div>
-
-            {/* Right Actions */}
-            <div className="flex items-center space-x-3 sm:space-x-4">
+          {/* Topbar - Hidden for Members/Guests as requested */}
+          {!(isMember || isGuest) && (
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-30 shadow-sm flex-shrink-0">
               <button
-                onClick={() => setNotificationDrawerOpen(true)}
-                className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
-                aria-label={unreadNotifications.length > 0 ? `Notifications, ${unreadNotifications.length} unread` : 'Notifications'}
+                onClick={() => setIsSidebarOpen(true)}
+                className="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                aria-label="Open menu"
               >
-                <Bell size={20} />
-                {unreadNotifications.length > 0 && (
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                )}
+                <Menu size={24} aria-hidden />
               </button>
-              <div
-                className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-sky-50 text-jci-blue rounded-full text-sm font-medium cursor-pointer hover:bg-sky-100 transition-colors"
-                onClick={() => setView('GAMIFICATION')}
-              >
-                <Award size={16} />
-                <span>{member?.points || 0} Pts</span>
+
+              {/* Search */}
+              <div className="hidden md:flex items-center relative max-w-md w-full ml-4">
+                <Search className="absolute left-3 text-slate-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search members, projects, or docs..."
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent rounded-lg focus:bg-white focus:ring-2 focus:ring-jci-blue focus:border-transparent outline-none transition-all text-sm"
+                  aria-label="Search members, projects, or docs"
+                />
               </div>
 
-              {/* User Snippet */}
-              {member && (
-                <div className="flex items-center space-x-2 pl-3 border-l border-slate-200">
-                  <img
-                    src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0097D7&color=fff`}
-                    alt="User"
-                    className="w-8 h-8 rounded-full border-2 border-slate-200 shadow-sm"
-                  />
-                  <div className="hidden lg:block min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {simulatedRole ? `Simulating: ${simulatedRole}` : member.role}
-                      {isDeveloper && !simulatedRole && ' (Developer)'}
-                    </p>
-                  </div>
+              {/* Right Actions */}
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <button
+                  onClick={() => setNotificationDrawerOpen(true)}
+                  className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                  aria-label={unreadNotifications.length > 0 ? `Notifications, ${unreadNotifications.length} unread` : 'Notifications'}
+                >
+                  <Bell size={20} />
+                  {unreadNotifications.length > 0 && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                  )}
+                </button>
+                <div
+                  className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-sky-50 text-jci-blue rounded-full text-sm font-medium cursor-pointer hover:bg-sky-100 transition-colors"
+                  onClick={() => setView('GAMIFICATION')}
+                >
+                  <Award size={16} />
+                  <span>{member?.points || 0} Pts</span>
                 </div>
-              )}
-            </div>
-          </header>
+
+                {/* User Snippet */}
+                {member && (
+                  <div className="flex items-center space-x-2 pl-3 border-l border-slate-200">
+                    <img
+                      src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0097D7&color=fff`}
+                      alt="User"
+                      className="w-8 h-8 rounded-full border-2 border-slate-200 shadow-sm"
+                    />
+                    <div className="hidden lg:block min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {simulatedRole ? `Simulating: ${simulatedRole}` : member.role}
+                        {isDeveloper && !simulatedRole && ' (Developer)'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </header>
+          )}
 
           {/* Scrollable Area */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-32 md:pb-8">
             <div className="max-w-7xl mx-auto">
               <RoleSimulator />
               {renderCurrentView()}
@@ -1731,6 +1745,48 @@ const JCIKLApp: React.FC = () => {
             </section>
           </div>
         </Modal>
+
+        {/* Floating Bottom Navigation Bar (Mobile) */}
+        {(isMember || isGuest) && (
+          <div className="md:hidden fixed bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md rounded-[40px] shadow-2xl border border-slate-200/50 flex items-center justify-around h-20 px-4 z-50">
+            <button
+              onClick={() => setView('DASHBOARD')}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : ''}`}>
+                <LayoutDashboard size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
+            </button>
+            <button
+              onClick={() => setView('PAYMENT_REQUESTS')}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'PAYMENT_REQUESTS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : ''}`}>
+                <FileText size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}>Claim</span>
+            </button>
+            <button
+              onClick={() => setView('DIRECTORY')}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : ''}`}>
+                <Building2 size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
+            </button>
+            <button
+              onClick={() => setView('BENEFITS')}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : ''}`}>
+                <Gift size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
+            </button>
+          </div>
+        )}
       </div>
     </HelpModalProvider>
   );

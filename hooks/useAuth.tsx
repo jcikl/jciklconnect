@@ -18,6 +18,7 @@ import { Member, UserRole, MemberTier } from '../types';
 import { MOCK_DEV_ADMIN } from '../services/mockData';
 import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
 import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored } from '../utils/authStorage';
+import { MembersService } from '../services/membersService';
 
 interface AuthContextType {
   user: User | null;
@@ -113,12 +114,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (firebaseUser && !checkDevMode()) {
           // Load member data from Firestore — must exist or user is not allowed to stay logged in
           try {
+            // 1. Try UID lookup first
             const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid));
-            if (memberDoc.exists() && isMounted && !checkDevMode()) {
-              const memberData = { id: firebaseUser.uid, ...memberDoc.data() } as Member;
+            let memberData: Member | null = null;
+
+            if (memberDoc.exists()) {
+              memberData = { id: firebaseUser.uid, ...memberDoc.data() } as Member;
+            } else if (firebaseUser.email) {
+              // 2. Try Email lookup if UID failed (for newly linked accounts or imported members)
+              const existingProfile = await MembersService.getMemberByEmail(firebaseUser.email);
+
+              if (existingProfile) {
+                // Link the profile to the new UID
+                const { id: oldId, ...data } = existingProfile;
+                const newMemberData = { ...data, updatedAt: new Date().toISOString() };
+
+                // Copy to new ID (UID)
+                await setDoc(doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid), newMemberData);
+
+                // If the old record had a different ID (imported ID), clean it up
+                if (oldId !== firebaseUser.uid) {
+                  try {
+                    const { deleteDoc } = await import('firebase/firestore');
+                    await deleteDoc(doc(db, COLLECTIONS.MEMBERS, oldId));
+                  } catch (err) {
+                    console.error('Failed to cleanup old profile:', err);
+                  }
+                }
+
+                memberData = { id: firebaseUser.uid, ...newMemberData } as Member;
+              }
+            }
+
+            if (memberData && isMounted && !checkDevMode()) {
               setMember(memberData);
-            } else if (!memberDoc.exists() && isMounted && !checkDevMode()) {
-              // No member record for this account — sign out so they cannot use the app
+            } else if (!memberData && isMounted && !checkDevMode()) {
+              // Still no member record for this account — sign out so they cannot use the app
               await firebaseSignOut(auth);
               setUser(null);
               setMember(null);
@@ -199,11 +230,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Regular Firebase authentication
     const userCred = await signInWithEmailAndPassword(auth, email, password);
-    // Require member document to exist — otherwise disallow login
+
+    // Check if member exists by UID or email
     const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, userCred.user.uid));
     if (!memberDoc.exists()) {
-      await firebaseSignOut(auth);
-      throw new Error('此帳號在會員名單中不存在，無法登入。請聯絡管理員。');
+      const existingProfile = await MembersService.getMemberByEmail(email);
+      if (!existingProfile) {
+        await firebaseSignOut(auth);
+        throw new Error('此帳號在會員名單中不存在，無法登入。請聯絡管理員。');
+      }
+      // Note: Linking is handled by onAuthStateChanged listener
     }
   };
 
@@ -331,12 +367,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     const userCredential = await signInWithPopup(auth, provider);
+    const email = userCredential.user.email;
 
-    // Require member document to exist — no auto-create; must be in member list to log in
+    if (!email) {
+      await firebaseSignOut(auth);
+      throw new Error('無法获取 Google 帳號的电邮地址。');
+    }
+
+    // Require member document to exist (by UID or Email) — no auto-create; must be in member list to log in
     const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, userCredential.user.uid));
     if (!memberDoc.exists()) {
-      await firebaseSignOut(auth);
-      throw new Error('此帳號在會員名單中不存在，無法登入。請聯絡管理員。');
+      const existingProfile = await MembersService.getMemberByEmail(email);
+      if (!existingProfile) {
+        await firebaseSignOut(auth);
+        throw new Error('此帳號在會員名單中不存在，無法登入。請聯絡管理员。');
+      }
+      // Note: Linking to UID is handled automatically by the onAuthStateChanged listener above
     }
   };
 
