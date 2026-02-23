@@ -541,10 +541,6 @@ export const PaymentRequestsView: React.FC = () => {
         </Card>
       )}
 
-      <FirstUseBanner flowId="payment-requests-v2" dismissLabel="Understood" onHelpClick={helpModal?.openHelp}>
-        Use this tool to submit reimbursement requests. You can now add multiple items per request, select projects, and download a PDF copy for your records. Reference numbers are mandatory for accounting reconciliation.
-      </FirstUseBanner>
-
       <Card>
         <div className="p-1">
           <Tabs

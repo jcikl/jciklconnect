@@ -204,26 +204,14 @@ export const StatCard: React.FC<{
         {icon}
       </div>
     </div>
-    {trend !== undefined && (
-      <div className="mt-2 md:mt-4 flex items-center text-sm min-w-0">
-        <span className={`${trend >= 0 ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50"} font-medium px-1.5 md:px-2 py-0.5 rounded-full text-xs flex-shrink-0`}>
-          {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
-        </span>
-        <span className="text-slate-400 ml-1 md:ml-2 text-xs truncate">vs last month</span>
-      </div>
-    )}
+
   </Card>
 );
 
 export const StatCardsContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`
-    flex overflow-x-auto pb-4 gap-4 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:pb-0
-    snap-x snap-mandatory scrollbar-hide
-    -mx-4 px-4 md:mx-0 md:px-0
-    ${className}
-  `}>
+  <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-6 ${className}`}>
     {React.Children.map(children, (child) => (
-      <div className="flex-shrink-0 w-[80%] md:w-auto snap-start">
+      <div className="w-full">
         {child}
       </div>
     ))}

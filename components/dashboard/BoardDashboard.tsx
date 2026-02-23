@@ -462,8 +462,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
         <div className="p-6">
           {activeTab === 'overview' && (
             <>
-              {/* Key Metrics Grid: 同排显示，总宽度控制在卡片内 */}
-              <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-6 mb-6">
+              {/* Member Metrics Row */}
+              <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
                 <div className="min-w-0">
                   <StatCard
                     title="Total Members"
@@ -481,6 +481,10 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                     subtext={`${Math.round((metrics.activeMembers / Math.max(metrics.totalMembers, 1)) * 100)}% engagement`}
                   />
                 </div>
+              </div>
+
+              {/* Activity Metrics Row */}
+              <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
                 <div className="min-w-0">
                   <StatCard
                     title="Upcoming Events"
@@ -506,7 +510,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                 </Card>
               ) : financialSummary ? (
                 <Card title="Financial Overview">
-                  <div className="grid grid-cols-3 gap-2 md:gap-6">
+                  <div className="grid grid-cols-2 gap-4 md:gap-6 mb-4">
                     <div className="min-w-0 bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
                       <div className="flex items-center justify-between mb-1 md:mb-2">
                         <span className="text-xs md:text-sm font-medium text-green-700 truncate">Total Income</span>
@@ -525,15 +529,15 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                         {formatCurrency(financialSummary.totalExpenses || 0)}
                       </p>
                     </div>
-                    <div className="min-w-0 bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between mb-1 md:mb-2">
-                        <span className="text-xs md:text-sm font-medium text-blue-700 truncate">Net Balance</span>
-                        <TrendingUp size={18} className="text-blue-600 flex-shrink-0 md:w-5 md:h-5" />
-                      </div>
-                      <p className="text-lg md:text-2xl font-bold text-blue-900 truncate">
-                        {formatCurrency((financialSummary.totalIncome || 0) - (financialSummary.totalExpenses || 0))}
-                      </p>
+                  </div>
+                  <div className="min-w-0 bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-1 md:mb-2">
+                      <span className="text-xs md:text-sm font-medium text-blue-700 truncate">Net Balance</span>
+                      <TrendingUp size={18} className="text-blue-600 flex-shrink-0 md:w-5 md:h-5" />
                     </div>
+                    <p className="text-lg md:text-2xl font-bold text-blue-900 truncate">
+                      {formatCurrency((financialSummary.totalIncome || 0) - (financialSummary.totalExpenses || 0))}
+                    </p>
                   </div>
                 </Card>
               ) : null}
@@ -574,7 +578,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                         </div>
                       </div>
 
-                      <div className="border-l border-slate-100 pl-6">
+                      <div>
                         <div className="flex items-center justify-between mb-4">
                           <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                             <Cake size={16} className="text-pink-500" />
@@ -686,7 +690,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                           </div>
                         </div>
                         <div className="space-y-2">
-                          {bankAccounts.slice(0, 3).map(account => (
+                          {bankAccounts.map(account => (
                             <div key={account.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
                               <div>
                                 <p className="text-sm font-medium text-slate-900">{account.name}</p>
