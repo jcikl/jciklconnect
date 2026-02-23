@@ -54,17 +54,6 @@ export const BusinessDirectoryView: React.FC = () => {
       </div>
 
       {/* Education/Instruction Card */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <Building2 className="text-blue-600 mt-1" size={20} />
-        <div>
-          <h4 className="font-semibold text-blue-900">List Your Business</h4>
-          <p className="text-sm text-blue-800 mt-1">
-            To list your business in the directory, simply update your "Professional & Business" information in your Member Profile.
-            Once you add a Company Name, your business will automatically appear here.
-          </p>
-        </div>
-      </div>
-
       <Card noPadding>
         <div className="px-4 md:px-6 pt-4 pb-2">
           <Tabs
