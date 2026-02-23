@@ -798,9 +798,31 @@ export interface BankAccount {
 /** 付款申请状态（Story 2.1） */
 export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'cancelled';
 
+export interface PaymentRequestItem {
+  purpose: string;
+  amount: number;
+  attachment?: string | null; // URL or name
+}
+
 export interface PaymentRequest {
   id: string;
   applicantId: string;
+  applicantName?: string | null;
+  applicantEmail?: string | null;
+  applicantPosition?: string | null;
+  date: string;
+  time: string;
+  category: 'administrative' | 'projects_activities';
+  activityId?: string | null;
+  totalAmount: number;
+  remark?: string | null;
+  items: PaymentRequestItem[];
+  claimFromBankAccountId?: string | null;
+  bankName?: string | null;
+  accountHolder?: string | null;
+  accountNumber?: string | null;
+
+  // Legacy/Compatibility fields
   amount: number;
   purpose: string;
   /** 活动 ID 或活动名称等关联；活动财政仅见本活动 */
@@ -813,8 +835,6 @@ export interface PaymentRequest {
   updatedBy?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
-  /** 可选：带出的申请人姓名等，便于列表展示 */
-  applicantName?: string | null;
 }
 
 export interface ReconciliationRecord {

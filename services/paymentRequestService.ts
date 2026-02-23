@@ -74,9 +74,23 @@ export class PaymentRequestService {
       const newPr: PaymentRequest = {
         id,
         applicantId: data.applicantId,
+        applicantName: data.applicantName ?? null,
+        applicantEmail: data.applicantEmail ?? null,
+        applicantPosition: data.applicantPosition ?? null,
+        date: data.date ?? now.split('T')[0],
+        time: data.time ?? now.split('T')[1].split('.')[0],
+        category: data.category ?? 'administrative',
+        activityId: data.activityId ?? null,
+        totalAmount: data.totalAmount ?? data.amount,
+        remark: data.remark ?? null,
+        items: data.items ?? [],
+        claimFromBankAccountId: data.claimFromBankAccountId ?? null,
+        bankName: data.bankName ?? null,
+        accountHolder: data.accountHolder ?? null,
+        accountNumber: data.accountNumber ?? null,
         amount: data.amount,
         purpose: data.purpose ?? '',
-        activityRef: data.activityRef ?? null,
+        activityRef: data.activityRef ?? data.activityId ?? null,
         referenceNumber,
         status: data.status ?? 'submitted',
         loId,
@@ -85,7 +99,6 @@ export class PaymentRequestService {
         updatedBy: createdBy ?? null,
         reviewedBy: null,
         reviewedAt: null,
-        applicantName: data.applicantName ?? null,
       };
       devPaymentRequests = [newPr, ...devPaymentRequests];
       return { id, referenceNumber };
@@ -93,9 +106,23 @@ export class PaymentRequestService {
     const now = Timestamp.now();
     const payload = removeUndefined({
       applicantId: data.applicantId,
+      applicantName: data.applicantName ?? null,
+      applicantEmail: data.applicantEmail ?? null,
+      applicantPosition: data.applicantPosition ?? null,
+      date: data.date ?? null,
+      time: data.time ?? null,
+      category: data.category ?? 'administrative',
+      activityId: data.activityId ?? null,
+      totalAmount: data.totalAmount ?? data.amount,
+      remark: data.remark ?? null,
+      items: data.items ?? [],
+      claimFromBankAccountId: data.claimFromBankAccountId ?? null,
+      bankName: data.bankName ?? null,
+      accountHolder: data.accountHolder ?? null,
+      accountNumber: data.accountNumber ?? null,
       amount: data.amount,
       purpose: data.purpose ?? null,
-      activityRef: data.activityRef ?? null,
+      activityRef: data.activityRef ?? data.activityId ?? null,
       referenceNumber,
       status: data.status ?? 'submitted',
       loId,
@@ -104,7 +131,6 @@ export class PaymentRequestService {
       updatedBy: createdBy ?? null,
       reviewedBy: null,
       reviewedAt: null,
-      applicantName: data.applicantName ?? null,
     });
     const ref = await addDoc(collection(db, COLLECTIONS.PAYMENT_REQUESTS), payload);
     return { id: ref.id, referenceNumber };

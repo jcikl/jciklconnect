@@ -1,6 +1,6 @@
-// Payment Requests – submit, my applications, finance list and review (Story 2.2–2.5)
+// Payment Requests – submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, RefreshCw, CheckCircle, XCircle, Search, X } from 'lucide-react';
+import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Trash2, Eye } from 'lucide-react';
 import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { MemberSelector } from '../ui/MemberSelector';
@@ -8,13 +8,15 @@ import { FirstUseBanner } from '../ui/FirstUseBanner';
 import { useHelpModal } from '../../contexts/HelpModalContext';
 import { LoadingState } from '../ui/Loading';
 import { PaymentRequestService } from '../../services/paymentRequestService';
-import { PaymentRequest, PaymentRequestStatus } from '../../types';
+import { FinanceService } from '../../services/financeService';
+import { ProjectsService } from '../../services/projectsService';
+import { PaymentRequest, PaymentRequestStatus, PaymentRequestItem, BankAccount, Project } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useMembers } from '../../hooks/useMembers';
 import { DEFAULT_LO_ID } from '../../config/constants';
-import type { Member } from '../../types';
 import { formatCurrency } from '../../utils/formatUtils';
+import { jsPDF } from 'jspdf';
 
 const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
   draft: 'Draft',
@@ -29,28 +31,6 @@ function StatusBadge({ status }: { status: PaymentRequestStatus }) {
   return <Badge variant={variant}>{STATUS_LABEL[status]}</Badge>;
 }
 
-const DEDUP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h
-function duplicateHintSet(items: PaymentRequest[]): Set<string> {
-  const key = (pr: PaymentRequest) => `${pr.activityRef ?? ''}|${pr.amount}|${pr.applicantId}`;
-  const byKey = new Map<string, PaymentRequest[]>();
-  for (const pr of items) {
-    const k = key(pr);
-    if (!byKey.has(k)) byKey.set(k, []);
-    byKey.get(k)!.push(pr);
-  }
-  const ids = new Set<string>();
-  for (const arr of byKey.values()) {
-    if (arr.length < 2) continue;
-    const sorted = [...arr].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    for (let i = 0; i < sorted.length; i++) {
-      const t = new Date(sorted[i].createdAt).getTime();
-      const inWindow = sorted.filter((p) => Math.abs(new Date(p.createdAt).getTime() - t) <= DEDUP_WINDOW_MS);
-      if (inWindow.length >= 2) inWindow.forEach((p) => ids.add(p.id));
-    }
-  }
-  return ids;
-}
-
 export const PaymentRequestsView: React.FC = () => {
   const { showToast } = useToast();
   const helpModal = useHelpModal();
@@ -63,10 +43,25 @@ export const PaymentRequestsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [formPurpose, setFormPurpose] = useState('');
-  const [formAmount, setFormAmount] = useState('');
-  const [formActivityRef, setFormActivityRef] = useState('');
-  const [formApplicantId, setFormApplicantId] = useState<string>(''); // '' = self
+
+  // Form States
+  const [formApplicantId, setFormApplicantId] = useState<string>('');
+  const [formApplicantName, setFormApplicantName] = useState('');
+  const [formApplicantEmail, setFormApplicantEmail] = useState('');
+  const [formApplicantPosition, setFormApplicantPosition] = useState('');
+  const [formCategory, setFormCategory] = useState<'administrative' | 'projects_activities'>('administrative');
+  const [formActivityId, setFormActivityId] = useState('');
+  const [formRemark, setFormRemark] = useState('');
+  const [formItems, setFormItems] = useState<PaymentRequestItem[]>([{ purpose: '', amount: 0 }]);
+  const [formClaimFromBankAccountId, setFormClaimFromBankAccountId] = useState('');
+  const [formBankName, setFormBankName] = useState('');
+  const [formAccountHolder, setFormAccountHolder] = useState('');
+  const [formAccountNumber, setFormAccountNumber] = useState('');
+
+  // Data for Selects
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [searchRef, setSearchRef] = useState('');
@@ -77,7 +72,32 @@ export const PaymentRequestsView: React.FC = () => {
   const activityRefFilter = isActivityFinance ? (member as { activityFinanceActivityId?: string | null })?.activityFinanceActivityId ?? null : null;
 
   const { members: memberOptions } = useMembers(loId);
-  const selectedMember = formApplicantId ? memberOptions.find((m) => m.id === formApplicantId) : null;
+
+  // Load Initial Data
+  useEffect(() => {
+    const loadSelectData = async () => {
+      try {
+        const [prjList, accounts] = await Promise.all([
+          ProjectsService.getAllProjects(),
+          FinanceService.getAllBankAccounts(),
+        ]);
+        setProjects(prjList);
+        setBankAccounts(accounts);
+      } catch (err) {
+        console.error('Failed to load select data:', err);
+      }
+    };
+    loadSelectData();
+  }, []);
+
+  // Pre-fill applicant details
+  useEffect(() => {
+    if (submitModalOpen && (user || member)) {
+      setFormApplicantName(member?.name || user?.displayName || '');
+      setFormApplicantEmail(user?.email || '');
+      // Try to find current position if any
+    }
+  }, [submitModalOpen, user, member]);
 
   const loadMyList = useCallback(async () => {
     if (!user?.uid) return;
@@ -119,8 +139,6 @@ export const PaymentRequestsView: React.FC = () => {
     if (activeTab === 'all' && canViewFinance) loadFinanceList();
   }, [activeTab, canViewFinance, loadFinanceList]);
 
-  const dedupIds = useMemo(() => duplicateHintSet(financeList), [financeList]);
-
   const handleApproveReject = async (id: string, status: 'approved' | 'rejected') => {
     if (!user?.uid) return;
     setActioningId(id);
@@ -154,40 +172,319 @@ export const PaymentRequestsView: React.FC = () => {
     }
   };
 
+  const addItem = () => {
+    setFormItems([...formItems, { purpose: '', amount: 0 }]);
+  };
+
+  const removeItem = (index: number) => {
+    if (formItems.length > 1) {
+      setFormItems(formItems.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateItem = (index: number, updates: Partial<PaymentRequestItem>) => {
+    const newItems = [...formItems];
+    newItems[index] = { ...newItems[index], ...updates };
+    setFormItems(newItems);
+  };
+
+  const totalAmount = formItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+  const handlePreviewPDF = (pr: PaymentRequest) => {
+    const doc = new jsPDF();
+    const primaryColor = [0, 151, 215]; // JCI Blue
+    const secondaryColor = [243, 156, 18]; // Gold
+    const lightGray = [248, 250, 252];
+    const borderGray = [226, 232, 240];
+    const textMain = [30, 41, 59];
+    const textSecondary = [100, 116, 139];
+
+    // --- 1. MODERN HEADER ---
+    const jciBlue = [0, 151, 215]; // #0097D7
+    const jciGold = [237, 189, 39]; // #EDBD27
+
+    // Title / Logo Area
+    doc.setTextColor(jciBlue[0], jciBlue[1], jciBlue[2]);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("JCI", 15, 20);
+
+    doc.setTextColor(jciGold[0], jciGold[1], jciGold[2]);
+    doc.setFontSize(14);
+    doc.text("Kuala Lumpur (Malaysia)", 24, 20);
+
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text("Established since 1954", 83, 20);
+
+    // Organization Details
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFontSize(8);
+    doc.text("25-3-2, Jalan 3/50, Off, Jln Gombak, Diamond Square, 53000 Kuala Lumpur", 15, 24);
+    doc.text("Patron: JCI Senator Dato’ Seri Dr Derek Goh BBM(L)", 15, 27);
+
+    doc.setTextColor(jciBlue[0], jciBlue[1], jciBlue[2]);
+    doc.text("www.jcikl.cc", 15, 30, { link: { url: "https://www.jcikl.cc" } });
+    doc.text("\u2022", 34, 30);
+    doc.text("www.jcimalaysia.cc", 37, 30, { link: { url: "https://www.jcimalaysia.cc" } });
+    doc.text("\u2022", 64, 30);
+    doc.text("www.jci.cc", 67, 30, { link: { url: "https://www.jci.cc" } });
+
+    // Title on the right
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("PAYMENT REQUEST", 195, 20, { align: "right" });
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`REF: ${pr.referenceNumber}`, 195, 26, { align: "right" });
+
+    let y = 50;
+
+    // --- 2. SUMMARY INFO (Applicant & Meta) ---
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("APPLICANT DETAILS", 15, y);
+    y += 4;
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.5);
+    doc.line(15, y, 30, y);
+    y += 8;
+
+    // Two-column layout for details
+    doc.setFontSize(9);
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFont("helvetica", "normal");
+
+    // Left Col
+    doc.text("Name", 15, y);
+    doc.text("Position", 15, y + 5);
+
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text(pr.applicantName || 'N/A', 40, y);
+    doc.text(pr.applicantPosition || 'N/A', 40, y + 5);
+
+    // Right Col
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFont("helvetica", "normal");
+    doc.text("Date", 120, y);
+    doc.text("Category", 120, y + 5);
+    doc.text("Project", 120, y + 10);
+
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text(pr.date || 'N/A', 145, y);
+    doc.text(pr.category === 'administrative' ? 'Administrative' : 'Projects & Activities', 145, y + 5);
+    const prjName = pr.category === 'administrative' ? pr.activityId : (projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || 'N/A');
+    const splitPrj = doc.splitTextToSize(String(prjName), 45);
+    doc.text(splitPrj, 145, y + 10);
+
+    y += 20;
+
+    // --- 3. ITEMS TABLE ---
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("CLAIM BREAKDOWN", 15, y);
+    y += 4;
+    doc.line(15, y, 30, y);
+    y += 8;
+
+    // Table Header
+    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.rect(15, y, 180, 10, 'F');
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("No.", 20, y + 6);
+    doc.text("Description / Purpose", 35, y + 6);
+    doc.text("Amount (RM)", 190, y + 6, { align: "right" });
+    y += 10;
+
+    // Table Body
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    (pr.items || []).forEach((item, idx) => {
+      // Row Background (zebra)
+      if (idx % 2 === 1) {
+        doc.setFillColor(252, 253, 254);
+        doc.rect(15, y, 180, 10, 'F');
+      }
+      doc.text(String(idx + 1), 20, y + 6);
+      doc.text(item.purpose, 35, y + 6);
+      doc.text(Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }), 190, y + 6, { align: "right" });
+
+      // Bottom border for each row
+      doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+      doc.setLineWidth(0.1);
+      doc.line(15, y + 10, 195, y + 10);
+
+      y += 10;
+      if (y > 250) { doc.addPage(); y = 20; }
+    });
+
+    // Total Section
+    y += 5;
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(130, y, 65, 12, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL", 135, y + 7.5);
+    doc.text(formatCurrency(pr.totalAmount || pr.amount), 190, y + 7.5, { align: "right" });
+
+    y += 25;
+
+    // --- 4. REMARKS ---
+    if (pr.remark) {
+      doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("REMARKS", 15, y);
+      y += 4;
+      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setLineWidth(0.5);
+      doc.line(15, y, 30, y);
+      y += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+      const lines = doc.splitTextToSize(pr.remark, 175);
+      doc.text(lines, 15, y);
+      y += lines.length * 4 + 10; // Adjust y after remarks
+    }
+
+    // --- 5. REMIT TO / BANKING ---
+    if (y > 230) { doc.addPage(); y = 20; }
+
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("PAYMENT METHOD", 15, y);
+    y += 4;
+    doc.line(15, y, 30, y);
+    y += 8;
+
+    // Banking Box
+    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.rect(15, y, 180, 38, 'F');
+    doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+    doc.rect(15, y, 180, 38, 'S');
+
+    const labelX = 20;
+    const valueX = 55;
+    const splitX = 105;
+
+    doc.setFontSize(9);
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFont("helvetica", "normal");
+
+    // Row 1: Claim From (Horizontal)
+    doc.text("Claim From", labelX, y + 8);
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFont("helvetica", "bold");
+    const bankAcc = bankAccounts.find(a => a.id === pr.claimFromBankAccountId);
+    doc.text(bankAcc?.name || 'N/A', valueX, y + 8);
+
+    // Row 2: Bank (Horizontal)
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFont("helvetica", "normal");
+    doc.text("Recipient Bank", labelX, y + 16);
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text(pr.bankName || 'N/A', valueX, y + 16);
+
+    // Row 3: Holder & Number (Vertical Stack)
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.setFont("helvetica", "normal");
+    doc.text("Account Holder", labelX, y + 25);
+    doc.text("Account Number", splitX, y + 25);
+
+    doc.setTextColor(textMain[0], textMain[1], textMain[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text(pr.accountHolder || 'N/A', labelX, y + 31);
+    doc.text(pr.accountNumber || 'N/A', splitX, y + 31);
+
+    y += 48;
+
+    // --- FOOTER ---
+    doc.setFontSize(7);
+    doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
+    doc.text(`Generated by JCI Connect Digital Finance on ${new Date().toLocaleString()}`, 105, 285, { align: "center" });
+    doc.text("This is a computer-generated document and no signature is required.", 105, 289, { align: "center" });
+
+    const blobUrl = doc.output('bloburl');
+    window.open(blobUrl, '_blank');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const purpose = formPurpose.trim();
-    const amount = parseFloat(formAmount);
-    if (!purpose || Number.isNaN(amount) || amount <= 0) {
-      showToast('Please enter purpose and a valid amount', 'error');
+
+    if (formItems.some(item => !item.purpose || item.amount <= 0)) {
+      showToast('Please fill all item descriptions and amounts', 'error');
       return;
     }
+
+    if (formCategory === 'projects_activities' && !formActivityId) {
+      showToast('Please select a project/activity', 'error');
+      return;
+    }
+
     if (!user?.uid || !member) {
       showToast('Please log in first', 'error');
       return;
     }
+
     setSubmitting(true);
     try {
+      const now = new Date();
       const applicantId = formApplicantId || user.uid;
-      const applicantName = selectedMember?.name ?? member?.name ?? null;
-      const { id, referenceNumber } = await PaymentRequestService.create(
-        {
-          applicantId,
-          amount,
-          purpose,
-          activityRef: formActivityRef.trim() || null,
-          status: 'submitted',
-          loId,
-          applicantName,
-        },
-        user.uid
-      );
+
+      const payload: Omit<PaymentRequest, 'id' | 'createdAt' | 'updatedAt' | 'referenceNumber'> = {
+        applicantId,
+        applicantName: formApplicantName,
+        applicantEmail: formApplicantEmail,
+        applicantPosition: formApplicantPosition,
+        date: now.toISOString().split('T')[0],
+        time: now.toTimeString().split(' ')[0],
+        category: formCategory,
+        activityId: formActivityId || null,
+        totalAmount: totalAmount,
+        remark: formRemark,
+        items: formItems,
+        claimFromBankAccountId: formClaimFromBankAccountId || null,
+        bankName: formBankName,
+        accountHolder: formAccountHolder,
+        accountNumber: formAccountNumber,
+        // Legacy
+        amount: totalAmount,
+        purpose: formItems[0].purpose,
+        activityRef: formActivityId || null,
+        status: 'submitted',
+        loId,
+      };
+
+      const { referenceNumber } = await PaymentRequestService.create(payload, user.uid);
+
       setSuccessRef(referenceNumber);
       setSubmitModalOpen(false);
-      setFormPurpose('');
-      setFormAmount('');
-      setFormActivityRef('');
-      setFormApplicantId('');
+
+      // Reset form
+      setFormItems([{ purpose: '', amount: 0 }]);
+      setFormRemark('');
+      setFormActivityId('');
+      setFormApplicantPosition('');
+      setFormBankName('');
+      setFormAccountHolder('');
+      setFormAccountNumber('');
+      setFormClaimFromBankAccountId('');
+
       showToast(`Application submitted. Reference: ${referenceNumber}`, 'success');
       await loadMyList();
     } catch (err) {
@@ -202,28 +499,32 @@ export const PaymentRequestsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Payment Requests</h2>
-          <p className="text-slate-500">Submit requests and view my application status</p>
+          <p className="text-slate-500">Submit claims and manage reimbursement requests</p>
         </div>
         {member && (
           <Button onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}>
-            <Plus size={18} className="mr-1" /> Submit Payment Request
+            <Plus size={18} className="mr-1" /> New Payment Request
           </Button>
         )}
       </div>
 
       {successRef && (
         <Card className="p-4 bg-green-50 border-green-200">
-          <p className="text-green-800 font-medium">Submitted successfully</p>
-          <p className="text-green-700 text-sm">Reference: {successRef} (use for bank transfer memo and reconciliation)</p>
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle className="text-green-600" size={18} />
+            <p className="text-green-800 font-bold">Submitted Successfully</p>
+          </div>
+          <p className="text-green-700 text-sm">Reference Number: <span className="font-mono font-bold">{successRef}</span></p>
+          <p className="text-green-600 text-xs mt-1 italic">Please include this reference in your bank transfer memo for faster reconciliation.</p>
         </Card>
       )}
 
-      <FirstUseBanner flowId="payment-requests" dismissLabel="Got it" onHelpClick={helpModal?.openHelp}>
-        Submit a payment request with purpose and amount. The system will generate a reference number (e.g. PR-default-lo-20250216-001). Use this reference in your bank transfer memo for reconciliation. You can also select a member to auto-fill their details.
+      <FirstUseBanner flowId="payment-requests-v2" dismissLabel="Understood" onHelpClick={helpModal?.openHelp}>
+        Use this tool to submit reimbursement requests. You can now add multiple items per request, select projects, and download a PDF copy for your records. Reference numbers are mandatory for accounting reconciliation.
       </FirstUseBanner>
 
       <Card>
-        <div>
+        <div className="p-1">
           <Tabs
             tabs={[
               { id: 'my', label: 'My Applications' },
@@ -232,123 +533,141 @@ export const PaymentRequestsView: React.FC = () => {
             activeTab={activeTab}
             onTabChange={(id) => setActiveTab(id as 'my' | 'all')}
           />
-          <div className="mt-4 flex justify-end mb-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={activeTab === 'my' ? loadMyList : loadFinanceList}
-              disabled={activeTab === 'my' ? loading : financeLoading}
-            >
-              <RefreshCw size={14} className="mr-1" /> Refresh
-            </Button>
-          </div>
-          {activeTab === 'my' && (
-            <>
-              {loading ? (
-                <LoadingState loading={true}><span /></LoadingState>
-              ) : myList.length === 0 ? (
-                <p className="text-slate-500">No applications yet</p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {myList.map((pr) => (
-                    <li key={pr.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <span className="font-medium">{pr.referenceNumber}</span>
-                        <span className="text-slate-500 ml-2">{pr.purpose}</span>
-                        {pr.activityRef && <span className="text-slate-400 text-sm ml-2">Activity: {pr.activityRef}</span>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span>{formatCurrency(pr.amount)}</span>
-                        <StatusBadge status={pr.status} />
-                        {pr.status === 'submitted' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleCancel(pr.id)}
-                            disabled={actioningId !== null}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X size={14} className="mr-1" /> Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-          {activeTab === 'all' && canViewFinance && (
-            <>
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <div className="flex-1 flex gap-2">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      placeholder="Search by reference (e.g. PR-default-lo-20250216-001)"
-                      value={searchRef}
-                      onChange={(e) => setSearchRef(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && loadFinanceList()}
-                      className="block w-full rounded-lg border-slate-300 shadow-sm py-2 pl-3 pr-10 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                      aria-label="Search by reference number"
-                    />
-                    <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
-                  <div className="w-36 shrink-0">
-                    <Select
-                      label=""
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
-                      options={[
-                        { value: '', label: 'All statuses' },
-                        { value: 'submitted', label: 'Pending' },
-                        { value: 'approved', label: 'Approved' },
-                        { value: 'rejected', label: 'Rejected' },
-                        { value: 'cancelled', label: 'Cancelled' },
-                        { value: 'draft', label: 'Draft' },
-                      ]}
-                      className="w-full"
-                      aria-label="Filter by status"
-                    />
-                  </div>
-                  <Button size="sm" variant="secondary" onClick={loadFinanceList} disabled={financeLoading}>
-                    <Search size={14} className="mr-1" /> Search
-                  </Button>
+
+          <div className="mt-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+            {activeTab === 'all' && (
+              <div className="flex-1 flex gap-2 w-full">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    placeholder="Search PR reference..."
+                    value={searchRef}
+                    onChange={(e) => setSearchRef(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && loadFinanceList()}
+                    className="block w-full rounded-lg border-slate-300 shadow-sm py-2 pl-3 pr-10 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                  />
+                  <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
+                <div className="w-40 shrink-0">
+                  <Select
+                    label=""
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
+                    options={[
+                      { value: '', label: 'All Statuses' },
+                      { value: 'submitted', label: 'Pending' },
+                      { value: 'approved', label: 'Approved' },
+                      { value: 'rejected', label: 'Rejected' },
+                    ]}
+                  />
+                </div>
+                <Button size="sm" onClick={loadFinanceList} disabled={financeLoading}>
+                  <Search size={14} className="mr-1" /> Search
+                </Button>
               </div>
-              {financeLoading ? (
-                <LoadingState loading={true}><span /></LoadingState>
-              ) : financeList.length === 0 ? (
-                <p className="text-slate-500">No applications</p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {financeList.map((pr) => (
-                    <li key={pr.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <span className="font-medium">{pr.referenceNumber}</span>
-                        {dedupIds.has(pr.id) && (
-                          <Badge variant="warning" className="ml-2 text-xs">Possible duplicate</Badge>
-                        )}
-                        <span className="text-slate-500 ml-2">{pr.purpose}</span>
-                        {pr.activityRef && <span className="text-slate-400 text-sm ml-2">Activity: {pr.activityRef}</span>}
-                        {pr.applicantName && <span className="text-slate-400 text-sm ml-2">Applicant: {pr.applicantName}</span>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span>{formatCurrency(pr.amount)}</span>
-                        <StatusBadge status={pr.status} />
-                        {pr.status === 'submitted' && (
-                          <span className="flex gap-1">
-                            <Button size="sm" variant="secondary" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null}><CheckCircle size={14} className="mr-1" /> Approve</Button>
-                            <Button size="sm" variant="secondary" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null}><XCircle size={14} className="mr-1" /> Reject</Button>
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
+            )}
+            <div className={`flex justify-end gap-2 w-full ${activeTab === 'all' ? 'md:w-auto' : ''}`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={activeTab === 'my' ? loadMyList : loadFinanceList}
+                disabled={activeTab === 'my' ? loading : financeLoading}
+              >
+                <RefreshCw size={14} className={`mr-1 ${loading || financeLoading ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {activeTab === 'my' ? (
+              loading ? <LoadingState loading={true}><span /></LoadingState> :
+                myList.length === 0 ? (
+                  <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <FileText className="mx-auto text-slate-300 mb-2" size={32} />
+                    <p className="text-slate-500 font-medium">No payment requests found</p>
+                    <Button variant="ghost" size="sm" onClick={() => setSubmitModalOpen(true)} className="mt-2">Create your first request</Button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {myList.map((pr) => (
+                      <Card key={pr.id} className="border-slate-100 hover:border-jci-blue/30 transition-colors">
+                        <div className="flex flex-col md:flex-row justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded leading-none">{pr.referenceNumber}</span>
+                              <StatusBadge status={pr.status} />
+                            </div>
+                            <h4 className="font-bold text-slate-800">{pr.purpose}</h4>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {pr.category === 'administrative'
+                                ? `Admin Account: ${pr.activityId || 'N/A'}`
+                                : 'Project: ' + (projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || 'N/A')}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">Requested on {new Date(pr.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <div className="flex flex-row md:flex-col items-end justify-between md:justify-center gap-2 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
+                            <span className="text-xl font-bold text-jci-blue">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)}>
+                                <Eye size={14} className="mr-1" /> View PDF
+                              </Button>
+                              {pr.status === 'submitted' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleCancel(pr.id)}
+                                  disabled={actioningId !== null}
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                >
+                                  <X size={14} className="mr-1" /> Cancel
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )
+            ) : (
+              financeLoading ? <LoadingState loading={true}><span /></LoadingState> :
+                financeList.length === 0 ? (
+                  <p className="text-center py-8 text-slate-500">No applications matching filters</p>
+                ) : (
+                  <div className="grid gap-3">
+                    {financeList.map((pr) => (
+                      <Card key={pr.id} className="p-3 border-slate-100 hover:border-slate-200">
+                        <div className="flex flex-col md:flex-row justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-mono font-bold text-xs">{pr.referenceNumber}</span>
+                              <StatusBadge status={pr.status} />
+                              <span className="text-xs text-slate-400">• applicant: {pr.applicantName || 'Unknown'}</span>
+                            </div>
+                            <h5 className="font-semibold text-slate-800 truncate">{pr.purpose}</h5>
+                            <p className="text-xs text-slate-500">{pr.category === 'administrative' ? `Admin Account: ${pr.activityId || 'N/A'}` : 'Project'}</p>
+                          </div>
+                          <div className="flex items-center gap-4 border-t md:border-t-0 pt-2 md:pt-0">
+                            <span className="font-bold text-slate-900">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => handlePreviewPDF(pr)} title="View PDF">
+                                <Eye size={16} />
+                              </Button>
+                              {pr.status === 'submitted' && (
+                                <div className="flex gap-1 ml-2">
+                                  <Button size="sm" variant="success" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null}>Approve</Button>
+                                  <Button size="sm" variant="danger" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null}>Reject</Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )
+            )}
+          </div>
         </div>
       </Card>
 
@@ -356,47 +675,178 @@ export const PaymentRequestsView: React.FC = () => {
         isOpen={submitModalOpen}
         onClose={() => !submitting && setSubmitModalOpen(false)}
         title="Submit Payment Request"
+        size="lg"
         drawerOnMobile
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <MemberSelector
-            label="Applicant"
-            members={memberOptions}
-            value={formApplicantId}
-            onChange={setFormApplicantId}
-            selfOption
-            selfLabel="Self"
-            placeholder="Search by name, phone, email…"
-            showLookupFields
-          />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-4">
+            <MemberSelector
+              label="Applicant"
+              members={memberOptions}
+              value={formApplicantId}
+              onChange={(id) => {
+                setFormApplicantId(id);
+                const sel = memberOptions.find(m => m.id === id);
+                if (sel) {
+                  setFormApplicantName(sel.name);
+                  setFormApplicantEmail(sel.email);
+                } else if (id === '') {
+                  setFormApplicantName(member?.name || user?.displayName || '');
+                  setFormApplicantEmail(user?.email || '');
+                }
+              }}
+              selfOption
+              selfLabel="Self"
+              placeholder="Select applicant..."
+            />
+            <Input
+              label="Applicant Position"
+              value={formApplicantPosition}
+              onChange={(e) => setFormApplicantPosition(e.target.value)}
+              placeholder="e.g. Project Lead / Secretary"
+              required
+            />
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <Select
+              label="Category"
+              value={formCategory}
+              onChange={(e) => {
+                setFormCategory(e.target.value as any);
+                setFormActivityId('');
+              }}
+              options={[
+                { value: 'administrative', label: 'Administrative' },
+                { value: 'projects_activities', label: 'Projects & Activities' },
+              ]}
+              required
+            />
+            {formCategory === 'projects_activities' ? (
+              <Select
+                label="Associated Project"
+                value={formActivityId}
+                onChange={(e) => setFormActivityId(e.target.value)}
+                options={[
+                  { value: '', label: 'Select a project...' },
+                  ...projects.map(p => ({ value: p.id, label: p.name })),
+                ]}
+                required
+              />
+            ) : (
+              <Input
+                label="Admin Account"
+                value={formActivityId}
+                onChange={(e) => setFormActivityId(e.target.value)}
+                placeholder="e.g. Maintenance / Utilities"
+                required
+              />
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-bold text-slate-900">Request Items</h4>
+              <Button type="button" size="sm" variant="secondary" onClick={addItem}>
+                <Plus size={14} className="mr-1" /> Add Item
+              </Button>
+            </div>
+
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              {formItems.map((item, idx) => (
+                <div key={idx} className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <Input
+                      label={idx === 0 ? "Description / Purpose" : ""}
+                      value={item.purpose}
+                      onChange={(e) => updateItem(idx, { purpose: e.target.value })}
+                      placeholder="e.g. Venue rental"
+                      required
+                    />
+                  </div>
+                  <div className="w-32">
+                    <Input
+                      label={idx === 0 ? "Amount" : ""}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={item.amount || ''}
+                      onChange={(e) => updateItem(idx, { amount: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  {formItems.length > 1 && (
+                    <Button type="button" variant="ghost" className="text-red-500 mb-[4px] p-2" onClick={() => removeItem(idx)}>
+                      <Trash2 size={18} />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Claim Amount</span>
+                <span className="text-lg font-bold text-jci-blue">{formatCurrency(totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t pt-4">
+            <h4 className="font-bold text-slate-900">Payment Details (Remit to)</h4>
+            <div className="grid md:grid-cols-2 gap-4">
+              <Select
+                label="Claim From Account"
+                value={formClaimFromBankAccountId}
+                onChange={(e) => setFormClaimFromBankAccountId(e.target.value)}
+                options={[
+                  { value: '', label: 'Select JCI Bank Account...' },
+                  ...bankAccounts.map(a => ({ value: a.id, label: a.name })),
+                ]}
+                required
+              />
+              <Input
+                label="Recipient Bank Name"
+                value={formBankName}
+                onChange={(e) => setFormBankName(e.target.value)}
+                placeholder="e.g. Maybank / Public Bank"
+                required
+              />
+              <Input
+                label="Account Holder Name"
+                value={formAccountHolder}
+                onChange={(e) => setFormAccountHolder(e.target.value)}
+                placeholder="Receiver name"
+                required
+              />
+              <Input
+                label="Account Number"
+                value={formAccountNumber}
+                onChange={(e) => setFormAccountNumber(e.target.value.replace(/\D/g, ''))}
+                placeholder="Number only"
+                inputMode="numeric"
+                required
+              />
+            </div>
+          </div>
+
           <Input
-            label="Purpose / Description"
-            value={formPurpose}
-            onChange={(e) => setFormPurpose(e.target.value)}
-            placeholder="Required"
-            required
+            label="Remark / Special Instructions (Optional)"
+            value={formRemark}
+            onChange={(e) => setFormRemark(e.target.value)}
+            placeholder="Add any additional notes here..."
           />
-          <Input
-            label="Amount"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formAmount}
-            onChange={(e) => setFormAmount(e.target.value)}
-            placeholder="0.00"
-            required
-          />
-          <Input
-            label="Activity (optional)"
-            value={formActivityRef}
-            onChange={(e) => setFormActivityRef(e.target.value)}
-            placeholder="Activity ID or name"
-          />
-          <div className="flex justify-end gap-2">
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="secondary" onClick={() => setSubmitModalOpen(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>{submitting ? 'Submitting…' : 'Submit'}</Button>
+            <Button type="submit" disabled={submitting} className="min-w-[120px]">
+              {submitting ? (
+                <>
+                  <RefreshCw size={16} className="mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : 'Submit Request'}
+            </Button>
           </div>
         </form>
       </Modal>
