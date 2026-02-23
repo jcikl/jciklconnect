@@ -190,7 +190,7 @@ export const PaymentRequestsView: React.FC = () => {
 
   const totalAmount = formItems.reduce((sum, item) => sum + (item.amount || 0), 0);
 
-  const handlePreviewPDF = (pr: PaymentRequest) => {
+  const handlePreviewPDF = async (pr: PaymentRequest) => {
     const doc = new jsPDF();
     const primaryColor = [0, 151, 215]; // JCI Blue
     const secondaryColor = [243, 156, 18]; // Gold
@@ -199,50 +199,72 @@ export const PaymentRequestsView: React.FC = () => {
     const textMain = [30, 41, 59];
     const textSecondary = [100, 116, 139];
 
+    // Load Logo
+    const img = new Image();
+    img.src = '/JCI Kuala Lumpur-transparent.png';
+    await new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+
     // --- 1. MODERN HEADER ---
     const jciBlue = [0, 151, 215]; // #0097D7
     const jciGold = [237, 189, 39]; // #EDBD27
 
-    // Title / Logo Area
-    doc.setTextColor(jciBlue[0], jciBlue[1], jciBlue[2]);
-    doc.setFontSize(14);
+    // Column 1: Logo
+    if (img.complete && img.naturalWidth > 0) {
+      const logoH = 22;
+      const logoW = (img.naturalWidth * logoH) / img.naturalHeight;
+      doc.addImage(img, 'PNG', 15, 12, logoW, logoH);
+    }
+
+    // Column 2: Logo Organisation Info (Starts at infoX)
+    const infoX = 70;
     doc.setFont("helvetica", "bold");
-    doc.text("JCI", 15, 20);
+    doc.setFontSize(14);
+
+    // Joint Title: JCI + Kuala Lumpur (Malaysia)
+    // Aligning baseline to 16.5 makes the cap-height top roughly at y=12
+    doc.setTextColor(jciBlue[0], jciBlue[1], jciBlue[2]);
+    doc.text("JCI", infoX, 16.5);
+    const jciWidth = doc.getTextWidth("JCI ");
 
     doc.setTextColor(jciGold[0], jciGold[1], jciGold[2]);
-    doc.setFontSize(14);
-    doc.text("Kuala Lumpur (Malaysia)", 24, 20);
+    doc.text("Kuala Lumpur (Malaysia)", infoX + jciWidth, 16.5);
+    const klWidth = doc.getTextWidth("Kuala Lumpur (Malaysia) ");
 
     doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    doc.text("Established since 1954", 83, 20);
+    doc.text("Established since 1954", infoX + jciWidth + klWidth, 16.5);
 
     // Organization Details
     doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
     doc.setFontSize(8);
-    doc.text("25-3-2, Jalan 3/50, Off, Jln Gombak, Diamond Square, 53000 Kuala Lumpur", 15, 24);
-    doc.text("Patron: JCI Senator Dato’ Seri Dr Derek Goh BBM(L)", 15, 27);
+    doc.text("25-3-2, Jalan 3/50, Off, Jln Gombak, Diamond Square, 53000 Kuala Lumpur", infoX, 22);
+    doc.text("Patron: JCI Senator Dato’ Seri Dr Derek Goh BBM(L)", infoX, 27);
 
     doc.setTextColor(jciBlue[0], jciBlue[1], jciBlue[2]);
-    doc.text("www.jcikl.cc", 15, 30, { link: { url: "https://www.jcikl.cc" } });
-    doc.text("\u2022", 34, 30);
-    doc.text("www.jcimalaysia.cc", 37, 30, { link: { url: "https://www.jcimalaysia.cc" } });
-    doc.text("\u2022", 64, 30);
-    doc.text("www.jci.cc", 67, 30, { link: { url: "https://www.jci.cc" } });
+    doc.text("www.jcikl.cc", infoX, 32, { link: { url: "https://www.jcikl.cc" } } as any);
+    doc.text("\u2022", infoX + 18, 32);
+    doc.text("www.jcimalaysia.cc", infoX + 21, 32, { link: { url: "https://www.jcimalaysia.cc" } } as any);
+    doc.text("\u2022", infoX + 46, 32);
+    doc.text("www.jci.cc", infoX + 49, 32, { link: { url: "https://www.jci.cc" } } as any);
 
-    // Title on the right
+    // --- 2. MAIN TITLE ---
+    let y = 45;
     doc.setTextColor(textMain[0], textMain[1], textMain[2]);
-    doc.setFontSize(16);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text("PAYMENT REQUEST", 195, 20, { align: "right" });
-    doc.setFontSize(10);
+    doc.text("PAYMENT REQUEST", 105, y, { align: "center" });
+    y += 7;
+    doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
-    doc.text(`REF: ${pr.referenceNumber}`, 195, 26, { align: "right" });
+    doc.text(`REF: ${pr.referenceNumber}`, 105, y, { align: "center" });
 
-    let y = 50;
+    y += 15;
 
-    // --- 2. SUMMARY INFO (Applicant & Meta) ---
+    // --- 3. SUMMARY INFO (Applicant & Meta) ---
     doc.setTextColor(textMain[0], textMain[1], textMain[2]);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
