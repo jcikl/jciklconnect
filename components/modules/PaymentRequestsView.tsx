@@ -262,7 +262,7 @@ export const PaymentRequestsView: React.FC = () => {
     doc.setFont("helvetica", "normal");
     doc.text(`REF: ${pr.referenceNumber}`, 105, y, { align: "center" });
 
-    y += 15;
+    y += 10;
 
     // --- 3. SUMMARY INFO (Applicant & Meta) ---
     doc.setTextColor(textMain[0], textMain[1], textMain[2]);
