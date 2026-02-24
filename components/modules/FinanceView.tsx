@@ -1135,7 +1135,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
           <p className="text-slate-500">Automated bookkeeping, dues collection, and budgeting.</p>
@@ -1910,13 +1910,6 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         <div className="space-y-4">
           <Card>
             <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search transactions..."
-                  value={txSearchTerm}
-                  onChange={(e) => setTxSearchTerm(e.target.value)}
-                />
-              </div>
               <div className="w-full md:w-48">
                 <Select
                   value={bankAccountFilter}

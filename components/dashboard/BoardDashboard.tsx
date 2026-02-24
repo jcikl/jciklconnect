@@ -577,917 +577,914 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
         </div>
       </div>
 
-      <Card noPadding>
-        <div className="px-6 pt-4">
-          <Tabs
-            tabs={['Overview', 'Analytics', 'Reports', 'Member Insights']}
-            activeTab={
-              activeTab === 'overview' ? 'Overview' :
-                activeTab === 'analytics' ? 'Analytics' :
-                  activeTab === 'reports' ? 'Reports' : 'Member Insights'
-            }
-            onTabChange={(tab) => {
-              if (tab === 'Overview') setActiveTab('overview');
-              else if (tab === 'Analytics') setActiveTab('analytics');
-              else if (tab === 'Reports') setActiveTab('reports');
-              else setActiveTab('insights');
-            }}
-          />
-        </div>
-        <div className="p-4">
-          {activeTab === 'overview' && (
-            <>
-              {/* Member Metrics Row */}
-              <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
-                <div className="min-w-0">
-                  <StatCard
-                    title="Total Members"
-                    value={metrics.totalMembers.toString()}
-                    icon={<Users size={20} />}
-                    subtext={`${metrics.newMembersThisMonth} new this month`}
-                    trend={metrics.newMembersThisMonth > 0 ? metrics.newMembersThisMonth : undefined}
-                    onClick={() => onNavigate?.('MEMBERS')}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <StatCard
-                    title="Active Members"
-                    value={metrics.activeMembers.toString()}
-                    icon={<CheckCircle size={20} />}
-                    subtext={`${Math.round((metrics.activeMembers / Math.max(metrics.totalMembers, 1)) * 100)}% engagement`}
-                    onClick={() => onNavigate?.('MEMBERS')}
-                  />
-                </div>
-              </div>
+      <Tabs
+        tabs={['Overview', 'Analytics', 'Reports', 'Member Insights']}
+        activeTab={
+          activeTab === 'overview' ? 'Overview' :
+            activeTab === 'analytics' ? 'Analytics' :
+              activeTab === 'reports' ? 'Reports' : 'Member Insights'
+        }
+        onTabChange={(tab) => {
+          if (tab === 'Overview') setActiveTab('overview');
+          else if (tab === 'Analytics') setActiveTab('analytics');
+          else if (tab === 'Reports') setActiveTab('reports');
+          else setActiveTab('insights');
+        }}
+      />
 
-              {/* Activity Metrics Row */}
-              <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
-                <div className="min-w-0">
-                  <StatCard
-                    title="Upcoming Events"
-                    value={metrics.upcomingEvents.toString()}
-                    icon={<Calendar size={20} />}
-                    subtext="Scheduled activities"
-                    onClick={() => onNavigate?.('EVENTS')}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <StatCard
-                    title="Active Projects"
-                    value={metrics.activeProjects.toString()}
-                    icon={<Briefcase size={20} />}
-                    subtext={`${metrics.completedProjects} completed`}
-                    onClick={() => onNavigate?.('PROJECTS')}
-                  />
-                </div>
+      <div>
+        {activeTab === 'overview' && (
+          <>
+            {/* Member Metrics Row */}
+            <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
+              <div className="min-w-0">
+                <StatCard
+                  title="Total Members"
+                  value={metrics.totalMembers.toString()}
+                  icon={<Users size={20} />}
+                  subtext={`${metrics.newMembersThisMonth} new this month`}
+                  trend={metrics.newMembersThisMonth > 0 ? metrics.newMembersThisMonth : undefined}
+                  onClick={() => onNavigate?.('MEMBERS')}
+                />
               </div>
+              <div className="min-w-0">
+                <StatCard
+                  title="Active Members"
+                  value={metrics.activeMembers.toString()}
+                  icon={<CheckCircle size={20} />}
+                  subtext={`${Math.round((metrics.activeMembers / Math.max(metrics.totalMembers, 1)) * 100)}% engagement`}
+                  onClick={() => onNavigate?.('MEMBERS')}
+                />
+              </div>
+            </div>
 
-              {/* Financial Overview */}
-              {loadingFinance ? (
-                <Card title="Financial Overview">
-                  <div className="text-center py-8 text-slate-400 text-sm">Loading financial data...</div>
-                </Card>
-              ) : financialSummary ? (
-                <Card
-                  title="Financial Overview"
-                  action={
-                    <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
-                      <Eye size={18} />
-                    </Button>
-                  }
-                >
-                  <div className="grid grid-cols-2 gap-4 md:gap-6 mb-4">
-                    <div className="min-w-0 bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
-                      <div className="flex items-center justify-between mb-1 md:mb-2">
-                        <span className="text-xs md:text-sm font-medium text-green-700 truncate">Total Income</span>
-                        <DollarSign size={18} className="text-green-600 flex-shrink-0 md:w-5 md:h-5" />
-                      </div>
-                      <p className="text-lg md:text-2xl font-bold text-green-900 truncate">
-                        {formatCurrency(financialSummary.totalIncome || 0)}
-                      </p>
-                    </div>
-                    <div className="min-w-0 bg-red-50 p-3 md:p-4 rounded-lg border border-red-200">
-                      <div className="flex items-center justify-between mb-1 md:mb-2">
-                        <span className="text-xs md:text-sm font-medium text-red-700 truncate">Total Expenses</span>
-                        <DollarSign size={18} className="text-red-600 flex-shrink-0 md:w-5 md:h-5" />
-                      </div>
-                      <p className="text-lg md:text-2xl font-bold text-red-900 truncate">
-                        {formatCurrency(financialSummary.totalExpenses || 0)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="min-w-0 bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200">
+            {/* Activity Metrics Row */}
+            <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
+              <div className="min-w-0">
+                <StatCard
+                  title="Upcoming Events"
+                  value={metrics.upcomingEvents.toString()}
+                  icon={<Calendar size={20} />}
+                  subtext="Scheduled activities"
+                  onClick={() => onNavigate?.('EVENTS')}
+                />
+              </div>
+              <div className="min-w-0">
+                <StatCard
+                  title="Active Projects"
+                  value={metrics.activeProjects.toString()}
+                  icon={<Briefcase size={20} />}
+                  subtext={`${metrics.completedProjects} completed`}
+                  onClick={() => onNavigate?.('PROJECTS')}
+                />
+              </div>
+            </div>
+
+            {/* Financial Overview */}
+            {loadingFinance ? (
+              <Card title="Financial Overview" className="mb-6">
+                <div className="text-center py-8 text-slate-400 text-sm">Loading financial data...</div>
+              </Card>
+            ) : financialSummary ? (
+              <Card
+                title="Financial Overview" className="mb-6"
+                action={
+                  <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
+                    <Eye size={18} />
+                  </Button>
+                }
+              >
+                <div className="grid grid-cols-2 gap-4 md:gap-6 mb-4">
+                  <div className="min-w-0 bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
                     <div className="flex items-center justify-between mb-1 md:mb-2">
-                      <span className="text-xs md:text-sm font-medium text-blue-700 truncate">Net Balance</span>
-                      <TrendingUp size={18} className="text-blue-600 flex-shrink-0 md:w-5 md:h-5" />
+                      <span className="text-xs md:text-sm font-medium text-green-700 truncate">Total Income</span>
+                      <DollarSign size={18} className="text-green-600 flex-shrink-0 md:w-5 md:h-5" />
                     </div>
-                    <p className="text-lg md:text-2xl font-bold text-blue-900 truncate">
-                      {formatCurrency((financialSummary.totalIncome || 0) - (financialSummary.totalExpenses || 0))}
+                    <p className="text-lg md:text-2xl font-bold text-green-900 truncate">
+                      {formatCurrency(financialSummary.totalIncome || 0)}
                     </p>
                   </div>
-                </Card>
-              ) : null}
+                  <div className="min-w-0 bg-red-50 p-3 md:p-4 rounded-lg border border-red-200">
+                    <div className="flex items-center justify-between mb-1 md:mb-2">
+                      <span className="text-xs md:text-sm font-medium text-red-700 truncate">Total Expenses</span>
+                      <DollarSign size={18} className="text-red-600 flex-shrink-0 md:w-5 md:h-5" />
+                    </div>
+                    <p className="text-lg md:text-2xl font-bold text-red-900 truncate">
+                      {formatCurrency(financialSummary.totalExpenses || 0)}
+                    </p>
+                  </div>
+                </div>
+                <div className="min-w-0 bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between mb-1 md:mb-2">
+                    <span className="text-xs md:text-sm font-medium text-blue-700 truncate">Net Balance</span>
+                    <TrendingUp size={18} className="text-blue-600 flex-shrink-0 md:w-5 md:h-5" />
+                  </div>
+                  <p className="text-lg md:text-2xl font-bold text-blue-900 truncate">
+                    {formatCurrency((financialSummary.totalIncome || 0) - (financialSummary.totalExpenses || 0))}
+                  </p>
+                </div>
+              </Card>
+            ) : null}
 
-              {/* Main Content Grid */}
-              <div className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  {/* Member Engagement */}
-                  <Card title="Member Engagement Metrics">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">Average Points per Member</p>
-                            <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.averagePoints}</p>
-                          </div>
-                          <Award size={32} className="text-jci-blue" />
+            {/* Main Content Grid */}
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                {/* Member Engagement */}
+                <Card title="Member Engagement Metrics">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Average Points per Member</p>
+                          <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.averagePoints}</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <AlertTriangle size={18} className="text-amber-600" />
-                              <span className="text-sm font-medium text-amber-700">High Risk Members</span>
-                            </div>
-                            <p className="text-2xl font-bold text-amber-900">{metrics.highRiskMembers}</p>
-                            <p className="text-xs text-amber-600 mt-1">Requires attention</p>
+                        <Award size={32} className="text-jci-blue" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle size={18} className="text-amber-600" />
+                            <span className="text-sm font-medium text-amber-700">High Risk Members</span>
                           </div>
-                          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <CheckCircle size={18} className="text-green-600" />
-                              <span className="text-sm font-medium text-green-700">Engagement Rate</span>
+                          <p className="text-2xl font-bold text-amber-900">{metrics.highRiskMembers}</p>
+                          <p className="text-xs text-amber-600 mt-1">Requires attention</p>
+                        </div>
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle size={18} className="text-green-600" />
+                            <span className="text-sm font-medium text-green-700">Engagement Rate</span>
+                          </div>
+                          <p className="text-2xl font-bold text-green-900">
+                            {metrics.totalMembers > 0 ? Math.round((metrics.activeMembers / metrics.totalMembers) * 100) : 0}%
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">Active participation</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <Cake size={16} className="text-pink-500" />
+                          Today's Birthdays
+                        </h4>
+                        <Badge variant="info" className="text-[10px]">
+                          {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </Badge>
+                      </div>
+
+                      {birthdaysToday.length > 0 ? (
+                        <div className="space-y-3 max-h-[160px] overflow-y-auto pr-2">
+                          {birthdaysToday.map(member => (
+                            <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg bg-pink-50/50 border border-pink-100 group hover:bg-pink-50 transition-colors">
+                              <div className="w-10 h-10 rounded-full bg-white border-2 border-pink-200 flex items-center justify-center text-pink-500 font-bold overflow-hidden">
+                                {member.avatar ? (
+                                  <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  member.name.charAt(0)
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{member.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-pink-600 font-semibold flex items-center gap-1">
+                                    <Gift size={10} /> Happy Birthday!
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="animate-bounce">
+                                <Cake size={16} className="text-pink-400" />
+                              </div>
                             </div>
-                            <p className="text-2xl font-bold text-green-900">
-                              {metrics.totalMembers > 0 ? Math.round((metrics.activeMembers / metrics.totalMembers) * 100) : 0}%
-                            </p>
-                            <p className="text-xs text-green-600 mt-1">Active participation</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-2">
+                            <Cake size={20} className="text-slate-300" />
+                          </div>
+                          <p className="text-xs text-slate-400 font-medium text-center px-4">No member birthdays recorded for today</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Project Status */}
+                <Card title="Project Status Overview">
+                  <div className="space-y-4">
+                    {projects.slice(0, 5).map(project => (
+                      <div key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-900">{project.name ?? project.title ?? 'Project'}</h4>
+                          <p className="text-sm text-slate-500">{project.status} • {project.completion ?? 0}% Complete</p>
+                        </div>
+                        <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
+                          {project.status}
+                        </Badge>
+                      </div>
+                    ))}
+                    {projects.length === 0 && (
+                      <div className="text-center py-8 text-slate-400 text-sm">No projects found</div>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Additional Metrics Grid */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Inventory Status */}
+                  <Card
+                    title="Inventory Status"
+                    action={
+                      <Button variant="ghost" size="sm" onClick={() => onNavigate?.('INVENTORY')}>
+                        <Eye size={18} />
+                      </Button>
+                    }
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Package size={20} className="text-jci-blue" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Total Items</p>
+                            <p className="text-2xl font-bold text-slate-900">{metrics.totalInventoryItems}</p>
                           </div>
                         </div>
                       </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                            <Cake size={16} className="text-pink-500" />
-                            Today's Birthdays
-                          </h4>
-                          <Badge variant="info" className="text-[10px]">
-                            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </Badge>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-xs text-green-700 mb-1">Available</p>
+                          <p className="text-lg font-bold text-green-900">{metrics.availableItems}</p>
                         </div>
+                        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                          <p className="text-xs text-amber-700 mb-1">Checked Out</p>
+                          <p className="text-lg font-bold text-amber-900">{metrics.checkedOutItems}</p>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs text-blue-700 mb-1">Total Value</p>
+                        <p className="text-lg font-bold text-blue-900">{formatCurrency(metrics.totalInventoryValue)}</p>
+                      </div>
+                    </div>
+                  </Card>
 
-                        {birthdaysToday.length > 0 ? (
-                          <div className="space-y-3 max-h-[160px] overflow-y-auto pr-2">
-                            {birthdaysToday.map(member => (
-                              <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg bg-pink-50/50 border border-pink-100 group hover:bg-pink-50 transition-colors">
-                                <div className="w-10 h-10 rounded-full bg-white border-2 border-pink-200 flex items-center justify-center text-pink-500 font-bold overflow-hidden">
-                                  {member.avatar ? (
-                                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    member.name.charAt(0)
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{member.name}</p>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-pink-600 font-semibold flex items-center gap-1">
-                                      <Gift size={10} /> Happy Birthday!
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="animate-bounce">
-                                  <Cake size={16} className="text-pink-400" />
-                                </div>
-                              </div>
-                            ))}
+                  {/* Bank Accounts */}
+                  <Card title="Bank Accounts">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <CreditCard size={20} className="text-jci-blue" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Total Balance</p>
+                            <p className="text-2xl font-bold text-slate-900">{formatCurrency(metrics.totalBankBalance)}</p>
                           </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-2">
-                              <Cake size={20} className="text-slate-300" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {bankAccounts.map(account => (
+                          <div key={account.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">{account.name}</p>
+                              <p className="text-xs text-slate-500">{account.accountNumber}</p>
                             </div>
-                            <p className="text-xs text-slate-400 font-medium text-center px-4">No member birthdays recorded for today</p>
+                            <div className="text-right">
+                              <p className={`text-sm font-bold ${(account.balance || 0) < (account.minimumBalance || 0) ? 'text-red-600' : 'text-green-600'}`}>
+                                {formatCurrency(account.balance || 0)}
+                              </p>
+                              {(account.balance || 0) < (account.minimumBalance || 0) && (
+                                <Badge variant="error" className="text-xs mt-1">Low Balance</Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {bankAccounts.length === 0 && (
+                          <div className="text-center py-4 text-slate-400 text-sm">No bank accounts</div>
+                        )}
+                        {metrics.lowBalanceAccounts > 0 && (
+                          <div className="p-2 bg-red-50 rounded-lg border border-red-200">
+                            <p className="text-xs text-red-700">
+                              <AlertTriangle size={14} className="inline mr-1" />
+                              {metrics.lowBalanceAccounts} account(s) below minimum balance
+                            </p>
                           </div>
                         )}
                       </div>
                     </div>
                   </Card>
 
-                  {/* Project Status */}
-                  <Card title="Project Status Overview">
+                  {/* Hobby Clubs Activity */}
+                  <Card title="Hobby Clubs Activity">
                     <div className="space-y-4">
-                      {projects.slice(0, 5).map(project => (
-                        <div key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-slate-900">{project.name ?? project.title ?? 'Project'}</h4>
-                            <p className="text-sm text-slate-500">{project.status} • {project.completion ?? 0}% Complete</p>
-                          </div>
-                          <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
-                            {project.status}
-                          </Badge>
-                        </div>
-                      ))}
-                      {projects.length === 0 && (
-                        <div className="text-center py-8 text-slate-400 text-sm">No projects found</div>
-                      )}
-                    </div>
-                  </Card>
-
-                  {/* Additional Metrics Grid */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Inventory Status */}
-                    <Card
-                      title="Inventory Status"
-                      action={
-                        <Button variant="ghost" size="sm" onClick={() => onNavigate?.('INVENTORY')}>
-                          <Eye size={18} />
-                        </Button>
-                      }
-                    >
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Package size={20} className="text-jci-blue" />
-                            <div>
-                              <p className="text-sm font-medium text-slate-700">Total Items</p>
-                              <p className="text-2xl font-bold text-slate-900">{metrics.totalInventoryItems}</p>
-                            </div>
+                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Heart size={20} className="text-jci-blue" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Total Clubs</p>
+                            <p className="text-2xl font-bold text-slate-900">{metrics.totalClubs}</p>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                            <p className="text-xs text-green-700 mb-1">Available</p>
-                            <p className="text-lg font-bold text-green-900">{metrics.availableItems}</p>
-                          </div>
-                          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                            <p className="text-xs text-amber-700 mb-1">Checked Out</p>
-                            <p className="text-lg font-bold text-amber-900">{metrics.checkedOutItems}</p>
-                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-xs text-green-700 mb-1">Active Clubs</p>
+                          <p className="text-lg font-bold text-green-900">{metrics.activeClubs}</p>
                         </div>
                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-xs text-blue-700 mb-1">Total Value</p>
-                          <p className="text-lg font-bold text-blue-900">{formatCurrency(metrics.totalInventoryValue)}</p>
+                          <p className="text-xs text-blue-700 mb-1">Total Members</p>
+                          <p className="text-lg font-bold text-blue-900">{metrics.totalClubMembers}</p>
                         </div>
                       </div>
-                    </Card>
-
-                    {/* Bank Accounts */}
-                    <Card title="Bank Accounts">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <CreditCard size={20} className="text-jci-blue" />
+                      <div className="space-y-2">
+                        {hobbyClubs.slice(0, 3).map(club => (
+                          <div key={club.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
                             <div>
-                              <p className="text-sm font-medium text-slate-700">Total Balance</p>
-                              <p className="text-2xl font-bold text-slate-900">{formatCurrency(metrics.totalBankBalance)}</p>
+                              <p className="text-sm font-medium text-slate-900">{club.name}</p>
+                              <p className="text-xs text-slate-500">{club.category}</p>
                             </div>
+                            <Badge variant="neutral">{club.membersCount || 0} members</Badge>
                           </div>
-                        </div>
-                        <div className="space-y-2">
-                          {bankAccounts.map(account => (
-                            <div key={account.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                              <div>
-                                <p className="text-sm font-medium text-slate-900">{account.name}</p>
-                                <p className="text-xs text-slate-500">{account.accountNumber}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className={`text-sm font-bold ${(account.balance || 0) < (account.minimumBalance || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                                  {formatCurrency(account.balance || 0)}
-                                </p>
-                                {(account.balance || 0) < (account.minimumBalance || 0) && (
-                                  <Badge variant="error" className="text-xs mt-1">Low Balance</Badge>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {bankAccounts.length === 0 && (
-                            <div className="text-center py-4 text-slate-400 text-sm">No bank accounts</div>
-                          )}
-                          {metrics.lowBalanceAccounts > 0 && (
-                            <div className="p-2 bg-red-50 rounded-lg border border-red-200">
-                              <p className="text-xs text-red-700">
-                                <AlertTriangle size={14} className="inline mr-1" />
-                                {metrics.lowBalanceAccounts} account(s) below minimum balance
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* Hobby Clubs Activity */}
-                    <Card title="Hobby Clubs Activity">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Heart size={20} className="text-jci-blue" />
-                            <div>
-                              <p className="text-sm font-medium text-slate-700">Total Clubs</p>
-                              <p className="text-2xl font-bold text-slate-900">{metrics.totalClubs}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                            <p className="text-xs text-green-700 mb-1">Active Clubs</p>
-                            <p className="text-lg font-bold text-green-900">{metrics.activeClubs}</p>
-                          </div>
-                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                            <p className="text-xs text-blue-700 mb-1">Total Members</p>
-                            <p className="text-lg font-bold text-blue-900">{metrics.totalClubMembers}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          {hobbyClubs.slice(0, 3).map(club => (
-                            <div key={club.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                              <div>
-                                <p className="text-sm font-medium text-slate-900">{club.name}</p>
-                                <p className="text-xs text-slate-500">{club.category}</p>
-                              </div>
-                              <Badge variant="neutral">{club.membersCount || 0} members</Badge>
-                            </div>
-                          ))}
-                          {hobbyClubs.length === 0 && (
-                            <div className="text-center py-4 text-slate-400 text-sm">No clubs</div>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* Business Directory Engagement */}
-                    <Card title="Business Directory">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Building2 size={20} className="text-jci-blue" />
-                            <div>
-                              <p className="text-sm font-medium text-slate-700">Total Businesses</p>
-                              <p className="text-2xl font-bold text-slate-900">{metrics.totalBusinesses}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                            <p className="text-xs text-green-700 mb-1">Verified</p>
-                            <p className="text-lg font-bold text-green-900">{metrics.verifiedBusinesses}</p>
-                          </div>
-                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                            <p className="text-xs text-blue-700 mb-1">Pending</p>
-                            <p className="text-lg font-bold text-blue-900">{metrics.totalBusinesses - metrics.verifiedBusinesses}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          {businesses.slice(0, 3).map(business => (
-                            <div key={business.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                              <div>
-                                <p className="text-sm font-medium text-slate-900">{business.companyName}</p>
-                                <p className="text-xs text-slate-500">{business.industry}</p>
-                              </div>
-                              {business.globalNetworkEnabled ? (
-                                <Badge variant="success">Verified</Badge>
-                              ) : (
-                                <Badge variant="warning">Pending</Badge>
-                              )}
-                            </div>
-                          ))}
-                          {businesses.length === 0 && (
-                            <div className="text-center py-4 text-slate-400 text-sm">No businesses</div>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Quick Actions */}
-                  <Card title="Quick Actions">
-                    <div className="space-y-2">
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => {
-                          setSelectedReportType('financial');
-                          setIsReportModalOpen(true);
-                        }}
-                      >
-                        <FileText size={16} className="mr-2" />
-                        Generate Financial Report
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('MEMBERS')}
-                      >
-                        <Users size={16} className="mr-2" />
-                        Member Analytics
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('INVENTORY')}
-                      >
-                        <Package size={16} className="mr-2" />
-                        Inventory Management
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('FINANCE')}
-                      >
-                        <DollarSign size={16} className="mr-2" />
-                        Financial Management
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('CLUBS')}
-                      >
-                        <Heart size={16} className="mr-2" />
-                        Hobby Clubs
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('DIRECTORY')}
-                      >
-                        <Building2 size={16} className="mr-2" />
-                        Business Directory
-                      </Button>
-                    </div>
-                  </Card>
-
-                  {/* AI Insights & Predictions */}
-                  <Card title="AI Insights & Predictions" className="border-l-4 border-l-purple-500">
-                    <div className="space-y-4">
-                      {loadingAI ? (
-                        <div className="text-center py-4 text-slate-400 text-sm">Loading AI insights...</div>
-                      ) : (
-                        <>
-                          {aiInsights.churnRisk.length > 0 && (
-                            <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <AlertCircle size={16} className="text-red-600" />
-                                <span className="text-sm font-semibold text-red-900">High Churn Risk</span>
-                              </div>
-                              <p className="text-xs text-red-700">
-                                {aiInsights.churnRisk.length} member(s) at high risk of leaving.
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs h-auto p-0 ml-1 text-red-700 hover:text-red-900"
-                                  onClick={() => onNavigate?.('AI_INSIGHTS')}
-                                >
-                                  View Details →
-                                </Button>
-                              </p>
-                            </div>
-                          )}
-
-                          {aiInsights.topRecommendations.length > 0 && (
-                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Lightbulb size={16} className="text-blue-600" />
-                                <span className="text-sm font-semibold text-blue-900">Top Recommendations</span>
-                              </div>
-                              <div className="space-y-2">
-                                {aiInsights.topRecommendations.slice(0, 2).map((rec: any, idx: number) => (
-                                  <div key={idx} className="text-xs text-blue-700">
-                                    • {rec.itemName} ({rec.matchScore}% match)
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {aiInsights.eventPredictions.length > 0 && (
-                            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <TrendingUp size={16} className="text-green-600" />
-                                <span className="text-sm font-semibold text-green-900">Event Predictions</span>
-                              </div>
-                              <p className="text-xs text-green-700">
-                                {aiInsights.eventPredictions.length} upcoming event(s) analyzed for demand
-                              </p>
-                            </div>
-                          )}
-
-                          {aiInsights.projectPredictions.length > 0 && (
-                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Sparkles size={16} className="text-amber-600" />
-                                <span className="text-sm font-semibold text-amber-900">Project Forecasts</span>
-                              </div>
-                              <p className="text-xs text-amber-700">
-                                {aiInsights.projectPredictions.length} active project(s) with success predictions
-                              </p>
-                            </div>
-                          )}
-
-                          {(aiInsights.churnRisk.length === 0 &&
-                            aiInsights.topRecommendations.length === 0 &&
-                            aiInsights.eventPredictions.length === 0 &&
-                            aiInsights.projectPredictions.length === 0) && (
-                              <div className="text-center py-4 text-slate-400 text-sm">
-                                No AI insights available yet
-                              </div>
-                            )}
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => onNavigate?.('AI_INSIGHTS')}
-                          >
-                            <Sparkles size={14} className="mr-2" />
-                            View Full AI Insights
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </Card>
-
-                  {/* Top Performers */}
-                  <Card title="Top Performers">
-                    <div className="space-y-3">
-                      {leaderboard.slice(0, 5).map((member, index) => (
-                        <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                            index === 1 ? 'bg-slate-100 text-slate-600' :
-                              index === 2 ? 'bg-amber-100 text-amber-700' :
-                                'bg-slate-100 text-slate-500'
-                            }`}>
-                            {index + 1}
-                          </div>
-                          <img src={member.avatar || undefined} alt={member.name} className="w-8 h-8 rounded-full" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
-                            <p className="text-xs text-slate-500">{member.points} points</p>
-                          </div>
-                        </div>
-                      ))}
-                      {leaderboard.length === 0 && (
-                        <div className="text-center py-4 text-slate-400 text-sm">No data available</div>
-                      )}
-                    </div>
-                  </Card>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'analytics' && (
-            <div className="space-y-6">
-              <div className="grid lg:grid-cols-2 gap-6">
-                <MemberGrowthChart members={members} />
-                <PointsDistributionChart pointHistory={pointHistory} />
-              </div>
-
-              <div className="grid lg:grid-cols-2 gap-6">
-                <Card title="Engagement Trends">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={engagementTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="month" stroke="#64748b" />
-                      <YAxis stroke="#64748b" />
-                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                      <Legend />
-                      <Line type="monotone" dataKey="events" stroke="#0097D7" strokeWidth={2} name="Events" />
-                      <Line type="monotone" dataKey="projects" stroke="#6EC4E8" strokeWidth={2} name="Projects" />
-                      <Line type="monotone" dataKey="members" stroke="#1C3F94" strokeWidth={2} name="Members" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Card>
-
-                <Card title="Project Status Distribution">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={projectStatusData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={(entry: any) => `${entry.status}: ${(entry.percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="count"
-                      >
-                        {projectStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5'][index % 4]} />
                         ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => value} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </Card>
+                        {hobbyClubs.length === 0 && (
+                          <div className="text-center py-4 text-slate-400 text-sm">No clubs</div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Business Directory Engagement */}
+                  <Card title="Business Directory">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Building2 size={20} className="text-jci-blue" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Total Businesses</p>
+                            <p className="text-2xl font-bold text-slate-900">{metrics.totalBusinesses}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-xs text-green-700 mb-1">Verified</p>
+                          <p className="text-lg font-bold text-green-900">{metrics.verifiedBusinesses}</p>
+                        </div>
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-xs text-blue-700 mb-1">Pending</p>
+                          <p className="text-lg font-bold text-blue-900">{metrics.totalBusinesses - metrics.verifiedBusinesses}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {businesses.slice(0, 3).map(business => (
+                          <div key={business.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">{business.companyName}</p>
+                              <p className="text-xs text-slate-500">{business.industry}</p>
+                            </div>
+                            {business.globalNetworkEnabled ? (
+                              <Badge variant="success">Verified</Badge>
+                            ) : (
+                              <Badge variant="warning">Pending</Badge>
+                            )}
+                          </div>
+                        ))}
+                        {businesses.length === 0 && (
+                          <div className="text-center py-4 text-slate-400 text-sm">No businesses</div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </div>
               </div>
 
-              <Card title="Event Types Distribution">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={eventTypeData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="type" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                    <Bar dataKey="count" fill="#0097D7" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </div>
-          )}
-
-          {activeTab === 'reports' && (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('financial'); setIsReportModalOpen(true); }}>
-                  <div className="text-center">
-                    <DollarSign className="mx-auto mb-3 text-jci-blue" size={32} />
-                    <h3 className="font-semibold text-slate-900 mb-1">Financial Report</h3>
-                    <p className="text-sm text-slate-500">Income, expenses, and balance sheets</p>
-                  </div>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('membership'); setIsReportModalOpen(true); }}>
-                  <div className="text-center">
-                    <Users className="mx-auto mb-3 text-jci-blue" size={32} />
-                    <h3 className="font-semibold text-slate-900 mb-1">Membership Report</h3>
-                    <p className="text-sm text-slate-500">Growth, engagement, and demographics</p>
-                  </div>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('engagement'); setIsReportModalOpen(true); }}>
-                  <div className="text-center">
-                    <Activity className="mx-auto mb-3 text-jci-blue" size={32} />
-                    <h3 className="font-semibold text-slate-900 mb-1">Engagement Report</h3>
-                    <p className="text-sm text-slate-500">Points, activities, and participation</p>
-                  </div>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('projects'); setIsReportModalOpen(true); }}>
-                  <div className="text-center">
-                    <Briefcase className="mx-auto mb-3 text-jci-blue" size={32} />
-                    <h3 className="font-semibold text-slate-900 mb-1">Project Report</h3>
-                    <p className="text-sm text-slate-500">Status, progress, and outcomes</p>
-                  </div>
-                </Card>
-              </div>
-
-              <Card title="Quick Report Generation">
-                <div className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-6">
+                {/* Quick Actions */}
+                <Card title="Quick Actions">
+                  <div className="space-y-2">
                     <Button
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => handleGenerateReport('Monthly Financial Summary')}
-                    >
-                      <FileText size={16} className="mr-2" />
-                      Monthly Financial Summary
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => handleGenerateReport('Member Engagement Analysis')}
-                    >
-                      <BarChart3 size={16} className="mr-2" />
-                      Member Engagement Analysis
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => handleGenerateReport('Project Status Report')}
-                    >
-                      <Briefcase size={16} className="mr-2" />
-                      Project Status Report
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => handleGenerateReport('Event Attendance Report')}
-                    >
-                      <Calendar size={16} className="mr-2" />
-                      Event Attendance Report
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="justify-start"
+                      variant="ghost"
+                      className="w-full justify-start"
                       onClick={() => {
                         setSelectedReportType('financial');
                         setIsReportModalOpen(true);
                       }}
                     >
-                      <DollarSign size={16} className="mr-2" />
-                      Annual Financial Report
+                      <FileText size={16} className="mr-2" />
+                      Generate Financial Report
                     </Button>
                     <Button
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => {
-                        setSelectedReportType('membership');
-                        setIsReportModalOpen(true);
-                      }}
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onNavigate?.('MEMBERS')}
                     >
                       <Users size={16} className="mr-2" />
-                      Member Benefits Usage Report
+                      Member Analytics
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onNavigate?.('INVENTORY')}
+                    >
+                      <Package size={16} className="mr-2" />
+                      Inventory Management
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onNavigate?.('FINANCE')}
+                    >
+                      <DollarSign size={16} className="mr-2" />
+                      Financial Management
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onNavigate?.('CLUBS')}
+                    >
+                      <Heart size={16} className="mr-2" />
+                      Hobby Clubs
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onNavigate?.('DIRECTORY')}
+                    >
+                      <Building2 size={16} className="mr-2" />
+                      Business Directory
+                    </Button>
+                  </div>
+                </Card>
+
+                {/* AI Insights & Predictions */}
+                <Card title="AI Insights & Predictions" className="border-l-4 border-l-purple-500">
+                  <div className="space-y-4">
+                    {loadingAI ? (
+                      <div className="text-center py-4 text-slate-400 text-sm">Loading AI insights...</div>
+                    ) : (
+                      <>
+                        {aiInsights.churnRisk.length > 0 && (
+                          <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <AlertCircle size={16} className="text-red-600" />
+                              <span className="text-sm font-semibold text-red-900">High Churn Risk</span>
+                            </div>
+                            <p className="text-xs text-red-700">
+                              {aiInsights.churnRisk.length} member(s) at high risk of leaving.
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs h-auto p-0 ml-1 text-red-700 hover:text-red-900"
+                                onClick={() => onNavigate?.('AI_INSIGHTS')}
+                              >
+                                View Details →
+                              </Button>
+                            </p>
+                          </div>
+                        )}
+
+                        {aiInsights.topRecommendations.length > 0 && (
+                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Lightbulb size={16} className="text-blue-600" />
+                              <span className="text-sm font-semibold text-blue-900">Top Recommendations</span>
+                            </div>
+                            <div className="space-y-2">
+                              {aiInsights.topRecommendations.slice(0, 2).map((rec: any, idx: number) => (
+                                <div key={idx} className="text-xs text-blue-700">
+                                  • {rec.itemName} ({rec.matchScore}% match)
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {aiInsights.eventPredictions.length > 0 && (
+                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <TrendingUp size={16} className="text-green-600" />
+                              <span className="text-sm font-semibold text-green-900">Event Predictions</span>
+                            </div>
+                            <p className="text-xs text-green-700">
+                              {aiInsights.eventPredictions.length} upcoming event(s) analyzed for demand
+                            </p>
+                          </div>
+                        )}
+
+                        {aiInsights.projectPredictions.length > 0 && (
+                          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Sparkles size={16} className="text-amber-600" />
+                              <span className="text-sm font-semibold text-amber-900">Project Forecasts</span>
+                            </div>
+                            <p className="text-xs text-amber-700">
+                              {aiInsights.projectPredictions.length} active project(s) with success predictions
+                            </p>
+                          </div>
+                        )}
+
+                        {(aiInsights.churnRisk.length === 0 &&
+                          aiInsights.topRecommendations.length === 0 &&
+                          aiInsights.eventPredictions.length === 0 &&
+                          aiInsights.projectPredictions.length === 0) && (
+                            <div className="text-center py-4 text-slate-400 text-sm">
+                              No AI insights available yet
+                            </div>
+                          )}
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => onNavigate?.('AI_INSIGHTS')}
+                        >
+                          <Sparkles size={14} className="mr-2" />
+                          View Full AI Insights
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Top Performers */}
+                <Card title="Top Performers">
+                  <div className="space-y-3">
+                    {leaderboard.slice(0, 5).map((member, index) => (
+                      <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                          index === 1 ? 'bg-slate-100 text-slate-600' :
+                            index === 2 ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-500'
+                          }`}>
+                          {index + 1}
+                        </div>
+                        <img src={member.avatar || undefined} alt={member.name} className="w-8 h-8 rounded-full" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
+                          <p className="text-xs text-slate-500">{member.points} points</p>
+                        </div>
+                      </div>
+                    ))}
+                    {leaderboard.length === 0 && (
+                      <div className="text-center py-4 text-slate-400 text-sm">No data available</div>
+                    )}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            <div className="grid lg:grid-cols-2 gap-6">
+              <MemberGrowthChart members={members} />
+              <PointsDistributionChart pointHistory={pointHistory} />
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card title="Engagement Trends">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={engagementTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#64748b" />
+                    <YAxis stroke="#64748b" />
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="events" stroke="#0097D7" strokeWidth={2} name="Events" />
+                    <Line type="monotone" dataKey="projects" stroke="#6EC4E8" strokeWidth={2} name="Projects" />
+                    <Line type="monotone" dataKey="members" stroke="#1C3F94" strokeWidth={2} name="Members" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+
+              <Card title="Project Status Distribution">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={projectStatusData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) => `${entry.status}: ${(entry.percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {projectStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5'][index % 4]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => value} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+
+            <Card title="Event Types Distribution">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={eventTypeData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="type" stroke="#64748b" />
+                  <YAxis stroke="#64748b" />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Bar dataKey="count" fill="#0097D7" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div className="space-y-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('financial'); setIsReportModalOpen(true); }}>
+                <div className="text-center">
+                  <DollarSign className="mx-auto mb-3 text-jci-blue" size={32} />
+                  <h3 className="font-semibold text-slate-900 mb-1">Financial Report</h3>
+                  <p className="text-sm text-slate-500">Income, expenses, and balance sheets</p>
+                </div>
+              </Card>
+
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('membership'); setIsReportModalOpen(true); }}>
+                <div className="text-center">
+                  <Users className="mx-auto mb-3 text-jci-blue" size={32} />
+                  <h3 className="font-semibold text-slate-900 mb-1">Membership Report</h3>
+                  <p className="text-sm text-slate-500">Growth, engagement, and demographics</p>
+                </div>
+              </Card>
+
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('engagement'); setIsReportModalOpen(true); }}>
+                <div className="text-center">
+                  <Activity className="mx-auto mb-3 text-jci-blue" size={32} />
+                  <h3 className="font-semibold text-slate-900 mb-1">Engagement Report</h3>
+                  <p className="text-sm text-slate-500">Points, activities, and participation</p>
+                </div>
+              </Card>
+
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('projects'); setIsReportModalOpen(true); }}>
+                <div className="text-center">
+                  <Briefcase className="mx-auto mb-3 text-jci-blue" size={32} />
+                  <h3 className="font-semibold text-slate-900 mb-1">Project Report</h3>
+                  <p className="text-sm text-slate-500">Status, progress, and outcomes</p>
+                </div>
+              </Card>
+            </div>
+
+            <Card title="Quick Report Generation">
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => handleGenerateReport('Monthly Financial Summary')}
+                  >
+                    <FileText size={16} className="mr-2" />
+                    Monthly Financial Summary
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => handleGenerateReport('Member Engagement Analysis')}
+                  >
+                    <BarChart3 size={16} className="mr-2" />
+                    Member Engagement Analysis
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => handleGenerateReport('Project Status Report')}
+                  >
+                    <Briefcase size={16} className="mr-2" />
+                    Project Status Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => handleGenerateReport('Event Attendance Report')}
+                  >
+                    <Calendar size={16} className="mr-2" />
+                    Event Attendance Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => {
+                      setSelectedReportType('financial');
+                      setIsReportModalOpen(true);
+                    }}
+                  >
+                    <DollarSign size={16} className="mr-2" />
+                    Annual Financial Report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => {
+                      setSelectedReportType('membership');
+                      setIsReportModalOpen(true);
+                    }}
+                  >
+                    <Users size={16} className="mr-2" />
+                    Member Benefits Usage Report
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            <Card title="Report History">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-slate-900">Financial Report - January 2024</p>
+                    <p className="text-xs text-slate-500">Generated on Jan 31, 2024</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm">
+                      <Download size={14} />
                     </Button>
                   </div>
                 </div>
-              </Card>
-
-              <Card title="Report History">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-slate-900">Financial Report - January 2024</p>
-                      <p className="text-xs text-slate-500">Generated on Jan 31, 2024</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Download size={14} />
-                      </Button>
-                    </div>
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-slate-900">Member Engagement Report - Q4 2023</p>
+                    <p className="text-xs text-slate-500">Generated on Dec 31, 2023</p>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-slate-900">Member Engagement Report - Q4 2023</p>
-                      <p className="text-xs text-slate-500">Generated on Dec 31, 2023</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Download size={14} />
-                      </Button>
-                    </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm">
+                      <Download size={14} />
+                    </Button>
                   </div>
                 </div>
-              </Card>
-            </div>
-          )}
-
-          {activeTab === 'insights' && (
-            <div className="space-y-6">
-              {/* Filter Controls */}
-              <Card className="bg-slate-50/50">
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Search members..."
-                      icon={<Search size={18} />}
-                      value={insightSearch}
-                      onChange={(e) => setInsightSearch(e.target.value)}
-                    />
-                  </div>
-                  <div className="w-full md:w-64">
-                    <Select
-                      options={[
-                        { label: 'All Dues Status', value: 'All' },
-                        { label: 'Paid', value: 'Paid' },
-                        { label: 'Pending', value: 'Pending' },
-                        { label: 'Overdue', value: 'Overdue' },
-                      ]}
-                      value={duesStatusFilter}
-                      onChange={(e) => setDuesStatusFilter(e.target.value as any)}
-                    />
-                  </div>
-                </div>
-              </Card>
-
-              {/* Monthly Birthday Grid */}
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {rotatedMonths.map((month) => {
-                  const monthMembers = memberInsightsGroups[month.index];
-                  if (monthMembers.length === 0 && !insightSearch && duesStatusFilter === 'All') {
-                    return null;
-                  }
-
-                  if (monthMembers.length === 0) return null;
-
-                  return (
-                    <Card
-                      key={month.name}
-                      title={
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="text-jci-blue" size={18} />
-                            <span className="font-bold">{month.name}</span>
-                          </div>
-                          {month.isCurrent && (
-                            <Badge variant="info" className="animate-pulse">
-                              Current Month
-                            </Badge>
-                          )}
-                        </div>
-                      }
-                      className={`h-full border-t-4 ${month.isCurrent
-                        ? 'border-t-jci-blue bg-blue-50/30'
-                        : 'border-t-slate-200'
-                        }`}
-                      noPadding
-                    >
-                      <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
-                        {[...monthMembers].sort((a, b) => {
-                          const dateA = a.dateOfBirth ? new Date(a.dateOfBirth).getDate() : 0;
-                          const dateB = b.dateOfBirth ? new Date(b.dateOfBirth).getDate() : 0;
-
-                          if (month.isCurrent) {
-                            const today = new Date().getDate();
-                            const isFutureA = dateA >= today;
-                            const isFutureB = dateB >= today;
-
-                            if (isFutureA && !isFutureB) return -1;
-                            if (!isFutureA && isFutureB) return 1;
-                          }
-                          return dateA - dateB;
-                        }).map(m => {
-                          const isBirthdayToday = m.dateOfBirth &&
-                            new Date(m.dateOfBirth).getDate() === new Date().getDate() &&
-                            new Date(m.dateOfBirth).getMonth() === new Date().getMonth();
-
-                          return (
-                            <div key={m.id} className={`p-3 rounded-xl border shadow-sm hover:shadow-md transition-all group ${isBirthdayToday
-                              ? 'bg-gradient-to-br from-jci-blue to-blue-600 text-white border-blue-400 shadow-lg scale-[1.03] z-10'
-                              : 'bg-white border-slate-100'
-                              }`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className={`font-bold transition-colors leading-none ${isBirthdayToday ? 'text-white' : 'text-slate-900 group-hover:text-jci-blue'
-                                      }`}>{m.name}</h4>
-                                    <Badge
-                                      variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
-                                      className={`text-[10px] px-1.5 py-0 ${isBirthdayToday ? 'bg-white text-jci-blue border-none' : ''}`}
-                                    >
-                                      {m.duesStatus}
-                                    </Badge>
-                                    {isBirthdayToday && (
-                                      <Badge variant="success" className="bg-pink-500 text-white border-none text-[10px] animate-bounce">
-                                        HAPPY BIRTHDAY! 🎂
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="mt-1">
-                                    {m.duesYear && (
-                                      <span className={`text-[10px] font-medium ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'}`}>FY {m.duesYear}</span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className={`p-1.5 rounded-lg ${isBirthdayToday ? 'bg-white/20' : 'bg-jci-blue/10'}`}>
-                                  <Gift size={14} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
-                                </div>
-                              </div>
-
-                              <div className={`grid grid-cols-2 gap-2 mt-3 pt-3 border-t ${isBirthdayToday ? 'border-white/20' : 'border-slate-50'}`}>
-                                <div className="flex items-center gap-2">
-                                  <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-pink-50'} rounded-md`}>
-                                    <Cake size={12} className={isBirthdayToday ? 'text-white' : 'text-pink-500'} />
-                                  </div>
-                                  <div>
-                                    <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Birthday</p>
-                                    <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.dateOfBirth ? new Date(m.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-blue-50'} rounded-md`}>
-                                    <Users size={12} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
-                                  </div>
-                                  <div>
-                                    <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Joined</p>
-                                    <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.joinDate ? m.joinDate.split('-')[0] : 'N/A'}</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {m.duesPaidDate && m.duesStatus === 'Paid' && (
-                                <div className={`mt-2 flex items-center gap-1.5 text-[10px] p-1.5 rounded-lg border ${isBirthdayToday
-                                  ? 'text-white bg-white/10 border-white/20'
-                                  : 'text-green-600 bg-green-50/50 border-green-100/50'
-                                  }`}>
-                                  <CheckCircle size={10} />
-                                  <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100">
-                        <p className="text-[10px] text-slate-400 font-medium">{monthMembers.length} {monthMembers.length === 1 ? 'member' : 'members'}</p>
-                      </div>
-                    </Card>
-                  );
-                })}
-
-                {Object.values(memberInsightsGroups).every(g => g.length === 0) && (
-                  <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                    <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-                      <Users className="text-slate-400" size={24} />
-                    </div>
-                    <h3 className="text-slate-900 font-semibold">No members found</h3>
-                    <p className="text-slate-500 text-sm mt-1">Try adjusting your filters or search terms.</p>
-                  </div>
-                )}
               </div>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'insights' && (
+          <div className="space-y-6">
+            {/* Filter Controls */}
+            <Card className="bg-slate-50/50">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search members..."
+                    icon={<Search size={18} />}
+                    value={insightSearch}
+                    onChange={(e) => setInsightSearch(e.target.value)}
+                  />
+                </div>
+                <div className="w-full md:w-64">
+                  <Select
+                    options={[
+                      { label: 'All Dues Status', value: 'All' },
+                      { label: 'Paid', value: 'Paid' },
+                      { label: 'Pending', value: 'Pending' },
+                      { label: 'Overdue', value: 'Overdue' },
+                    ]}
+                    value={duesStatusFilter}
+                    onChange={(e) => setDuesStatusFilter(e.target.value as any)}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Monthly Birthday Grid */}
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {rotatedMonths.map((month) => {
+                const monthMembers = memberInsightsGroups[month.index];
+                if (monthMembers.length === 0 && !insightSearch && duesStatusFilter === 'All') {
+                  return null;
+                }
+
+                if (monthMembers.length === 0) return null;
+
+                return (
+                  <Card
+                    key={month.name}
+                    title={
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="text-jci-blue" size={18} />
+                          <span className="font-bold">{month.name}</span>
+                        </div>
+                        {month.isCurrent && (
+                          <Badge variant="info" className="animate-pulse">
+                            Current Month
+                          </Badge>
+                        )}
+                      </div>
+                    }
+                    className={`h-full border-t-4 ${month.isCurrent
+                      ? 'border-t-jci-blue bg-blue-50/30'
+                      : 'border-t-slate-200'
+                      }`}
+                    noPadding
+                  >
+                    <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
+                      {[...monthMembers].sort((a, b) => {
+                        const dateA = a.dateOfBirth ? new Date(a.dateOfBirth).getDate() : 0;
+                        const dateB = b.dateOfBirth ? new Date(b.dateOfBirth).getDate() : 0;
+
+                        if (month.isCurrent) {
+                          const today = new Date().getDate();
+                          const isFutureA = dateA >= today;
+                          const isFutureB = dateB >= today;
+
+                          if (isFutureA && !isFutureB) return -1;
+                          if (!isFutureA && isFutureB) return 1;
+                        }
+                        return dateA - dateB;
+                      }).map(m => {
+                        const isBirthdayToday = m.dateOfBirth &&
+                          new Date(m.dateOfBirth).getDate() === new Date().getDate() &&
+                          new Date(m.dateOfBirth).getMonth() === new Date().getMonth();
+
+                        return (
+                          <div key={m.id} className={`p-3 rounded-xl border shadow-sm hover:shadow-md transition-all group ${isBirthdayToday
+                            ? 'bg-gradient-to-br from-jci-blue to-blue-600 text-white border-blue-400 shadow-lg scale-[1.03] z-10'
+                            : 'bg-white border-slate-100'
+                            }`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className={`font-bold transition-colors leading-none ${isBirthdayToday ? 'text-white' : 'text-slate-900 group-hover:text-jci-blue'
+                                    }`}>{m.name}</h4>
+                                  <Badge
+                                    variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
+                                    className={`text-[10px] px-1.5 py-0 ${isBirthdayToday ? 'bg-white text-jci-blue border-none' : ''}`}
+                                  >
+                                    {m.duesStatus}
+                                  </Badge>
+                                  {isBirthdayToday && (
+                                    <Badge variant="success" className="bg-pink-500 text-white border-none text-[10px] animate-bounce">
+                                      HAPPY BIRTHDAY! 🎂
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="mt-1">
+                                  {m.duesYear && (
+                                    <span className={`text-[10px] font-medium ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'}`}>FY {m.duesYear}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className={`p-1.5 rounded-lg ${isBirthdayToday ? 'bg-white/20' : 'bg-jci-blue/10'}`}>
+                                <Gift size={14} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
+                              </div>
+                            </div>
+
+                            <div className={`grid grid-cols-2 gap-2 mt-3 pt-3 border-t ${isBirthdayToday ? 'border-white/20' : 'border-slate-50'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-pink-50'} rounded-md`}>
+                                  <Cake size={12} className={isBirthdayToday ? 'text-white' : 'text-pink-500'} />
+                                </div>
+                                <div>
+                                  <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Birthday</p>
+                                  <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.dateOfBirth ? new Date(m.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-blue-50'} rounded-md`}>
+                                  <Users size={12} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
+                                </div>
+                                <div>
+                                  <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Joined</p>
+                                  <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.joinDate ? m.joinDate.split('-')[0] : 'N/A'}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {m.duesPaidDate && m.duesStatus === 'Paid' && (
+                              <div className={`mt-2 flex items-center gap-1.5 text-[10px] p-1.5 rounded-lg border ${isBirthdayToday
+                                ? 'text-white bg-white/10 border-white/20'
+                                : 'text-green-600 bg-green-50/50 border-green-100/50'
+                                }`}>
+                                <CheckCircle size={10} />
+                                <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100">
+                      <p className="text-[10px] text-slate-400 font-medium">{monthMembers.length} {monthMembers.length === 1 ? 'member' : 'members'}</p>
+                    </div>
+                  </Card>
+                );
+              })}
+
+              {Object.values(memberInsightsGroups).every(g => g.length === 0) && (
+                <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                  <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                    <Users className="text-slate-400" size={24} />
+                  </div>
+                  <h3 className="text-slate-900 font-semibold">No members found</h3>
+                  <p className="text-slate-500 text-sm mt-1">Try adjusting your filters or search terms.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </Card>
+          </div>
+        )}
+      </div>
 
       {/* Report Generation Modal */}
       <Modal

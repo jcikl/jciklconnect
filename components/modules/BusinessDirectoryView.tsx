@@ -52,18 +52,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
           <h2 className="text-2xl font-bold text-slate-900">Member Business Directory</h2>
           <p className="text-slate-500">Support local member businesses and global JCI network connections.</p>
         </div>
-        <div className="w-full md:w-64">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-            <input
-              type="text"
-              placeholder="Search services..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-jci-blue/20 outline-none"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Education/Instruction Card */}
