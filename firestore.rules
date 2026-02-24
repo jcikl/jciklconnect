@@ -598,6 +598,11 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
     
+    // Finance: payment requests (PaymentRequestsView - for members to submit, edit, and view)
+    match /paymentRequests/{docId} {
+      allow read, create, update, delete: if isMember();
+    }
+    
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

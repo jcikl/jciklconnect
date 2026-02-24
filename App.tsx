@@ -1038,6 +1038,8 @@ const JCIKLApp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
   const { user, member, loading: authLoading, signOut, simulatedRole } = useAuth();
   const { showToast } = useToast();
   const { isBoard, isAdmin, isDeveloper, isMember, isGuest, isOrganizationSecretary, effectiveRole, hasPermission } = usePermissions();
@@ -1258,8 +1260,8 @@ const JCIKLApp: React.FC = () => {
       case 'KNOWLEDGE': return <KnowledgeView />;
       case 'COMMUNICATION': return <CommunicationView />;
       case 'CLUBS': return <HobbyClubsView />;
-      case 'SURVEYS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <SurveysView />;
-      case 'BENEFITS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <MemberBenefitsView />;
+      case 'SURVEYS': return <SurveysView />;
+      case 'BENEFITS': return <MemberBenefitsView />;
       case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <DataImportExportView />;
       case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <AdvertisementsView />;
       case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <AIInsightsView onNavigate={(view) => setView(view as ViewType)} />;
@@ -1759,7 +1761,10 @@ const JCIKLApp: React.FC = () => {
               <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
             </button>
             <button
-              onClick={() => setView('PAYMENT_REQUESTS')}
+              onClick={() => {
+                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                else setView('PAYMENT_REQUESTS');
+              }}
               className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}
             >
               <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'PAYMENT_REQUESTS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : ''}`}>
@@ -1768,7 +1773,10 @@ const JCIKLApp: React.FC = () => {
               <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}>Claim</span>
             </button>
             <button
-              onClick={() => setView('DIRECTORY')}
+              onClick={() => {
+                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                else setView('DIRECTORY');
+              }}
               className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
             >
               <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : ''}`}>
@@ -1788,6 +1796,26 @@ const JCIKLApp: React.FC = () => {
           </div>
         )}
       </div>
+
+      <Modal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} title="Join Member to Unlock More" size="md">
+        <div className="text-center p-4">
+          <div className="w-16 h-16 bg-blue-50 text-jci-blue rounded-full flex items-center justify-center mx-auto mb-4">
+            <Award size={32} />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">Unlock More Features</h3>
+          <p className="text-sm text-slate-500 mb-8">
+            Upgrade your account to access Claims, Business Directory, Projects, Mentorship, and more exclusive member benefits!
+          </p>
+          <div className="flex flex-col gap-3">
+            <Button className="w-full" onClick={() => { setUpgradeModalOpen(false); /* Route to Join Us or open registration */ }}>
+              Join Us Now
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => setUpgradeModalOpen(false)}>
+              Maybe Later
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </HelpModalProvider>
   );
 }
