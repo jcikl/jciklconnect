@@ -18,6 +18,30 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
   const { members } = useMembers(); // Used to find owner name
   const { showToast } = useToast();
 
+  // Map each industry to a unique gradient for the banner background
+  const INDUSTRY_BANNER_MAP: Record<string, { from: string; to: string }> = {
+    'Advertising, Marketing & Media': { from: 'from-pink-200', to: 'to-purple-200' },
+    'Agriculture & Animals': { from: 'from-green-200', to: 'to-emerald-200' },
+    'Architecture, Engineering & Construction': { from: 'from-indigo-200', to: 'to-blue-200' },
+    'Art, Entertainment & Design': { from: 'from-rose-200', to: 'to-orange-200' },
+    'Automotive & Accessories': { from: 'from-gray-200', to: 'to-slate-200' },
+    'Food & Beverages': { from: 'from-yellow-200', to: 'to-amber-200' },
+    'Telecom, AI, Computers & IT': { from: 'from-cyan-200', to: 'to-teal-200' },
+    'Consulting & Professional Services': { from: 'from-purple-200', to: 'to-fuchsia-200' },
+    'Education & Training': { from: 'from-blue-200', to: 'to-sky-200' },
+    'Event & Hospitality': { from: 'from-pink-200', to: 'to-rose-200' },
+    'Crypto, Blockchain, Finance & Insurance': { from: 'from-indigo-200', to: 'to-violet-200' },
+    'Health & Wellness': { from: 'from-red-200', to: 'to-pink-200' },
+    'Legal, HR, Accounting & Tax': { from: 'from-emerald-200', to: 'to-green-200' },
+    'Manufacturing & Supply Chain': { from: 'from-orange-200', to: 'to-amber-200' },
+    'Wholesale, Retail & E-Commerce': { from: 'from-teal-200', to: 'to-cyan-200' },
+    'Personal, Beauty & Sports': { from: 'from-fuchsia-200', to: 'to-pink-200' },
+    'Real Estate & Property Services': { from: 'from-slate-200', to: 'to-gray-200' },
+    'Transport & Logistics': { from: 'from-amber-200', to: 'to-yellow-200' },
+    'Travel & Tourism': { from: 'from-sky-200', to: 'to-blue-200' },
+    'Other': { from: 'from-gray-200', to: 'to-slate-200' },
+  };
+
   const uniqueIndustries = useMemo(() => {
     const industries = new Set(businesses.map(b => b.industry).filter(Boolean));
     return ['All', ...Array.from(industries).sort()];
@@ -93,7 +117,8 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
                     const owner = members.find(m => m.id === biz.memberId);
                     return (
                       <Card key={biz.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
-                        <div className="h-24 bg-gradient-to-r from-slate-100 to-slate-200 relative">
+                        {/* Industry‑specific banner */}
+                        <div className={`h-24 ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.from ?? 'from-slate-100'} ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.to ?? 'to-slate-200'} bg-gradient-to-r relative`}>
                           <div className="absolute -bottom-6 left-2 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
                             <img
                               src={biz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.companyName)}&background=0097D7&color=fff`}

@@ -673,16 +673,17 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                 ) : (
                   <div className="grid gap-3">
                     {filteredFinanceList.map((pr) => (
-                      <Card key={pr.id} className="p-3 border-slate-100 hover:border-slate-200">
+                      <Card key={pr.id} noPadding className="p-4 border-slate-100 hover:border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <div className="flex items-center gap-2 justify-between flex-wrap mb-1">
                               <span className="font-mono font-bold text-xs">{pr.referenceNumber}</span>
                               <StatusBadge status={pr.status} />
-                              <span className="text-xs text-slate-400">• applicant: {pr.applicantName || 'Unknown'}</span>
                             </div>
                             <h5 className="font-semibold text-slate-800 truncate">{pr.purpose}</h5>
                             <p className="text-xs text-slate-500">{pr.category === 'administrative' ? `Admin Account: ${pr.activityId || 'N/A'}` : 'Project'}</p>
+                            <p className="text-xs text-slate-400">Applicant: {pr.applicantName || 'Unknown'}</p>
+
                           </div>
                           <div className="flex items-center gap-4 border-t md:border-t-0 pt-2 md:pt-0">
                             <span className="font-bold text-slate-900">{formatCurrency(pr.totalAmount || pr.amount)}</span>
