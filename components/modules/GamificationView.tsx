@@ -308,6 +308,7 @@ export const GamificationView: React.FC = () => {
 
             {/* Leaderboard Visibility Settings Modal */}
             <Modal
+              isOpen={isVisibilityModalOpen}
               onClose={() => setVisibilityModalOpen(false)}
               title="Leaderboard Visibility Settings"
               drawerOnMobile

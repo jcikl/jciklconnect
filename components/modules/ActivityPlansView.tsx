@@ -10,7 +10,7 @@ import { ActivityPlan } from '../../services/activityPlansService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatCurrency } from '../../utils/formatUtils';
 
-export const ActivityPlansView: React.FC = () => {
+export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
@@ -26,15 +26,30 @@ export const ActivityPlansView: React.FC = () => {
   const canManage = isBoard || isAdmin;
 
   const filteredPlans = useMemo(() => {
-    if (activeTab === 'all') return plans;
-    return plans.filter(plan => {
-      if (activeTab === 'draft') return plan.status === 'Draft';
-      if (activeTab === 'submitted') return plan.status === 'Submitted' || plan.status === 'Under Review';
-      if (activeTab === 'approved') return plan.status === 'Approved' || plan.status === 'Active';
-      if (activeTab === 'rejected') return plan.status === 'Rejected';
-      return true;
-    });
-  }, [plans, activeTab]);
+    let filtered = plans;
+    const term = (searchQuery || '').toLowerCase();
+
+    if (activeTab !== 'all') {
+      filtered = filtered.filter(plan => {
+        if (activeTab === 'draft') return plan.status === 'Draft';
+        if (activeTab === 'submitted') return plan.status === 'Submitted' || plan.status === 'Under Review';
+        if (activeTab === 'approved') return plan.status === 'Approved' || plan.status === 'Active';
+        if (activeTab === 'rejected') return plan.status === 'Rejected';
+        return true;
+      });
+    }
+
+    if (term) {
+      filtered = filtered.filter(plan =>
+        (plan.title ?? '').toLowerCase().includes(term) ||
+        (plan.description ?? '').toLowerCase().includes(term) ||
+        (plan.objectives ?? '').toLowerCase().includes(term) ||
+        (plan.submittedBy ?? '').toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
+  }, [plans, activeTab, searchQuery]);
 
   const paginatedPlans = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -318,6 +333,7 @@ export const ActivityPlansView: React.FC = () => {
 
       {/* Create/Edit Activity Plan Modal */}
       <Modal
+        isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedPlan(null);

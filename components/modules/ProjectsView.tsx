@@ -28,7 +28,7 @@ import { Transaction } from '../../types';
 
 const PENDING_USE_TEMPLATE_KEY = 'jci_pending_use_template_id';
 
-export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
+export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searchQuery?: string }> = ({ onNavigate, searchQuery }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isProposalModalOpen, setProposalModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'projects' | 'past-projects' | 'templates'>('projects');
@@ -53,14 +53,29 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void }> = (
 
   const displayedProjects = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
+    const term = (searchQuery || '').toLowerCase();
+
+    let filtered = projects;
+
     if (activeTab === 'past-projects') {
-      return projects.filter(p => p.eventStartDate && p.eventStartDate < today);
+      filtered = projects.filter(p => p.eventStartDate && p.eventStartDate < today);
+    } else if (activeTab === 'projects') {
+      filtered = projects.filter(p => !p.eventStartDate || p.eventStartDate >= today);
+    } else {
+      return [];
     }
-    if (activeTab === 'projects') {
-      return projects.filter(p => !p.eventStartDate || p.eventStartDate >= today);
+
+    if (term) {
+      filtered = filtered.filter(p =>
+        (p.name ?? '').toLowerCase().includes(term) ||
+        (p.title ?? '').toLowerCase().includes(term) ||
+        (p.description ?? '').toLowerCase().includes(term) ||
+        (p.objectives ?? '').toLowerCase().includes(term)
+      );
     }
-    return [];
-  }, [projects, activeTab]);
+
+    return filtered;
+  }, [projects, activeTab, searchQuery]);
 
   const handleBatchDelete = async () => {
     if (selectedProjectIds.size === 0) return;

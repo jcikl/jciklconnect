@@ -14,7 +14,7 @@ import { AIPredictionService } from '../../services/aiPredictionService';
 import { CommunicationService } from '../../services/communicationService';
 import { NewsPost } from '../../types';
 
-export const CommunicationView: React.FC = () => {
+export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [activeTab, setActiveTab] = useState('Newsfeed');
     const [postContent, setPostContent] = useState('');
     const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
@@ -202,7 +202,15 @@ export const CommunicationView: React.FC = () => {
                             {/* Feed Items */}
                             {activeTab === 'Announcements' ? (
                                 <AnnouncementsTab
-                                    posts={posts.filter(p => p.type === 'Announcement')}
+                                    posts={posts.filter(p => p.type === 'Announcement').filter(p => {
+                                        const term = (searchQuery || '').toLowerCase();
+                                        if (!term) return true;
+                                        return (
+                                            (p.content ?? '').toLowerCase().includes(term) ||
+                                            (p.author?.name ?? '').toLowerCase().includes(term) ||
+                                            (p.author?.role ?? '').toLowerCase().includes(term)
+                                        );
+                                    })}
                                     loading={loading}
                                     error={error}
                                     canManage={canManageAnnouncements}
@@ -223,7 +231,15 @@ export const CommunicationView: React.FC = () => {
                                 />
                             ) : (
                                 <LoadingState loading={loading} error={error} empty={posts.length === 0} emptyMessage="No posts yet. Be the first to share!">
-                                    {posts.map(post => (
+                                    {posts.filter(p => {
+                                        const term = (searchQuery || '').toLowerCase();
+                                        if (!term) return true;
+                                        return (
+                                            (p.content ?? '').toLowerCase().includes(term) ||
+                                            (p.author?.name ?? '').toLowerCase().includes(term) ||
+                                            (p.author?.role ?? '').toLowerCase().includes(term)
+                                        );
+                                    }).map(post => (
                                         <div key={post.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors">
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center gap-3">

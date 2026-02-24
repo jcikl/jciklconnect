@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Gift, Plus, Edit, Trash2, Users, TrendingUp, Calendar, Tag, CheckCircle, History, Eye } from 'lucide-react';
 import { Button, Card, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
@@ -10,7 +10,7 @@ import { useMembers } from '../../hooks/useMembers';
 import { MemberBenefit } from '../../services/memberBenefitsService';
 import { formatDate, toDate } from '../../utils/dateUtils';
 
-export const MemberBenefitsView: React.FC = () => {
+export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBenefit, setSelectedBenefit] = useState<MemberBenefit | null>(null);
   const [claimedBenefitIds, setClaimedBenefitIds] = useState<Set<string>>(new Set());
@@ -87,11 +87,24 @@ export const MemberBenefitsView: React.FC = () => {
     }
   };
 
-  const displayBenefits = [...benefits].sort((a, b) => {
-    const aClaimed = claimedBenefitIds.has(a.id!) ? 1 : 0;
-    const bClaimed = claimedBenefitIds.has(b.id!) ? 1 : 0;
-    return bClaimed - aClaimed;
-  });
+  const displayBenefits = useMemo(() => {
+    let filtered = [...benefits];
+    const term = (searchQuery || '').toLowerCase();
+
+    if (term) {
+      filtered = filtered.filter(b =>
+        (b.name ?? '').toLowerCase().includes(term) ||
+        (b.description ?? '').toLowerCase().includes(term) ||
+        (b.provider ?? '').toLowerCase().includes(term)
+      );
+    }
+
+    return filtered.sort((a, b) => {
+      const aClaimed = claimedBenefitIds.has(a.id!) ? 1 : 0;
+      const bClaimed = claimedBenefitIds.has(b.id!) ? 1 : 0;
+      return bClaimed - aClaimed;
+    });
+  }, [benefits, claimedBenefitIds, searchQuery]);
 
   return (
     <div className="space-y-6">

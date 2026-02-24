@@ -1,7 +1,7 @@
 // AI Insights View - Unified AI predictions, recommendations, and analytics
 import React, { useState, useEffect } from 'react';
 import { Sparkles, TrendingDown, TrendingUp, Users, Calendar, Target, Heart, AlertTriangle, Lightbulb, BarChart3, RefreshCw, BookOpen } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, ProgressBar } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs, ProgressBar, StatCardsContainer } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useAuth } from '../../hooks/useAuth';
 import { useMembers } from '../../hooks/useMembers';
@@ -14,9 +14,10 @@ import { formatDate } from '../../utils/dateUtils';
 
 interface AIInsightsViewProps {
     onNavigate?: (view: string) => void;
+    searchQuery?: string;
 }
 
-export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) => {
+export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate, searchQuery }) => {
     const [activeTab, setActiveTab] = useState<'churn' | 'recommendations' | 'predictions'>('churn');
     const [churnData, setChurnData] = useState<Array<{ member: any; risk: ChurnRiskFactors }>>([]);
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -175,6 +176,7 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) =>
                             churnData={churnData}
                             loading={loading}
                             onSelectMember={setSelectedMemberId}
+                            searchQuery={searchQuery}
                         />
                     )}
                     {activeTab === 'recommendations' && (
@@ -183,6 +185,7 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) =>
                             loading={loading}
                             currentMember={currentMember}
                             onNavigate={onNavigate}
+                            searchQuery={searchQuery}
                         />
                     )}
                     {activeTab === 'predictions' && (
@@ -193,6 +196,7 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate }) =>
                             projects={projects}
                             events={events}
                             onNavigate={onNavigate}
+                            searchQuery={searchQuery}
                         />
                     )}
                 </div>
@@ -214,13 +218,22 @@ const ChurnPredictionView: React.FC<{
     churnData: Array<{ member: any; risk: ChurnRiskFactors }>;
     loading: boolean;
     onSelectMember: (memberId: string) => void;
-}> = ({ churnData, loading, onSelectMember }) => {
-    const highRisk = churnData.filter(d => d.risk.riskLevel === 'High');
-    const mediumRisk = churnData.filter(d => d.risk.riskLevel === 'Medium');
-    const lowRisk = churnData.filter(d => d.risk.riskLevel === 'Low');
+    searchQuery?: string;
+}> = ({ churnData, loading, onSelectMember, searchQuery }) => {
+    const term = (searchQuery || '').toLowerCase();
+    const filteredChurnData = term
+        ? churnData.filter(d =>
+            (d.member?.name ?? '').toLowerCase().includes(term) ||
+            (d.member?.email ?? '').toLowerCase().includes(term)
+        )
+        : churnData;
+
+    const highRisk = filteredChurnData.filter(d => d.risk.riskLevel === 'High');
+    const mediumRisk = filteredChurnData.filter(d => d.risk.riskLevel === 'Medium');
+    const lowRisk = filteredChurnData.filter(d => d.risk.riskLevel === 'Low');
 
     return (
-        <LoadingState loading={loading} error={null} empty={churnData.length === 0} emptyMessage="No members at risk identified">
+        <LoadingState loading={loading} error={null} empty={filteredChurnData.length === 0} emptyMessage="No members at risk identified">
             <div className="space-y-6">
                 {/* Risk Summary */}
                 <StatCardsContainer>
@@ -248,7 +261,7 @@ const ChurnPredictionView: React.FC<{
                 <div>
                     <h3 className="text-lg font-bold text-slate-900 mb-4">Members at Risk</h3>
                     <div className="space-y-3">
-                        {churnData.map(({ member, risk }) => (
+                        {filteredChurnData.map(({ member, risk }) => (
                             <Card
                                 key={member.id}
                                 className="hover:shadow-md transition-shadow cursor-pointer"
@@ -307,7 +320,8 @@ const RecommendationsView: React.FC<{
     loading: boolean;
     currentMember: any;
     onNavigate?: (view: string) => void;
-}> = ({ recommendations, loading, currentMember, onNavigate }) => {
+    searchQuery?: string;
+}> = ({ recommendations, loading, currentMember, onNavigate, searchQuery }) => {
     if (!currentMember) {
         return (
             <div className="text-center py-10 text-slate-400">
@@ -329,14 +343,23 @@ const RecommendationsView: React.FC<{
         }
     };
 
-    const groupedRecs = recommendations.reduce((acc, rec) => {
+    const term = (searchQuery || '').toLowerCase();
+    const filteredRecs = term
+        ? recommendations.filter(rec =>
+            (rec.title ?? '').toLowerCase().includes(term) ||
+            (rec.description ?? '').toLowerCase().includes(term) ||
+            (rec.reason ?? '').toLowerCase().includes(term)
+        )
+        : recommendations;
+
+    const groupedRecs = filteredRecs.reduce((acc, rec) => {
         if (!acc[rec.type]) acc[rec.type] = [];
         acc[rec.type].push(rec);
         return acc;
     }, {} as Record<string, Recommendation[]>);
 
     return (
-        <LoadingState loading={loading} error={null} empty={recommendations.length === 0} emptyMessage="No recommendations available at this time">
+        <LoadingState loading={loading} error={null} empty={filteredRecs.length === 0} emptyMessage="No recommendations available at this time">
             <div className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
                     <div className="flex items-center gap-3 mb-2">
@@ -413,16 +436,35 @@ const PredictionsView: React.FC<{
     projects?: any[];
     events?: any[];
     onNavigate?: (view: string) => void;
-}> = ({ eventPredictions, projectPredictions, loading, projects = [], events = [], onNavigate }) => {
+    searchQuery?: string;
+}> = ({ eventPredictions, projectPredictions, loading, projects = [], events = [], onNavigate, searchQuery }) => {
+    const term = (searchQuery || '').toLowerCase();
+
+    // Filter project predictions by name
+    const filteredProjectPredictions = term
+        ? projectPredictions.filter(pred => {
+            const relatedProject = projects.find(p => p.id === pred.projectId);
+            return (relatedProject?.name ?? '').toLowerCase().includes(term);
+        })
+        : projectPredictions;
+
+    // Filter event predictions by title
+    const filteredEventPredictions = term
+        ? eventPredictions.filter(pred => {
+            const relatedEvent = events.find(e => e.type === pred.eventType);
+            return (relatedEvent?.title ?? pred.eventType).toLowerCase().includes(term);
+        })
+        : eventPredictions;
+
     return (
-        <LoadingState loading={loading} error={null} empty={eventPredictions.length === 0 && projectPredictions.length === 0} emptyMessage="No predictions available">
+        <LoadingState loading={loading} error={null} empty={filteredEventPredictions.length === 0 && filteredProjectPredictions.length === 0} emptyMessage="No predictions available">
             <div className="space-y-6">
                 {/* Event Demand Predictions */}
-                {eventPredictions.length > 0 && (
+                {filteredEventPredictions.length > 0 && (
                     <div>
                         <h3 className="text-lg font-bold text-slate-900 mb-4">Event Demand Predictions</h3>
                         <div className="space-y-4">
-                            {eventPredictions.map((pred, index) => {
+                            {filteredEventPredictions.map((pred, index) => {
                                 const relatedEvent = events.find(e => e.type === pred.eventType);
                                 return (
                                     <Card key={index}>
@@ -476,11 +518,11 @@ const PredictionsView: React.FC<{
                 )}
 
                 {/* Project Success Predictions */}
-                {projectPredictions.length > 0 && (
+                {filteredProjectPredictions.length > 0 && (
                     <div>
                         <h3 className="text-lg font-bold text-slate-900 mb-4">Project Success Predictions</h3>
                         <div className="space-y-4">
-                            {projectPredictions.map((pred) => {
+                            {filteredProjectPredictions.map((pred) => {
                                 const relatedProject = projects.find(p => p.id === pred.projectId);
                                 return (
                                     <Card key={pred.projectId}>

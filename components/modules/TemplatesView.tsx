@@ -9,7 +9,7 @@ import { EventTemplate, ActivityPlanTemplate, EventBudgetTemplate } from '../../
 import { formatDate } from '../../utils/dateUtils';
 import { formatCurrency } from '../../utils/formatUtils';
 
-export const TemplatesView: React.FC = () => {
+export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isActivityPlanModalOpen, setIsActivityPlanModalOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
@@ -182,7 +182,14 @@ export const TemplatesView: React.FC = () => {
           {activeTab === 'events' && (
             <LoadingState loading={loading} error={error} empty={eventTemplates.length === 0} emptyMessage="No event templates found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {eventTemplates.map(template => (
+                {eventTemplates.filter(template => {
+                  const term = (searchQuery || '').toLowerCase();
+                  if (!term) return true;
+                  return (
+                    (template.name ?? '').toLowerCase().includes(term) ||
+                    (template.description ?? '').toLowerCase().includes(term)
+                  );
+                }).map(template => (
                   <Card key={template.id} className="hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -261,7 +268,14 @@ export const TemplatesView: React.FC = () => {
           {activeTab === 'activityPlans' && (
             <LoadingState loading={loading} error={error} empty={activityPlanTemplates.length === 0} emptyMessage="No activity plan templates found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activityPlanTemplates.map(template => (
+                {activityPlanTemplates.filter(template => {
+                  const term = (searchQuery || '').toLowerCase();
+                  if (!term) return true;
+                  return (
+                    (template.name ?? '').toLowerCase().includes(term) ||
+                    (template.description ?? '').toLowerCase().includes(term)
+                  );
+                }).map(template => (
                   <Card key={template.id} className="hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -326,7 +340,14 @@ export const TemplatesView: React.FC = () => {
           {activeTab === 'budgets' && (
             <LoadingState loading={loading} error={error} empty={eventBudgetTemplates.length === 0} emptyMessage="No budget templates found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {eventBudgetTemplates.map(template => (
+                {eventBudgetTemplates.filter(template => {
+                  const term = (searchQuery || '').toLowerCase();
+                  if (!term) return true;
+                  return (
+                    (template.name ?? '').toLowerCase().includes(term) ||
+                    (template.description ?? '').toLowerCase().includes(term)
+                  );
+                }).map(template => (
                   <Card key={template.id} className="hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -395,6 +416,7 @@ export const TemplatesView: React.FC = () => {
 
       {/* Event Template Modal */}
       <Modal
+        isOpen={isEventModalOpen}
         onClose={() => {
           setIsEventModalOpen(false);
           setSelectedEventTemplate(null);
@@ -496,6 +518,7 @@ export const TemplatesView: React.FC = () => {
 
       {/* Activity Plan Template Modal */}
       <Modal
+        isOpen={isActivityPlanModalOpen}
         onClose={() => {
           setIsActivityPlanModalOpen(false);
           setSelectedActivityPlanTemplate(null);
@@ -583,7 +606,8 @@ export const TemplatesView: React.FC = () => {
           setIsBudgetModalOpen(false);
           setSelectedBudgetTemplate(null);
         }}
-        onSubmit={handleEventTemplateSubmit}
+        template={selectedBudgetTemplate}
+        onSubmit={handleBudgetTemplateSubmit}
         drawerOnMobile
       />
     </div>
@@ -592,7 +616,8 @@ export const TemplatesView: React.FC = () => {
 
 // Budget Template Modal Component
 interface BudgetTemplateModalProps {
-  isOpen: boolean; // Added missing prop
+  isOpen: boolean;
+  onClose: () => void;
   template: EventBudgetTemplate | null;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   drawerOnMobile?: boolean;

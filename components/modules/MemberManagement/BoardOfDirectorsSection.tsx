@@ -254,11 +254,9 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       {canManage && (
                         <div className="w-48">
                           <Select
-                            placeholder="Add CD..."
                             value=""
                             onChange={(e) => handleAddCommissionDirector(position, e.target.value)}
                             options={[{ value: '', label: '+ Add Director' }, ...memberOptions]}
-                            size="sm"
                           />
                         </div>
                       )}
@@ -271,12 +269,12 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                         assignments[position].commissionDirectorIds.map(id => {
                           const m = members.find(mem => mem.id === id);
                           return (
-                            <div key={id} className="flex items-center gap-2 bg-slate-50 pl-2 pr-1 py-1 rounded-full border border-slate-200">
+                            <div key={id} className="flex items-center gap-2 bg-slate-50 pl-4 pr-1 py-1 rounded-full border border-slate-200">
                               <span className="text-xs font-medium text-slate-700">{m?.name || 'Unknown'}</span>
                               {canManage && (
                                 <button
                                   onClick={() => handleRemoveCommissionDirector(position, id)}
-                                  className="p-1 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"
+                                  className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"
                                 >
                                   <Trash2 size={12} />
                                 </button>

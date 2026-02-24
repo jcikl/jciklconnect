@@ -226,7 +226,8 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
-        where('email', '==', email)
+        where('email', '==', email),
+        limit(1)
       );
 
       const snapshot = await getDocs(q);

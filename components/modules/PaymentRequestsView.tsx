@@ -31,7 +31,7 @@ function StatusBadge({ status }: { status: PaymentRequestStatus }) {
   return <Badge variant={variant}>{STATUS_LABEL[status]}</Badge>;
 }
 
-export const PaymentRequestsView: React.FC = () => {
+export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const { showToast } = useToast();
   const helpModal = useHelpModal();
   const { user, member } = useAuth();
@@ -611,7 +611,18 @@ export const PaymentRequestsView: React.FC = () => {
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    {myList.map((pr) => (
+                    {myList.filter(pr => {
+                      const term = (searchQuery || '').toLowerCase();
+                      if (!term) return true;
+                      const projectName = projects.find(p => p.id === pr.activityId)?.name || '';
+                      return (
+                        (pr.purpose ?? '').toLowerCase().includes(term) ||
+                        (pr.referenceNumber ?? '').toLowerCase().includes(term) ||
+                        (pr.activityId ?? '').toLowerCase().includes(term) ||
+                        projectName.toLowerCase().includes(term) ||
+                        pr.items?.some(item => (item.purpose ?? '').toLowerCase().includes(term))
+                      );
+                    }).map((pr) => (
                       <Card key={pr.id} className="border-slate-100 hover:border-jci-blue/30 transition-colors">
                         <div className="flex flex-col md:flex-row justify-between gap-4">
                           <div className="flex-1">
@@ -657,7 +668,18 @@ export const PaymentRequestsView: React.FC = () => {
                   <p className="text-center py-8 text-slate-500">No applications matching filters</p>
                 ) : (
                   <div className="grid gap-3">
-                    {financeList.map((pr) => (
+                    {financeList.filter(pr => {
+                      const term = (searchQuery || '').toLowerCase();
+                      if (!term) return true;
+                      const projectName = projects.find(p => p.id === pr.activityId)?.name || '';
+                      return (
+                        (pr.purpose ?? '').toLowerCase().includes(term) ||
+                        (pr.referenceNumber ?? '').toLowerCase().includes(term) ||
+                        (pr.activityId ?? '').toLowerCase().includes(term) ||
+                        projectName.toLowerCase().includes(term) ||
+                        pr.items?.some(item => (item.purpose ?? '').toLowerCase().includes(term))
+                      );
+                    }).map((pr) => (
                       <Card key={pr.id} className="p-3 border-slate-100 hover:border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between gap-3">
                           <div className="min-w-0 flex-1">

@@ -9,7 +9,7 @@ import { useMembers } from '../../hooks/useMembers';
 import { HobbyClub } from '../../types';
 import { Tabs } from '../ui/Common';
 
-export const HobbyClubsView: React.FC = () => {
+export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
@@ -96,7 +96,15 @@ export const HobbyClubsView: React.FC = () => {
                     {activeTab === 'clubs' ? (
                         <LoadingState loading={loading} error={error} empty={clubs.length === 0} emptyMessage="No hobby clubs found">
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {clubs.map(club => (
+                                {clubs.filter(club => {
+                                    const term = (searchQuery || '').toLowerCase();
+                                    if (!term) return true;
+                                    return (
+                                        (club.name ?? '').toLowerCase().includes(term) ||
+                                        (club.category ?? '').toLowerCase().includes(term) ||
+                                        (club.lead ?? '').toLowerCase().includes(term)
+                                    );
+                                }).map(club => (
                                     <Card key={club.id} noPadding className="hover:shadow-lg transition-shadow">
                                         <div className="h-32 bg-slate-200 relative">
                                             <img src={club.image} alt={club.name} className="w-full h-full object-cover" />

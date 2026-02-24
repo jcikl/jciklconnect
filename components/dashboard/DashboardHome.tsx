@@ -27,12 +27,16 @@ interface DashboardHomeProps {
   userRole: import('../../types').UserRole;
   onOpenNotifications: () => void;
   onNavigate?: (view: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
   userRole,
   onOpenNotifications,
-  onNavigate
+  onNavigate,
+  searchQuery,
+  onSearchChange
 }) => {
   const { showToast } = useToast();
   const { member, signOut } = useAuth();
@@ -245,6 +249,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <input
             type="text"
             placeholder="Search events, members, or projects..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
             className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
           />
         </div>

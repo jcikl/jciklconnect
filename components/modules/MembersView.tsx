@@ -203,7 +203,7 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
   );
 };
 
-export const MembersView: React.FC = () => {
+export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -239,13 +239,15 @@ export const MembersView: React.FC = () => {
 
   // Filter members based on search
   const filteredMembers = useMemo(() => {
-    return searchTerm
+    const term = (searchQuery || searchTerm).toLowerCase();
+    return term
       ? members.filter(m =>
-        (m.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (m.email ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+        (m.name ?? '').toLowerCase().includes(term) ||
+        (m.email ?? '').toLowerCase().includes(term) ||
+        (m.phone ?? '').toLowerCase().includes(term)
       )
       : members;
-  }, [members, searchTerm]);
+  }, [members, searchTerm, searchQuery]);
 
   // Paginate filtered members
   const paginatedMembers = useMemo(() => {
@@ -278,7 +280,7 @@ export const MembersView: React.FC = () => {
   // Reset to page 1 when search term changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, searchQuery]);
 
   // Handle Ctrl+A for Select All on current page
   useEffect(() => {

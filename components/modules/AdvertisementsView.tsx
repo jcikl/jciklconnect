@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Megaphone, Plus, Edit, Trash2, Eye, MousePointerClick, TrendingUp, Calendar, Image as ImageIcon, Link as LinkIcon, BarChart3, Download, Filter } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { Button, Card, Badge, Modal, useToast, Tabs, StatCardsContainer } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
@@ -33,7 +33,7 @@ const AdImage: React.FC<AdImageProps> = ({ imageUrl, title }) => {
   );
 };
 
-export const AdvertisementsView: React.FC = () => {
+export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAd, setSelectedAd] = useState<Advertisement | null>(null);
   const [activeTab, setActiveTab] = useState<'ads' | 'packages' | 'analytics'>('ads');
@@ -162,7 +162,14 @@ export const AdvertisementsView: React.FC = () => {
           {activeTab === 'ads' ? (
             <LoadingState loading={loading} error={error} empty={advertisements.length === 0} emptyMessage="No advertisements found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {advertisements.map(ad => (
+                {advertisements.filter(ad => {
+                  const term = (searchQuery || '').toLowerCase();
+                  if (!term) return true;
+                  return (
+                    (ad.title ?? '').toLowerCase().includes(term) ||
+                    (ad.description ?? '').toLowerCase().includes(term)
+                  );
+                }).map(ad => (
                   <Card key={ad.id} className="hover:shadow-md transition-shadow">
                     <div className="aspect-video bg-slate-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden relative">
                       <AdImage imageUrl={ad.imageUrl} title={ad.title} />
@@ -261,7 +268,14 @@ export const AdvertisementsView: React.FC = () => {
           ) : activeTab === 'packages' ? (
             <LoadingState loading={loading} error={error} empty={packages.length === 0} emptyMessage="No promotion packages available">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {packages.map(pkg => (
+                {packages.filter(pkg => {
+                  const term = (searchQuery || '').toLowerCase();
+                  if (!term) return true;
+                  return (
+                    (pkg.name ?? '').toLowerCase().includes(term) ||
+                    (pkg.description ?? '').toLowerCase().includes(term)
+                  );
+                }).map(pkg => (
                   <Card key={pkg.id} className="hover:shadow-md transition-shadow">
                     <h3 className="font-bold text-lg text-slate-900 mb-2">{pkg.name}</h3>
                     <p className="text-sm text-slate-600 mb-4">{pkg.description}</p>

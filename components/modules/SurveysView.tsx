@@ -11,7 +11,7 @@ import { formatDate } from '../../utils/dateUtils';
 import { SurveyAnalyticsService, SurveyAnalytics, QuestionAnalytics } from '../../services/surveyAnalyticsService';
 import { CommunicationService } from '../../services/communicationService';
 
-export const SurveysView: React.FC = () => {
+export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
     const [questions, setQuestions] = useState<SurveyQuestion[]>([]);
@@ -192,7 +192,14 @@ export const SurveysView: React.FC = () => {
                     {activeTab === 'surveys' ? (
                         <LoadingState loading={loading} error={error} empty={surveys.length === 0} emptyMessage="No surveys available">
                             <div className="grid md:grid-cols-2 gap-6">
-                                {surveys.map(survey => (
+                                {surveys.filter(survey => {
+                                    const term = (searchQuery || '').toLowerCase();
+                                    if (!term) return true;
+                                    return (
+                                        (survey.title ?? '').toLowerCase().includes(term) ||
+                                        (survey.description ?? '').toLowerCase().includes(term)
+                                    );
+                                }).map(survey => (
                                     <Card key={survey.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
                                         <div className="flex justify-between items-start mb-4">
                                             <Badge variant={survey.status === 'Active' ? 'success' : survey.status === 'Closed' ? 'neutral' : 'warning'}>{survey.status}</Badge>

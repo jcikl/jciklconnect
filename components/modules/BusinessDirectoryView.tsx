@@ -7,7 +7,7 @@ import { useMembers } from '../../hooks/useMembers';
 import { BusinessProfile } from '../../types';
 
 
-export const BusinessDirectoryView: React.FC = () => {
+export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
@@ -28,14 +28,16 @@ export const BusinessDirectoryView: React.FC = () => {
     if (selectedIndustry !== 'All') {
       filtered = filtered.filter(biz => biz.industry === selectedIndustry);
     }
-    if (!searchTerm) return filtered;
-    const lowerSearch = searchTerm.toLowerCase();
+    const term = (searchQuery || searchTerm).toLowerCase();
+    if (!term) return filtered;
+
     return filtered.filter(biz =>
-      biz.companyName.toLowerCase().includes(lowerSearch) ||
-      biz.industry.toLowerCase().includes(lowerSearch) ||
-      biz.description?.toLowerCase().includes(lowerSearch)
+      (biz.companyName ?? '').toLowerCase().includes(term) ||
+      (biz.industry ?? '').toLowerCase().includes(term) ||
+      (biz.description ?? '').toLowerCase().includes(term) ||
+      (biz.businessCategory ?? '').toLowerCase().includes(term)
     );
-  }, [businesses, searchTerm, selectedIndustry]);
+  }, [businesses, searchTerm, searchQuery, selectedIndustry]);
 
   const handleContact = () => {
     setDetailModalOpen(false);

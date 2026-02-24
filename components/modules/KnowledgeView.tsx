@@ -12,7 +12,7 @@ import { DocumentsService, DocumentWithVersions, DocumentVersion } from '../../s
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatUtils';
 
-export const KnowledgeView: React.FC = () => {
+export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [activeTab, setActiveTab] = useState<'learning' | 'documents' | 'certificates'>('learning');
     const [selectedPath, setSelectedPath] = useState<LearningPath | null>(null);
     const [selectedDocument, setSelectedDocument] = useState<DocumentWithVersions | null>(null);
@@ -41,14 +41,14 @@ export const KnowledgeView: React.FC = () => {
     // Filter documents based on search term and category
     const filteredDocuments = useMemo(() => {
         let filtered = documents || [];
+        const term = (searchQuery || searchTerm).toLowerCase();
 
         // Filter by search term
-        if (searchTerm.trim()) {
-            const searchLower = searchTerm.toLowerCase();
+        if (term.trim()) {
             filtered = filtered.filter(doc =>
-                doc.name.toLowerCase().includes(searchLower) ||
-                doc.description?.toLowerCase().includes(searchLower) ||
-                doc.category.toLowerCase().includes(searchLower)
+                doc.name.toLowerCase().includes(term) ||
+                doc.description?.toLowerCase().includes(term) ||
+                doc.category.toLowerCase().includes(term)
             );
         }
 
@@ -58,7 +58,7 @@ export const KnowledgeView: React.FC = () => {
         }
 
         return filtered;
-    }, [documents, searchTerm, selectedCategory]);
+    }, [documents, searchTerm, selectedCategory, searchQuery]);
 
     useEffect(() => {
         if (member) {
@@ -149,7 +149,7 @@ export const KnowledgeView: React.FC = () => {
                             loading={loading}
                             onSelectDocument={setSelectedDocument}
                             canManage={isBoard || isAdmin}
-                            searchTerm={searchTerm}
+                            searchTerm={searchQuery || searchTerm}
                             onSearchChange={setSearchTerm}
                             selectedCategory={selectedCategory}
                             onCategoryChange={setSelectedCategory}

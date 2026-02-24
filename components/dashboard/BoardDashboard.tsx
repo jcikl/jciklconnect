@@ -21,10 +21,12 @@ import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface BoardDashboardProps {
-  onNavigate?: (view: string) => void;
+  onNavigate?: (view: any) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
-export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) => {
+export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, searchQuery, onSearchChange }) => {
   const { member, signOut } = useAuth();
   const { notifications } = useCommunication();
   const unreadNotifications = notifications.filter(n => !n.read);
@@ -497,6 +499,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
           <input
             type="text"
             placeholder="Search board reports, financials, or members..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
             className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
           />
         </div>
@@ -510,7 +514,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
 
       {/* Horizontal Circular Shortcuts (5x2) */}
       <div className="grid grid-cols-5 gap-y-6">
-        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('EVENTS')}>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('PROJECTS')}>
           <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm bg-blue-50 text-jci-blue border-blue-100 group-hover:bg-blue-100`}>
             <Calendar size={24} />
           </div>

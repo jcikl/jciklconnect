@@ -21,7 +21,7 @@ service cloud.firestore {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              getUserRole() != null &&
-             getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+             getUserRole() in ['GUEST', 'PROBATION_MEMBER', 'MEMBER', 'BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'];
     }
     
     function isBoard() {
@@ -45,6 +45,14 @@ service cloud.firestore {
              getUserRole() != null &&
              getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'];
     }
+
+    // Roles that can edit members
+    function canEditMembers() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             getUserRole() != null &&
+             getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY'];
+    }
     
     function getMyLoId() {
       return exists(/databases/$(database)/documents/members/$(request.auth.uid)) ? 
@@ -58,24 +66,25 @@ service cloud.firestore {
     }
     
     // Members collection: 组织财政/活动财政/会员 boundary; multi-LO: read by same loId or self.
-    // Any logged-in user with a member doc (MEMBER/BOARD/ADMIN) can read all members (for directory, leaderboard).
     match /members/{memberId} {
-      // 1. Allow user to read their own document (by UID or Email claim)
-      allow get: if isAuthenticated() && (
+      // 1. Basic Read Access (Get and List)
+      // Allow if: own linked record, own email match (for linking), or authorized role
+      allow get, read: if isAuthenticated() && (
         request.auth.uid == memberId || 
-        (resource != null && resource.data.email == request.auth.token.email)
+        (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
+        isMember() || 
+        canReadOrgMembers()
       );
       
-      // 2. Allow searching for your own record by email during linking/login
-      // This is critical for the getMemberByEmail function in membersService
+      // Allow listing specifically for email search during linking
       allow list: if isAuthenticated() && (
-        (request.query.limit <= 5 && request.query.filters.email == request.auth.token.email) ||
-        isMember() || canReadOrgMembers()
+        isMember() || 
+        canReadOrgMembers() ||
+        (request.query.filters.get('email', []) == [request.auth.token.get('email', '')]) ||
+        (request.query.filters.email == [request.auth.token.get('email', '')])
       );
 
-      // 3. Allow full read if user is an established member (MEMBER, BOARD, ADMIN, or org roles)
-      allow read: if isMember() || canReadOrgMembers();
-      
+      // 2. Create/Update/Delete Access
       allow create: if isAuthenticated() && 
                        (request.auth.uid == memberId || isBoard()) &&
                        request.resource.data.name is string &&
@@ -84,9 +93,12 @@ service cloud.firestore {
       
       allow update: if isAuthenticated() && 
         (request.auth.uid == memberId || 
-         (isBoard() && (resource == null || resourceInMyLo(resource.data))));
+         (canEditMembers() && (resource == null || resourceInMyLo(resource.data))));
       
-      allow delete: if isAdmin() || (isAuthenticated() && resource != null && resource.data.email == request.auth.token.email);
+      allow delete: if isAdmin() || (isAuthenticated() && (
+        (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
+        (memberId == request.auth.uid)
+      ));
     }
     
     // Communication/Posts collection
@@ -115,7 +127,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated() && 
                                        exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'ACTIVITY_FINANCE'];
     }
     
     // Projects collection

@@ -27,7 +27,7 @@ import { InventoryService } from '../../services/inventoryService';
 import { ADMINISTRATIVE_PURPOSES } from '../../config/constants';
 import type { Project, MembershipType } from '../../types';
 
-export const FinanceView: React.FC = () => {
+export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const helpModal = useHelpModal();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -361,8 +361,9 @@ export const FinanceView: React.FC = () => {
       }
 
       // Search term (Multi-keyword fuzzy search)
-      if (debouncedSearchTerm) {
-        const terms = debouncedSearchTerm.toLowerCase().split(/\s+/).filter(t => t !== '');
+      const termToUse = searchQuery || debouncedSearchTerm;
+      if (termToUse) {
+        const terms = termToUse.toLowerCase().split(/\s+/).filter(t => t !== '');
 
         // Every term must match at least one field (AND logic across terms)
         const isMatch = terms.every(term => {
@@ -375,7 +376,9 @@ export const FinanceView: React.FC = () => {
             tx.date.toLowerCase(),
             String(tx.amount),
             tx.type.toLowerCase(),
-            (tx.purpose || '').toLowerCase()
+            (tx.purpose || '').toLowerCase(),
+            (tx.projectId || '').toLowerCase(),
+            (tx.memberId || '').toLowerCase()
           ];
 
           const parentMatch = parentFields.some(field => field.includes(term));
@@ -438,12 +441,31 @@ export const FinanceView: React.FC = () => {
         } else if (!isTransactionInCategory(tx, txCategoryFilter)) return false;
       }
       if (bankAccountFilter !== 'All' && tx.bankAccountId !== bankAccountFilter) return false;
-      if (debouncedSearchTerm) {
-        const terms = debouncedSearchTerm.toLowerCase().split(/\s+/).filter(t => t !== '');
+      const termToUse = searchQuery || debouncedSearchTerm;
+      if (termToUse) {
+        const terms = termToUse.toLowerCase().split(/\s+/).filter(t => t !== '');
         return terms.every(term => {
-          const parentFields = [tx.description.toLowerCase(), (tx.referenceNumber || '').toLowerCase(), (tx.category || '').toLowerCase(), (tx.status || '').toLowerCase(), tx.date.toLowerCase(), String(tx.amount), tx.type.toLowerCase(), (tx.purpose || '').toLowerCase()];
+          const parentFields = [
+            tx.description.toLowerCase(),
+            (tx.referenceNumber || '').toLowerCase(),
+            (tx.category || '').toLowerCase(),
+            (tx.status || '').toLowerCase(),
+            tx.date.toLowerCase(),
+            String(tx.amount),
+            tx.type.toLowerCase(),
+            (tx.purpose || '').toLowerCase(),
+            (tx.projectId || '').toLowerCase(),
+            (tx.memberId || '').toLowerCase()
+          ];
           if (parentFields.some(field => field.includes(term))) return true;
-          return transactionSplits[tx.id]?.some(s => s.category.toLowerCase().includes(term) || s.description.toLowerCase().includes(term) || s.purpose?.toLowerCase().includes(term) || String(s.amount).includes(term));
+          return transactionSplits[tx.id]?.some(s =>
+            s.category.toLowerCase().includes(term) ||
+            s.description.toLowerCase().includes(term) ||
+            s.purpose?.toLowerCase().includes(term) ||
+            String(s.amount).includes(term) ||
+            (s.projectId || '').toLowerCase().includes(term) ||
+            (s.memberId || '').toLowerCase().includes(term)
+          );
         });
       }
       return true;

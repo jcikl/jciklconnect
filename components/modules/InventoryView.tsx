@@ -11,7 +11,7 @@ import { InventoryItem, MaintenanceSchedule, InventoryAlert, Transaction, StockM
 import { formatDate } from '../../utils/dateUtils';
 import { formatCurrency } from '../../utils/formatUtils';
 
-export const InventoryView: React.FC = () => {
+export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -53,14 +53,14 @@ export const InventoryView: React.FC = () => {
   const { showToast } = useToast();
 
   const filteredItems = useMemo(() => {
-    if (!searchTerm) return items;
-    const lowerSearch = searchTerm.toLowerCase();
+    const term = (searchQuery || searchTerm).toLowerCase();
+    if (!term) return items;
     return items.filter(item =>
-      item.name.toLowerCase().includes(lowerSearch) ||
-      item.category.toLowerCase().includes(lowerSearch) ||
-      item.location.toLowerCase().includes(lowerSearch)
+      (item.name ?? '').toLowerCase().includes(term) ||
+      (item.category ?? '').toLowerCase().includes(term) ||
+      (item.location ?? '').toLowerCase().includes(term)
     );
-  }, [items, searchTerm]);
+  }, [items, searchTerm, searchQuery]);
 
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -72,7 +72,7 @@ export const InventoryView: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, searchQuery]);
 
   useEffect(() => {
     if (activeTab === 'maintenance') {

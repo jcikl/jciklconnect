@@ -21,7 +21,7 @@ import { formatDate } from '../../utils/dateUtils';
 
 type ViewMode = 'list' | 'calendar';
 
-export const EventsView: React.FC = () => {
+export const EventsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -34,7 +34,14 @@ export const EventsView: React.FC = () => {
   const filteredEvents = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const term = (searchQuery || '').toLowerCase();
+
     return events.filter(e => {
+      // Filter by search term first
+      if (term && !(e.title ?? '').toLowerCase().includes(term)) {
+        return false;
+      }
+
       // Use eventStartDate (from project.eventStartDate) for filtering
       const eventDate = e.date ? new Date(e.date) : null;
       if (!eventDate) return false;
@@ -47,7 +54,7 @@ export const EventsView: React.FC = () => {
         return eventDate < today;
       }
     });
-  }, [events, activeTab]);
+  }, [events, activeTab, searchQuery]);
 
   return (
     <div className="space-y-6">

@@ -1034,6 +1034,8 @@ const JCIKLApp: React.FC = () => {
   const [leadPhone, setLeadPhone] = useState('');
   const [leadInterests, setLeadInterests] = useState('');
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   // All hooks must be called before any conditional returns
   const navigate = useNavigate();
   const location = useLocation();
@@ -1106,8 +1108,10 @@ const JCIKLApp: React.FC = () => {
         // Redirect to /roadmap after login
         navigate('/roadmap');
         setView('DASHBOARD');
+        setSearchQuery('');
       } else {
         setView('GUEST');
+        setSearchQuery('');
       }
     }
   }, [user, member, authLoading, navigate]);
@@ -1166,6 +1170,11 @@ const JCIKLApp: React.FC = () => {
     }
   };
 
+  const handleViewChange = (newView: ViewType) => {
+    setSearchQuery('');
+    setView(newView);
+  };
+
   const openRegistration = () => setRegisterModalOpen(true);
   const closeRegistration = () => setRegisterModalOpen(false);
   const openLogin = () => setLoginModalOpen(true);
@@ -1186,6 +1195,7 @@ const JCIKLApp: React.FC = () => {
 
   // Handle guest page navigation
   const handleGuestPageChange = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => {
+    setSearchQuery('');
     if (page === 'home') {
       setView('GUEST');
       navigate('/');
@@ -1247,38 +1257,40 @@ const JCIKLApp: React.FC = () => {
   // Note: Cannot use hooks inside this function - use values from component scope
   const renderCurrentView = () => {
     switch (view) {
-      case 'MEMBERS': return <MembersView />;
-      case 'ACTIVITIES': return <ActivityPlansView />;
-      case 'PROJECTS': return <ProjectsView onNavigate={(view) => setView(view as ViewType)} />;
-      case 'EVENTS': return <EventsView />;
-      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return hasPermission('canViewFinance') ? <FinanceView /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />;
-      case 'PAYMENT_REQUESTS': return <PaymentRequestsView />;
-      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <GamificationView />;
-      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return hasPermission('canViewFinance') ? <InventoryView /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />;
-      case 'DIRECTORY': return <BusinessDirectoryView />;
-      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />;
-      case 'KNOWLEDGE': return <KnowledgeView />;
-      case 'COMMUNICATION': return <CommunicationView />;
-      case 'CLUBS': return <HobbyClubsView />;
-      case 'SURVEYS': return <SurveysView />;
-      case 'BENEFITS': return <MemberBenefitsView />;
-      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <DataImportExportView />;
-      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <AdvertisementsView />;
-      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <AIInsightsView onNavigate={(view) => setView(view as ViewType)} />;
-      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <TemplatesView />;
-      case 'ACTIVITY_PLANS': return <ActivityPlansView />;
-      case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={(view) => setView(view as ViewType)} />; return <ReportsView />;
+      case 'MEMBERS': return <MembersView searchQuery={searchQuery} />;
+      case 'ACTIVITIES': return <ActivityPlansView searchQuery={searchQuery} />;
+      case 'PROJECTS': return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
+      case 'EVENTS': return <EventsView searchQuery={searchQuery} />;
+      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
+      case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
+      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <GamificationView />;
+      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
+      case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} />;
+      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
+      case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
+      case 'COMMUNICATION': return <CommunicationView searchQuery={searchQuery} />;
+      case 'CLUBS': return <HobbyClubsView searchQuery={searchQuery} />;
+      case 'SURVEYS': return <SurveysView searchQuery={searchQuery} />;
+      case 'BENEFITS': return <MemberBenefitsView searchQuery={searchQuery} />;
+      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <DataImportExportView />;
+      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <AdvertisementsView searchQuery={searchQuery} />;
+      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
+      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <TemplatesView searchQuery={searchQuery} />;
+      case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
+      case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
       default:
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
         if (isBoard || isAdmin) {
-          return <BoardDashboard onNavigate={(view) => setView(view as ViewType)} />;
+          return <BoardDashboard onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
         }
         return <DashboardHome
           userRole={member?.role || UserRole.MEMBER}
           onOpenNotifications={() => setNotificationDrawerOpen(true)}
-          onNavigate={(view) => setView(view as ViewType)}
+          onNavigate={handleViewChange}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />;
     }
   };
@@ -1338,7 +1350,7 @@ const JCIKLApp: React.FC = () => {
                 icon={<LayoutDashboard size={18} />}
                 label="Dashboard"
                 isActive={view === 'DASHBOARD'}
-                onClick={() => { setView('DASHBOARD'); setIsSidebarOpen(false); }}
+                onClick={() => { handleViewChange('DASHBOARD'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
               {!(isMember || isGuest) && (
@@ -1346,7 +1358,7 @@ const JCIKLApp: React.FC = () => {
                   icon={<Users size={18} />}
                   label={member?.role === UserRole.MEMBER || member?.role === UserRole.GUEST ? 'Profile' : 'Members'}
                   isActive={view === 'MEMBERS'}
-                  onClick={() => { setView('MEMBERS'); setIsSidebarOpen(false); }}
+                  onClick={() => { handleViewChange('MEMBERS'); setIsSidebarOpen(false); }}
                   isCollapsed={isSidebarCollapsed}
                 />
               )}
@@ -1355,7 +1367,7 @@ const JCIKLApp: React.FC = () => {
                   icon={<Calendar size={18} />}
                   label="Event List"
                   isActive={view === 'EVENTS'}
-                  onClick={() => { setView('EVENTS'); setIsSidebarOpen(false); }}
+                  onClick={() => { handleViewChange('EVENTS'); setIsSidebarOpen(false); }}
                   isCollapsed={isSidebarCollapsed}
                 />
               )}
@@ -1364,7 +1376,7 @@ const JCIKLApp: React.FC = () => {
                   icon={<MessageSquare size={18} />}
                   label="Communication"
                   isActive={view === 'COMMUNICATION'}
-                  onClick={() => { setView('COMMUNICATION'); setIsSidebarOpen(false); }}
+                  onClick={() => { handleViewChange('COMMUNICATION'); setIsSidebarOpen(false); }}
                   isCollapsed={isSidebarCollapsed}
                 />
               )}
@@ -1372,14 +1384,14 @@ const JCIKLApp: React.FC = () => {
                 icon={<Building2 size={18} />}
                 label="Directory"
                 isActive={view === 'DIRECTORY'}
-                onClick={() => { setView('DIRECTORY'); setIsSidebarOpen(false); }}
+                onClick={() => { handleViewChange('DIRECTORY'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
               <SidebarItem
                 icon={<BookOpen size={18} />}
                 label="Knowledge"
                 isActive={view === 'KNOWLEDGE'}
-                onClick={() => { setView('KNOWLEDGE'); setIsSidebarOpen(false); }}
+                onClick={() => { handleViewChange('KNOWLEDGE'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
               {member?.role !== UserRole.GUEST && (
@@ -1387,7 +1399,7 @@ const JCIKLApp: React.FC = () => {
                   icon={<Gift size={18} />}
                   label="Benefits"
                   isActive={view === 'BENEFITS'}
-                  onClick={() => { setView('BENEFITS'); setIsSidebarOpen(false); }}
+                  onClick={() => { handleViewChange('BENEFITS'); setIsSidebarOpen(false); }}
                   isCollapsed={isSidebarCollapsed}
                 />
               )}
@@ -1395,7 +1407,7 @@ const JCIKLApp: React.FC = () => {
                 icon={<Heart size={18} />}
                 label="Hobby Clubs"
                 isActive={view === 'CLUBS'}
-                onClick={() => { setView('CLUBS'); setIsSidebarOpen(false); }}
+                onClick={() => { handleViewChange('CLUBS'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
 
@@ -1408,7 +1420,7 @@ const JCIKLApp: React.FC = () => {
                       icon={<FolderKanban size={18} />}
                       label="Events Management"
                       isActive={view === 'PROJECTS'}
-                      onClick={() => { setView('PROJECTS'); setIsSidebarOpen(false); }}
+                      onClick={() => { handleViewChange('PROJECTS'); setIsSidebarOpen(false); }}
                       isCollapsed={isSidebarCollapsed}
                     />
                   )}
@@ -1416,7 +1428,7 @@ const JCIKLApp: React.FC = () => {
                     icon={<CheckSquare size={18} />}
                     label="Surveys"
                     isActive={view === 'SURVEYS'}
-                    onClick={() => { setView('SURVEYS'); setIsSidebarOpen(false); }}
+                    onClick={() => { handleViewChange('SURVEYS'); setIsSidebarOpen(false); }}
                     isCollapsed={isSidebarCollapsed}
                   />
                   {!(isMember || isGuest) && (
@@ -1424,7 +1436,7 @@ const JCIKLApp: React.FC = () => {
                       icon={<FileText size={18} />}
                       label="Payment Requests"
                       isActive={view === 'PAYMENT_REQUESTS'}
-                      onClick={() => { setView('PAYMENT_REQUESTS'); setIsSidebarOpen(false); }}
+                      onClick={() => { handleViewChange('PAYMENT_REQUESTS'); setIsSidebarOpen(false); }}
                       isCollapsed={isSidebarCollapsed}
                     />
                   )}
@@ -1434,14 +1446,62 @@ const JCIKLApp: React.FC = () => {
                         icon={<TrendingUp size={18} />}
                         label="Finances"
                         isActive={view === 'FINANCE'}
-                        onClick={() => { setView('FINANCE'); setIsSidebarOpen(false); }}
+                        onClick={() => { handleViewChange('FINANCE'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem
                         icon={<Package size={18} />}
                         label="Inventory"
                         isActive={view === 'INVENTORY'}
-                        onClick={() => { setView('INVENTORY'); setIsSidebarOpen(false); }}
+                        onClick={() => { handleViewChange('INVENTORY'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                    </>
+                  )}
+                  {!(isMember || isGuest) && (
+                    <SidebarItem
+                      icon={<Workflow size={18} />}
+                      label="Automation Studio"
+                      isActive={view === 'AUTOMATION'}
+                      onClick={() => { handleViewChange('AUTOMATION'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
+                  )}
+                  {isAdmin && (
+                    <>
+                      <SidebarItem
+                        icon={<Database size={18} />}
+                        label="Data Import/Export"
+                        isActive={view === 'DATA_IMPORT_EXPORT'}
+                        onClick={() => { handleViewChange('DATA_IMPORT_EXPORT'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<Megaphone size={18} />}
+                        label="Advertisements"
+                        isActive={view === 'ADVERTISEMENTS'}
+                        onClick={() => { handleViewChange('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<LayoutDashboard size={18} />}
+                        label="Templates"
+                        isActive={view === 'TEMPLATES'}
+                        onClick={() => { handleViewChange('TEMPLATES'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<BarChart3 size={18} />}
+                        label="Reports"
+                        isActive={view === 'REPORTS'}
+                        onClick={() => { handleViewChange('REPORTS'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<Code size={18} />}
+                        label="Developer Interface"
+                        isActive={view === 'DEVELOPER'}
+                        onClick={() => { handleViewChange('DEVELOPER'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                     </>
@@ -1451,92 +1511,25 @@ const JCIKLApp: React.FC = () => {
                       icon={<Award size={18} />}
                       label="Gamification"
                       isActive={view === 'GAMIFICATION'}
-                      onClick={() => { setView('GAMIFICATION'); setIsSidebarOpen(false); }}
+                      onClick={() => { handleViewChange('GAMIFICATION'); setIsSidebarOpen(false); }}
                       isCollapsed={isSidebarCollapsed}
                     />
                   )}
-                </div>
-              )}
-              {member?.role !== UserRole.GUEST && !isMember && (
-                <div className="pt-4 mt-4 border-t border-slate-100 px-2">
-                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>System</p>
-                  {(isBoard || isAdmin || isDeveloper) && (
-                    <>
-                      <SidebarItem
-                        icon={<Megaphone size={18} />}
-                        label="Advertisements"
-                        isActive={view === 'ADVERTISEMENTS'}
-                        onClick={() => { setView('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<FileText size={18} />}
-                        label="Templates"
-                        isActive={view === 'TEMPLATES'}
-                        onClick={() => { setView('TEMPLATES'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<BarChart3 size={18} />}
-                        label="Reports & BI"
-                        isActive={view === 'REPORTS'}
-                        onClick={() => { setView('REPORTS'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<Database size={18} />}
-                        label="Data Import/Export"
-                        isActive={view === 'DATA_IMPORT_EXPORT'}
-                        onClick={() => { setView('DATA_IMPORT_EXPORT'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                    </>
-                  )}
-                  {hasPermission('canViewFinance') && (
-                    <SidebarItem
-                      icon={<Workflow size={18} />}
-                      label="Automation"
-                      isActive={view === 'AUTOMATION'}
-                      onClick={() => { setView('AUTOMATION'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
-                  <SidebarItem
-                    icon={<BookOpen size={18} />}
-                    label="Help / New Process Guide"
-                    isActive={false}
-                    onClick={() => { setIsHelpModalOpen(true); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                </div>
-              )}
-              {isDeveloper && (
-                <div className="pt-4 mt-4 border-t border-slate-100 px-2">
-                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Developer</p>
-                  <SidebarItem
-                    icon={<Sparkles size={18} />}
-                    label="AI Insights"
-                    isActive={view === 'AI_INSIGHTS'}
-                    onClick={() => { setView('AI_INSIGHTS'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                  <SidebarItem
-                    icon={<Code size={18} />}
-                    label="Developer Interface"
-                    isActive={view === 'DEVELOPER'}
-                    onClick={() => { setView('DEVELOPER'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
                 </div>
               )}
             </nav>
 
-            {/* Footer Actions & Dev Tools */}
-            <div className="p-4 border-t border-slate-100 space-y-2 flex-shrink-0">
-
+            <div className="pt-4 mt-auto border-t border-slate-100 px-2 space-y-1 pb-4">
+              <SidebarItem
+                icon={<BookOpen size={18} />}
+                label="Help / Process Guide"
+                isActive={false}
+                onClick={() => { setIsHelpModalOpen(true); setIsSidebarOpen(false); }}
+                isCollapsed={isSidebarCollapsed}
+              />
               <button
                 onClick={handleLogout}
-                className={`flex items-center text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 text-sm font-medium ${isSidebarCollapsed ? 'w-full justify-center px-0 py-3' : 'w-full space-x-3 px-4 py-2'}`}
+                className={`flex items-center text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 text-sm font-medium ${isSidebarCollapsed ? 'w-full justify-center px-0 py-3' : 'w-full space-x-3 px-4 py-3'}`}
                 title={isSidebarCollapsed ? "Sign Out" : undefined}
               >
                 <LogOut size={18} />
@@ -1622,6 +1615,8 @@ const JCIKLApp: React.FC = () => {
                       <input
                         type="text"
                         placeholder="Search members, activities, or docs..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-4 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
                       />
                     </div>
@@ -1758,56 +1753,58 @@ const JCIKLApp: React.FC = () => {
         </Modal>
 
         {/* Floating Bottom Navigation Bar (Mobile) */}
-        {(isMember || isGuest || isBoard || isAdmin || isDeveloper) && (
-          <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
-            <button
-              onClick={() => setView('DASHBOARD')}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <LayoutDashboard size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
-            </button>
-            <button
-              onClick={() => {
-                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                else setView('PAYMENT_REQUESTS');
-              }}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'PAYMENT_REQUESTS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <FileText size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}>Claim</span>
-            </button>
-            <button
-              onClick={() => {
-                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                else setView('DIRECTORY');
-              }}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <Building2 size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
-            </button>
-            <button
-              onClick={() => {
-                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                else setView('BENEFITS');
-              }}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <Gift size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
-            </button>
-          </div>
-        )}
-      </div>
+        {
+          (isMember || isGuest || isBoard || isAdmin || isDeveloper) && (
+            <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
+              <button
+                onClick={() => handleViewChange('DASHBOARD')}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <LayoutDashboard size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                  else handleViewChange('PAYMENT_REQUESTS');
+                }}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'PAYMENT_REQUESTS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <FileText size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}>Claim</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                  else handleViewChange('DIRECTORY');
+                }}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <Building2 size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                  else handleViewChange('BENEFITS');
+                }}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <Gift size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
+              </button>
+            </div>
+          )
+        }
+      </div >
 
       <Modal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} title="Join Member to Unlock More" size="md">
         <div className="text-center p-4">
@@ -1828,7 +1825,7 @@ const JCIKLApp: React.FC = () => {
           </div>
         </div>
       </Modal>
-    </HelpModalProvider>
+    </HelpModalProvider >
   );
 }
 
