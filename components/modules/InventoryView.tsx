@@ -58,7 +58,8 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     return items.filter(item =>
       (item.name ?? '').toLowerCase().includes(term) ||
       (item.category ?? '').toLowerCase().includes(term) ||
-      (item.location ?? '').toLowerCase().includes(term)
+      (item.location ?? '').toLowerCase().includes(term) ||
+      (item.description ?? '').toLowerCase().includes(term)
     );
   }, [items, searchTerm, searchQuery]);
 
@@ -325,18 +326,6 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
           <div className="p-4">
             {activeTab === 'items' && (
               <div className="space-y-4">
-                <div className="mb-4">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1.5 text-slate-400" size={16} />
-                    <input
-                      type="text"
-                      placeholder="Search items..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 py-1 text-sm border rounded-md w-full max-w-md"
-                    />
-                  </div>
-                </div>
                 <Card title="Asset Registry">
                   <LoadingState loading={loading} error={error} empty={filteredItems.length === 0} emptyMessage="No inventory items found">
                     <div className="overflow-x-auto">

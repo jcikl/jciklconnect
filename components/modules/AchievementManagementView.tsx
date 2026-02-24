@@ -12,7 +12,7 @@ import { Achievement, AchievementCriteria, AchievementMilestone } from '../../ty
 import { formatDate } from '../../utils/dateUtils';
 import { AchievementProgressVisualizer, AchievementDashboard } from './AchievementProgressVisualizer';
 
-export const AchievementManagementView: React.FC = () => {
+export const AchievementManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [activeTab, setActiveTab] = useState('all');
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
@@ -38,6 +38,30 @@ export const AchievementManagementView: React.FC = () => {
   const { member: currentMember } = useAuth();
   const { isAdmin, isBoard } = usePermissions();
   const { showToast } = useToast();
+
+  const filteredAchievements = React.useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return achievements;
+    return achievements.filter(a =>
+      (a.name ?? '').toLowerCase().includes(term) ||
+      (a.description ?? '').toLowerCase().includes(term) ||
+      (a.category ?? '').toLowerCase().includes(term) ||
+      (a.tier ?? '').toLowerCase().includes(term)
+    );
+  }, [achievements, searchQuery]);
+
+  const filteredMemberAchievements = React.useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return memberAchievements;
+    return memberAchievements.filter(award => {
+      const achievement = achievements.find(a => a.id === award.achievementId);
+      if (!achievement) return false;
+      return (
+        (achievement.name ?? '').toLowerCase().includes(term) ||
+        (achievement.description ?? '').toLowerCase().includes(term)
+      );
+    });
+  }, [memberAchievements, achievements, searchQuery]);
 
   const canManage = isAdmin || isBoard;
 
@@ -179,9 +203,9 @@ export const AchievementManagementView: React.FC = () => {
       />
 
       {activeTab === 'all' ? (
-        <LoadingState loading={loading} error={error} empty={achievements.length === 0} emptyMessage="No achievements defined yet">
+        <LoadingState loading={loading} error={error} empty={filteredAchievements.length === 0} emptyMessage="No achievements defined yet">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {achievements.map(achievement => (
+            {filteredAchievements.map(achievement => (
               <Card key={achievement.id} className={`hover:shadow-lg transition-shadow border-2 ${getTierColor(achievement.tier)}`}>
                 <div className="flex items-start justify-between mb-4">
                   <div className="text-5xl">{achievement.icon}</div>
@@ -244,9 +268,9 @@ export const AchievementManagementView: React.FC = () => {
           </div>
         </LoadingState>
       ) : activeTab === 'my' ? (
-        <LoadingState loading={loading} error={error} empty={memberAchievements.length === 0} emptyMessage="You haven't earned any achievements yet">
+        <LoadingState loading={loading} error={error} empty={filteredMemberAchievements.length === 0} emptyMessage="You haven't earned any achievements yet">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {memberAchievements.map((award) => {
+            {filteredMemberAchievements.map((award) => {
               const achievement = achievements.find(a => a.id === award.achievementId);
               if (!achievement) return null;
 

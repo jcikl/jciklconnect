@@ -4,7 +4,7 @@ import {
   Download, Filter, Plus, Edit, Trash2, Eye, RefreshCw,
   PieChart, LineChart, Activity, Target, Award, Package
 } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, StatCard } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs, StatCard, StatCardsContainer } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { ReportService, ReportData, ReportOptions } from '../../services/reportService';

@@ -20,7 +20,7 @@ function matchesSearch(m: Member, q: string): boolean {
     m.name,
     m.email,
     m.phone,
-    (m as Record<string, unknown>).fullName,
+    (m as unknown as Record<string, unknown>).fullName,
   ]
     .filter(Boolean)
     .map(String)
@@ -162,9 +162,8 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
                   id={`member-opt-${m.id || 'self'}`}
                   role="option"
                   aria-selected={value === m.id}
-                  className={`px-3 py-2 text-sm cursor-pointer ${
-                    i === highlight ? 'bg-jci-blue/10 text-jci-navy' : 'text-slate-700 hover:bg-slate-50'
-                  }`}
+                  className={`px-3 py-2 text-sm cursor-pointer ${i === highlight ? 'bg-jci-blue/10 text-jci-navy' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => handleSelect(m.id)}
                 >
@@ -181,7 +180,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
         <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm border-l-4 border-l-jci-teal">
           <p className="font-medium text-slate-700 mb-1">主档带出</p>
           {MEMBER_LOOKUP_FIELDS.map((key) => {
-            const v = (selectedMember as Record<string, unknown>)[key];
+            const v = (selectedMember as unknown as Record<string, unknown>)[key];
             if (v == null || v === '') return null;
             return (
               <p key={key} className="text-slate-600">

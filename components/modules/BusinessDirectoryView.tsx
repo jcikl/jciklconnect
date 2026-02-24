@@ -104,16 +104,16 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
                   {filteredBusinesses.map(biz => {
                     const owner = members.find(m => m.id === biz.memberId);
                     return (
-                      <Card key={biz.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
+                      <Card key={biz.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
                         <div className="h-24 bg-gradient-to-r from-slate-100 to-slate-200 relative">
-                          <div className="absolute -bottom-6 left-6 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
+                          <div className="absolute -bottom-6 left-2 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
                             <img
                               src={biz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.companyName)}&background=0097D7&color=fff`}
                               alt="Logo"
                               className="w-full h-full object-cover rounded"
                             />
                           </div>
-                          <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                          <div className="absolute text-right top-2 right-2 flex flex-col items-end gap-1">
                             <Badge variant="neutral">{biz.industry}</Badge>
 
                             {/* Business Category Tag - fallback to owner profile */}
@@ -136,7 +136,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
                             })()}
                           </div>
                         </div>
-                        <div className="pt-8 px-6 pb-6 flex-1 flex flex-col">
+                        <div className="pt-8 px-2 pb-6 flex-1 flex flex-col">
                           <h3 className="text-lg font-bold text-slate-900">{owner?.name || 'Unknown'}</h3>
                           <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
                             {biz.companyName}

@@ -21,6 +21,17 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
     const { members } = useMembers();
     const { showToast } = useToast();
 
+    const filteredClubs = React.useMemo(() => {
+        const term = (searchQuery || '').toLowerCase();
+        if (!term) return clubs;
+        return clubs.filter(club =>
+            (club.name ?? '').toLowerCase().includes(term) ||
+            (club.category ?? '').toLowerCase().includes(term) ||
+            (club.lead ?? '').toLowerCase().includes(term) ||
+            (club.nextActivity ?? '').toLowerCase().includes(term)
+        );
+    }, [clubs, searchQuery]);
+
     const handleCreateClub = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
@@ -94,17 +105,9 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 </div>
                 <div className="p-4">
                     {activeTab === 'clubs' ? (
-                        <LoadingState loading={loading} error={error} empty={clubs.length === 0} emptyMessage="No hobby clubs found">
+                        <LoadingState loading={loading} error={error} empty={filteredClubs.length === 0} emptyMessage="No hobby clubs found">
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {clubs.filter(club => {
-                                    const term = (searchQuery || '').toLowerCase();
-                                    if (!term) return true;
-                                    return (
-                                        (club.name ?? '').toLowerCase().includes(term) ||
-                                        (club.category ?? '').toLowerCase().includes(term) ||
-                                        (club.lead ?? '').toLowerCase().includes(term)
-                                    );
-                                }).map(club => (
+                                {filteredClubs.map(club => (
                                     <Card key={club.id} noPadding className="hover:shadow-lg transition-shadow">
                                         <div className="h-32 bg-slate-200 relative">
                                             <img src={club.image} alt={club.name} className="w-full h-full object-cover" />
@@ -214,7 +217,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                             </div>
                         </LoadingState>
                     ) : (
-                        <ClubActivitiesTab clubs={clubs} />
+                        <ClubActivitiesTab clubs={filteredClubs} />
                     )}
                 </div>
             </Card>

@@ -10,7 +10,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { BadgeDefinition } from '../../services/badgeService';
 import { formatDate } from '../../utils/dateUtils';
 
-export const BadgeManagementView: React.FC = () => {
+export const BadgeManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [activeTab, setActiveTab] = useState('badges');
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
@@ -23,6 +23,26 @@ export const BadgeManagementView: React.FC = () => {
   const { members, loading: membersLoading } = useMembers();
   const { isAdmin, isBoard } = usePermissions();
   const { showToast } = useToast();
+
+  const filteredBadges = React.useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return badges;
+    return badges.filter(badge =>
+      (badge.name ?? '').toLowerCase().includes(term) ||
+      (badge.description ?? '').toLowerCase().includes(term) ||
+      (badge.category ?? '').toLowerCase().includes(term) ||
+      (badge.tier ?? '').toLowerCase().includes(term)
+    );
+  }, [badges, searchQuery]);
+
+  const filteredMemberBadges = React.useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return memberBadges;
+    return memberBadges.filter(badge =>
+      (badge.name ?? '').toLowerCase().includes(term) ||
+      (badge.description ?? '').toLowerCase().includes(term)
+    );
+  }, [memberBadges, searchQuery]);
 
   const canManage = isAdmin || isBoard;
 
@@ -167,9 +187,9 @@ export const BadgeManagementView: React.FC = () => {
       </div>
 
       {activeTab === 'All Badges' ? (
-        <LoadingState loading={loading} error={error} empty={badges.length === 0} emptyMessage="No badges defined yet">
+        <LoadingState loading={loading} error={error} empty={filteredBadges.length === 0} emptyMessage="No badges defined yet">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {badges.map(badge => (
+            {filteredBadges.map(badge => (
               <Card key={badge.id} className="hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between mb-4">
                   <div className="text-5xl">{badge.icon}</div>
@@ -234,9 +254,9 @@ export const BadgeManagementView: React.FC = () => {
           </div>
         </LoadingState>
       ) : (
-        <LoadingState loading={loading} error={error} empty={memberBadges.length === 0} emptyMessage="You haven't earned any badges yet">
+        <LoadingState loading={loading} error={error} empty={filteredMemberBadges.length === 0} emptyMessage="You haven't earned any badges yet">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {memberBadges.map((badge) => (
+            {filteredMemberBadges.map((badge) => (
               <Card key={badge.id} className="hover:shadow-lg transition-shadow">
                 <div className="text-5xl mb-4">{badge.icon}</div>
                 <h3 className="font-bold text-lg text-slate-900 mb-1">{badge.name}</h3>

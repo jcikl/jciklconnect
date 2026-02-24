@@ -60,6 +60,21 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         return filtered;
     }, [documents, searchTerm, selectedCategory, searchQuery]);
 
+    const filteredPaths = useMemo(() => {
+        let filtered = paths || [];
+        const term = (searchQuery || searchTerm).toLowerCase();
+
+        if (term.trim()) {
+            filtered = filtered.filter(path =>
+                path.name.toLowerCase().includes(term) ||
+                path.description?.toLowerCase().includes(term) ||
+                path.category?.toLowerCase().includes(term)
+            );
+        }
+
+        return filtered;
+    }, [paths, searchTerm, searchQuery]);
+
     useEffect(() => {
         if (member) {
             loadMyProgress();
@@ -134,7 +149,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                 <div className="p-4">
                     {activeTab === 'learning' && (
                         <LearningPathsTab
-                            paths={paths}
+                            paths={filteredPaths}
                             myProgress={myProgress}
                             loading={pathsLoading}
                             onStartPath={handleStartPath}

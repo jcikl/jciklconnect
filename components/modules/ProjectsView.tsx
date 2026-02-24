@@ -70,7 +70,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         (p.name ?? '').toLowerCase().includes(term) ||
         (p.title ?? '').toLowerCase().includes(term) ||
         (p.description ?? '').toLowerCase().includes(term) ||
-        (p.objectives ?? '').toLowerCase().includes(term)
+        (p.objectives ?? '').toLowerCase().includes(term) ||
+        (p.pillar ?? '').toLowerCase().includes(term) ||
+        (p.level ?? '').toLowerCase().includes(term) ||
+        (p.category ?? '').toLowerCase().includes(term) ||
+        (p.type ?? '').toLowerCase().includes(term)
       );
     }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Award, TrendingUp, Star, Crown, Zap, PlusCircle, Settings, Eye, EyeOff, Users as UsersIcon } from 'lucide-react';
 import { Card, Button, ProgressBar, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
@@ -16,7 +16,7 @@ import { BehavioralNudgingConfig } from './BehavioralNudgingConfig';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useBadges } from '../../hooks/useBadges';
 
-export const GamificationView: React.FC = () => {
+export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isLogModalOpen, setLogModalOpen] = useState(false);
   const [leaderboardVisibility, setLeaderboardVisibility] = useState<'public' | 'members_only' | 'private'>('public');
@@ -28,8 +28,18 @@ export const GamificationView: React.FC = () => {
   const { badges, memberBadges } = useBadges();
   const { showToast } = useToast();
 
-  const sortedMembers = [...leaderboard];
-  const currentUserRank = member ? sortedMembers.findIndex(m => m.id === member.id) + 1 : 0;
+  const filteredLeaderboard = useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return leaderboard;
+    return leaderboard.filter(m =>
+      (m.name ?? '').toLowerCase().includes(term) ||
+      (m.email ?? '').toLowerCase().includes(term) ||
+      (m.tier ?? '').toLowerCase().includes(term)
+    );
+  }, [leaderboard, searchQuery]);
+
+  const sortedMembers = [...filteredLeaderboard];
+  const currentUserRank = member ? leaderboard.findIndex(m => m.id === member.id) + 1 : 0;
 
   // Load member's visibility preference
   React.useEffect(() => {
@@ -133,9 +143,9 @@ export const GamificationView: React.FC = () => {
       {activeTab === 'rules' ? (
         <PointRulesConfig />
       ) : activeTab === 'badges' ? (
-        <BadgeManagementView />
+        <BadgeManagementView searchQuery={searchQuery} />
       ) : activeTab === 'achievements' ? (
-        <AchievementManagementView />
+        <AchievementManagementView searchQuery={searchQuery} />
       ) : activeTab === 'nudging' ? (
         <BehavioralNudgingConfig />
       ) : (
@@ -283,7 +293,7 @@ export const GamificationView: React.FC = () => {
             >
               <LoadingState loading={loading} error={error} empty={sortedMembers.length === 0} emptyMessage="No leaderboard data">
                 <div className="space-y-4">
-                  {sortedMembers.slice(0, 10).map((member, index) => (
+                  {(searchQuery ? sortedMembers : sortedMembers.slice(0, 10)).map((member, index) => (
                     <div key={member.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
                       <div className="flex items-center gap-3">
                         <div className={`w-6 text-center font-bold ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-amber-600' : 'text-slate-400'}`}>

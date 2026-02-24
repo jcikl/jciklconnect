@@ -1458,24 +1458,8 @@ const JCIKLApp: React.FC = () => {
                       />
                     </>
                   )}
-                  {!(isMember || isGuest) && (
-                    <SidebarItem
-                      icon={<Workflow size={18} />}
-                      label="Automation Studio"
-                      isActive={view === 'AUTOMATION'}
-                      onClick={() => { handleViewChange('AUTOMATION'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
                   {isAdmin && (
                     <>
-                      <SidebarItem
-                        icon={<Database size={18} />}
-                        label="Data Import/Export"
-                        isActive={view === 'DATA_IMPORT_EXPORT'}
-                        onClick={() => { handleViewChange('DATA_IMPORT_EXPORT'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
                       <SidebarItem
                         icon={<Megaphone size={18} />}
                         label="Advertisements"
@@ -1483,8 +1467,27 @@ const JCIKLApp: React.FC = () => {
                         onClick={() => { handleViewChange('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
+
+                    </>
+                  )}
+                  {!(isMember || isGuest) && (
+                    <SidebarItem
+                      icon={<Award size={18} />}
+                      label="Gamification"
+                      isActive={view === 'GAMIFICATION'}
+                      onClick={() => { handleViewChange('GAMIFICATION'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
+                  )}
+                </div>
+              )}
+              {member?.role !== UserRole.GUEST && !isMember && (
+                <div className="pt-4 mt-4 border-t border-slate-100 px-2">
+                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>System</p>
+                  {(isBoard || isAdmin || isDeveloper) && (
+                    <>
                       <SidebarItem
-                        icon={<LayoutDashboard size={18} />}
+                        icon={<FileText size={18} />}
                         label="Templates"
                         isActive={view === 'TEMPLATES'}
                         onClick={() => { handleViewChange('TEMPLATES'); setIsSidebarOpen(false); }}
@@ -1498,23 +1501,49 @@ const JCIKLApp: React.FC = () => {
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem
-                        icon={<Code size={18} />}
-                        label="Developer Interface"
-                        isActive={view === 'DEVELOPER'}
-                        onClick={() => { handleViewChange('DEVELOPER'); setIsSidebarOpen(false); }}
+                        icon={<Database size={18} />}
+                        label="Data Import/Export"
+                        isActive={view === 'DATA_IMPORT_EXPORT'}
+                        onClick={() => { handleViewChange('DATA_IMPORT_EXPORT'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                     </>
                   )}
                   {!(isMember || isGuest) && (
                     <SidebarItem
-                      icon={<Award size={18} />}
-                      label="Gamification"
-                      isActive={view === 'GAMIFICATION'}
-                      onClick={() => { handleViewChange('GAMIFICATION'); setIsSidebarOpen(false); }}
+                      icon={<Workflow size={18} />}
+                      label="Automation Studio"
+                      isActive={view === 'AUTOMATION'}
+                      onClick={() => { handleViewChange('AUTOMATION'); setIsSidebarOpen(false); }}
                       isCollapsed={isSidebarCollapsed}
                     />
                   )}
+                  <SidebarItem
+                    icon={<BookOpen size={18} />}
+                    label="Help / New Process Guide"
+                    isActive={false}
+                    onClick={() => { setIsHelpModalOpen(true); setIsSidebarOpen(false); }}
+                    isCollapsed={isSidebarCollapsed}
+                  />
+                </div>
+              )}
+              {isDeveloper && (
+                <div className="pt-4 mt-4 border-t border-slate-100 px-2">
+                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Developer</p>
+                  <SidebarItem
+                    icon={<Sparkles size={18} />}
+                    label="AI Insights"
+                    isActive={view === 'AI_INSIGHTS'}
+                    onClick={() => { setView('AI_INSIGHTS'); setIsSidebarOpen(false); }}
+                    isCollapsed={isSidebarCollapsed}
+                  />
+                  <SidebarItem
+                    icon={<Code size={18} />}
+                    label="Developer Interface"
+                    isActive={view === 'DEVELOPER'}
+                    onClick={() => { handleViewChange('DEVELOPER'); setIsSidebarOpen(false); }}
+                    isCollapsed={isSidebarCollapsed}
+                  />
                 </div>
               )}
             </nav>

@@ -244,7 +244,8 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       ? members.filter(m =>
         (m.name ?? '').toLowerCase().includes(term) ||
         (m.email ?? '').toLowerCase().includes(term) ||
-        (m.phone ?? '').toLowerCase().includes(term)
+        (m.phone ?? '').toLowerCase().includes(term) ||
+        (m.fullName ?? '').toLowerCase().includes(term)
       )
       : members;
   }, [members, searchTerm, searchQuery]);
@@ -580,49 +581,35 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
             <div className="p-4">
               {activeTab === 'directory' && (
-                <>
-
-                  {/* Search Bar */}
-                  <div className="relative mb-6">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                    <Input
-                      placeholder="Search members by name or email..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-
-                  <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
-                    <MemberTable
-                      members={paginatedMembers}
-                      onSelect={setSelectedMemberId}
-                      selectedIds={selectedIds}
-                      onToggleSelection={toggleSelection}
-                      onToggleAll={toggleAll}
-                      isAllSelected={isAllSelected}
-                    />
-                    {filteredMembers.length > 0 && (
-                      <div className="mt-4">
-                        <Pagination
-                          currentPage={currentPage}
-                          totalPages={totalPages}
-                          totalItems={filteredMembers.length}
-                          itemsPerPage={itemsPerPage}
-                          onPageChange={setCurrentPage}
-                          onItemsPerPageChange={(newItemsPerPage) => {
-                            setItemsPerPage(newItemsPerPage);
-                            setCurrentPage(1);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </LoadingState>
-                </>
+                <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
+                  <MemberTable
+                    members={paginatedMembers}
+                    onSelect={setSelectedMemberId}
+                    selectedIds={selectedIds}
+                    onToggleSelection={toggleSelection}
+                    onToggleAll={toggleAll}
+                    isAllSelected={isAllSelected}
+                  />
+                  {filteredMembers.length > 0 && (
+                    <div className="mt-4">
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filteredMembers.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onItemsPerPageChange={(newItemsPerPage) => {
+                          setItemsPerPage(newItemsPerPage);
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+                  )}
+                </LoadingState>
               )}
 
               {activeTab === 'guest' && (
-                <GuestManagementView />
+                <GuestManagementView searchQuery={searchQuery} />
               )}
 
               {activeTab === 'statistics' && (
@@ -634,11 +621,11 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               )}
 
               {activeTab === 'mentorship' && (
-                <MentorMatching />
+                <MentorMatching searchQuery={searchQuery} />
               )}
 
               {activeTab === 'promotion-tracking' && (
-                <PromotionTracking />
+                <PromotionTracking searchQuery={searchQuery} />
               )}
             </div>
           </Card>
@@ -2027,7 +2014,7 @@ const ChurnPredictionModal: React.FC<ChurnPredictionModalProps> = ({ member, pre
 };
 
 // Guest Management View Component
-const GuestManagementView: React.FC = () => {
+const GuestManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const { members, updateMember } = useMembers();
   const { member: currentMember } = useAuth();
   const { isBoard, isAdmin } = usePermissions();
@@ -2041,11 +2028,22 @@ const GuestManagementView: React.FC = () => {
   const canApprove = isBoard || isAdmin;
 
   useEffect(() => {
-    const guestList = members.filter(m => m.role === UserRole.GUEST);
-    const probationList = members.filter(m => m.role === UserRole.PROBATION_MEMBER);
+    const term = (searchQuery || '').toLowerCase();
+    const filterFn = (m: Member) => {
+      if (!term) return true;
+      return (
+        (m.name ?? '').toLowerCase().includes(term) ||
+        (m.email ?? '').toLowerCase().includes(term) ||
+        (m.phone ?? '').toLowerCase().includes(term) ||
+        (m.fullName ?? '').toLowerCase().includes(term)
+      );
+    };
+
+    const guestList = members.filter(m => m.role === UserRole.GUEST && filterFn(m));
+    const probationList = members.filter(m => m.role === UserRole.PROBATION_MEMBER && filterFn(m));
     setGuests(guestList);
     setProbationMembers(probationList);
-  }, [members]);
+  }, [members, searchQuery]);
 
   const handleApproveGuest = async (guestId: string) => {
     if (!canApprove) {

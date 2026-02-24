@@ -143,6 +143,47 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     if (activeTab === 'all' && canViewFinance) loadFinanceList();
   }, [activeTab, canViewFinance, loadFinanceList]);
 
+  const filteredMyList = useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return myList;
+
+    return myList.filter(pr => {
+      const projectName = projects.find(p => p.id === pr.activityId)?.name || '';
+      const adminAccountName = bankAccounts.find(b => b.id === pr.claimFromBankAccountId)?.name || '';
+      return (
+        (pr.referenceNumber ?? '').toLowerCase().includes(term) ||
+        (pr.bankName ?? '').toLowerCase().includes(term) ||
+        (pr.accountHolder ?? '').toLowerCase().includes(term) ||
+        (pr.accountNumber ?? '').toLowerCase().includes(term) ||
+        (pr.activityId ?? '').toLowerCase().includes(term) ||
+        projectName.toLowerCase().includes(term) ||
+        adminAccountName.toLowerCase().includes(term) ||
+        pr.items?.some(item => (item.purpose ?? '').toLowerCase().includes(term))
+      );
+    });
+  }, [myList, searchQuery, projects, bankAccounts]);
+
+  const filteredFinanceList = useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return financeList;
+
+    return financeList.filter(pr => {
+      const projectName = projects.find(p => p.id === pr.activityId)?.name || '';
+      const adminAccountName = bankAccounts.find(b => b.id === pr.claimFromBankAccountId)?.name || '';
+      return (
+        (pr.referenceNumber ?? '').toLowerCase().includes(term) ||
+        (pr.bankName ?? '').toLowerCase().includes(term) ||
+        (pr.accountHolder ?? '').toLowerCase().includes(term) ||
+        (pr.accountNumber ?? '').toLowerCase().includes(term) ||
+        (pr.activityId ?? '').toLowerCase().includes(term) ||
+        (pr.applicantName ?? '').toLowerCase().includes(term) ||
+        projectName.toLowerCase().includes(term) ||
+        adminAccountName.toLowerCase().includes(term) ||
+        pr.items?.some(item => (item.purpose ?? '').toLowerCase().includes(term))
+      );
+    });
+  }, [financeList, searchQuery, projects, bankAccounts]);
+
   const handleApproveReject = async (id: string, status: 'approved' | 'rejected') => {
     if (!user?.uid) return;
     setActioningId(id);
@@ -559,17 +600,6 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           <div className="mt-6 flex flex-col md:flex-row gap-4 items-center justify-between">
             {activeTab === 'all' && (
               <div className="flex-1 flex gap-2 w-full">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    placeholder="Search PR reference..."
-                    value={searchRef}
-                    onChange={(e) => setSearchRef(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && loadFinanceList()}
-                    className="block w-full rounded-lg border-slate-300 shadow-sm py-2 pl-3 pr-10 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                  />
-                  <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
                 <div className="w-40 shrink-0">
                   <Select
                     label=""
@@ -583,9 +613,6 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                     ]}
                   />
                 </div>
-                <Button size="sm" onClick={loadFinanceList} disabled={financeLoading}>
-                  <Search size={14} className="mr-1" /> Search
-                </Button>
               </div>
             )}
             <div className={`flex justify-end gap-2 w-full ${activeTab === 'all' ? 'md:w-auto' : ''}`}>
@@ -611,18 +638,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    {myList.filter(pr => {
-                      const term = (searchQuery || '').toLowerCase();
-                      if (!term) return true;
-                      const projectName = projects.find(p => p.id === pr.activityId)?.name || '';
-                      return (
-                        (pr.purpose ?? '').toLowerCase().includes(term) ||
-                        (pr.referenceNumber ?? '').toLowerCase().includes(term) ||
-                        (pr.activityId ?? '').toLowerCase().includes(term) ||
-                        projectName.toLowerCase().includes(term) ||
-                        pr.items?.some(item => (item.purpose ?? '').toLowerCase().includes(term))
-                      );
-                    }).map((pr) => (
+                    {filteredMyList.map((pr) => (
                       <Card key={pr.id} className="border-slate-100 hover:border-jci-blue/30 transition-colors">
                         <div className="flex flex-col md:flex-row justify-between gap-4">
                           <div className="flex-1">
@@ -668,18 +684,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                   <p className="text-center py-8 text-slate-500">No applications matching filters</p>
                 ) : (
                   <div className="grid gap-3">
-                    {financeList.filter(pr => {
-                      const term = (searchQuery || '').toLowerCase();
-                      if (!term) return true;
-                      const projectName = projects.find(p => p.id === pr.activityId)?.name || '';
-                      return (
-                        (pr.purpose ?? '').toLowerCase().includes(term) ||
-                        (pr.referenceNumber ?? '').toLowerCase().includes(term) ||
-                        (pr.activityId ?? '').toLowerCase().includes(term) ||
-                        projectName.toLowerCase().includes(term) ||
-                        pr.items?.some(item => (item.purpose ?? '').toLowerCase().includes(term))
-                      );
-                    }).map((pr) => (
+                    {filteredFinanceList.map((pr) => (
                       <Card key={pr.id} className="p-3 border-slate-100 hover:border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between gap-3">
                           <div className="min-w-0 flex-1">

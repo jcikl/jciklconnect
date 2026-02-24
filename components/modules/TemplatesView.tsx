@@ -38,6 +38,39 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
 
   const canManage = isBoard || isAdmin;
 
+  const filteredEventTemplates = useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return eventTemplates;
+    return eventTemplates.filter(t =>
+      (t.name ?? '').toLowerCase().includes(term) ||
+      (t.description ?? '').toLowerCase().includes(term) ||
+      (t.type ?? '').toLowerCase().includes(term) ||
+      (t.defaultLocation ?? '').toLowerCase().includes(term)
+    );
+  }, [eventTemplates, searchQuery]);
+
+  const filteredActivityPlanTemplates = useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return activityPlanTemplates;
+    return activityPlanTemplates.filter(t =>
+      (t.name ?? '').toLowerCase().includes(term) ||
+      (t.description ?? '').toLowerCase().includes(term) ||
+      (t.type ?? '').toLowerCase().includes(term) ||
+      (t.defaultObjectives ?? '').toLowerCase().includes(term)
+    );
+  }, [activityPlanTemplates, searchQuery]);
+
+  const filteredBudgetTemplates = useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return eventBudgetTemplates;
+    return eventBudgetTemplates.filter(t =>
+      (t.name ?? '').toLowerCase().includes(term) ||
+      (t.description ?? '').toLowerCase().includes(term) ||
+      (t.eventType ?? '').toLowerCase().includes(term) ||
+      t.budgetCategories.some(cat => cat.category.toLowerCase().includes(term))
+    );
+  }, [eventBudgetTemplates, searchQuery]);
+
   const handleEventTemplateSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -180,16 +213,9 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         </div>
         <div className="p-4">
           {activeTab === 'events' && (
-            <LoadingState loading={loading} error={error} empty={eventTemplates.length === 0} emptyMessage="No event templates found">
+            <LoadingState loading={loading} error={error} empty={filteredEventTemplates.length === 0} emptyMessage="No event templates found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {eventTemplates.filter(template => {
-                  const term = (searchQuery || '').toLowerCase();
-                  if (!term) return true;
-                  return (
-                    (template.name ?? '').toLowerCase().includes(term) ||
-                    (template.description ?? '').toLowerCase().includes(term)
-                  );
-                }).map(template => (
+                {filteredEventTemplates.map(template => (
                   <Card key={template.id} className="hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -266,16 +292,9 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
           )}
 
           {activeTab === 'activityPlans' && (
-            <LoadingState loading={loading} error={error} empty={activityPlanTemplates.length === 0} emptyMessage="No activity plan templates found">
+            <LoadingState loading={loading} error={error} empty={filteredActivityPlanTemplates.length === 0} emptyMessage="No activity plan templates found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activityPlanTemplates.filter(template => {
-                  const term = (searchQuery || '').toLowerCase();
-                  if (!term) return true;
-                  return (
-                    (template.name ?? '').toLowerCase().includes(term) ||
-                    (template.description ?? '').toLowerCase().includes(term)
-                  );
-                }).map(template => (
+                {filteredActivityPlanTemplates.map(template => (
                   <Card key={template.id} className="hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -338,16 +357,9 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
           )}
 
           {activeTab === 'budgets' && (
-            <LoadingState loading={loading} error={error} empty={eventBudgetTemplates.length === 0} emptyMessage="No budget templates found">
+            <LoadingState loading={loading} error={error} empty={filteredBudgetTemplates.length === 0} emptyMessage="No budget templates found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {eventBudgetTemplates.filter(template => {
-                  const term = (searchQuery || '').toLowerCase();
-                  if (!term) return true;
-                  return (
-                    (template.name ?? '').toLowerCase().includes(term) ||
-                    (template.description ?? '').toLowerCase().includes(term)
-                  );
-                }).map(template => (
+                {filteredBudgetTemplates.map(template => (
                   <Card key={template.id} className="hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">

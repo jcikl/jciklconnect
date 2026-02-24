@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  TrendingUp, CheckCircle, Clock, Award, AlertCircle, 
-  Calendar, FileText, User, Users, RefreshCw, Check, X 
+import {
+  TrendingUp, CheckCircle, Clock, Award, AlertCircle,
+  Calendar, FileText, User, Users, RefreshCw, Check, X
 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, Modal, useToast } from '../../ui/Common';
 import { PromotionService } from '../../../services/promotionService';
-import { 
-  PromotionProgress, 
-  PromotionHistory, 
-  ManualPromotionRequest 
+import {
+  PromotionProgress,
+  PromotionHistory,
+  ManualPromotionRequest
 } from '../../../types';
 
-export const PromotionTracking: React.FC = () => {
+export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [probationMembers, setProbationMembers] = useState<any[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [promotionProgress, setPromotionProgress] = useState<PromotionProgress | null>(null);
@@ -62,7 +62,7 @@ export const PromotionTracking: React.FC = () => {
         method,
         method === 'manual' ? manualPromotionReason : undefined
       );
-      
+
       if (promotion) {
         showToast('Member promoted successfully!', 'success');
         setShowManualPromotionModal(false);
@@ -88,7 +88,7 @@ export const PromotionTracking: React.FC = () => {
         manualPromotionReason,
         true // Override requirements
       );
-      
+
       showToast('Manual promotion request submitted', 'success');
       setShowManualPromotionModal(false);
       setManualPromotionReason('');
@@ -96,6 +96,17 @@ export const PromotionTracking: React.FC = () => {
       showToast(err.message || 'Failed to submit promotion request', 'error');
     }
   };
+
+  const filteredProbationMembers = React.useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return probationMembers;
+    return probationMembers.filter((m: any) =>
+      (m.name ?? '').toLowerCase().includes(term) ||
+      (m.email ?? '').toLowerCase().includes(term) ||
+      (m.phone ?? '').toLowerCase().includes(term) ||
+      (m.fullName ?? '').toLowerCase().includes(term)
+    );
+  }, [probationMembers, searchQuery]);
 
   if (loading && !statistics) {
     return (
@@ -119,7 +130,7 @@ export const PromotionTracking: React.FC = () => {
               <Users className="text-blue-600" size={32} />
             </div>
           </Card>
-          
+
           <Card>
             <div className="flex items-center justify-between">
               <div>
@@ -129,7 +140,7 @@ export const PromotionTracking: React.FC = () => {
               <CheckCircle className="text-green-600" size={32} />
             </div>
           </Card>
-          
+
           <Card>
             <div className="flex items-center justify-between">
               <div>
@@ -139,7 +150,7 @@ export const PromotionTracking: React.FC = () => {
               <TrendingUp className="text-purple-600" size={32} />
             </div>
           </Card>
-          
+
           <Card>
             <div className="flex items-center justify-between">
               <div>
@@ -174,8 +185,8 @@ export const PromotionTracking: React.FC = () => {
       {/* Probation Members List */}
       <Card title="Probation Members">
         <div className="space-y-3">
-          {probationMembers.map(member => (
-            <div 
+          {filteredProbationMembers.map(member => (
+            <div
               key={member.id}
               className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
             >
@@ -188,8 +199,8 @@ export const PromotionTracking: React.FC = () => {
                   <div className="text-xs text-slate-500">Joined: {member.joinDate}</div>
                 </div>
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => handleViewProgress(member.id)}
               >
@@ -219,9 +230,9 @@ export const PromotionTracking: React.FC = () => {
                   {promotionProgress.overallProgress.toFixed(0)}%
                 </span>
               </div>
-              <ProgressBar 
-                progress={promotionProgress.overallProgress} 
-                color={promotionProgress.isEligibleForPromotion ? 'bg-green-600' : 'bg-blue-600'} 
+              <ProgressBar
+                progress={promotionProgress.overallProgress}
+                color={promotionProgress.isEligibleForPromotion ? 'bg-green-600' : 'bg-blue-600'}
               />
             </div>
 
@@ -229,13 +240,12 @@ export const PromotionTracking: React.FC = () => {
             <div className="space-y-3">
               <h4 className="font-semibold text-slate-900">Requirements</h4>
               {promotionProgress.requirements.map(req => (
-                <div 
+                <div
                   key={req.id}
-                  className={`p-4 rounded-lg border-2 ${
-                    req.isCompleted 
-                      ? 'border-green-200 bg-green-50' 
-                      : 'border-slate-200 bg-white'
-                  }`}
+                  className={`p-4 rounded-lg border-2 ${req.isCompleted
+                    ? 'border-green-200 bg-green-50'
+                    : 'border-slate-200 bg-white'
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-3">
@@ -263,7 +273,7 @@ export const PromotionTracking: React.FC = () => {
             {/* Action Buttons */}
             <div className="flex space-x-3">
               {promotionProgress.isEligibleForPromotion ? (
-                <Button 
+                <Button
                   className="flex-1"
                   onClick={() => handlePromoteMember(promotionProgress.memberId, 'automatic')}
                 >
@@ -271,7 +281,7 @@ export const PromotionTracking: React.FC = () => {
                   Promote to Full Member
                 </Button>
               ) : (
-                <Button 
+                <Button
                   variant="outline"
                   className="flex-1"
                   onClick={() => setShowManualPromotionModal(true)}

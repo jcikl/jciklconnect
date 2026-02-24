@@ -36,10 +36,12 @@ import * as Forms from '../../ui/Form';
 
 interface MentorMatchingProps {
   onClose?: () => void;
+  searchQuery?: string;
 }
 
 export const MentorMatching: React.FC<MentorMatchingProps> = ({
   onClose,
+  searchQuery,
 }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [mentorshipStats, setMentorshipStats] = useState<MentorshipStats | null>(null);
@@ -71,8 +73,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
       // Filter unassigned mentees
       const unassigned = allMembers.filter(m =>
         !m.mentorId &&
-        m.role === 'MEMBER' &&
-        m.name.toLowerCase().includes(searchTerm.toLowerCase())
+        m.role === 'MEMBER'
       );
       setUnassignedMentees(unassigned);
     } catch (error) {
@@ -82,6 +83,17 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
       setLoading(false);
     }
   };
+
+  const filteredUnassignedMentees = React.useMemo(() => {
+    const term = (searchQuery || searchTerm).toLowerCase();
+    if (!term) return unassignedMentees;
+    return unassignedMentees.filter(m =>
+      (m.name ?? '').toLowerCase().includes(term) ||
+      (m.email ?? '').toLowerCase().includes(term) ||
+      (m.phone ?? '').toLowerCase().includes(term) ||
+      (m.fullName ?? '').toLowerCase().includes(term)
+    );
+  }, [unassignedMentees, searchTerm, searchQuery]);
 
   const handleFindMatches = async (mentee: Member) => {
     setSelectedMentee(mentee);
@@ -300,18 +312,18 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-gray-900">
-                    Unassigned Mentees ({unassignedMentees.length})
+                    Unassigned Mentees ({filteredUnassignedMentees.length})
                   </h3>
                 </div>
 
-                {unassignedMentees.length === 0 ? (
+                {filteredUnassignedMentees.length === 0 ? (
                   <div className="text-center py-12">
                     <UserCheck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-500">All mentees have been assigned mentors</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {unassignedMentees.map((mentee) => (
+                    {filteredUnassignedMentees.map((mentee) => (
                       <div key={mentee.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center gap-3 mb-3">
                           <img

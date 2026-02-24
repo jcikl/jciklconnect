@@ -38,6 +38,20 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     const { showToast } = useToast();
     const canManageAnnouncements = isBoard || isAdmin;
 
+    const filteredPosts = React.useMemo(() => {
+        const term = (searchQuery || '').toLowerCase();
+        if (!term) return posts;
+        return posts.filter(p =>
+            (p.content ?? '').toLowerCase().includes(term) ||
+            (p.author?.name ?? '').toLowerCase().includes(term) ||
+            (p.author?.role ?? '').toLowerCase().includes(term)
+        );
+    }, [posts, searchQuery]);
+
+    const filteredAnnouncements = React.useMemo(() => {
+        return filteredPosts.filter(p => p.type === 'Announcement');
+    }, [filteredPosts]);
+
     // Analyze sentiment for posts
     const [sentimentAnalysis, setSentimentAnalysis] = useState<Record<string, any>>({});
     const [analyzingPosts, setAnalyzingPosts] = useState<Set<string>>(new Set());
@@ -202,15 +216,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                             {/* Feed Items */}
                             {activeTab === 'Announcements' ? (
                                 <AnnouncementsTab
-                                    posts={posts.filter(p => p.type === 'Announcement').filter(p => {
-                                        const term = (searchQuery || '').toLowerCase();
-                                        if (!term) return true;
-                                        return (
-                                            (p.content ?? '').toLowerCase().includes(term) ||
-                                            (p.author?.name ?? '').toLowerCase().includes(term) ||
-                                            (p.author?.role ?? '').toLowerCase().includes(term)
-                                        );
-                                    })}
+                                    posts={filteredAnnouncements}
                                     loading={loading}
                                     error={error}
                                     canManage={canManageAnnouncements}
@@ -230,16 +236,8 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                     }}
                                 />
                             ) : (
-                                <LoadingState loading={loading} error={error} empty={posts.length === 0} emptyMessage="No posts yet. Be the first to share!">
-                                    {posts.filter(p => {
-                                        const term = (searchQuery || '').toLowerCase();
-                                        if (!term) return true;
-                                        return (
-                                            (p.content ?? '').toLowerCase().includes(term) ||
-                                            (p.author?.name ?? '').toLowerCase().includes(term) ||
-                                            (p.author?.role ?? '').toLowerCase().includes(term)
-                                        );
-                                    }).map(post => (
+                                <LoadingState loading={loading} error={error} empty={filteredPosts.length === 0} emptyMessage="No posts yet. Be the first to share!">
+                                    {filteredPosts.map(post => (
                                         <div key={post.id} className="p-4 md:p-6 hover:bg-slate-50 transition-colors">
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center gap-3">

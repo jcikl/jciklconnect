@@ -43,6 +43,19 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
 
+  const filteredAds = useMemo(() => {
+    const term = (searchQuery || '').toLowerCase();
+    if (!term) return advertisements;
+    return advertisements.filter(ad =>
+      (ad.title ?? '').toLowerCase().includes(term) ||
+      (ad.description ?? '').toLowerCase().includes(term) ||
+      (ad.type ?? '').toLowerCase().includes(term) ||
+      (ad.placement ?? '').toLowerCase().includes(term) ||
+      (ad.status ?? '').toLowerCase().includes(term) ||
+      (ad.targetAudience ?? '').toLowerCase().includes(term)
+    );
+  }, [advertisements, searchQuery]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -160,16 +173,9 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         </div>
         <div className="p-4">
           {activeTab === 'ads' ? (
-            <LoadingState loading={loading} error={error} empty={advertisements.length === 0} emptyMessage="No advertisements found">
+            <LoadingState loading={loading} error={error} empty={filteredAds.length === 0} emptyMessage="No advertisements found">
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {advertisements.filter(ad => {
-                  const term = (searchQuery || '').toLowerCase();
-                  if (!term) return true;
-                  return (
-                    (ad.title ?? '').toLowerCase().includes(term) ||
-                    (ad.description ?? '').toLowerCase().includes(term)
-                  );
-                }).map(ad => (
+                {filteredAds.map(ad => (
                   <Card key={ad.id} className="hover:shadow-md transition-shadow">
                     <div className="aspect-video bg-slate-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden relative">
                       <AdImage imageUrl={ad.imageUrl} title={ad.title} />

@@ -30,6 +30,17 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     const { showToast } = useToast();
     const canManage = isAdmin || isBoard;
 
+    const filteredSurveys = React.useMemo(() => {
+        const term = (searchQuery || '').toLowerCase();
+        if (!term) return surveys;
+        return surveys.filter(survey =>
+            (survey.title ?? '').toLowerCase().includes(term) ||
+            (survey.description ?? '').toLowerCase().includes(term) ||
+            (survey.status ?? '').toLowerCase().includes(term) ||
+            (survey.targetAudience ?? '').toLowerCase().includes(term)
+        );
+    }, [surveys, searchQuery]);
+
     const generateQuestionId = () => `q-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     const handleAddQuestion = () => {
@@ -190,16 +201,9 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 </div>
                 <div className="p-4">
                     {activeTab === 'surveys' ? (
-                        <LoadingState loading={loading} error={error} empty={surveys.length === 0} emptyMessage="No surveys available">
+                        <LoadingState loading={loading} error={error} empty={filteredSurveys.length === 0} emptyMessage="No surveys available">
                             <div className="grid md:grid-cols-2 gap-6">
-                                {surveys.filter(survey => {
-                                    const term = (searchQuery || '').toLowerCase();
-                                    if (!term) return true;
-                                    return (
-                                        (survey.title ?? '').toLowerCase().includes(term) ||
-                                        (survey.description ?? '').toLowerCase().includes(term)
-                                    );
-                                }).map(survey => (
+                                {filteredSurveys.map(survey => (
                                     <Card key={survey.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
                                         <div className="flex justify-between items-start mb-4">
                                             <Badge variant={survey.status === 'Active' ? 'success' : survey.status === 'Closed' ? 'neutral' : 'warning'}>{survey.status}</Badge>

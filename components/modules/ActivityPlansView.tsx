@@ -44,6 +44,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
         (plan.title ?? '').toLowerCase().includes(term) ||
         (plan.description ?? '').toLowerCase().includes(term) ||
         (plan.objectives ?? '').toLowerCase().includes(term) ||
+        (plan.type ?? '').toLowerCase().includes(term) ||
         (plan.submittedBy ?? '').toLowerCase().includes(term)
       );
     }
