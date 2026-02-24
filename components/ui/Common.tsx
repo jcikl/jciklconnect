@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // --- Types & Interfaces ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -138,7 +139,7 @@ export const Button: React.FC<ButtonProps> = ({
 // Fix: Destructure ...props and spread them onto the underlying div element.
 export const Card: React.FC<CardProps> = ({ children, className = '', title, action, noPadding = false, ...props }) => {
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden card-hover ${className}`} {...props}>
+    <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${props.onClick ? 'cursor-pointer hover:shadow-md transition-all active:scale-[0.98]' : ''} ${className}`} {...props}>
       {(title || action) && (
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           {title && <h3 className="font-semibold text-slate-800 text-base">{title}</h3>}
@@ -193,9 +194,10 @@ export const StatCard: React.FC<{
   value: string | number;
   trend?: number;
   icon: React.ReactNode;
-  subtext?: string
-}> = ({ title, value, trend, icon, subtext }) => (
-  <Card className="hover:shadow-md transition-shadow min-w-0">
+  subtext?: string;
+  onClick?: () => void;
+}> = ({ title, value, trend, icon, subtext, onClick }) => (
+  <Card onClick={onClick} className="hover:shadow-md transition-shadow min-w-0">
     <div className="flex items-start justify-between gap-1 min-w-0">
       <div className="min-w-0 flex-1">
         <p className="text-xs md:text-sm font-medium text-slate-500 mb-0.5 md:mb-1 truncate">{title}</p>
@@ -221,32 +223,96 @@ export const StatCardsContainer: React.FC<{ children: React.ReactNode; className
 );
 
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '' }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(false);
+
+  const checkScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setShowLeftArrow(scrollLeft > 2);
+      setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const timer = setTimeout(checkScroll, 100);
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      window.removeEventListener('resize', checkScroll);
+      clearTimeout(timer);
+    };
+  }, [tabs]);
+
+  const handleScroll = () => {
+    checkScroll();
+  };
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className={`border-b border-slate-200 ${className}`}>
-      <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-        {tabs.map((tab) => {
-          const id = typeof tab === 'string' ? tab : tab.id;
-          const label = typeof tab === 'string' ? tab : tab.label;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                onTabChange(id);
-              }}
-              className={`
-                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                ${activeTab === id
-                  ? 'border-jci-blue text-jci-blue'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}
-              `}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </nav>
+    <div className={`relative border-b border-slate-200 ${className}`}>
+      {showLeftArrow && (
+        <button
+          onClick={scrollLeft}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100"
+          aria-label="Scroll left"
+        >
+          <ChevronLeft size={16} />
+        </button>
+      )}
+
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="overflow-x-auto no-scrollbar scroll-smooth"
+      >
+        <nav className="-mb-px flex space-x-8 px-2" aria-label="Tabs">
+          {tabs.map((tab) => {
+            const id = typeof tab === 'string' ? tab : tab.id;
+            const label = typeof tab === 'string' ? tab : tab.label;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onTabChange(id);
+                }}
+                className={`
+                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex-shrink-0
+                  ${activeTab === id
+                    ? 'border-jci-blue text-jci-blue'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}
+                `}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {showRightArrow && (
+        <button
+          onClick={scrollRight}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/80 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100"
+          aria-label="Scroll right"
+        >
+          <ChevronRight size={16} />
+        </button>
+      )}
     </div>
   );
 };

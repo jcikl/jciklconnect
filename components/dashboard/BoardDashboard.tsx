@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search, Bell, LogOut, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
 import { Select, Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
@@ -15,6 +15,8 @@ import { ReportService, ReportOptions } from '../../services/reportService';
 import { AIPredictionService } from '../../services/aiPredictionService';
 import { formatCurrency } from '../../utils/formatUtils';
 import { UserRole, Member } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
+import { useCommunication } from '../../hooks/useCommunication';
 import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -23,6 +25,9 @@ interface BoardDashboardProps {
 }
 
 export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) => {
+  const { member, signOut } = useAuth();
+  const { notifications } = useCommunication();
+  const unreadNotifications = notifications.filter(n => !n.read);
   const { members, loading: membersLoading } = useMembers();
   const { events, loading: eventsLoading } = useEvents();
   const { projects, loading: projectsLoading } = useProjects();
@@ -33,6 +38,15 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
   const [financialSummary, setFinancialSummary] = useState<any>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [loadingFinance, setLoadingFinance] = useState(true);
+
+  if (!member) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="w-12 h-12 border-4 border-jci-blue border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-medium">Initializing Board Dashboard...</p>
+      </div>
+    );
+  }
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'reports' | 'insights'>('overview');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState<'financial' | 'membership' | 'engagement' | 'projects'>('financial');
@@ -399,9 +413,167 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
     return months;
   }, [currentMonthIndex]);
 
+  const renderHeader = () => (
+    <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-8 pb-4 sm:pb-6 lg:pb-8 px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8">
+      {/* Decorative Background Pattern */}
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+      <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+
+      <div className="relative z-10 space-y-8">
+        {/* Top Row: Avatar & Status | Notifications */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <img
+                src={member?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'Board')}&background=ffffff&color=0097D7`}
+                alt="Avatar"
+                className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
+              />
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
+            </div>
+            <div className="cursor-pointer group">
+              <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
+                <span>{member?.name}</span>
+              </div>
+              <p className="font-medium text-sm tracking-wide text-blue-200">Board Member</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <button
+              className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+            >
+              <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+              {unreadNotifications.length > 0 && (
+                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
+                  {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={async () => {
+                try {
+                  await signOut();
+                  showToast('Logged out successfully', 'success');
+                } catch (error) {
+                  showToast('Failed to logout', 'error');
+                }
+              }}
+              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+              title="Sign Out"
+            >
+              <LogOut size={20} className="group-hover:scale-110 transition-transform" />
+            </button>
+          </div>
+        </div>
+
+        {/* Greeting & Quick Summary */}
+        <div className="space-y-3">
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+            Strategic Overview <br /> for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h2>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
+              <Users size={16} className="text-blue-200" />
+              <p className="text-sm font-medium text-blue-50">
+                {metrics.totalMembers} Total Members
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
+              <DollarSign size={16} className="text-green-300" />
+              <p className="text-sm font-medium text-blue-50">
+                {formatCurrency(metrics.totalBankBalance)} Cash
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+            <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search board reports, financials, or members..."
+            className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Executive Summary Header */}
+    <div className="space-y-6 pb-24">
+      {renderHeader()}
+
+      {/* Horizontal Circular Shortcuts (5x2) */}
+      <Card className="bg-slate-50/50">
+        <div className="grid grid-cols-5 gap-y-6">
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('EVENTS')}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm bg-blue-50 text-jci-blue border-blue-100 group-hover:bg-blue-100`}>
+              <Calendar size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Events Mgmt</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('SURVEYS')}>
+            <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 group-hover:bg-rose-100 transition-colors shadow-sm">
+              <CheckSquare size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Survey View</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('MEMBERS')}>
+            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100 group-hover:bg-purple-100 transition-colors shadow-sm">
+              <Users size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Members View</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('INVENTORY')}>
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 group-hover:bg-amber-100 transition-colors shadow-sm">
+              <Package size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Inventory View</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('EVENTS')}>
+            <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600 border border-green-100 group-hover:bg-green-100 transition-colors shadow-sm">
+              <Zap size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Event View</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('COMMUNICATION')}>
+            <div className="w-12 h-12 rounded-full bg-sky-50 flex items-center justify-center text-sky-600 border border-sky-100 group-hover:bg-sky-100 transition-colors shadow-sm">
+              <Activity size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Comm View</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('KNOWLEDGE')}>
+            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 group-hover:bg-indigo-100 transition-colors shadow-sm">
+              <BookOpen size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Knowledge View</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('CLUBS')}>
+            <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 border border-pink-100 group-hover:bg-pink-100 transition-colors shadow-sm">
+              <Heart size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Hobby View</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('FINANCE')}>
+            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:bg-emerald-100 transition-colors shadow-sm">
+              <DollarSign size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Finance View</span>
+          </div>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('GAMIFICATION')}>
+            <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-600 border border-orange-100 group-hover:bg-orange-100 transition-colors shadow-sm">
+              <Target size={24} />
+            </div>
+            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Gamify View</span>
+          </div>
+        </div>
+      </Card>
       <Card noPadding>
         <div className="px-6 pt-4">
           <Tabs
@@ -431,6 +603,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                     icon={<Users size={20} />}
                     subtext={`${metrics.newMembersThisMonth} new this month`}
                     trend={metrics.newMembersThisMonth > 0 ? metrics.newMembersThisMonth : undefined}
+                    onClick={() => onNavigate?.('MEMBERS')}
                   />
                 </div>
                 <div className="min-w-0">
@@ -439,6 +612,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                     value={metrics.activeMembers.toString()}
                     icon={<CheckCircle size={20} />}
                     subtext={`${Math.round((metrics.activeMembers / Math.max(metrics.totalMembers, 1)) * 100)}% engagement`}
+                    onClick={() => onNavigate?.('MEMBERS')}
                   />
                 </div>
               </div>
@@ -451,6 +625,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                     value={metrics.upcomingEvents.toString()}
                     icon={<Calendar size={20} />}
                     subtext="Scheduled activities"
+                    onClick={() => onNavigate?.('EVENTS')}
                   />
                 </div>
                 <div className="min-w-0">
@@ -459,6 +634,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                     value={metrics.activeProjects.toString()}
                     icon={<Briefcase size={20} />}
                     subtext={`${metrics.completedProjects} completed`}
+                    onClick={() => onNavigate?.('PROJECTS')}
                   />
                 </div>
               </div>
@@ -469,7 +645,14 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                   <div className="text-center py-8 text-slate-400 text-sm">Loading financial data...</div>
                 </Card>
               ) : financialSummary ? (
-                <Card title="Financial Overview">
+                <Card
+                  title="Financial Overview"
+                  action={
+                    <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
+                      <Eye size={18} />
+                    </Button>
+                  }
+                >
                   <div className="grid grid-cols-2 gap-4 md:gap-6 mb-4">
                     <div className="min-w-0 bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
                       <div className="flex items-center justify-between mb-1 md:mb-2">
@@ -609,7 +792,14 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
                   {/* Additional Metrics Grid */}
                   <div className="grid md:grid-cols-2 gap-6">
                     {/* Inventory Status */}
-                    <Card title="Inventory Status">
+                    <Card
+                      title="Inventory Status"
+                      action={
+                        <Button variant="ghost" size="sm" onClick={() => onNavigate?.('INVENTORY')}>
+                          <Eye size={18} />
+                        </Button>
+                      }
+                    >
                       <div className="space-y-4">
                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                           <div className="flex items-center gap-3">
@@ -1443,7 +1633,41 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
           </div>
         </div>
       </Modal>
-    </div>
+
+      {/* Bottom Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 pt-2 bg-gradient-to-t from-white via-white/95 to-transparent">
+        <div className="max-w-md mx-auto bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 p-2 flex items-center justify-around">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'overview' ? 'text-jci-blue bg-white/10' : 'text-slate-400 hover:text-white'}`}
+          >
+            <LayoutDashboard size={20} />
+            <span className="text-[10px] font-bold">Dashboard</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.('CLAIM')}
+            className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-white transition-all"
+          >
+            <Smartphone size={20} />
+            <span className="text-[10px] font-bold">Claim</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.('DIRECTORY')}
+            className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-white transition-all"
+          >
+            <Building2 size={20} />
+            <span className="text-[10px] font-bold">Directory</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.('BENEFITS')}
+            className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-white transition-all"
+          >
+            <Gift size={20} />
+            <span className="text-[10px] font-bold">Benefits</span>
+          </button>
+        </div>
+      </div>
+    </div >
   );
 };
 

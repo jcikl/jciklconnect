@@ -6,26 +6,6 @@ import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { useMembers } from '../../hooks/useMembers';
 import { BusinessProfile } from '../../types';
 
-const getIndustryEmoji = (industry: string) => {
-  const lower = industry.toLowerCase();
-  if (lower.includes('tech') || lower.includes('software') || lower.includes('it')) return '💻';
-  if (lower.includes('food') || lower.includes('restaurant') || lower.includes('f&b') || lower.includes('pizza') || lower.includes('burger')) return '🍔';
-  if (lower.includes('health') || lower.includes('medical') || lower.includes('clinic')) return '🏥';
-  if (lower.includes('edu') || lower.includes('school') || lower.includes('training')) return '📚';
-  if (lower.includes('finance') || lower.includes('bank') || lower.includes('accounting')) return '💰';
-  if (lower.includes('real estate') || lower.includes('property')) return '🏢';
-  if (lower.includes('retail') || lower.includes('shop') || lower.includes('store')) return '🛍️';
-  if (lower.includes('manufactur') || lower.includes('factory')) return '🏭';
-  if (lower.includes('market') || lower.includes('advertis')) return '📢';
-  if (lower.includes('consult')) return '🤝';
-  if (lower.includes('legal') || lower.includes('law')) return '⚖️';
-  if (lower.includes('automotive') || lower.includes('car')) return '🚗';
-  if (lower.includes('travel') || lower.includes('tour')) return '✈️';
-  if (lower.includes('event') || lower.includes('entertainment')) return '🎉';
-  if (lower.includes('art') || lower.includes('design')) return '🎨';
-  if (lower.includes('construct') || lower.includes('build')) return '🏗️';
-  return '🏢'; // default
-};
 
 export const BusinessDirectoryView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,11 +90,6 @@ export const BusinessDirectoryView: React.FC = () => {
                           : 'bg-blue-50 text-jci-blue hover:bg-blue-100 font-medium'
                           }`}
                       >
-                        {ind !== 'All' && (
-                          <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[10px] shadow-sm">
-                            {getIndustryEmoji(ind)}
-                          </div>
-                        )}
                         <span className="text-sm">{ind}</span>
                       </button>
                     );
