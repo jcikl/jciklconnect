@@ -1575,83 +1575,83 @@ const JCIKLApp: React.FC = () => {
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 
+          {/* Global Persistent Header - Always visible, not affected by scrolling */}
+          {view !== 'DASHBOARD' && member && (
+            <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-8 pb-4 px-5 sm:px-8 text-white shadow-2xl relative overflow-hidden">
+              {/* Decorative Background Pattern */}
+              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+
+              <div className="relative z-10 space-y-6 max-w-7xl mx-auto">
+                {/* Top Row: Avatar & Status | Notifications */}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className="relative">
+                      <img
+                        src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
+                        alt="Avatar"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-white/30 shadow-lg object-cover"
+                      />
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
+                    </div>
+                    <div>
+                      <p className="text-blue-100 text-lg sm:text-xl font-bold leading-tight">{member.name}</p>
+                      <div className="flex items-center space-x-2 mt-0.5">
+                        <p className="font-medium text-[10px] sm:text-xs tracking-wide text-blue-100/70 uppercase">{member.role}</p>
+                        <div
+                          className="flex items-center space-x-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] sm:text-xs font-bold cursor-pointer hover:bg-white/30 transition-colors"
+                          onClick={() => setView('GAMIFICATION')}
+                        >
+                          <Award size={12} />
+                          <span>{member?.points || 0} Pts</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <button
+                      onClick={() => setNotificationDrawerOpen(true)}
+                      className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+                    >
+                      <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+                      {unreadNotifications.length > 0 && (
+                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
+                          {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleLogout}
+                      className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+                      title="Sign Out"
+                    >
+                      <LogOut size={20} className="group-hover:scale-110 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative group max-w-3xl">
+                  <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+                    <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search members, activities, or docs..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-4 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Scrollable Area */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-32 md:pb-8">
             <div className="max-w-7xl mx-auto">
               <RoleSimulator />
-
-              {/* Global Persistent Header - Only for non-dashboard views */}
-              {view !== 'DASHBOARD' && member && (
-                <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-8 pb-4 px-5 sm:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 mb-8">
-                  {/* Decorative Background Pattern */}
-                  <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
-
-                  <div className="relative z-10 space-y-6">
-                    {/* Top Row: Avatar & Status | Notifications */}
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-3 sm:space-x-4">
-                        <div className="relative">
-                          <img
-                            src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
-                            alt="Avatar"
-                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-white/30 shadow-lg object-cover"
-                          />
-                          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
-                        </div>
-                        <div>
-                          <p className="text-blue-100 text-lg sm:text-xl font-bold leading-tight">{member.name}</p>
-                          <div className="flex items-center space-x-2 mt-0.5">
-                            <p className="font-medium text-[10px] sm:text-xs tracking-wide text-blue-100/70 uppercase">{member.role}</p>
-                            <div
-                              className="flex items-center space-x-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] sm:text-xs font-bold cursor-pointer hover:bg-white/30 transition-colors"
-                              onClick={() => setView('GAMIFICATION')}
-                            >
-                              <Award size={12} />
-                              <span>{member?.points || 0} Pts</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2 sm:space-x-3">
-                        <button
-                          onClick={() => setNotificationDrawerOpen(true)}
-                          className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
-                        >
-                          <Bell size={20} className="group-hover:rotate-12 transition-transform" />
-                          {unreadNotifications.length > 0 && (
-                            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
-                              {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
-                            </span>
-                          )}
-                        </button>
-
-                        <button
-                          onClick={handleLogout}
-                          className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
-                          title="Sign Out"
-                        >
-                          <LogOut size={20} className="group-hover:scale-110 transition-transform" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Search Bar */}
-                    <div className="relative group max-w-3xl">
-                      <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-                        <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Search members, activities, or docs..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-4 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {renderCurrentView()}
             </div>
