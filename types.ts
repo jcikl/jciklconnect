@@ -333,12 +333,14 @@ export interface BusinessProfile {
   memberId: string;
   companyName: string;
   industry: string;
+  businessCategory?: string;
   description: string;
   website: string;
   offer: string; // Special offer for JCI members
   logo: string;
   internationalConnections?: InternationalConnection[];
   globalNetworkEnabled?: boolean;
+  acceptsInternationalBusiness?: 'Yes' | 'No' | 'Willing to Explore' | boolean;
   jciChapters?: string[]; // JCI chapters this business is connected with
 }
 

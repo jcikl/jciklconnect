@@ -13,32 +13,26 @@ import { formatDate, toDate } from '../../utils/dateUtils';
 export const MemberBenefitsView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBenefit, setSelectedBenefit] = useState<MemberBenefit | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'my' | 'usage'>('all');
-  const [myBenefits, setMyBenefits] = useState<MemberBenefit[]>([]);
+  const [claimedBenefitIds, setClaimedBenefitIds] = useState<Set<string>>(new Set());
   const [selectedBenefitForUsage, setSelectedBenefitForUsage] = useState<MemberBenefit | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
-  const { benefits, loading, error, createBenefit, updateBenefit, deleteBenefit, getEligibleBenefits, recordUsage, getUsageHistory } = useMemberBenefits();
+  const { benefits, loading, error, createBenefit, updateBenefit, deleteBenefit, recordUsage, getUsageHistory } = useMemberBenefits();
   const { member } = useAuth();
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (member && activeTab === 'my') {
-      loadMyBenefits();
+    if (member) {
+      loadClaimedBenefits();
     }
-  }, [member, activeTab]);
+  }, [member]);
 
-  const loadMyBenefits = async () => {
+  const loadClaimedBenefits = async () => {
     if (!member) return;
     try {
-      const eligible = await getEligibleBenefits(
-        member.id,
-        member.tier,
-        member.points,
-        member.role,
-        member.joinDate
-      );
-      setMyBenefits(eligible);
+      const history = await getUsageHistory(undefined, member.id);
+      const claimedIds = new Set(history.map(h => h.benefitId));
+      setClaimedBenefitIds(claimedIds);
     } catch (err) {
       // Error handled by hook
     }
@@ -93,7 +87,11 @@ export const MemberBenefitsView: React.FC = () => {
     }
   };
 
-  const displayBenefits = activeTab === 'my' ? myBenefits : benefits;
+  const displayBenefits = [...benefits].sort((a, b) => {
+    const aClaimed = claimedBenefitIds.has(a.id!) ? 1 : 0;
+    const bClaimed = claimedBenefitIds.has(b.id!) ? 1 : 0;
+    return bClaimed - aClaimed;
+  });
 
   return (
     <div className="space-y-6">
@@ -114,13 +112,6 @@ export const MemberBenefitsView: React.FC = () => {
       </div>
 
       <Card noPadding>
-        <div className="px-4 md:px-6 pt-4">
-          <Tabs
-            tabs={['All Benefits', 'My Benefits']}
-            activeTab={activeTab === 'all' ? 'All Benefits' : 'My Benefits'}
-            onTabChange={(tab) => setActiveTab(tab === 'All Benefits' ? 'all' : 'my')}
-          />
-        </div>
         <div className="p-4">
           <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits available">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -185,10 +176,12 @@ export const MemberBenefitsView: React.FC = () => {
                         </Button>
                       </>
                     )}
-                    {activeTab === 'my' && (
+                    {member && (
                       <Button
                         size="sm"
                         className="flex-1"
+                        variant={claimedBenefitIds.has(benefit.id!) ? 'outline' : 'primary'}
+                        disabled={claimedBenefitIds.has(benefit.id!)}
                         onClick={async () => {
                           if (!member) {
                             showToast('Please login to claim benefits', 'error');
@@ -196,24 +189,17 @@ export const MemberBenefitsView: React.FC = () => {
                           }
 
                           try {
-                            // Check if benefit has usage limit
-                            if (benefit.usageLimit) {
-                              // In a real implementation, we would check member's usage count
-                              // For now, we'll just record the usage
-                            }
-
                             await recordUsage(member.id, benefit.id!, `Claimed ${benefit.name}`);
                             showToast('Benefit claimed! Details will be sent via email.', 'success');
 
-                            // Reload eligible benefits to update usage counts
-                            await loadMyBenefits();
+                            await loadClaimedBenefits();
                           } catch (err) {
                             // Error handled by hook
                           }
                         }}
                       >
                         <CheckCircle size={14} className="mr-2" />
-                        Claim Benefit
+                        {claimedBenefitIds.has(benefit.id!) ? 'Claimed' : 'Claim Benefit'}
                       </Button>
                     )}
                   </div>
@@ -222,17 +208,6 @@ export const MemberBenefitsView: React.FC = () => {
             </div>
           </LoadingState>
 
-          {activeTab === 'usage' && (
-            <UsageTrackingTab
-              benefits={benefits}
-              member={member}
-              onViewUsage={(benefit) => {
-                setSelectedBenefitForUsage(benefit);
-                setIsUsageModalOpen(true);
-              }}
-              getUsageHistory={getUsageHistory}
-            />
-          )}
         </div>
       </Card>
 

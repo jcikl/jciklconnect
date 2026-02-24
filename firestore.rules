@@ -70,11 +70,11 @@ service cloud.firestore {
       // This is critical for the getMemberByEmail function in membersService
       allow list: if isAuthenticated() && (
         (request.query.limit <= 5 && request.query.filters.email == request.auth.token.email) ||
-        isMember()
+        isMember() || canReadOrgMembers()
       );
 
-      // 3. Allow full read if user is an established member (MEMBER, BOARD, ADMIN)
-      allow read: if isMember();
+      // 3. Allow full read if user is an established member (MEMBER, BOARD, ADMIN, or org roles)
+      allow read: if isMember() || canReadOrgMembers();
       
       allow create: if isAuthenticated() && 
                        (request.auth.uid == memberId || isBoard()) &&

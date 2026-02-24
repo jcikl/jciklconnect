@@ -15,7 +15,7 @@ export const useMembers = (loIdFilter?: string | null) => {
 
   const loadMembers = useCallback(async () => {
     const inDevMode = isDevMode() || isDevModeFromAuth;
-    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role);
+    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'].includes(currentMember.role);
 
     if (!inDevMode && !isFullMember) {
       setMembers([]);
@@ -40,7 +40,7 @@ export const useMembers = (loIdFilter?: string | null) => {
   useEffect(() => {
     if (authLoading) return;
     const inDevMode = isDevMode() || isDevModeFromAuth;
-    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role);
+    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'].includes(currentMember.role);
 
     if (!inDevMode && !isFullMember) {
       setMembers([]);

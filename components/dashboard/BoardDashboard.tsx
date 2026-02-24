@@ -402,22 +402,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate }) =>
   return (
     <div className="space-y-6">
       {/* Executive Summary Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex gap-4">
-            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
-              <p className="text-xs text-slate-300 mb-1">Active Members</p>
-              <p className="text-2xl font-bold">{metrics.activeMembers}</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
-              <p className="text-xs text-slate-300 mb-1">Active Projects</p>
-              <p className="text-2xl font-bold">{metrics.activeProjects}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
       <Card noPadding>
         <div className="px-6 pt-4">
           <Tabs

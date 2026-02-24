@@ -247,12 +247,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             placeholder="Search events, members, or projects..."
             className="w-full bg-white text-slate-800 rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/20 outline-none transition-all placeholder:text-slate-400 placeholder:font-medium text-base"
           />
-          <div className="absolute inset-y-0 right-5 flex items-center">
-            <div className="w-px h-6 bg-slate-200 mr-5" />
-            <button className="text-slate-400 hover:text-jci-blue transition-colors p-1">
-              <Zap size={20} />
-            </button>
-          </div>
+
         </div>
       </div>
     </div>
@@ -339,8 +334,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   .slice(0, 5)
                   .map(event => {
                     const isRecommended = recommendedEvents.some(re => re.id === event.id);
+                    const isRegistered = myRegistrationEventIds.includes(event.id!);
                     return (
-                      <div key={event.id} className="flex items-center space-x-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors">
+                      <div key={event.id} className="flex items-center space-x-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors" onClick={() => onNavigate?.('EVENTS')}>
                         <div className={`w-12 h-12 ${eventTab === 'upcoming' ? 'bg-blue-50 text-jci-blue' : 'bg-slate-100 text-slate-500'} rounded-lg flex flex-col items-center justify-center flex-shrink-0 shadow-sm border border-slate-100`}>
                           <span className="text-[10px] font-bold uppercase">{new Date(event.date).toLocaleString('default', { month: 'short' })}</span>
                           <span className="text-lg font-bold leading-none">{new Date(event.date).getDate()}</span>
@@ -352,9 +348,20 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           </div>
                           <p className="text-xs text-slate-500">{event.type} • {event.attendees} Attending</p>
                         </div>
-                        {event.predictedDemand === 'High' && eventTab === 'upcoming' && (
-                          <Badge variant="jci">Hot</Badge>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {isRegistered ? (
+                            <Badge variant="success" className="px-2 py-0.5 text-[10px]">Registered</Badge>
+                          ) : (
+                            eventTab === 'upcoming' && (
+                              <Button size="sm" variant="outline" className="text-xs h-7 px-2" onClick={(e) => { e.stopPropagation(); onNavigate?.('EVENTS'); }}>
+                                Register
+                              </Button>
+                            )
+                          )}
+                          {event.predictedDemand === 'High' && eventTab === 'upcoming' && (
+                            <Badge variant="jci" className="px-2 py-0.5 text-[10px]">Hot</Badge>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

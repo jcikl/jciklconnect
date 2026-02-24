@@ -6,25 +6,56 @@ import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { useMembers } from '../../hooks/useMembers';
 import { BusinessProfile } from '../../types';
 
+const getIndustryEmoji = (industry: string) => {
+  const lower = industry.toLowerCase();
+  if (lower.includes('tech') || lower.includes('software') || lower.includes('it')) return '💻';
+  if (lower.includes('food') || lower.includes('restaurant') || lower.includes('f&b') || lower.includes('pizza') || lower.includes('burger')) return '🍔';
+  if (lower.includes('health') || lower.includes('medical') || lower.includes('clinic')) return '🏥';
+  if (lower.includes('edu') || lower.includes('school') || lower.includes('training')) return '📚';
+  if (lower.includes('finance') || lower.includes('bank') || lower.includes('accounting')) return '💰';
+  if (lower.includes('real estate') || lower.includes('property')) return '🏢';
+  if (lower.includes('retail') || lower.includes('shop') || lower.includes('store')) return '🛍️';
+  if (lower.includes('manufactur') || lower.includes('factory')) return '🏭';
+  if (lower.includes('market') || lower.includes('advertis')) return '📢';
+  if (lower.includes('consult')) return '🤝';
+  if (lower.includes('legal') || lower.includes('law')) return '⚖️';
+  if (lower.includes('automotive') || lower.includes('car')) return '🚗';
+  if (lower.includes('travel') || lower.includes('tour')) return '✈️';
+  if (lower.includes('event') || lower.includes('entertainment')) return '🎉';
+  if (lower.includes('art') || lower.includes('design')) return '🎨';
+  if (lower.includes('construct') || lower.includes('build')) return '🏗️';
+  return '🏢'; // default
+};
+
 export const BusinessDirectoryView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'directory' | 'international'>('directory');
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('All');
 
   const { businesses, loading, error } = useBusinessDirectory();
   const { members } = useMembers(); // Used to find owner name
   const { showToast } = useToast();
 
+  const uniqueIndustries = useMemo(() => {
+    const industries = new Set(businesses.map(b => b.industry).filter(Boolean));
+    return ['All', ...Array.from(industries).sort()];
+  }, [businesses]);
+
   const filteredBusinesses = useMemo(() => {
-    if (!searchTerm) return businesses;
+    let filtered = businesses;
+    if (selectedIndustry !== 'All') {
+      filtered = filtered.filter(biz => biz.industry === selectedIndustry);
+    }
+    if (!searchTerm) return filtered;
     const lowerSearch = searchTerm.toLowerCase();
-    return businesses.filter(biz =>
+    return filtered.filter(biz =>
       biz.companyName.toLowerCase().includes(lowerSearch) ||
       biz.industry.toLowerCase().includes(lowerSearch) ||
       biz.description?.toLowerCase().includes(lowerSearch)
     );
-  }, [businesses, searchTerm]);
+  }, [businesses, searchTerm, selectedIndustry]);
 
   const handleContact = () => {
     setDetailModalOpen(false);
@@ -64,67 +95,115 @@ export const BusinessDirectoryView: React.FC = () => {
         </div>
         <div className="p-4">
           {activeTab === 'directory' ? (
-            <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredBusinesses.map(biz => {
-                  const owner = members.find(m => m.id === biz.memberId);
-                  return (
-                    <Card key={biz.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
-                      <div className="h-24 bg-gradient-to-r from-slate-100 to-slate-200 relative">
-                        <div className="absolute -bottom-6 left-6 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
-                          <img
-                            src={biz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.companyName)}&background=0097D7&color=fff`}
-                            alt="Logo"
-                            className="w-full h-full object-cover rounded"
-                          />
-                        </div>
-                        <div className="absolute top-4 right-4">
-                          <Badge variant="neutral">{biz.industry}</Badge>
-                        </div>
-                      </div>
-                      <div className="pt-8 px-6 pb-6 flex-1 flex flex-col">
-                        <h3 className="text-lg font-bold text-slate-900">{biz.companyName}</h3>
-                        <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
-                          Owned by <span className="font-medium text-jci-blue">{owner?.name || 'Unknown'}</span>
-                        </p>
-                        <p className="text-sm text-slate-600 mb-4 flex-1 line-clamp-3">{biz.description}</p>
-
-                        {biz.offer && (
-                          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
-                            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">JCI Member Deal</span>
-                            <p className="text-sm font-medium text-blue-900">{biz.offer}</p>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-bold text-slate-700 mb-3 px-1">Categories</h3>
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 px-1 -mx-1">
+                  {uniqueIndustries.map(ind => {
+                    const isActive = selectedIndustry === ind;
+                    return (
+                      <button
+                        key={ind}
+                        onClick={() => setSelectedIndustry(ind)}
+                        className={`flex items-center gap-2 px-4 py-1.5 rounded-full whitespace-nowrap transition-colors flex-shrink-0 ${isActive
+                          ? 'bg-jci-blue text-white font-medium shadow-md shadow-jci-blue/20'
+                          : 'bg-blue-50 text-jci-blue hover:bg-blue-100 font-medium'
+                          }`}
+                      >
+                        {ind !== 'All' && (
+                          <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[10px] shadow-sm">
+                            {getIndustryEmoji(ind)}
                           </div>
                         )}
+                        <span className="text-sm">{ind}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                        <div className="flex gap-2 mt-auto">
-                          {biz.website && (
+              <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredBusinesses.map(biz => {
+                    const owner = members.find(m => m.id === biz.memberId);
+                    return (
+                      <Card key={biz.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
+                        <div className="h-24 bg-gradient-to-r from-slate-100 to-slate-200 relative">
+                          <div className="absolute -bottom-6 left-6 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
+                            <img
+                              src={biz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.companyName)}&background=0097D7&color=fff`}
+                              alt="Logo"
+                              className="w-full h-full object-cover rounded"
+                            />
+                          </div>
+                          <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                            <Badge variant="neutral">{biz.industry}</Badge>
+
+                            {/* Business Category Tag - fallback to owner profile */}
+                            {(biz.businessCategory || (owner?.businessCategory && owner.businessCategory.length > 0)) && (
+                              <Badge variant="info" className="text-[10px]">
+                                {biz.businessCategory || owner?.businessCategory?.join(', ')}
+                              </Badge>
+                            )}
+
+                            {/* International Business Status - fallback to owner profile */}
+                            {(() => {
+                              const status = biz.acceptsInternationalBusiness || owner?.acceptInternationalBusiness;
+                              if (status === 'Yes' || status === true) {
+                                return <Badge variant="success" className="text-[10px]">Accepts International BIZ</Badge>;
+                              }
+                              if (status === 'Willing to Explore') {
+                                return <Badge variant="warning" className="text-[10px]">Exploring International BIZ</Badge>;
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </div>
+                        <div className="pt-8 px-6 pb-6 flex-1 flex flex-col">
+                          <h3 className="text-lg font-bold text-slate-900">{owner?.name || 'Unknown'}</h3>
+                          <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                            {biz.companyName}
+                          </p>
+                          <div className="flex gap-2 mt-auto mb-4">
+                            {biz.website && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => window.open(biz.website.startsWith('http') ? biz.website : `https://${biz.website}`, '_blank')}
+                              >
+                                <Globe size={14} className="mr-2" /> Website
+                              </Button>
+                            )}
                             <Button
-                              variant="outline"
+                              variant="secondary"
                               size="sm"
                               className="flex-1"
-                              onClick={() => window.open(biz.website.startsWith('http') ? biz.website : `https://${biz.website}`, '_blank')}
+                              onClick={() => {
+                                setSelectedBiz(biz);
+                                setDetailModalOpen(true);
+                              }}
                             >
-                              <Globe size={14} className="mr-2" /> Website
+                              Contact
                             </Button>
+                          </div>
+                          <p className="text-sm text-slate-600 mb-4 flex-1 line-clamp-3">{biz.description}</p>
+
+                          {biz.offer && (
+                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                              <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">JCI Member Deal</span>
+                              <p className="text-sm font-medium text-blue-900">{biz.offer}</p>
+                            </div>
                           )}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => {
-                              setSelectedBiz(biz);
-                              setDetailModalOpen(true);
-                            }}
-                          >
-                            Contact
-                          </Button>
+
+
                         </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </LoadingState>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </LoadingState>
+            </div>
           ) : (
             <InternationalNetworkTab businesses={filteredBusinesses} />
           )}
