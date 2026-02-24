@@ -257,46 +257,44 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {renderHeader()}
 
       {/* Horizontal Shortcuts Grid */}
-      <Card className="bg-slate-50/50">
-        <div className="grid grid-cols-6 sm:grid-cols-6 gap-y-6 gap-x-4">
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('PROJECTS')}>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-green-50 text-green-600 border-green-100 group-hover:bg-green-100'}`}>
-              <Briefcase size={24} />
-            </div>
-            <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>My Projects</span>
+      <div className="grid grid-cols-6 sm:grid-cols-6 gap-y-6 gap-x-4">
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('PROJECTS')}>
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-green-50 text-green-600 border-green-100 group-hover:bg-green-100'}`}>
+            <Briefcase size={24} />
           </div>
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('MEMBERS')}>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-purple-50 text-purple-600 border-purple-100 group-hover:bg-purple-100'}`}>
-              <Users size={24} />
-            </div>
-            <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>Find Mentor</span>
-          </div>
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('GAMIFICATION')}>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-100'}`}>
-              <Target size={24} />
-            </div>
-            <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>Set Goals</span>
-          </div>
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('SURVEYS')}>
-            <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 group-hover:bg-rose-100 transition-colors shadow-sm">
-              <CheckSquare size={24} />
-            </div>
-            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Survey</span>
-          </div>
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('CLUBS')}>
-            <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 border border-pink-100 group-hover:bg-pink-100 transition-colors shadow-sm">
-              <Heart size={24} />
-            </div>
-            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Hobby Clubs</span>
-          </div>
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('KNOWLEDGE')}>
-            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 group-hover:bg-indigo-100 transition-colors shadow-sm">
-              <BookOpen size={24} />
-            </div>
-            <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Knowledge</span>
-          </div>
+          <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>My Projects</span>
         </div>
-      </Card>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('MEMBERS')}>
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-purple-50 text-purple-600 border-purple-100 group-hover:bg-purple-100'}`}>
+            <Users size={24} />
+          </div>
+          <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>Find Mentor</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('GAMIFICATION')}>
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-100'}`}>
+            <Target size={24} />
+          </div>
+          <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>Set Goals</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('SURVEYS')}>
+          <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 group-hover:bg-rose-100 transition-colors shadow-sm">
+            <CheckSquare size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Survey</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('CLUBS')}>
+          <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 border border-pink-100 group-hover:bg-pink-100 transition-colors shadow-sm">
+            <Heart size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Hobby Clubs</span>
+        </div>
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('KNOWLEDGE')}>
+          <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 group-hover:bg-indigo-100 transition-colors shadow-sm">
+            <BookOpen size={24} />
+          </div>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Knowledge</span>
+        </div>
+      </div>
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
