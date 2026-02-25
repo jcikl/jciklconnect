@@ -48,6 +48,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   const searchY = useTransform(scrollY, [0, 120], [0, -180]);
   const backgroundY = useTransform(scrollY, [0, 120], [0, -180]);
   const headerY = useTransform(scrollY, [0, 120], [0, -180]);
+  const counterY = useTransform(headerY, (y) => -Number(y));
 
   const { notifications } = useCommunication();
   const unreadNotifications = notifications.filter(n => !n.read);
@@ -448,8 +449,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       </motion.div>
 
       <div className="relative z-10 pt-8 pb-4 sm:pb-6 lg:pb-8">
-        {/* Top Row: Fixed/Docked Area */}
-        <div className="flex justify-between items-center mb-8">
+        {/* Top Row: Fixed/Docked Area (Counter-animated to stay fixed) */}
+        <motion.div style={{ y: counterY }} className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-3">
             <div className="relative">
               <img
@@ -494,7 +495,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
               <LogOut size={20} className="group-hover:scale-110 transition-transform" />
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Dynamic Animation Area */}
         <div className="relative">

@@ -57,6 +57,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const searchY = useTransform(scrollY, [0, 100], [0, -180]);
   const backgroundY = useTransform(scrollY, [0, 100], [0, -180]);
   const headerY = useTransform(scrollY, [0, 100], [0, -180]);
+  const counterY = useTransform(headerY, (y) => -Number(y));
 
   const { showToast } = useToast();
   const { member, signOut } = useAuth();
@@ -166,7 +167,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }
 
   const renderHeader = () => (
-    <div className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8">
+    <motion.div
+      style={{ y: headerY }}
+      className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8"
+    >
       {/* Decorative Background Pattern */}
       <motion.div style={{ y: backgroundY }} className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
@@ -174,8 +178,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       </motion.div>
 
       <div className="relative z-10 pt-8 pb-4 sm:pb-6 lg:pb-8 flex flex-col">
-        {/* Top Row: Fixed Area */}
-        <div className="flex justify-between items-center mb-8">
+        {/* Top Row: Fixed Area (Counter-animated) */}
+        <motion.div style={{ y: counterY }} className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-3">
             <div className="relative">
               <img
@@ -221,7 +225,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               <LogOut size={20} className="group-hover:scale-110 transition-transform" />
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Dynamic Animation Area */}
         <div className="relative">
@@ -288,7 +292,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 
   return (
