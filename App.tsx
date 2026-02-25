@@ -57,6 +57,7 @@ import { BoardDashboard } from './components/dashboard/BoardDashboard';
 import { DashboardHome } from './components/dashboard/DashboardHome';
 import { DeveloperInterface } from './components/modules/DeveloperInterface';
 import { HelpModalProvider } from './contexts/HelpModalContext';
+import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 
 // --- View Definitions ---
 type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER';
@@ -1018,7 +1019,9 @@ const NotificationDrawer: React.FC<{ isOpen: boolean, onClose: () => void, notif
 
 // --- Main App Shell ---
 
-const JCIKLApp: React.FC = () => {
+
+
+export const JCIKLApp: React.FC = () => {
   const [view, setView] = useState<ViewType>('GUEST');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1035,6 +1038,8 @@ const JCIKLApp: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const { isBatchMode } = useBatchMode();
 
   // All hooks must be called before any conditional returns
   const navigate = useNavigate();
@@ -1784,7 +1789,7 @@ const JCIKLApp: React.FC = () => {
 
         {/* Floating Bottom Navigation Bar (Mobile) */}
         {
-          (isMember || isGuest || isBoard || isAdmin || isDeveloper) && (
+          (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
             <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
               <button
                 onClick={() => handleViewChange('DASHBOARD')}
@@ -1836,16 +1841,13 @@ const JCIKLApp: React.FC = () => {
         }
       </div >
 
-      <Modal isOpen={isUpgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} title="Join Member to Unlock More" size="md">
-        <div className="text-center p-4">
-          <div className="w-16 h-16 bg-blue-50 text-jci-blue rounded-full flex items-center justify-center mx-auto mb-4">
-            <Award size={32} />
-          </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">Unlock More Features</h3>
-          <p className="text-sm text-slate-500 mb-8">
-            Upgrade your account to access Claims, Business Directory, Projects, Mentorship, and more exclusive member benefits!
-          </p>
-          <div className="flex flex-col gap-3">
+      <Modal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        title="Join Member to Unlock More"
+        size="md"
+        footer={(
+          <div className="flex flex-col gap-3 w-full">
             <Button className="w-full" onClick={() => { setUpgradeModalOpen(false); /* Route to Join Us or open registration */ }}>
               Join Us Now
             </Button>
@@ -1853,47 +1855,59 @@ const JCIKLApp: React.FC = () => {
               Maybe Later
             </Button>
           </div>
+        )}
+      >
+        <div className="text-center p-4">
+          <div className="w-16 h-16 bg-blue-50 text-jci-blue rounded-full flex items-center justify-center mx-auto mb-4">
+            <Award size={32} />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">Unlock More Features</h3>
+          <p className="text-sm text-slate-500 mb-4">
+            Upgrade your account to access Claims, Business Directory, Projects, Mentorship, and more exclusive member benefits!
+          </p>
         </div>
       </Modal>
-    </HelpModalProvider >
+    </HelpModalProvider>
   );
-}
+};
 
 const App: React.FC = () => {
   return (
-    <ErrorBoundary
-      onError={(error, errorInfo) => {
-        // Log error to our error logging service
-        errorLoggingService.logError(error, {
-          component: 'App',
-          action: 'render'
-        }, errorInfo);
-      }}
-    >
-      <BrowserRouter>
-        <AsyncErrorBoundary
-          onError={(error) => {
-            errorLoggingService.logError(error, {
-              component: 'App',
-              action: 'async_operation'
-            });
-          }}
-        >
-          <AuthProvider>
-            <ErrorBoundary
-              onError={(error, errorInfo) => {
-                errorLoggingService.logError(error, {
-                  component: 'JCIKLApp',
-                  action: 'main_app_render'
-                }, errorInfo);
-              }}
-            >
-              <JCIKLApp />
-            </ErrorBoundary>
-          </AuthProvider>
-        </AsyncErrorBoundary>
-      </BrowserRouter>
-    </ErrorBoundary>
+    <BatchModeProvider>
+      <ErrorBoundary
+        onError={(error, errorInfo) => {
+          // Log error to our error logging service
+          errorLoggingService.logError(error, {
+            component: 'App',
+            action: 'render'
+          }, errorInfo);
+        }}
+      >
+        <BrowserRouter>
+          <AsyncErrorBoundary
+            onError={(error) => {
+              errorLoggingService.logError(error, {
+                component: 'App',
+                action: 'async_operation'
+              });
+            }}
+          >
+            <AuthProvider>
+              <ErrorBoundary
+                onError={(error, errorInfo) => {
+                  errorLoggingService.logError(error, {
+                    component: 'JCIKLApp',
+                    action: 'main_app_render'
+                  }, errorInfo);
+                }}
+              >
+                <JCIKLApp />
+              </ErrorBoundary>
+            </AuthProvider>
+          </AsyncErrorBoundary>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </BatchModeProvider>
   );
 }
 

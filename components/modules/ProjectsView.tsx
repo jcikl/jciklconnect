@@ -25,6 +25,7 @@ import { ProjectReportService, ProjectReport } from '../../services/projectRepor
 // ProjectTransactionModal removed Header: Title and Due Date
 import { FinanceService } from '../../services/financeService';
 import { Transaction } from '../../types';
+import { useBatchMode } from '../../contexts/BatchModeContext';
 
 const PENDING_USE_TEMPLATE_KEY = 'jci_pending_use_template_id';
 
@@ -48,6 +49,12 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
+  const { setIsBatchMode } = useBatchMode();
+
+  useEffect(() => {
+    setIsBatchMode(selectedProjectIds.size > 1);
+    return () => setIsBatchMode(false);
+  }, [selectedProjectIds.size, setIsBatchMode]);
   const [isBatchStatusModalOpen, setIsBatchStatusModalOpen] = useState(false);
   const [batchOperationProgress, setBatchOperationProgress] = useState<{ current: number; total: number } | null>(null);
 
@@ -506,64 +513,50 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
 
       {/* Floating Batch Action Bar */}
       {(activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId && displayedProjects.length > 0 && selectedProjectIds.size > 1 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-slate-700 backdrop-blur-md bg-slate-900/90">
-            <div className="flex items-center gap-2 border-r border-slate-700 pr-6">
-              <Layers size={18} className="text-blue-400" />
-              <span className="font-bold text-sm tracking-tight">{selectedProjectIds.size} events selected</span>
+        <div className="fixed bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[60] animate-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-slate-900 text-white px-2 md:px-6 py-3 md:py-4 rounded-[40px] md:rounded-2xl shadow-2xl flex items-center justify-around md:justify-start gap-0 md:gap-6 border border-white/10 backdrop-blur-md h-20 md:h-auto">
+            <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:pr-4 md:border-r border-white/20 min-w-[70px] md:min-w-0">
+              <Layers size={20} className="text-blue-400 md:w-4 md:h-4" />
+              <span className="text-[9px] md:text-sm font-bold md:font-medium tracking-widest md:tracking-tight uppercase md:capitalize whitespace-nowrap">{selectedProjectIds.size} Selected</span>
             </div>
 
             {batchOperationProgress ? (
-              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div className="flex-1 max-w-[150px] md:w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
                 <div
                   className="h-full bg-blue-500 transition-all duration-300 ease-out"
                   style={{ width: `${(batchOperationProgress.current / batchOperationProgress.total) * 100}%` }}
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                {selectedProjectIds.size < projects.length && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSelectAll}
-                    className="text-white hover:bg-slate-800 text-xs py-1"
-                  >
-                    <CheckCircle size={14} className="mr-1" />
-                    Select All
-                  </Button>
-                )}
-                {selectedProjectIds.size > 0 && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedProjectIds(new Set())}
-                      className="text-white hover:bg-slate-800 text-xs py-1"
-                    >
-                      Clear Selection
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsBatchStatusModalOpen(true)}
-                      className="text-blue-400 hover:bg-blue-500/20 text-xs py-1"
-                    >
-                      <Settings size={14} className="mr-1" />
-                      Batch Status
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={handleBatchDelete}
-                      className="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 text-xs py-1"
-                    >
-                      <Trash2 size={14} className="mr-1" />
-                      Batch Delete
-                    </Button>
-                  </>
-                )}
-              </div>
+              <>
+                <button
+                  onClick={() => setIsBatchStatusModalOpen(true)}
+                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-blue-400 hover:text-blue-300 transition-all min-w-[70px] md:min-w-0"
+                >
+                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+                    <Settings size={20} className="md:w-4 md:h-4" />
+                  </div>
+                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Status</span>
+                </button>
+                <button
+                  onClick={handleBatchDelete}
+                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"
+                >
+                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+                    <Trash2 size={20} className="md:w-4 md:h-4" />
+                  </div>
+                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Delete</span>
+                </button>
+                <button
+                  onClick={() => setSelectedProjectIds(new Set())}
+                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-slate-400 hover:text-white transition-all min-w-[70px] md:min-w-0"
+                >
+                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+                    <X size={20} className="md:w-4 md:h-4" />
+                  </div>
+                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Clear</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -578,8 +571,14 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         title="Start New Project"
         size="lg"
         drawerOnMobile
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button className="flex-1" type="submit" form="create-project-form">Create Project</Button>
+            <Button variant="ghost" type="button" onClick={() => setProposalModalOpen(false)}>Cancel</Button>
+          </div>
+        }
       >
-        <form onSubmit={handleCreateProject} className="space-y-4">
+        <form id="create-project-form" onSubmit={handleCreateProject} className="space-y-4">
           <p className="text-sm text-slate-500 mb-4 bg-blue-50 p-3 rounded text-blue-800">
             Create a new project. You can add an Activity Plan later in the project detail page.
           </p>
@@ -708,17 +707,26 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             rows={3}
           />
 
-          <div className="pt-4 flex gap-3">
-            <Button className="flex-1" type="submit">Create Project</Button>
-            <Button variant="ghost" type="button" onClick={() => setProposalModalOpen(false)}>Cancel</Button>
-          </div>
+
         </form>
       </Modal>
 
 
       {/* Create/Edit Event Template Modal */}
-      <Modal isOpen={isTemplateModalOpen} onClose={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }} title={selectedTemplate ? "Edit Template" : "Create Event Template"} size="lg" drawerOnMobile>
-        <form onSubmit={handleCreateTemplate} className="space-y-4">
+      <Modal
+        isOpen={isTemplateModalOpen}
+        onClose={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }}
+        title={selectedTemplate ? "Edit Template" : "Create Event Template"}
+        size="lg"
+        drawerOnMobile
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button className="flex-1" type="submit" form="create-template-form">{selectedTemplate ? 'Update Template' : 'Create Template'}</Button>
+            <Button variant="ghost" type="button" onClick={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }}>Cancel</Button>
+          </div>
+        }
+      >
+        <form id="create-template-form" onSubmit={handleCreateTemplate} className="space-y-4">
           <Input name="name" label="Template Name" placeholder="e.g. Monthly Networking Event" defaultValue={selectedTemplate?.name} required />
           <Textarea name="description" label="Description" placeholder="Template description..." defaultValue={selectedTemplate?.description} rows={3} />
           <Select name="type" label="Event Type" options={[{ label: 'Meeting', value: 'Meeting' }, { label: 'Training', value: 'Training' }, { label: 'Social', value: 'Social' }, { label: 'Project', value: 'Project' }, { label: 'International', value: 'International' }]} defaultValue={selectedTemplate?.type} required />
@@ -732,10 +740,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           </div>
           <Textarea name="checklist" label="Checklist (one item per line)" placeholder="Venue booking&#10;Catering&#10;Registration setup" defaultValue={selectedTemplate?.checklist?.join('\n')} rows={4} helperText="Enter each checklist item on a new line" />
           <Textarea name="resources" label="Required Resources (one item per line)" placeholder="Projector&#10;Sound system&#10;Tables" defaultValue={selectedTemplate?.requiredResources?.join('\n')} rows={3} helperText="Enter each resource on a new line" />
-          <div className="pt-4 flex gap-3">
-            <Button className="flex-1" type="submit">{selectedTemplate ? 'Update Template' : 'Create Template'}</Button>
-            <Button variant="ghost" type="button" onClick={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }}>Cancel</Button>
-          </div>
         </form>
       </Modal>
 
@@ -3659,7 +3663,18 @@ interface TemplatePreviewModalProps {
 }
 
 const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({ template, onClose, onUse }) => (
-  <Modal isOpen={true} onClose={onClose} title={`Template Preview: ${template.name}`} size="lg">
+  <Modal
+    isOpen={true}
+    onClose={onClose}
+    title={`Template Preview: ${template.name}`}
+    size="lg"
+    footer={
+      <div className="flex gap-3 w-full">
+        <Button onClick={onUse} className="flex-1"><Copy size={16} className="mr-2" />Use This Template</Button>
+        <Button variant="ghost" onClick={onClose}>Close</Button>
+      </div>
+    }
+  >
     <div className="space-y-6">
       <div>
         <Badge variant="neutral" className="mb-2">{template.type}</Badge>
@@ -3703,10 +3718,6 @@ const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({ template, o
           <div className="flex flex-wrap gap-2">{template.requiredResources.map((r, i) => <Badge key={i} variant="neutral">{r}</Badge>)}</div>
         </div>
       )}
-      <div className="pt-4 flex gap-3 border-t">
-        <Button onClick={onUse} className="flex-1"><Copy size={16} className="mr-2" />Use This Template</Button>
-        <Button variant="ghost" onClick={onClose}>Close</Button>
-      </div>
     </div>
   </Modal>
 );

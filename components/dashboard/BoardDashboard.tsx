@@ -45,8 +45,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   );
 
   // Transform Search Bar: Move up to dock with Top Row
-  const searchY = useTransform(scrollY, [0, 120], [0, -150]);
-  const backgroundY = useTransform(scrollY, [0, 120], [0, -150]);
   const headerY = useTransform(scrollY, [0, 120], [0, -150]);
   const counterY = useTransform(headerY, (y) => -Number(y));
 
@@ -1531,6 +1529,23 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         title={`Generate ${selectedReportType.charAt(0).toUpperCase() + selectedReportType.slice(1)} Report`}
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button
+              className="flex-1"
+              onClick={() => handleGenerateReport(selectedReportType)}
+            >
+              <Download size={16} className="mr-2" />
+              Generate & Download
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setIsReportModalOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        }
       >
         <div className="space-y-4">
           <div>
@@ -1656,21 +1671,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             </div>
           )}
 
-          <div className="pt-4 border-t flex gap-3">
-            <Button
-              className="flex-1"
-              onClick={() => handleGenerateReport(selectedReportType)}
-            >
-              <Download size={16} className="mr-2" />
-              Generate & Download
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setIsReportModalOpen(false)}
-            >
-              Cancel
-            </Button>
-          </div>
+
         </div>
       </Modal>
 

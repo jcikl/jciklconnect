@@ -11,10 +11,10 @@ interface LoginModalProps {
   onSwitchToRegister?: () => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSwitchToRegister 
+export const LoginModal: React.FC<LoginModalProps> = ({
+  isOpen,
+  onClose,
+  onSwitchToRegister
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -172,7 +172,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         )}
       </form>
 
-      {/* Password Reset Modal */}
       <Modal
         isOpen={showResetModal}
         onClose={() => {
@@ -181,12 +180,37 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           setError(null);
         }}
         title="Reset Password"
+        footer={(
+          <div className="flex gap-3 w-full">
+            <Button
+              form="reset-password-form"
+              type="submit"
+              className="flex-1"
+              isLoading={resetLoading}
+              disabled={resetLoading}
+            >
+              Send Reset Link
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setShowResetModal(false);
+                setResetEmail('');
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
       >
         <form
+          id="reset-password-form"
           onSubmit={async (e) => {
             e.preventDefault();
             setError(null);
-            
+
             if (!resetEmail.trim()) {
               setError('Please enter your email address');
               return;
@@ -233,28 +257,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             required
             icon={<Mail size={18} />}
           />
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="submit"
-              className="flex-1"
-              isLoading={resetLoading}
-              disabled={resetLoading}
-            >
-              Send Reset Link
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setShowResetModal(false);
-                setResetEmail('');
-                setError(null);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
         </form>
       </Modal>
     </Modal>

@@ -34,6 +34,7 @@ import { PromotionTracking } from './MemberManagement/PromotionTracking';
 import { BoardOfDirectorsSection } from './MemberManagement/BoardOfDirectorsSection';
 import { MemberBatchImportModal } from './Members/MemberBatchImportModal';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useBatchMode } from '../../contexts/BatchModeContext';
 
 const HOBBY_OPTIONS = [
   "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
@@ -225,6 +226,12 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
   const { members, loading, error, createMember, updateMember, deleteMember, batchUpdateMembers, batchDeleteMembers, loadMembers } = useMembers(loIdFilter);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const { setIsBatchMode } = useBatchMode();
+
+  useEffect(() => {
+    setIsBatchMode(selectedIds.size > 1);
+    return () => setIsBatchMode(false);
+  }, [selectedIds.size, setIsBatchMode]);
   const [isBatchActionModalOpen, setIsBatchActionModalOpen] = useState(false);
   const [batchActionType, setBatchActionType] = useState<'delete' | 'set' | null>(null);
   const [batchSetField, setBatchSetField] = useState<string>('');
@@ -655,20 +662,29 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         isOpen={isBatchActionModalOpen}
         onClose={() => setIsBatchActionModalOpen(false)}
         title={batchActionType === 'delete' ? 'Confirm Batch Delete' : 'Batch Set Fields'}
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button variant="outline" onClick={() => setIsBatchActionModalOpen(false)}>Cancel</Button>
+            {batchActionType === 'delete' ? (
+              <Button variant="danger" onClick={async () => {
+                await batchDeleteMembers(Array.from(selectedIds));
+                setSelectedIds(new Set());
+                setIsBatchActionModalOpen(false);
+              }}>Delete Members</Button>
+            ) : (
+              <Button disabled={!batchSetField || !batchSetValue} onClick={async () => {
+                const updates: Partial<Member> = { [batchSetField]: batchSetValue };
+                await batchUpdateMembers(Array.from(selectedIds), updates);
+                setSelectedIds(new Set());
+                setIsBatchActionModalOpen(false);
+              }}>Apply Changes</Button>
+            )}
+          </div>
+        }
       >
         <div className="space-y-4">
           {batchActionType === 'delete' ? (
-            <>
-              <p className="text-slate-600">Are you sure you want to delete <span className="font-bold text-red-600">{selectedIds.size}</span> members? This action cannot be undone.</p>
-              <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => setIsBatchActionModalOpen(false)}>Cancel</Button>
-                <Button variant="danger" onClick={async () => {
-                  await batchDeleteMembers(Array.from(selectedIds));
-                  setSelectedIds(new Set());
-                  setIsBatchActionModalOpen(false);
-                }}>Delete Members</Button>
-              </div>
-            </>
+            <p className="text-slate-600">Are you sure you want to delete <span className="font-bold text-red-600">{selectedIds.size}</span> members? This action cannot be undone.</p>
           ) : (
             <>
               <div className="space-y-3">
@@ -716,23 +732,25 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   )}
                 </div>
               )}
-
-              <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => setIsBatchActionModalOpen(false)}>Cancel</Button>
-                <Button disabled={!batchSetField || !batchSetValue} onClick={async () => {
-                  const updates: Partial<Member> = { [batchSetField]: batchSetValue };
-                  await batchUpdateMembers(Array.from(selectedIds), updates);
-                  setSelectedIds(new Set());
-                  setIsBatchActionModalOpen(false);
-                }}>Apply Changes</Button>
-              </div>
             </>
           )}
         </div>
       </Modal>
 
-      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Register New Member" size="xl" drawerOnMobile>
-        <form onSubmit={handleAddMember} className="space-y-4">
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        title="Register New Member"
+        size="xl"
+        drawerOnMobile
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button variant="outline" className="flex-1" type="button" onClick={() => setAddModalOpen(false)}>Cancel</Button>
+            <Button className="flex-1" type="submit" form="add-member-form">Register Member</Button>
+          </div>
+        }
+      >
+        <form id="add-member-form" onSubmit={handleAddMember} className="space-y-4">
           <div className="bg-blue-50 p-4 rounded-lg mb-4">
             <p className="text-xs text-blue-700 flex items-start gap-2">
               <Sparkles size={14} className="shrink-0 mt-0.5" />
@@ -856,10 +874,6 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
           </div>
 
-          <div className="pt-4 border-t flex gap-3">
-            <Button variant="outline" className="flex-1" type="button" onClick={() => setAddModalOpen(false)}>Cancel</Button>
-            <Button className="flex-1" type="submit">Register Member</Button>
-          </div>
         </form>
       </Modal>
 
@@ -874,7 +888,18 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       />
 
       {/* Export Modal – Export Data (migrated from Import/Export tab) */}
-      <Modal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} title="Export Data" drawerOnMobile>
+      <Modal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Data"
+        drawerOnMobile
+        footer={
+          <Button onClick={handleExportFromModal} disabled={isExporting} className="w-full">
+            <Download size={16} className="mr-2" />
+            {isExporting ? 'Exporting...' : `Export ${exportType} as ${exportFormat}`}
+          </Button>
+        }
+      >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Data Type</label>
@@ -900,10 +925,6 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               ]}
             />
           </div>
-          <Button onClick={handleExportFromModal} disabled={isExporting} className="w-full">
-            <Download size={16} className="mr-2" />
-            {isExporting ? 'Exporting...' : `Export ${exportType} as ${exportFormat}`}
-          </Button>
         </div>
       </Modal>
 
@@ -1082,42 +1103,43 @@ const BatchActionBar: React.FC<{
   onBatchSet: () => void
 }> = ({ selectedCount, onClear, onBatchDelete, onBatchSet }) => {
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-white/10 backdrop-blur-md">
-        <div className="flex items-center gap-3 pr-6 border-r border-white/20">
+    <div className="fixed bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[40] animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="bg-slate-900 text-white px-2 md:px-6 py-3 md:py-4 rounded-[40px] md:rounded-2xl shadow-2xl flex items-center justify-around md:justify-start gap-0 md:gap-6 border border-white/10 backdrop-blur-md h-20 md:h-auto">
+        <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:pr-6 md:border-r border-white/20 min-w-[70px] md:min-w-0">
           <div className="w-8 h-8 rounded-full bg-jci-blue flex items-center justify-center font-bold text-sm">
             {selectedCount}
           </div>
-          <span className="text-sm font-medium whitespace-nowrap">Members selected</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onBatchSet}
-            className="text-white hover:bg-white/10"
-          >
-            <Settings size={16} className="mr-2" />
-            Batch Set
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onBatchDelete}
-            className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-          >
-            <Trash2 size={16} className="mr-2" />
-            Delete
-          </Button>
+          <span className="text-[9px] md:text-sm font-bold md:font-medium tracking-widest md:tracking-normal uppercase md:capitalize whitespace-nowrap">Selected</span>
         </div>
 
         <button
-          onClick={onClear}
-          className="p-1 hover:bg-white/10 rounded-full transition-colors ml-2"
-          title="Clear selection"
+          onClick={onBatchSet}
+          className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-white hover:text-jci-blue transition-all min-w-[70px] md:min-w-0"
         >
-          <X size={18} />
+          <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+            <Settings size={20} className="md:w-4 md:h-4" />
+          </div>
+          <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Batch Set</span>
+        </button>
+
+        <button
+          onClick={onBatchDelete}
+          className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"
+        >
+          <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+            <Trash2 size={20} className="md:w-4 md:h-4" />
+          </div>
+          <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Delete</span>
+        </button>
+
+        <button
+          onClick={onClear}
+          className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-slate-400 hover:text-white transition-all min-w-[70px] md:min-w-0"
+        >
+          <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+            <X size={20} className="md:w-4 md:h-4" />
+          </div>
+          <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Clear</span>
         </button>
       </div>
     </div>

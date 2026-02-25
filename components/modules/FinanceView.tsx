@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers } from 'lucide-react';
+import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -26,6 +26,7 @@ import { getAdministrativeProjectIds, addAdministrativeProjectId } from '../../u
 import { InventoryService } from '../../services/inventoryService';
 import { ADMINISTRATIVE_PURPOSES } from '../../config/constants';
 import type { Project, MembershipType } from '../../types';
+import { useBatchMode } from '../../contexts/BatchModeContext';
 
 export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const helpModal = useHelpModal();
@@ -122,6 +123,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   // Batch category editing state
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
   const [selectedSplitIds, setSelectedSplitIds] = useState<Set<string>>(new Set());
+  const { setIsBatchMode } = useBatchMode();
+
+  useEffect(() => {
+    setIsBatchMode((selectedTxIds.size + selectedSplitIds.size) > 1);
+    return () => setIsBatchMode(false);
+  }, [selectedTxIds.size, selectedSplitIds.size, setIsBatchMode]);
   const [isBatchCategoryModalOpen, setIsBatchCategoryModalOpen] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [batchOperationProgress, setBatchOperationProgress] = useState<{ current: number; total: number } | null>(null);
@@ -2470,22 +2477,22 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       {/* Fixed Bottom Action Bar for Batch Selection */}
       {moduleTab === 'Transactions' && displayTransactions.length > 0 && (selectedTxIds.size + selectedSplitIds.size) > 1 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-6 bg-slate-900/95 backdrop-blur-sm px-6 py-3 rounded-full shadow-2xl border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="p-1 bg-blue-500 rounded-md">
-                <Layers size={18} className="text-white" />
+        <div className="fixed bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[40] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center justify-around md:justify-start gap-0 md:gap-6 bg-slate-900/95 backdrop-blur-md px-2 md:px-6 py-3 md:py-4 rounded-[40px] md:rounded-2xl shadow-2xl border border-white/10 h-20 md:h-auto">
+            <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:pr-4 md:border-r border-slate-700 min-w-[70px] md:min-w-0">
+              <div className="p-1.5 bg-blue-500 rounded-lg md:w-8 md:h-8 flex items-center justify-center">
+                <Layers size={20} className="text-white md:w-4 md:h-4" />
               </div>
-              <div className="flex flex-col pr-4 border-r border-slate-700">
-                <span className="text-sm font-bold text-white leading-none">
+              <div className="flex flex-col items-center md:items-start">
+                <span className="text-[9px] md:text-sm font-bold md:font-bold text-white leading-none uppercase md:capitalize tracking-widest md:tracking-normal">
                   {batchOperationProgress
-                    ? `Processing ${batchOperationProgress.current}/${batchOperationProgress.total}...`
-                    : `${selectedTxIds.size + selectedSplitIds.size} selected`
+                    ? `Processing...`
+                    : `${selectedTxIds.size + selectedSplitIds.size} Selected`
                   }
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">
+                <span className="text-[10px] text-slate-400 font-medium hidden md:block mt-1">
                   {batchOperationProgress
-                    ? 'Please wait while we update your records'
+                    ? `${batchOperationProgress.current}/${batchOperationProgress.total}`
                     : `${selectedTxIds.size} main • ${selectedSplitIds.size} splits`
                   }
                 </span>
@@ -2493,73 +2500,42 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
 
             {batchOperationProgress ? (
-              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div className="flex-1 max-w-[200px] md:w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
                 <div
                   className="h-full bg-blue-500 transition-all duration-300 ease-out"
                   style={{ width: `${(batchOperationProgress.current / batchOperationProgress.total) * 100}%` }}
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const allVisibleTxIds = displayTransactions.map(t => t.id);
-                  const allVisibleSplitIds = displayTransactions.flatMap(t =>
-                    t.isSplit && transactionSplits[t.id] ? transactionSplits[t.id].map(s => s.id) : []
-                  );
-                  const isAllSelected = allVisibleTxIds.length > 0 && allVisibleTxIds.every(id => selectedTxIds.has(id)) &&
-                    (allVisibleSplitIds.length === 0 || allVisibleSplitIds.every(id => selectedSplitIds.has(id)));
-
-                  return !isAllSelected && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleSelectAllTransactions}
-                      className="text-slate-300 hover:text-white hover:bg-slate-800 rounded-full h-9 px-4 flex items-center gap-1.5"
-                    >
-                      <CheckCircle size={14} />
-                      Select All
-                    </Button>
-                  );
-                })()}
-
-                {(selectedTxIds.size > 0 || selectedSplitIds.size > 0) && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setSelectedTxIds(new Set()); setSelectedSplitIds(new Set()); }}
-                      className="text-slate-300 hover:text-white hover:bg-slate-800 rounded-full h-9 px-4"
-                    >
-                      Clear
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleBatchApprove}
-                      className="border-green-500/50 text-green-500 hover:bg-green-500 hover:text-white rounded-full h-9 px-5 font-semibold transition-all duration-200 flex items-center gap-1.5"
-                    >
-                      <CheckCircle size={14} />
-                      Batch Approve
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleBatchDelete}
-                      className="border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white rounded-full h-9 px-5 font-semibold transition-all duration-200 flex items-center gap-1.5"
-                    >
-                      <Trash2 size={14} />
-                      Batch Delete
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setIsBatchCategoryModalOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-500 text-white rounded-full h-9 px-5 font-semibold shadow-lg shadow-blue-500/20"
-                    >
-                      Batch Set Category
-                    </Button>
-                  </>
-                )}
-              </div>
+              <>
+                <button
+                  onClick={() => setIsBatchCategoryModalOpen(true)}
+                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-blue-400 hover:text-blue-300 transition-all min-w-[70px] md:min-w-0"
+                >
+                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+                    <Settings size={20} className="md:w-4 md:h-4" />
+                  </div>
+                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Batch Set</span>
+                </button>
+                <button
+                  onClick={handleBatchDelete}
+                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"
+                >
+                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+                    <Trash2 size={20} className="md:w-4 md:h-4" />
+                  </div>
+                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Delete</span>
+                </button>
+                <button
+                  onClick={() => { setSelectedTxIds(new Set()); setSelectedSplitIds(new Set()); }}
+                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-slate-400 hover:text-white transition-all min-w-[70px] md:min-w-0"
+                >
+                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+                    <X size={20} className="md:w-4 md:h-4" />
+                  </div>
+                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Clear</span>
+                </button>
+              </>
             )}
           </div>
         </div>
