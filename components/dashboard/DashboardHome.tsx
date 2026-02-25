@@ -55,6 +55,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Transform Search Bar: Move up
   const searchY = useTransform(scrollY, [0, 100], [0, -180]);
+  const backgroundY = useTransform(scrollY, [0, 100], [0, -180]);
+  const headerY = useTransform(scrollY, [0, 100], [0, -180]);
 
   const { showToast } = useToast();
   const { member, signOut } = useAuth();
@@ -166,8 +168,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const renderHeader = () => (
     <div className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8">
       {/* Decorative Background Pattern */}
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
-      <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+      <motion.div style={{ y: backgroundY }} className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+      </motion.div>
 
       <div className="relative z-10 pt-8 pb-4 sm:pb-6 lg:pb-8 flex flex-col">
         {/* Top Row: Fixed Area */}
@@ -270,7 +274,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           </motion.div>
 
           {/* Search Bar: Slides up */}
-          <motion.div style={{ y: searchY }} className="relative group">
+          <div className="relative group">
             <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
               <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
             </div>
@@ -281,7 +285,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-4 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
             />
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>
