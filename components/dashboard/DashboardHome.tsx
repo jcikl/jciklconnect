@@ -50,11 +50,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   // Mask wipe effect
   const maskProgress = useTransform(scrollY, [0, 100], [0, 100]);
   const greetingMask = useTransform(maskProgress, (p) =>
-    `linear-gradient(to bottom, transparent ${p}%, black ${p + 20}%)`
+    `linear-gradient(to bottom, transparent ${p}%, black ${p}%)`
   );
 
   // Transform Search Bar: Move up
-  const searchY = useTransform(scrollY, [0, 100], [0, -80]);
+  const searchY = useTransform(scrollY, [0, 100], [0, -180]);
 
   const { showToast } = useToast();
   const { member, signOut } = useAuth();
@@ -163,54 +163,40 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     return <div className="text-center py-10 text-slate-400">Loading member data...</div>;
   }
 
-  // Header Padding animations
-  const headerPaddingTop = useTransform(scrollY, [0, 100], ["2rem", "1rem"]);
-  const headerPaddingBottom = useTransform(scrollY, [0, 100], ["2rem", "1rem"]);
-  const contentGap = useTransform(scrollY, [0, 100], ["2rem", "0.5rem"]);
-
   const renderHeader = () => (
-    <motion.div
-      className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8"
-      style={{
-        paddingTop: headerPaddingTop,
-        paddingBottom: headerPaddingBottom
-      }}
-    >
+    <div className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8">
       {/* Decorative Background Pattern */}
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
       <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 flex flex-col">
+      <div className="relative z-10 pt-8 pb-4 sm:pb-6 lg:pb-8 flex flex-col">
         {/* Top Row: Fixed Area */}
-        <motion.div
-          style={{ marginBottom: contentGap }}
-          className="flex justify-between items-center"
-        >
+        <div className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-3">
             <div className="relative">
               <img
                 src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
                 alt="Avatar"
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
+                className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
               />
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-jci-navy rounded-full"></div>
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
             </div>
             <div className="cursor-pointer group">
-              <div className="flex items-center space-x-1 text-blue-100 text-base sm:text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
                 <span>{member.name}</span>
               </div>
-              <p className="font-medium text-[10px] sm:text-xs tracking-wide text-blue-200 uppercase">{member.role}</p>
+              <p className="font-medium text-sm tracking-wide">{member.role}</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex items-center space-x-3">
             <button
               onClick={onOpenNotifications}
-              className="relative p-2.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
             >
-              <Bell size={18} className="group-hover:rotate-12 transition-transform" />
+              <Bell size={20} className="group-hover:rotate-12 transition-transform" />
               {unreadNotifications.length > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-[16px] bg-red-500 rounded-full border-2 border-jci-navy text-[8px] flex items-center justify-center font-black">
+                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
                   {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
                 </span>
               )}
@@ -225,13 +211,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   showToast('Failed to logout', 'error');
                 }
               }}
-              className="p-2.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
               title="Sign Out"
             >
-              <LogOut size={18} className="group-hover:scale-110 transition-transform" />
+              <LogOut size={20} className="group-hover:scale-110 transition-transform" />
             </button>
           </div>
-        </motion.div>
+        </div>
 
         {/* Dynamic Animation Area */}
         <div className="relative">
@@ -241,19 +227,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               x: greetingX,
               opacity: greetingOpacity,
               maskImage: greetingMask,
-              WebkitMaskImage: greetingMask,
-              height: useTransform(scrollY, [0, 80], ["auto", "0px"]),
-              marginBottom: useTransform(scrollY, [0, 80], ["2rem", "0rem"]),
-              overflow: "hidden"
+              WebkitMaskImage: greetingMask
             }}
-            className="space-y-3"
+            className="space-y-3 mb-8"
           >
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
               What would you <br /> prefer to do today?
             </h2>
             {topRecommendation ? (
               <div
-                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-1.5 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
+                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
                 onClick={() => {
                   if (topRecommendation.actionUrl) {
                     const view = topRecommendation.actionUrl.replace('/', '').toUpperCase();
@@ -261,14 +244,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   }
                 }}
               >
-                <Sparkles size={14} className="text-yellow-400 animate-pulse" />
-                <p className="text-xs font-medium text-blue-50">
+                <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+                <p className="text-sm font-medium text-blue-50">
                   AI Suggests: <span className="underline decoration-yellow-400/50 underline-offset-4">{topRecommendation.itemName}</span>
                 </p>
               </div>
             ) : nudges.length > 0 ? (
               <div
-                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-1.5 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
+                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
                 onClick={() => {
                   if (nudges[0].actionUrl) {
                     const view = nudges[0].actionUrl.replace('/', '').toUpperCase();
@@ -276,32 +259,32 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   }
                 }}
               >
-                <Zap size={14} className="text-amber-400 animate-pulse" />
-                <p className="text-xs font-medium text-blue-50">
+                <Zap size={16} className="text-amber-400 animate-pulse" />
+                <p className="text-sm font-medium text-blue-50">
                   {nudges[0].title}
                 </p>
               </div>
             ) : (
-              <p className="text-blue-100/70 text-xs font-medium">Ready to make an impact? Check out the latest.</p>
+              <p className="text-blue-100/70 font-medium">Ready to make an impact? Check out the latest.</p>
             )}
           </motion.div>
 
-          {/* Search Bar Area */}
-          <div className="relative group">
+          {/* Search Bar: Slides up */}
+          <motion.div style={{ y: searchY }} className="relative group">
             <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-              <Search size={18} className="text-white/40 group-focus-within:text-white transition-colors" />
+              <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
             </div>
             <input
               type="text"
               placeholder="Search events, members, or projects..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-white/10 backdrop-blur-md text-white rounded-2xl py-3 pl-12 pr-4 shadow-xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-sm sm:text-base"
+              className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-4 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
             />
-          </div>
+          </motion.div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 
   return (
