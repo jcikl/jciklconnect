@@ -436,13 +436,17 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   }, [currentMonthIndex]);
 
   // Header Padding animations
-  const headerPaddingTop = useTransform(scrollY, [0, 120], ["2rem", "1rem"]);
-  const headerPaddingBottom = useTransform(scrollY, [0, 120], ["2rem", "1rem"]);
+  const headerPaddingTop = useTransform(scrollY, [0, 120], ["1rem", "1rem"]);
+  const headerPaddingBottom = useTransform(scrollY, [0, 120], ["1rem", "1rem"]);
   const contentGap = useTransform(scrollY, [0, 120], ["2rem", "0.5rem"]);
 
   const renderHeader = () => (
     <motion.div
       className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8"
+      style={{
+        paddingTop: headerPaddingTop,
+        paddingBottom: headerPaddingBottom
+      }}
     >
       {/* Decorative Background Pattern */}
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
