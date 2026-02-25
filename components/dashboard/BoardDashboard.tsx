@@ -45,9 +45,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   );
 
   // Transform Search Bar: Move up to dock with Top Row
-  const searchY = useTransform(scrollY, [0, 120], [0, -180]);
-  const backgroundY = useTransform(scrollY, [0, 120], [0, -180]);
-  const headerY = useTransform(scrollY, [0, 120], [0, -180]);
+  const searchY = useTransform(scrollY, [0, 120], [0, -150]);
+  const backgroundY = useTransform(scrollY, [0, 120], [0, -150]);
+  const headerY = useTransform(scrollY, [0, 120], [0, -150]);
   const counterY = useTransform(headerY, (y) => -Number(y));
 
   const { notifications } = useCommunication();
@@ -448,9 +448,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
       </motion.div>
 
-      <div className="relative z-10 pt-8 pb-4 sm:pb-6 lg:pb-8">
+      <div className="relative z-10 pt-4 pb-4 sm:pb-6 lg:pb-8">
         {/* Top Row: Fixed/Docked Area (Counter-animated to stay fixed) */}
-        <motion.div style={{ y: counterY }} className="flex justify-between items-center mb-8">
+        <motion.div style={{ y: counterY }} className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-3">
             <div className="relative">
               <img
@@ -502,12 +502,13 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
           {/* Greeting: Dissolves into the top row as we scroll */}
           <motion.div
             style={{
+              y: counterY,
               x: greetingX,
               opacity: greetingOpacity,
               maskImage: greetingMask,
               WebkitMaskImage: greetingMask
             }}
-            className="space-y-3 mb-8"
+            className="space-y-3 mb-4"
           >
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
               Strategic Overview <br /> for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
