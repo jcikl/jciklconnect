@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, CheckCircle, DollarSign, Calendar } from 'lucide-react';
 import { BankAccount, ReconciliationRecord, TransactionType } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
+import { Modal, Button } from '../../ui/Common';
 
 interface BankReconciliationModalProps {
   isOpen: boolean;
@@ -91,189 +92,181 @@ export const BankReconciliationModal: React.FC<BankReconciliationModalProps> = (
     ? parseFloat(statementBalance) - systemBalance
     : null;
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Bank Reconciliation</h2>
-            <p className="text-sm text-gray-600 mt-1">{account.name}</p>
-          </div>
-          <button
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Bank Reconciliation"
+      size="lg"
+      bottomSheet
+      drawerOnMobile
+      footer={
+        <div className="flex items-center justify-end gap-3 w-full">
+          <Button
+            variant="ghost"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={loading}
+            className="flex-1 sm:flex-none"
           >
-            <X className="w-6 h-6" />
-          </button>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleReconcile}
+            disabled={loading || calculating || !statementBalance}
+            className="flex-1 sm:flex-none"
+          >
+            {loading ? 'Reconciling...' : 'Reconcile Account'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* Account Info */}
+        <div>
+          <p className="text-sm text-gray-600">{account.name}</p>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Success Message */}
-          {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-green-800">Reconciliation completed successfully!</span>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              <span className="text-red-800">{error}</span>
-            </div>
-          )}
-
-          {/* Reconciliation Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="w-4 h-4 inline mr-2" />
-              Reconciliation Date
-            </label>
-            <input
-              type="date"
-              value={reconciliationDate}
-              onChange={(e) => setReconciliationDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+        {/* Success Message */}
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <span className="text-green-800">Reconciliation completed successfully!</span>
           </div>
+        )}
 
-          {/* Transaction Type Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Transaction Type Filter
-            </label>
-            <select
-              value={transactionTypeFilter}
-              onChange={(e) => setTransactionTypeFilter(e.target.value as TransactionType | 'all')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Types</option>
-              <option value="project">Project</option>
-              <option value="operations">Operations</option>
-              <option value="dues">Dues</option>
-              <option value="merchandise">Merchandise</option>
-            </select>
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600" />
+            <span className="text-red-800">{error}</span>
           </div>
+        )}
 
-          {/* System Balance Display */}
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">System Balance</span>
-              {calculating ? (
-                <span className="text-sm text-gray-500">Calculating...</span>
-              ) : (
-                <span className="text-lg font-bold text-gray-900">
-                  {account.currency} {systemBalance?.toFixed(2) || '0.00'}
-                </span>
-              )}
-            </div>
+        {/* Reconciliation Date */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <Calendar className="w-4 h-4 inline mr-2" />
+            Reconciliation Date
+          </label>
+          <input
+            type="date"
+            value={reconciliationDate}
+            onChange={(e) => setReconciliationDate(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
 
-            {/* Balance by Type */}
-            {balanceByType && transactionTypeFilter === 'all' && (
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-200">
-                <div className="text-xs">
-                  <span className="text-gray-600">Project:</span>
-                  <span className="ml-2 font-medium">{account.currency} {balanceByType.project.toFixed(2)}</span>
-                </div>
-                <div className="text-xs">
-                  <span className="text-gray-600">Operations:</span>
-                  <span className="ml-2 font-medium">{account.currency} {balanceByType.operations.toFixed(2)}</span>
-                </div>
-                <div className="text-xs">
-                  <span className="text-gray-600">Dues:</span>
-                  <span className="ml-2 font-medium">{account.currency} {balanceByType.dues.toFixed(2)}</span>
-                </div>
-                <div className="text-xs">
-                  <span className="text-gray-600">Merchandise:</span>
-                  <span className="ml-2 font-medium">{account.currency} {balanceByType.merchandise.toFixed(2)}</span>
-                </div>
-              </div>
+        {/* Transaction Type Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Transaction Type Filter
+          </label>
+          <select
+            value={transactionTypeFilter}
+            onChange={(e) => setTransactionTypeFilter(e.target.value as TransactionType | 'all')}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">All Types</option>
+            <option value="project">Project</option>
+            <option value="operations">Operations</option>
+            <option value="dues">Dues</option>
+            <option value="merchandise">Merchandise</option>
+          </select>
+        </div>
+
+        {/* System Balance Display */}
+        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">System Balance</span>
+            {calculating ? (
+              <span className="text-sm text-gray-500">Calculating...</span>
+            ) : (
+              <span className="text-lg font-bold text-gray-900">
+                {account.currency} {systemBalance?.toFixed(2) || '0.00'}
+              </span>
             )}
           </div>
 
-          {/* Statement Balance Input */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <DollarSign className="w-4 h-4 inline mr-2" />
-              Statement Balance
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={statementBalance}
-              onChange={(e) => setStatementBalance(e.target.value)}
-              placeholder="Enter bank statement balance"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Difference Display */}
-          {difference !== null && (
-            <div
-              className={`rounded-lg p-4 ${
-                Math.abs(difference) < 0.01
-                  ? 'bg-green-50 border border-green-200'
-                  : 'bg-yellow-50 border border-yellow-200'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Difference</span>
-                <span
-                  className={`text-lg font-bold ${
-                    Math.abs(difference) < 0.01 ? 'text-green-600' : 'text-yellow-600'
-                  }`}
-                >
-                  {account.currency} {Math.abs(difference).toFixed(2)}
-                </span>
+          {/* Balance by Type */}
+          {balanceByType && transactionTypeFilter === 'all' && (
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-200">
+              <div className="text-xs">
+                <span className="text-gray-600">Project:</span>
+                <span className="ml-2 font-medium">{account.currency} {balanceByType.project.toFixed(2)}</span>
               </div>
-              {Math.abs(difference) < 0.01 ? (
-                <p className="text-xs text-green-600 mt-1">Balances match!</p>
-              ) : (
-                <p className="text-xs text-yellow-600 mt-1">
-                  {difference > 0 ? 'Statement is higher' : 'System is higher'}
-                </p>
-              )}
+              <div className="text-xs">
+                <span className="text-gray-600">Operations:</span>
+                <span className="ml-2 font-medium">{account.currency} {balanceByType.operations.toFixed(2)}</span>
+              </div>
+              <div className="text-xs">
+                <span className="text-gray-600">Dues:</span>
+                <span className="ml-2 font-medium">{account.currency} {balanceByType.dues.toFixed(2)}</span>
+              </div>
+              <div className="text-xs">
+                <span className="text-gray-600">Merchandise:</span>
+                <span className="ml-2 font-medium">{account.currency} {balanceByType.merchandise.toFixed(2)}</span>
+              </div>
             </div>
           )}
-
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes (Optional)
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Add any notes about this reconciliation..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            />
-          </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors"
-            disabled={loading}
+        {/* Statement Balance Input */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <DollarSign className="w-4 h-4 inline mr-2" />
+            Statement Balance
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={statementBalance}
+            onChange={(e) => setStatementBalance(e.target.value)}
+            placeholder="Enter bank statement balance"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Difference Display */}
+        {difference !== null && (
+          <div
+            className={`rounded-lg p-4 ${Math.abs(difference) < 0.01
+              ? 'bg-green-50 border border-green-200'
+              : 'bg-yellow-50 border border-yellow-200'
+              }`}
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleReconcile}
-            disabled={loading || calculating || !statementBalance}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            {loading ? 'Reconciling...' : 'Reconcile Account'}
-          </button>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Difference</span>
+              <span
+                className={`text-lg font-bold ${Math.abs(difference) < 0.01 ? 'text-green-600' : 'text-yellow-600'
+                  }`}
+              >
+                {account.currency} {Math.abs(difference).toFixed(2)}
+              </span>
+            </div>
+            {Math.abs(difference) < 0.01 ? (
+              <p className="text-xs text-green-600 mt-1">Balances match!</p>
+            ) : (
+              <p className="text-xs text-yellow-600 mt-1">
+                {difference > 0 ? 'Statement is higher' : 'System is higher'}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Notes */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Notes (Optional)
+          </label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Add any notes about this reconciliation..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          />
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

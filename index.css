@@ -4,25 +4,39 @@
 
 /* Custom Animations */
 @layer utilities {
+
   /* Fade in animation */
   @keyframes fadeIn {
     from {
       opacity: 0;
     }
+
     to {
       opacity: 1;
     }
   }
 
-  /* Slide in from bottom */
+  /* Slide in from bottom - subtle */
   @keyframes slideInUp {
     from {
       transform: translateY(20px);
       opacity: 0;
     }
+
     to {
       transform: translateY(0);
       opacity: 1;
+    }
+  }
+
+  /* Slide in from absolute bottom */
+  @keyframes slideInFullUp {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
     }
   }
 
@@ -32,6 +46,7 @@
       transform: translateX(20px);
       opacity: 0;
     }
+
     to {
       transform: translateX(0);
       opacity: 1;
@@ -44,6 +59,7 @@
       transform: scale(0.95);
       opacity: 0;
     }
+
     to {
       transform: scale(1);
       opacity: 1;
@@ -52,9 +68,12 @@
 
   /* Pulse animation */
   @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.5;
     }
@@ -65,6 +84,7 @@
     0% {
       background-position: -1000px 0;
     }
+
     100% {
       background-position: 1000px 0;
     }
@@ -84,6 +104,10 @@
 
   .animate-scale-in {
     animation: scaleIn 0.2s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideInFullUp 0.3s ease-out;
   }
 
   /* Page transition */
@@ -120,8 +144,9 @@
 
   /* Hide scrollbar for IE, Edge and Firefox */
   .no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 }
-

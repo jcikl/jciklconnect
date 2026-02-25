@@ -5,29 +5,7 @@ import { FinanceService } from '../../../services/financeService';
 import { projectFinancialService } from '../../../services/projectFinancialService';
 import * as Forms from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
-
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: string }> = ({ isOpen, onClose, title, children, size = 'max-w-3xl' }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className={`bg-white rounded-lg shadow-xl w-full ${size} max-h-[90vh] overflow-y-auto`}>
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="p-4">{children}</div>
-      </div>
-    </div>
-  );
-};
-
-const Button: React.FC<{ onClick?: () => void; type?: 'button' | 'submit'; disabled?: boolean; className?: string; title?: string; children: React.ReactNode }> = ({ onClick, type = 'button', disabled, className = '', title, children }) => (
-  <button onClick={onClick} type={type} disabled={disabled} className={`px-4 py-2 rounded ${className}`} title={title}>
-    {children}
-  </button>
-);
+import { Modal, Button } from '../../ui/Common';
 
 interface TransactionSplitModalProps {
   transaction: Transaction;
@@ -421,7 +399,38 @@ export function TransactionSplitModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={transaction.isSplit ? "Edit Transaction Split" : "Split Transaction"} size="max-w-5xl">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={transaction.isSplit ? "Edit Transaction Split" : "Split Transaction"}
+      size="5xl"
+      bottomSheet
+      drawerOnMobile
+      footer={
+        <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-3">
+          <div className="w-full sm:w-auto order-2 sm:order-1">
+            {transaction.isSplit && (
+              <Button
+                onClick={handleCancelSplit}
+                disabled={loading}
+                variant="outline"
+                className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+              >
+                {loading ? 'Canceling...' : 'Cancel Split'}
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
+            <Button variant="ghost" onClick={onClose} disabled={loading} className="flex-1 sm:flex-none">
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={loading || !isValid} className="flex-1 sm:flex-none">
+              {loading ? 'Saving...' : (transaction.isSplit ? 'Update Splits' : 'Create Splits')}
+            </Button>
+          </div>
+        </div>
+      }
+    >
       <div className="space-y-4">
         {/* Transaction Info */}
         <div className="bg-gray-50 p-4 rounded-lg">
@@ -439,6 +448,7 @@ export function TransactionSplitModal({
             <div className="flex items-center gap-2">
               <Button
                 onClick={handleQuickSplit}
+                variant="ghost"
                 className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-3 py-1 flex items-center gap-2 hover:bg-amber-100 transition-colors"
                 title="Quick split for ToyyibPay dues: 350 (Membership) + 75 (Pink Shirt) + 75 (Jacket)"
               >
@@ -447,7 +457,8 @@ export function TransactionSplitModal({
               </Button>
               <Button
                 onClick={handleAddSplit}
-                className="border border-gray-300 text-sm px-3 py-1 flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                variant="outline"
+                className="text-sm px-3 py-1 flex items-center gap-2 hover:bg-gray-50 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add Split
@@ -457,191 +468,193 @@ export function TransactionSplitModal({
 
           {/* Table */}
           <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 font-medium">
-                <tr>
-                  <th className="py-2 px-3 text-xs font-semibold w-[20px]">#</th>
-                  <th className="py-2 px-2 text-xs font-semibold w-[160px]">Category</th>
-                  <th className="py-2 px-2 text-xs font-semibold w-[80px]">Year</th>
-                  <th className="py-2 px-2 text-xs font-semibold w-[140px]">Member/Project/Admin</th>
-                  <th className="py-2 px-2 text-xs font-semibold w-[120px]">Purpose</th>
-                  <th className="py-2 px-2 text-xs font-semibold text-right w-[80px]">Amount (RM)</th>
-                  <th className="py-2 px-2 text-xs font-semibold w-[120px]">Description</th>
-                  <th className="py-2 px-2 text-xs font-semibold w-[40px]"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {splits.map((split, index) => {
-                  const isEditing = editingIndex === index;
-                  const data = isEditing && editForm ? editForm : split;
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 font-medium whitespace-nowrap">
+                  <tr>
+                    <th className="py-2 px-3 text-xs font-semibold w-[20px]">#</th>
+                    <th className="py-2 px-2 text-xs font-semibold w-[160px]">Category</th>
+                    <th className="py-2 px-2 text-xs font-semibold w-[80px]">Year</th>
+                    <th className="py-2 px-2 text-xs font-semibold w-[140px]">Member/Project/Admin</th>
+                    <th className="py-2 px-2 text-xs font-semibold w-[120px]">Purpose</th>
+                    <th className="py-2 px-2 text-xs font-semibold text-right w-[80px]">Amount (RM)</th>
+                    <th className="py-2 px-2 text-xs font-semibold w-[120px]">Description</th>
+                    <th className="py-2 px-2 text-xs font-semibold w-[40px]"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {splits.map((split, index) => {
+                    const isEditing = editingIndex === index;
+                    const data = isEditing && editForm ? editForm : split;
 
-                  return (
-                    <tr key={index} className="border-t hover:bg-slate-50">
-                      <td className="py-2 px-3 text-xs">{index + 1}</td>
+                    return (
+                      <tr key={index} className="border-t hover:bg-slate-50">
+                        <td className="py-2 px-3 text-xs">{index + 1}</td>
 
-                      {isEditing ? (
-                        <>
-                          <td className="py-1 px-2">
-                            <Forms.Select
-                              value={data.category}
-                              onChange={(e) => setEditForm({ ...editForm!, category: e.target.value as CategoryType })}
-                              options={categoryOptions}
-                              className="text-xs h-8"
-                            />
-                          </td>
-                          <td className="py-1 px-2">
-                            {data.category === 'Membership' || data.category === 'Administrative' ? (
+                        {isEditing ? (
+                          <>
+                            <td className="py-1 px-2">
+                              <Forms.Select
+                                value={data.category}
+                                onChange={(e) => setEditForm({ ...editForm!, category: e.target.value as CategoryType })}
+                                options={categoryOptions}
+                                className="text-xs h-8"
+                              />
+                            </td>
+                            <td className="py-1 px-2">
+                              {data.category === 'Membership' || data.category === 'Administrative' ? (
+                                <Forms.Input
+                                  type="number"
+                                  value={data.year || ''}
+                                  onChange={(e) => setEditForm({ ...editForm!, year: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
+                                  placeholder="Year"
+                                  className="text-xs h-8"
+                                />
+                              ) : data.category === 'Projects & Activities' ? (
+                                <Combobox
+                                  options={['All', String(currentYear), ...projectYears.map(y => String(y))].filter((v, i, a) => a.indexOf(v) === i)}
+                                  value={splitYearFilters[index] || ''}
+                                  onChange={(value) => setSplitYearFilter(index, value)}
+                                  placeholder="Year"
+                                />
+                              ) : null}
+                            </td>
+                            <td className="py-1 px-2">
+                              {data.category === 'Membership' && (
+                                <Combobox
+                                  options={memberOptions.map(m => m.name)}
+                                  value={memberOptions.find(m => m.id === data.memberId)?.name || ''}
+                                  onChange={(value) => {
+                                    const member = memberOptions.find(m => m.name === value);
+                                    setEditForm({ ...editForm!, memberId: member?.id || value });
+                                  }}
+                                  placeholder="Member"
+                                />
+                              )}
+                              {data.category === 'Projects & Activities' && (
+                                <Combobox
+                                  groupedOptions={groupedProjectOptionsBySplit[index]}
+                                  value={filteredProjectOptionsBySplit[index]?.find(p => p.id === data.projectId)?.name || ''}
+                                  onChange={(value) => {
+                                    const project = filteredProjectOptionsBySplit[index]?.find(p => p.name === value);
+                                    setEditForm({ ...editForm!, projectId: project?.id || '' });
+                                  }}
+                                  placeholder="Project"
+                                />
+                              )}
+                              {data.category === 'Administrative' && (
+                                <Combobox
+                                  options={adminAccounts}
+                                  value={data.projectId}
+                                  onChange={(value) => setEditForm({ ...editForm!, projectId: value })}
+                                  placeholder="Account"
+                                />
+                              )}
+                            </td>
+                            <td className="py-1 px-2">
+                              {data.category === 'Administrative' ? (
+                                <Combobox
+                                  options={adminPurposes}
+                                  value={data.purpose}
+                                  onChange={(value) => setEditForm({ ...editForm!, purpose: value })}
+                                  placeholder="Purpose"
+                                />
+                              ) : data.category === 'Membership' ? (
+                                <Forms.Input
+                                  value={data.purpose}
+                                  readOnly
+                                  disabled
+                                  className="text-xs h-8 bg-slate-50"
+                                />
+                              ) : data.category === 'Projects & Activities' ? (
+                                <Combobox
+                                  options={purposesByProject[data.projectId] || projectPurposes}
+                                  value={data.purpose}
+                                  onChange={(value) => setEditForm({ ...editForm!, purpose: value })}
+                                  placeholder="Purpose"
+                                />
+                              ) : (
+                                <Forms.Input
+                                  value={data.purpose}
+                                  onChange={(e) => setEditForm({ ...editForm!, purpose: e.target.value })}
+                                  placeholder="Purpose"
+                                  className="text-xs h-8"
+                                />
+                              )}
+                            </td>
+                            <td className="py-1 px-2">
                               <Forms.Input
                                 type="number"
-                                value={data.year || ''}
-                                onChange={(e) => setEditForm({ ...editForm!, year: e.target.value === '' ? undefined : parseInt(e.target.value, 10) })}
-                                placeholder="Year"
+                                step="0.01"
+                                min="0"
+                                value={data.amount || ''}
+                                onChange={(e) => setEditForm({ ...editForm!, amount: parseFloat(e.target.value) || 0 })}
+                                className="text-xs h-8 text-right"
+                              />
+                            </td>
+                            <td className="py-1 px-2">
+                              <Forms.Input
+                                value={data.description}
+                                onChange={(e) => setEditForm({ ...editForm!, description: e.target.value })}
+                                placeholder="Description"
                                 className="text-xs h-8"
                               />
-                            ) : data.category === 'Projects & Activities' ? (
-                              <Combobox
-                                options={['All', String(currentYear), ...projectYears.map(y => String(y))].filter((v, i, a) => a.indexOf(v) === i)}
-                                value={splitYearFilters[index] || ''}
-                                onChange={(value) => setSplitYearFilter(index, value)}
-                                placeholder="Year"
-                              />
-                            ) : null}
-                          </td>
-                          <td className="py-1 px-2">
-                            {data.category === 'Membership' && (
-                              <Combobox
-                                options={memberOptions.map(m => m.name)}
-                                value={memberOptions.find(m => m.id === data.memberId)?.name || ''}
-                                onChange={(value) => {
-                                  const member = memberOptions.find(m => m.name === value);
-                                  setEditForm({ ...editForm!, memberId: member?.id || value });
-                                }}
-                                placeholder="Member"
-                              />
-                            )}
-                            {data.category === 'Projects & Activities' && (
-                              <Combobox
-                                groupedOptions={groupedProjectOptionsBySplit[index]}
-                                value={filteredProjectOptionsBySplit[index]?.find(p => p.id === data.projectId)?.name || ''}
-                                onChange={(value) => {
-                                  const project = filteredProjectOptionsBySplit[index]?.find(p => p.name === value);
-                                  setEditForm({ ...editForm!, projectId: project?.id || '' });
-                                }}
-                                placeholder="Project"
-                              />
-                            )}
-                            {data.category === 'Administrative' && (
-                              <Combobox
-                                options={adminAccounts}
-                                value={data.projectId}
-                                onChange={(value) => setEditForm({ ...editForm!, projectId: value })}
-                                placeholder="Account"
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 px-2">
-                            {data.category === 'Administrative' ? (
-                              <Combobox
-                                options={adminPurposes}
-                                value={data.purpose}
-                                onChange={(value) => setEditForm({ ...editForm!, purpose: value })}
-                                placeholder="Purpose"
-                              />
-                            ) : data.category === 'Membership' ? (
-                              <Forms.Input
-                                value={data.purpose}
-                                readOnly
-                                disabled
-                                className="text-xs h-8 bg-slate-50"
-                              />
-                            ) : data.category === 'Projects & Activities' ? (
-                              <Combobox
-                                options={purposesByProject[data.projectId] || projectPurposes}
-                                value={data.purpose}
-                                onChange={(value) => setEditForm({ ...editForm!, purpose: value })}
-                                placeholder="Purpose"
-                              />
-                            ) : (
-                              <Forms.Input
-                                value={data.purpose}
-                                onChange={(e) => setEditForm({ ...editForm!, purpose: e.target.value })}
-                                placeholder="Purpose"
-                                className="text-xs h-8"
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 px-2">
-                            <Forms.Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={data.amount || ''}
-                              onChange={(e) => setEditForm({ ...editForm!, amount: parseFloat(e.target.value) || 0 })}
-                              className="text-xs h-8 text-right"
-                            />
-                          </td>
-                          <td className="py-1 px-2">
-                            <Forms.Input
-                              value={data.description}
-                              onChange={(e) => setEditForm({ ...editForm!, description: e.target.value })}
-                              placeholder="Description"
-                              className="text-xs h-8"
-                            />
-                          </td>
-                          <td className="py-1 px-2">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={handleInlineSave}
-                                className="p-1 text-green-600 hover:bg-green-100 rounded"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={handleInlineCancel}
-                                className="p-1 text-red-600 hover:bg-red-100 rounded"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="py-2 px-2 text-xs">{split.category}</td>
-                          <td className="py-2 px-2 text-xs">{split.year || '-'}</td>
-                          <td className="py-2 px-2 text-xs">
-                            {split.category === 'Membership' && memberOptions.find(m => m.id === split.memberId)?.name}
-                            {split.category === 'Projects & Activities' && projectOptions.find(p => p.id === split.projectId)?.name}
-                            {split.category === 'Administrative' && split.projectId}
-                          </td>
-                          <td className="py-2 px-2 text-xs">{split.purpose || '-'}</td>
-                          <td className="py-2 px-2 text-right font-mono text-blue-600">{split.amount?.toFixed(2) || '0.00'}</td>
-                          <td className="py-2 px-2 text-xs">{split.description || '-'}</td>
-                          <td className="py-2 px-2">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => startInlineEdit(index)}
-                                className="p-1 text-slate-400 hover:text-jci-blue"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              {splits.length > 1 && (
+                            </td>
+                            <td className="py-1 px-2">
+                              <div className="flex items-center gap-1">
                                 <button
-                                  onClick={() => handleRemoveSplit(index)}
-                                  className="p-1 text-slate-400 hover:text-red-600"
+                                  onClick={handleInlineSave}
+                                  className="p-1 text-green-600 hover:bg-green-100 rounded"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Check className="w-4 h-4" />
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                                <button
+                                  onClick={handleInlineCancel}
+                                  className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-2 px-2 text-xs">{split.category}</td>
+                            <td className="py-2 px-2 text-xs">{split.year || '-'}</td>
+                            <td className="py-2 px-2 text-xs">
+                              {split.category === 'Membership' && memberOptions.find(m => m.id === split.memberId)?.name}
+                              {split.category === 'Projects & Activities' && projectOptions.find(p => p.id === split.projectId)?.name}
+                              {split.category === 'Administrative' && split.projectId}
+                            </td>
+                            <td className="py-2 px-2 text-xs">{split.purpose || '-'}</td>
+                            <td className="py-2 px-2 text-right font-mono text-blue-600">{split.amount?.toFixed(2) || '0.00'}</td>
+                            <td className="py-2 px-2 text-xs">{split.description || '-'}</td>
+                            <td className="py-2 px-2">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => startInlineEdit(index)}
+                                  className="p-1 text-slate-400 hover:text-blue-600"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                {splits.length > 1 && (
+                                  <button
+                                    onClick={() => handleRemoveSplit(index)}
+                                    className="p-1 text-slate-400 hover:text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -670,29 +683,6 @@ export function TransactionSplitModal({
             {error}
           </div>
         )}
-
-        {/* Actions */}
-        <div className="flex justify-between gap-2 pt-4">
-          <div>
-            {transaction.isSplit && (
-              <Button
-                onClick={handleCancelSplit}
-                disabled={loading}
-                className="border border-red-300 text-red-700 hover:bg-red-50"
-              >
-                {loading ? 'Canceling...' : 'Cancel Split'}
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={onClose} disabled={loading} className="border border-gray-300 text-gray-700">
-              Close
-            </Button>
-            <Button onClick={handleSubmit} disabled={loading || !isValid} className="bg-blue-600 text-white">
-              {loading ? 'Saving...' : (transaction.isSplit ? 'Update Splits' : 'Create Splits')}
-            </Button>
-          </div>
-        </div>
       </div>
     </Modal>
   );

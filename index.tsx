@@ -5,6 +5,7 @@ import './index.css';
 import './styles/accessibility.css';
 import { AuthProvider } from './hooks/useAuth';
 import { AccessibilityRunner } from './components/accessibility/AccessibilityRunner';
+import { ToastProvider } from './components/ui/Common';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,10 +15,12 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <AccessibilityRunner>
-        <App />
-      </AccessibilityRunner>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <AccessibilityRunner>
+          <App />
+        </AccessibilityRunner>
+      </AuthProvider>
+    </ToastProvider>
   </React.StrictMode>
 );

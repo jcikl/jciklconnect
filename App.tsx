@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -144,8 +144,7 @@ const GuestHeader = ({
           </Link>
         </nav>
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={onLogin}>Log In</Button>
-          <Button onClick={onRegister}>Join Us</Button>
+          <Button onClick={onLogin}>Log In</Button>
         </div>
       </div>
     </header>
@@ -1035,6 +1034,7 @@ const JCIKLApp: React.FC = () => {
   const [leadInterests, setLeadInterests] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // All hooks must be called before any conditional returns
   const navigate = useNavigate();
@@ -1255,35 +1255,35 @@ const JCIKLApp: React.FC = () => {
 
   // Render current view based on selected view
   // Note: Cannot use hooks inside this function - use values from component scope
-  const renderCurrentView = () => {
+  const renderCurrentView = (scrollRef?: React.RefObject<HTMLDivElement>) => {
     switch (view) {
       case 'MEMBERS': return <MembersView searchQuery={searchQuery} />;
       case 'ACTIVITIES': return <ActivityPlansView searchQuery={searchQuery} />;
       case 'PROJECTS': return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
       case 'EVENTS': return <EventsView searchQuery={searchQuery} />;
-      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
+      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
-      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <GamificationView />;
-      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
+      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
+      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} />;
-      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
+      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
       case 'COMMUNICATION': return <CommunicationView searchQuery={searchQuery} />;
       case 'CLUBS': return <HobbyClubsView searchQuery={searchQuery} />;
       case 'SURVEYS': return <SurveysView searchQuery={searchQuery} />;
       case 'BENEFITS': return <MemberBenefitsView searchQuery={searchQuery} />;
-      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <DataImportExportView />;
-      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <AdvertisementsView searchQuery={searchQuery} />;
-      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
-      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <TemplatesView searchQuery={searchQuery} />;
+      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
+      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
+      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
+      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
       case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
-      case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />; return <ReportsView />;
+      case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
       default:
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
         if (isBoard || isAdmin) {
-          return <BoardDashboard onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} />;
+          return <BoardDashboard onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
         }
         return <DashboardHome
           userRole={member?.role || UserRole.MEMBER}
@@ -1291,6 +1291,7 @@ const JCIKLApp: React.FC = () => {
           onNavigate={handleViewChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          scrollRef={scrollRef}
         />;
     }
   };
@@ -1649,11 +1650,11 @@ const JCIKLApp: React.FC = () => {
           )}
 
           {/* Scrollable Area */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-32 md:pb-8">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-32 md:pb-8">
             <div className="max-w-7xl mx-auto">
               <RoleSimulator />
 
-              {renderCurrentView()}
+              {renderCurrentView(scrollContainerRef)}
             </div>
           </div>
         </main>
@@ -1878,20 +1879,18 @@ const App: React.FC = () => {
             });
           }}
         >
-          <ToastProvider>
-            <AuthProvider>
-              <ErrorBoundary
-                onError={(error, errorInfo) => {
-                  errorLoggingService.logError(error, {
-                    component: 'JCIKLApp',
-                    action: 'main_app_render'
-                  }, errorInfo);
-                }}
-              >
-                <JCIKLApp />
-              </ErrorBoundary>
-            </AuthProvider>
-          </ToastProvider>
+          <AuthProvider>
+            <ErrorBoundary
+              onError={(error, errorInfo) => {
+                errorLoggingService.logError(error, {
+                  component: 'JCIKLApp',
+                  action: 'main_app_render'
+                }, errorInfo);
+              }}
+            >
+              <JCIKLApp />
+            </ErrorBoundary>
+          </AuthProvider>
         </AsyncErrorBoundary>
       </BrowserRouter>
     </ErrorBoundary>

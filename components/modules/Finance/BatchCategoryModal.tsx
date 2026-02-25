@@ -4,23 +4,7 @@ import { Transaction, TransactionSplit } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
 import * as Forms from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
-
-const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: string }> = ({ isOpen, onClose, title, children, size = 'max-w-2xl' }) => {
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className={`bg-white rounded-lg shadow-xl w-full ${size} max-h-[90vh] overflow-y-auto`}>
-                <div className="flex items-center justify-between p-4 border-b">
-                    <h2 className="text-lg font-semibold">{title}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                        <X size={20} />
-                    </button>
-                </div>
-                <div className="p-4">{children}</div>
-            </div>
-        </div>
-    );
-};
+import { Modal, Button } from '../../ui/Common';
 
 type CategoryType = 'Projects & Activities' | 'Membership' | 'Administrative';
 
@@ -229,7 +213,39 @@ export function BatchCategoryModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Batch Set Transaction Category" size="max-w-2xl">
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Batch Set Transaction Category"
+            size="2xl"
+            bottomSheet
+            drawerOnMobile
+            footer={
+                <div className="flex justify-end items-center gap-2 w-full">
+                    <Button
+                        onClick={onClose}
+                        disabled={loading}
+                        variant="outline"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={loading || !hasAnyUpdate || totalSelected === 0}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2"
+                    >
+                        {loading ? (
+                            'Applying...'
+                        ) : (
+                            <>
+                                <CheckSquare size={16} />
+                                Apply to {totalSelected} Record{totalSelected !== 1 ? 's' : ''}
+                            </>
+                        )}
+                    </Button>
+                </div>
+            }
+        >
             <div className="space-y-4">
                 {/* Summary */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3">
@@ -415,25 +431,6 @@ export function BatchCategoryModal({
                         {error}
                     </div>
                 )}
-
-                {/* Actions */}
-                <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
-                    <button
-                        onClick={onClose}
-                        disabled={loading}
-                        className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading || !hasAnyUpdate || totalSelected === 0}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                    >
-                        <CheckSquare size={16} />
-                        {loading ? 'Applying...' : `Apply to ${totalSelected} Record${totalSelected !== 1 ? 's' : ''}`}
-                    </button>
-                </div>
             </div>
         </Modal>
     );

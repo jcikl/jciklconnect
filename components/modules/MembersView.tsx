@@ -245,7 +245,8 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         (m.name ?? '').toLowerCase().includes(term) ||
         (m.email ?? '').toLowerCase().includes(term) ||
         (m.phone ?? '').toLowerCase().includes(term) ||
-        (m.fullName ?? '').toLowerCase().includes(term)
+        (m.fullName ?? '').toLowerCase().includes(term) ||
+        (m.address ?? '').toLowerCase().includes(term)
       )
       : members;
   }, [members, searchTerm, searchQuery]);
@@ -2035,7 +2036,8 @@ const GuestManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }
         (m.name ?? '').toLowerCase().includes(term) ||
         (m.email ?? '').toLowerCase().includes(term) ||
         (m.phone ?? '').toLowerCase().includes(term) ||
-        (m.fullName ?? '').toLowerCase().includes(term)
+        (m.fullName ?? '').toLowerCase().includes(term) ||
+        (m.address ?? '').toLowerCase().includes(term)
       );
     };
 

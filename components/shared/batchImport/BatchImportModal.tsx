@@ -372,6 +372,23 @@ export const BatchImportModal: React.FC<Props> = ({
       title={`Batch Import: ${config.name}`}
       size="2xl"
       scrollInBody={false}
+      bottomSheet
+      drawerOnMobile
+      footer={
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose} disabled={importing} className="flex-1">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleImport}
+            disabled={validRows.length === 0 || importing}
+            isLoading={importing}
+            className="flex-1"
+          >
+            {importing ? 'Importing...' : `Import ${validRows.length} ${config.name.toLowerCase()}`}
+          </Button>
+        </div>
+      }
     >
       {/* Hidden file input - Always present so Upload button works */}
       <input
@@ -708,21 +725,6 @@ export const BatchImportModal: React.FC<Props> = ({
             </div>
           </div>
         )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={onClose} disabled={importing} className="flex-1">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleImport}
-            disabled={validRows.length === 0 || importing}
-            isLoading={importing}
-            className="flex-1"
-          >
-            {importing ? 'Importing...' : `Import ${validRows.length} ${config.name.toLowerCase()}`}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

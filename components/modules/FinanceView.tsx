@@ -2173,8 +2173,21 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )
       }
 
-      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setRecordFormMemberId(''); setRecordFormYear(new Date().getFullYear()); setRecordFormProjectId(''); }} title="Record Transaction" drawerOnMobile>
-        <form onSubmit={handleAddTransaction} className="space-y-6">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setRecordFormMemberId(''); setRecordFormYear(new Date().getFullYear()); setRecordFormProjectId(''); }}
+        title="Record Transaction"
+        size="2xl"
+        bottomSheet
+        drawerOnMobile
+        footer={
+          <div className="flex gap-2 w-full">
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button className="flex-1" type="submit" form="record-transaction-form">Save Transaction</Button>
+          </div>
+        }
+      >
+        <form id="record-transaction-form" onSubmit={handleAddTransaction} className="space-y-6">
           <TransactionForm
             mode="create"
             accounts={accounts}
@@ -2198,17 +2211,26 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             setEditingModalYear={setEditingModalYear}
             inventoryItems={inventoryItems}
           />
-
-          <div className="pt-4">
-            <Button className="w-full" type="submit">Save Transaction</Button>
-          </div>
         </form>
       </Modal>
 
       {/* Edit Transaction Modal */}
       {editingTransaction && (
-        <Modal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingTransaction(null); setEditingMembershipFilterYear(null); setEditingMembershipMemberId(''); setEditingMembershipYear(new Date().getFullYear()); setEditingAdministrativeYear(new Date().getFullYear()); setEditingAdministrativePurposeBase(''); }} title="Edit Transaction" drawerOnMobile>
-          <form onSubmit={handleUpdateTransaction} className="space-y-6">
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => { setIsEditModalOpen(false); setEditingTransaction(null); setEditingMembershipFilterYear(null); setEditingMembershipMemberId(''); setEditingMembershipYear(new Date().getFullYear()); setEditingAdministrativeYear(new Date().getFullYear()); setEditingAdministrativePurposeBase(''); }}
+          title="Edit Transaction"
+          size="2xl"
+          bottomSheet
+          drawerOnMobile
+          footer={
+            <div className="flex gap-2 w-full">
+              <Button variant="ghost" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+              <Button className="flex-1 shadow-sm" type="submit" form="edit-transaction-form">Update Transaction</Button>
+            </div>
+          }
+        >
+          <form id="edit-transaction-form" onSubmit={handleUpdateTransaction} className="space-y-6">
             <TransactionForm
               mode="edit"
               accounts={accounts}
@@ -2232,10 +2254,6 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               setEditingModalYear={setEditingModalYear}
               inventoryItems={inventoryItems}
             />
-
-            <div className="pt-4">
-              <Button className="w-full h-11 text-base shadow-sm" type="submit">Update Transaction</Button>
-            </div>
           </form>
         </Modal>
       )}
@@ -2555,21 +2573,35 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       />
 
       {/* Add Administrative Project ID Modal (行政费户口) */}
-      <Modal isOpen={isAddAdministrativeProjectOpen} onClose={() => setIsAddAdministrativeProjectOpen(false)} title="Add Admin Account" drawerOnMobile>
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          const name = (new FormData(e.currentTarget).get('projectId') as string)?.trim();
-          if (name) {
-            addAdministrativeProjectId(name);
-            setAdministrativeProjectIds(getAdministrativeProjectIds());
-            showToast('Admin account added successfully', 'success');
-            setIsAddAdministrativeProjectOpen(false);
-          }
-        }} className="space-y-4">
-          <Input name="projectId" label="Account Name" placeholder="e.g. National Due, Maintenance" required />
-          <div className="pt-4">
-            <Button className="w-full" type="submit">Add</Button>
+      <Modal
+        isOpen={isAddAdministrativeProjectOpen}
+        onClose={() => setIsAddAdministrativeProjectOpen(false)}
+        title="Add Admin Account"
+        size="md"
+        bottomSheet
+        drawerOnMobile
+        footer={
+          <div className="flex gap-2 w-full">
+            <Button variant="ghost" onClick={() => setIsAddAdministrativeProjectOpen(false)}>Cancel</Button>
+            <Button className="flex-1" type="submit" form="add-admin-account-form">Add Account</Button>
           </div>
+        }
+      >
+        <form
+          id="add-admin-account-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const name = (new FormData(e.currentTarget).get('projectId') as string)?.trim();
+            if (name) {
+              addAdministrativeProjectId(name);
+              setAdministrativeProjectIds(getAdministrativeProjectIds());
+              showToast('Admin account added successfully', 'success');
+              setIsAddAdministrativeProjectOpen(false);
+            }
+          }}
+          className="space-y-4"
+        >
+          <Input name="projectId" label="Account Name" placeholder="e.g. National Due, Maintenance" required />
         </form>
       </Modal>
     </div >
@@ -2706,11 +2738,33 @@ const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Financial Reports" size="xl" drawerOnMobile>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Financial Reports"
+      size="xl"
+      bottomSheet
+      drawerOnMobile
+      footer={
+        <div className="flex flex-wrap gap-2 w-full justify-between sm:justify-end">
+          <Button variant="outline" onClick={handleExport} className="flex-1 sm:flex-none">
+            <Download size={16} className="mr-2" />
+            Export Report
+          </Button>
+          <Button variant="outline" onClick={handleExportTransactions} className="flex-1 sm:flex-none">
+            <Download size={16} className="mr-2" />
+            Export Transactions
+          </Button>
+          <Button variant="secondary" onClick={onClose} className="w-full sm:w-auto mt-2 sm:mt-0">
+            Close
+          </Button>
+        </div>
+      }
+    >
       <div className="space-y-6">
         {/* Report Filters */}
         <div className="flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-[140px]">
             <label className="block text-sm font-medium text-slate-700 mb-1">Year</label>
             <Select
               value={reportYear.toString()}
@@ -2718,7 +2772,7 @@ const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
               options={years.map(y => ({ label: y.toString(), value: y.toString() }))}
             />
           </div>
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-[140px]">
             <label className="block text-sm font-medium text-slate-700 mb-1">Month (Optional)</label>
             <Select
               value={reportMonth === null ? 'all' : reportMonth.toString()}
@@ -2730,7 +2784,7 @@ const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
             />
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Fiscal Year Start (Optional)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Fiscal Year Start</label>
             <Select
               value={fiscalYearStart.toString()}
               onChange={(e) => onFiscalYearStartChange?.(parseInt(e.target.value))}
@@ -2741,21 +2795,11 @@ const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                 { label: 'Fiscal Year (Oct)', value: '9' },
               ]}
             />
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-[10px] text-slate-500 mt-1">
               {fiscalYearStart === 0
-                ? 'Using Calendar Year (Jan-Dec)'
-                : `Fiscal Year: ${monthNames[fiscalYearStart]} - ${monthNames[fiscalYearStart - 1] || monthNames[11]}`}
+                ? 'Calendar Year (Jan-Dec)'
+                : `${monthNames[fiscalYearStart]} - ${monthNames[fiscalYearStart - 1] || monthNames[11]}`}
             </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExport}>
-              <Download size={16} className="mr-2" />
-              Export Report (CSV)
-            </Button>
-            <Button variant="outline" onClick={handleExportTransactions}>
-              <Download size={16} className="mr-2" />
-              Export Transactions (CSV)
-            </Button>
           </div>
         </div>
 
@@ -3019,14 +3063,29 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Bank Account" drawerOnMobile>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add Bank Account"
+      size="lg"
+      bottomSheet
+      drawerOnMobile
+      footer={
+        <div className="flex justify-end gap-2 w-full">
+          <Button variant="ghost" onClick={onClose} type="button">Cancel</Button>
+          <Button type="submit" form="add-bank-account-form" disabled={loading} className="flex-1 sm:flex-none">
+            {loading ? 'Adding...' : 'Add Account'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="add-bank-account-form" onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input name="bankName" label="Bank" placeholder="e.g. Maybank, CIMB" required />
           <Input name="name" label="Account Name" placeholder="e.g. Main Operating Account" required />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select
             name="type"
             label="Account Type"
@@ -3048,14 +3107,14 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            onChange={(e) => {
+            onChange={(e: any) => {
               e.target.value = e.target.value.replace(/[^0-9]/g, '');
             }}
             required
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input name="initialBalance" label="Initial Balance (Starting Balance)" type="number" step="0.01" placeholder="0.00" required />
           <Select
             name="currency"
@@ -3068,13 +3127,6 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
             ]}
             required
           />
-        </div>
-
-        <div className="pt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} type="button">Cancel</Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Account'}
-          </Button>
         </div>
       </form>
     </Modal>
@@ -3120,6 +3172,7 @@ const BankReconciliationModal: React.FC<BankReconciliationModalProps> = ({
       setStatementBalance('');
       setReconciliationDate(new Date().toISOString().split('T')[0]);
       setNotes('');
+      onClose(); // Auto close on success
     } catch (err) {
       showToast('Failed to reconcile bank account', 'error');
     } finally {
@@ -3128,8 +3181,25 @@ const BankReconciliationModal: React.FC<BankReconciliationModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Reconcile Bank Account" size="lg" drawerOnMobile>
-      <form onSubmit={handleReconcile} className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Reconcile Bank Account"
+      size="lg"
+      bottomSheet
+      drawerOnMobile
+      footer={
+        <div className="flex gap-3 w-full">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="bank-reconciliation-form" className="flex-1" disabled={isReconciling}>
+            {isReconciling ? 'Reconciling...' : 'Reconcile Account'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="bank-reconciliation-form" onSubmit={handleReconcile} className="space-y-4">
         <Select
           label="Select Bank Account"
           value={selectedAccountId}
@@ -3179,15 +3249,6 @@ const BankReconciliationModal: React.FC<BankReconciliationModalProps> = ({
             placeholder="Add any notes about this reconciliation..."
           />
         </div>
-
-        <div className="pt-4 flex gap-3">
-          <Button type="submit" className="flex-1" disabled={isReconciling}>
-            {isReconciling ? 'Reconciling...' : 'Reconcile Account'}
-          </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
       </form>
     </Modal>
   );
@@ -3229,8 +3290,25 @@ const DuesRenewalModal: React.FC<DuesRenewalModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Initiate Annual Dues Renewal" size="lg" drawerOnMobile>
-      <form onSubmit={handleRenew} className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Initiate Annual Dues Renewal"
+      size="lg"
+      bottomSheet
+      drawerOnMobile
+      footer={
+        <div className="flex gap-3 w-full">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="dues-renewal-form" className="flex-1" disabled={isRenewing}>
+            {isRenewing ? 'Initiating...' : 'Initiate Renewal'}
+          </Button>
+        </div>
+      }
+    >
+      <form id="dues-renewal-form" onSubmit={handleRenew} className="space-y-4">
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start gap-3">
             <AlertCircle className="text-blue-600 mt-0.5" size={20} />

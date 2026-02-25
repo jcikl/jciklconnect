@@ -521,8 +521,15 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
 
       {/* Stock Adjustment Modal */}
       {selectedItem && (
-        <Modal isOpen={isAdjustmentModalOpen} onClose={() => { setAdjustmentModalOpen(false); setSelectedItem(null); }} title={`Stock Adjustment: ${selectedItem.name}`} drawerOnMobile>
-          <form onSubmit={async (e) => {
+        <Modal
+          isOpen={isAdjustmentModalOpen}
+          onClose={() => { setAdjustmentModalOpen(false); setSelectedItem(null); }}
+          title={`Stock Adjustment: ${selectedItem.name}`}
+          bottomSheet
+          drawerOnMobile
+          footer={<Button className="w-full" type="submit" form="stock-adjustment-form">Complete Adjustment</Button>}
+        >
+          <form id="stock-adjustment-form" onSubmit={async (e) => {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
             try {
@@ -564,86 +571,92 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
               { label: 'Initial Stock', value: 'Initial Stock' },
               { label: 'Other', value: 'Other' },
             ]} required />
-
-            <div className="pt-4">
-              <Button className="w-full" type="submit">Complete Adjustment</Button>
-            </div>
           </form>
         </Modal>
       )}
 
       {/* Stock Card (History) Modal */}
-      {selectedItem && (
-        <Modal
-          isOpen={isStockCardModalOpen}
-          onClose={() => { setStockCardModalOpen(false); setSelectedItem(null); setStockMovements([]); }}
-          title={`Stock Card: ${selectedItem.name}`}
-          size="xl"
-          drawerOnMobile
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="p-4 bg-slate-50 rounded-xl">
-                <p className="text-xs text-slate-500 font-medium uppercase mb-1">Current Stock</p>
-                <div className="text-2xl font-bold text-slate-900">{selectedItem.quantity}</div>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-xl">
-                <p className="text-xs text-blue-500 font-medium uppercase mb-1">Total In</p>
-                <div className="text-2xl font-bold text-blue-600">
-                  {stockMovements.filter(m => m.type === 'In').reduce((sum, m) => sum + m.quantity, 0)}
+      {
+        selectedItem && (
+          <Modal
+            isOpen={isStockCardModalOpen}
+            onClose={() => { setStockCardModalOpen(false); setSelectedItem(null); setStockMovements([]); }}
+            title={`Stock Card: ${selectedItem.name}`}
+            size="xl"
+            bottomSheet
+            drawerOnMobile
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <p className="text-xs text-slate-500 font-medium uppercase mb-1">Current Stock</p>
+                  <div className="text-2xl font-bold text-slate-900">{selectedItem.quantity}</div>
+                </div>
+                <div className="p-4 bg-blue-50 rounded-xl">
+                  <p className="text-xs text-blue-500 font-medium uppercase mb-1">Total In</p>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {stockMovements.filter(m => m.type === 'In').reduce((sum, m) => sum + m.quantity, 0)}
+                  </div>
+                </div>
+                <div className="p-4 bg-orange-50 rounded-xl">
+                  <p className="text-xs text-orange-500 font-medium uppercase mb-1">Total Out</p>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {Math.abs(stockMovements.filter(m => m.type === 'Out').reduce((sum, m) => sum + m.quantity, 0))}
+                  </div>
                 </div>
               </div>
-              <div className="p-4 bg-orange-50 rounded-xl">
-                <p className="text-xs text-orange-500 font-medium uppercase mb-1">Total Out</p>
-                <div className="text-2xl font-bold text-orange-600">
-                  {Math.abs(stockMovements.filter(m => m.type === 'Out').reduce((sum, m) => sum + m.quantity, 0))}
-                </div>
-              </div>
-            </div>
 
-            <LoadingState loading={isHistoryLoading} error={null} empty={stockMovements.length === 0} emptyMessage="No stock movements recorded.">
-              <div className="max-h-[60vh] overflow-y-auto pr-2">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 sticky top-0 z-10">
-                    <tr className="border-b border-slate-200">
-                      <th className="py-2 px-3">Date</th>
-                      <th className="py-2 px-3">Type</th>
-                      <th className="py-2 px-3">Variant</th>
-                      <th className="py-2 px-3">Change</th>
-                      <th className="py-2 px-3">Balance</th>
-                      <th className="py-2 px-3">Reason</th>
-                      <th className="py-2 px-3">By</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {stockMovements.map(mov => (
-                      <tr key={mov.id} className="hover:bg-slate-50">
-                        <td className="py-3 px-3 text-slate-500">{formatDate(new Date(mov.date))}</td>
-                        <td className="py-3 px-3">
-                          <Badge variant={mov.type === 'In' ? 'success' : mov.type === 'Out' ? 'warning' : 'info'}>
-                            {mov.type}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-3 text-slate-500">{mov.variant || '-'}</td>
-                        <td className={`py-3 px-3 font-bold ${mov.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {mov.quantity > 0 ? `+${mov.quantity}` : mov.quantity}
-                        </td>
-                        <td className="py-3 px-3 font-medium">{mov.newQuantity}</td>
-                        <td className="py-3 px-3 text-slate-600">{mov.reason}</td>
-                        <td className="py-3 px-3 text-slate-500">{mov.performedBy}</td>
+              <LoadingState loading={isHistoryLoading} error={null} empty={stockMovements.length === 0} emptyMessage="No stock movements recorded.">
+                <div className="max-h-[60vh] overflow-y-auto pr-2">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                      <tr className="border-b border-slate-200">
+                        <th className="py-2 px-3">Date</th>
+                        <th className="py-2 px-3">Type</th>
+                        <th className="py-2 px-3">Variant</th>
+                        <th className="py-2 px-3">Change</th>
+                        <th className="py-2 px-3">Balance</th>
+                        <th className="py-2 px-3">Reason</th>
+                        <th className="py-2 px-3">By</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </LoadingState>
-          </div>
-        </Modal>
-      )}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {stockMovements.map(mov => (
+                        <tr key={mov.id} className="hover:bg-slate-50">
+                          <td className="py-3 px-3 text-slate-500">{formatDate(new Date(mov.date))}</td>
+                          <td className="py-3 px-3">
+                            <Badge variant={mov.type === 'In' ? 'success' : mov.type === 'Out' ? 'warning' : 'info'}>
+                              {mov.type}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-3 text-slate-500">{mov.variant || '-'}</td>
+                          <td className={`py-3 px-3 font-bold ${mov.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {mov.quantity > 0 ? `+${mov.quantity}` : mov.quantity}
+                          </td>
+                          <td className="py-3 px-3 font-medium">{mov.newQuantity}</td>
+                          <td className="py-3 px-3 text-slate-600">{mov.reason}</td>
+                          <td className="py-3 px-3 text-slate-500">{mov.performedBy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </LoadingState>
+            </div>
+          </Modal>
+        )
+      }
 
       {/* Add Item Modal */}
-      <Modal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} title="Add Inventory Item" drawerOnMobile>
-        <form onSubmit={handleAddItem} className="space-y-4">
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        title="Add Inventory Item"
+        bottomSheet
+        drawerOnMobile
+        footer={<Button className="w-full" type="submit" form="add-item-form">Add Item</Button>}
+      >
+        <form id="add-item-form" onSubmit={handleAddItem} className="space-y-4">
           <Input name="name" label="Item Name" placeholder="e.g. Projector" required />
           <Select name="category" label="Category" options={[
             { label: 'Electronics', value: 'Electronics' },
@@ -747,141 +760,155 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
           </div>
 
           <div className="pt-4">
-            <Button className="w-full" type="submit">Add Item</Button>
           </div>
         </form>
       </Modal>
 
       {/* Edit Item Modal */}
-      {selectedItem && (
-        <Modal isOpen={isEditModalOpen} onClose={() => { setEditModalOpen(false); setSelectedItem(null); }} title="Edit Inventory Item" drawerOnMobile>
-          <form onSubmit={handleEditItem} className="space-y-4">
-            <Input name="name" label="Item Name" defaultValue={selectedItem.name} required />
-            <Select name="category" label="Category" options={[
-              { label: 'Electronics', value: 'Electronics' },
-              { label: 'Furniture', value: 'Furniture' },
-              { label: 'Merchandise', value: 'Merchandise' },
-              { label: 'Stationery', value: 'Stationery' },
-              { label: 'Equipment', value: 'Equipment' },
-              { label: 'Supplies', value: 'Supplies' },
-              { label: 'Other', value: 'Other' },
-            ]} defaultValue={selectedItem.category} required />
-            <Input name="location" label="Location" defaultValue={selectedItem.location} required />
-            <div className="grid grid-cols-2 gap-4">
-              {formVariants.length > 0 ? (
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">Total Quantity</label>
-                  <div className="h-10 px-3 flex items-center bg-slate-50 border border-slate-200 rounded-md text-slate-600">
-                    {formVariants.reduce((sum, v) => sum + v.quantity, 0)}
-                  </div>
-                  <input type="hidden" name="quantity" value={formVariants.reduce((sum, v) => sum + v.quantity, 0)} />
-                </div>
-              ) : (
-                <Input name="quantity" label="Quantity" type="number" defaultValue={selectedItem.quantity?.toString() || '1'} required />
-              )}
-              <Select name="condition" label="Condition" options={[
-                { label: 'Excellent', value: 'Excellent' },
-                { label: 'Good', value: 'Good' },
-                { label: 'Fair', value: 'Fair' },
-                { label: 'Poor', value: 'Poor' },
-              ]} defaultValue={selectedItem.condition || 'Good'} required />
-            </div>
-            <Textarea name="description" label="Description" defaultValue={selectedItem.description || ''} />
-
-            {/* Variants Management */}
-            <div className="pt-4 border-t border-slate-200">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="text-sm font-semibold text-slate-900">Variants (e.g. Sizes)</h4>
-                <Button type="button" variant="outline" size="sm" onClick={addVariant}>
-                  <Plus size={14} className="mr-1" /> Add Variant
-                </Button>
-              </div>
-
-              {formVariants.length > 0 ? (
-                <div className="space-y-3">
-                  {formVariants.map((variant, index) => (
-                    <div key={index} className="flex gap-3 items-end">
-                      <div className="flex-1">
-                        <Input
-                          label={index === 0 ? "Size/Specs" : ""}
-                          value={variant.size}
-                          onChange={(e) => updateVariant(index, 'size', e.target.value)}
-                          placeholder="e.g. M, L, Blue"
-                          required
-                        />
-                      </div>
-                      <div className="w-24">
-                        <Input
-                          type="number"
-                          label={index === 0 ? "Qty" : ""}
-                          value={variant.quantity.toString()}
-                          onChange={(e) => updateVariant(index, 'quantity', e.target.value)}
-                          required
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeVariant(index)}
-                        className="text-red-500 hover:text-red-700 h-10"
-                      >
-                        <Trash2 size={14} />
-                      </Button>
+      {
+        selectedItem && (
+          <Modal
+            isOpen={isEditModalOpen}
+            onClose={() => { setEditModalOpen(false); setSelectedItem(null); }}
+            title="Edit Inventory Item"
+            bottomSheet
+            drawerOnMobile
+            footer={<Button className="w-full" type="submit" form="edit-item-form">Update Item</Button>}
+          >
+            <form id="edit-item-form" onSubmit={handleEditItem} className="space-y-4">
+              <Input name="name" label="Item Name" defaultValue={selectedItem.name} required />
+              <Select name="category" label="Category" options={[
+                { label: 'Electronics', value: 'Electronics' },
+                { label: 'Furniture', value: 'Furniture' },
+                { label: 'Merchandise', value: 'Merchandise' },
+                { label: 'Stationery', value: 'Stationery' },
+                { label: 'Equipment', value: 'Equipment' },
+                { label: 'Supplies', value: 'Supplies' },
+                { label: 'Other', value: 'Other' },
+              ]} defaultValue={selectedItem.category} required />
+              <Input name="location" label="Location" defaultValue={selectedItem.location} required />
+              <div className="grid grid-cols-2 gap-4">
+                {formVariants.length > 0 ? (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700">Total Quantity</label>
+                    <div className="h-10 px-3 flex items-center bg-slate-50 border border-slate-200 rounded-md text-slate-600">
+                      {formVariants.reduce((sum, v) => sum + v.quantity, 0)}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500 italic">No variants added. Using base quantity instead.</p>
-              )}
-            </div>
-
-            {/* Depreciation Tracking Section */}
-            <div className="pt-4 border-t border-slate-200">
-              <h4 className="text-sm font-semibold text-slate-900 mb-3">Depreciation Tracking</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <Input name="purchaseDate" label="Purchase Date" type="date" defaultValue={selectedItem.purchaseDate || ''} />
-                <Input name="purchasePrice" label="Purchase Price (RM)" type="number" step="0.01" defaultValue={selectedItem.purchasePrice?.toString() || ''} placeholder="0.00" />
+                    <input type="hidden" name="quantity" value={formVariants.reduce((sum, v) => sum + v.quantity, 0)} />
+                  </div>
+                ) : (
+                  <Input name="quantity" label="Quantity" type="number" defaultValue={selectedItem.quantity?.toString() || '1'} required />
+                )}
+                <Select name="condition" label="Condition" options={[
+                  { label: 'Excellent', value: 'Excellent' },
+                  { label: 'Good', value: 'Good' },
+                  { label: 'Fair', value: 'Fair' },
+                  { label: 'Poor', value: 'Poor' },
+                ]} defaultValue={selectedItem.condition || 'Good'} required />
               </div>
-              <Select name="depreciationMethod" label="Depreciation Method" options={[
-                { label: 'None', value: 'None' },
-                { label: 'Straight Line', value: 'Straight Line' },
-                { label: 'Declining Balance', value: 'Declining Balance' },
-                { label: 'Units of Production', value: 'Units of Production' },
-              ]} defaultValue={selectedItem.depreciationMethod || 'None'} />
-              <div className="grid grid-cols-2 gap-4">
-                <Input name="depreciationRate" label="Depreciation Rate (% per year)" type="number" step="0.1" defaultValue={selectedItem.depreciationRate?.toString() || ''} placeholder="20" />
-                <Input name="usefulLife" label="Useful Life (Years)" type="number" min="1" defaultValue={selectedItem.usefulLife?.toString() || ''} placeholder="5" />
-              </div>
-              {selectedItem.currentValue !== undefined && selectedItem.purchasePrice !== undefined && (
-                <div className="mt-3 p-3 bg-slate-50 rounded-lg">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Purchase Price:</span>
-                    <span className="font-semibold text-slate-900">RM {selectedItem.purchasePrice.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-slate-600">Current Value:</span>
-                    <span className="font-semibold text-green-600">RM {selectedItem.currentValue.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-slate-600">Total Depreciation:</span>
-                    <span className="font-semibold text-red-600">RM {(selectedItem.purchasePrice - selectedItem.currentValue).toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
+              <Textarea name="description" label="Description" defaultValue={selectedItem.description || ''} />
 
-            <div className="pt-4">
-              <Button className="w-full" type="submit">Update Item</Button>
-            </div>
-          </form>
-        </Modal>
-      )}
+              {/* Variants Management */}
+              <div className="pt-4 border-t border-slate-200">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-sm font-semibold text-slate-900">Variants (e.g. Sizes)</h4>
+                  <Button type="button" variant="outline" size="sm" onClick={addVariant}>
+                    <Plus size={14} className="mr-1" /> Add Variant
+                  </Button>
+                </div>
+
+                {formVariants.length > 0 ? (
+                  <div className="space-y-3">
+                    {formVariants.map((variant, index) => (
+                      <div key={index} className="flex gap-3 items-end">
+                        <div className="flex-1">
+                          <Input
+                            label={index === 0 ? "Size/Specs" : ""}
+                            value={variant.size}
+                            onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                            placeholder="e.g. M, L, Blue"
+                            required
+                          />
+                        </div>
+                        <div className="w-24">
+                          <Input
+                            type="number"
+                            label={index === 0 ? "Qty" : ""}
+                            value={variant.quantity.toString()}
+                            onChange={(e) => updateVariant(index, 'quantity', e.target.value)}
+                            required
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeVariant(index)}
+                          className="text-red-500 hover:text-red-700 h-10"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">No variants added. Using base quantity instead.</p>
+                )}
+              </div>
+
+              {/* Depreciation Tracking Section */}
+              <div className="pt-4 border-t border-slate-200">
+                <h4 className="text-sm font-semibold text-slate-900 mb-3">Depreciation Tracking</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input name="purchaseDate" label="Purchase Date" type="date" defaultValue={selectedItem.purchaseDate || ''} />
+                  <Input name="purchasePrice" label="Purchase Price (RM)" type="number" step="0.01" defaultValue={selectedItem.purchasePrice?.toString() || ''} placeholder="0.00" />
+                </div>
+                <Select name="depreciationMethod" label="Depreciation Method" options={[
+                  { label: 'None', value: 'None' },
+                  { label: 'Straight Line', value: 'Straight Line' },
+                  { label: 'Declining Balance', value: 'Declining Balance' },
+                  { label: 'Units of Production', value: 'Units of Production' },
+                ]} defaultValue={selectedItem.depreciationMethod || 'None'} />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input name="depreciationRate" label="Depreciation Rate (% per year)" type="number" step="0.1" defaultValue={selectedItem.depreciationRate?.toString() || ''} placeholder="20" />
+                  <Input name="usefulLife" label="Useful Life (Years)" type="number" min="1" defaultValue={selectedItem.usefulLife?.toString() || ''} placeholder="5" />
+                </div>
+                {selectedItem.currentValue !== undefined && selectedItem.purchasePrice !== undefined && (
+                  <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Purchase Price:</span>
+                      <span className="font-semibold text-slate-900">RM {selectedItem.purchasePrice.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-slate-600">Current Value:</span>
+                      <span className="font-semibold text-green-600">RM {selectedItem.currentValue.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-slate-600">Total Depreciation:</span>
+                      <span className="font-semibold text-red-600">RM {(selectedItem.purchasePrice - selectedItem.currentValue).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4">
+              </div>
+            </form>
+          </Modal>
+        )
+      }
 
       {/* Check Out Modal */}
       {selectedItem && (
-        <Modal isOpen={isCheckOutModalOpen} onClose={() => { setCheckOutModalOpen(false); setSelectedItem(null); }} title="Check Out Item" drawerOnMobile>
-          <form onSubmit={handleCheckOut} className="space-y-4">
+        <Modal
+          isOpen={isCheckOutModalOpen}
+          onClose={() => { setCheckOutModalOpen(false); setSelectedItem(null); }}
+          title="Check Out Item"
+          bottomSheet
+          drawerOnMobile
+          footer={<Button className="w-full" type="submit" form="checkout-form">Check Out</Button>}
+        >
+          <form id="checkout-form" onSubmit={handleCheckOut} className="space-y-4">
             <p className="text-sm text-slate-600 mb-4">Checking out: <strong>{selectedItem.name}</strong></p>
             <Select name="memberId" label="Assign To" options={[
               { label: 'Select member...', value: '' },
@@ -889,43 +916,45 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             ]} required />
             <Input name="expectedReturnDate" label="Expected Return Date" type="date" />
             <div className="pt-4">
-              <Button className="w-full" type="submit">Check Out</Button>
             </div>
           </form>
         </Modal>
       )}
 
       {/* Maintenance Schedule Modal */}
-      {isMaintenanceModalOpen && (
-        <MaintenanceScheduleModal
-          isOpen={true}
-          onClose={() => {
-            setMaintenanceModalOpen(false);
-            setSelectedSchedule(null);
-          }}
-          schedule={selectedSchedule}
-          items={items}
-          members={members ?? []}
-          onSave={async (scheduleData) => {
-            try {
-              if (selectedSchedule) {
-                await updateMaintenanceSchedule(selectedSchedule.id, scheduleData);
-                showToast('Maintenance schedule updated', 'success');
-              } else {
-                await createMaintenanceSchedule(scheduleData);
-                showToast('Maintenance schedule created', 'success');
-              }
-              await loadMaintenanceSchedules();
+      {
+        isMaintenanceModalOpen && (
+          <MaintenanceScheduleModal
+            isOpen={true}
+            onClose={() => {
               setMaintenanceModalOpen(false);
               setSelectedSchedule(null);
-            } catch (err) {
-              showToast('Failed to save maintenance schedule', 'error');
-            }
-          }}
-          drawerOnMobile
-        />
-      )}
-    </div>
+            }}
+            schedule={selectedSchedule}
+            items={items}
+            members={members ?? []}
+            onSave={async (scheduleData) => {
+              try {
+                if (selectedSchedule) {
+                  await updateMaintenanceSchedule(selectedSchedule.id, scheduleData);
+                  showToast('Maintenance schedule updated', 'success');
+                } else {
+                  await createMaintenanceSchedule(scheduleData);
+                  showToast('Maintenance schedule created', 'success');
+                }
+                await loadMaintenanceSchedules();
+                setMaintenanceModalOpen(false);
+                setSelectedSchedule(null);
+              } catch (err) {
+                showToast('Failed to save maintenance schedule', 'error');
+              }
+            }}
+            bottomSheet
+            drawerOnMobile
+          />
+        )
+      }
+    </div >
   );
 };
 
@@ -1177,6 +1206,7 @@ interface MaintenanceScheduleModalProps {
   members: any[];
   onSave: (schedule: Omit<MaintenanceSchedule, 'id'>) => Promise<string | void>;
   drawerOnMobile?: boolean;
+  bottomSheet?: boolean;
 }
 
 const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
@@ -1187,6 +1217,7 @@ const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
   members,
   onSave,
   drawerOnMobile,
+  bottomSheet,
 }) => {
   const [formData, setFormData] = useState({
     itemId: schedule?.itemId || '',
@@ -1212,8 +1243,20 @@ const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={schedule ? 'Edit Maintenance Schedule' : 'Create Maintenance Schedule'} drawerOnMobile={drawerOnMobile}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={schedule ? 'Edit Maintenance Schedule' : 'Create Maintenance Schedule'}
+      bottomSheet={bottomSheet}
+      drawerOnMobile={drawerOnMobile}
+      footer={
+        <div className="flex gap-3">
+          <Button variant="ghost" type="button" onClick={onClose} className="flex-1">Cancel</Button>
+          <Button type="submit" form="maintenance-schedule-form" className="flex-1">Save Schedule</Button>
+        </div>
+      }
+    >
+      <form id="maintenance-schedule-form" onSubmit={handleSubmit} className="space-y-4">
         <Select
           label="Item"
           value={formData.itemId}
@@ -1277,10 +1320,6 @@ const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
           placeholder="Additional notes..."
           rows={3}
         />
-        <div className="flex gap-3 pt-4">
-          <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
-          <Button type="submit" className="flex-1">Save Schedule</Button>
-        </div>
       </form>
     </Modal>
   );

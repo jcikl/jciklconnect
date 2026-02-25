@@ -18,16 +18,36 @@ import { UserRole, Member } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { useCommunication } from '../../hooks/useCommunication';
 import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface BoardDashboardProps {
   onNavigate?: (view: any) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
-export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, searchQuery, onSearchChange }) => {
+export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, searchQuery, onSearchChange, scrollRef }) => {
   const { member, signOut } = useAuth();
+
+  // Header Scroll Animations
+  const { scrollY } = useScroll({ container: scrollRef });
+
+  // Transform Greeting: Move left and fade out via vertical mask
+  const greetingX = useTransform(scrollY, [0, 120], [0, -40]);
+  const greetingOpacity = useTransform(scrollY, [0, 80], [1, 0]);
+
+  // Mask wipe effect: as we scroll, the mask moves down
+  const maskProgress = useTransform(scrollY, [0, 120], [0, 100]);
+  const greetingMask = useTransform(maskProgress, (p) =>
+    `linear-gradient(to bottom, transparent ${p}%, black ${p + 20}%)`
+  );
+
+  // Transform Search Bar: Move up to dock with Top Row
+  // Top Row is ~80px. Greeting area is ~120px. 
+  const searchY = useTransform(scrollY, [0, 120], [0, -110]);
+
   const { notifications } = useCommunication();
   const unreadNotifications = notifications.filter(n => !n.read);
   const { members, loading: membersLoading } = useMembers();
@@ -415,39 +435,53 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     return months;
   }, [currentMonthIndex]);
 
+  // Header Padding animations
+  const headerPaddingTop = useTransform(scrollY, [0, 120], ["2rem", "1rem"]);
+  const headerPaddingBottom = useTransform(scrollY, [0, 120], ["2rem", "1rem"]);
+  const contentGap = useTransform(scrollY, [0, 120], ["2rem", "0.5rem"]);
+
   const renderHeader = () => (
-    <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-8 pb-4 sm:pb-6 lg:pb-8 px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8">
+    <motion.div
+      className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8"
+      style={{
+        paddingTop: headerPaddingTop,
+        paddingBottom: headerPaddingBottom
+      }}
+    >
       {/* Decorative Background Pattern */}
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
       <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 space-y-8">
-        {/* Top Row: Avatar & Status | Notifications */}
-        <div className="flex justify-between items-center">
+      <div className="relative z-10 flex flex-col">
+        {/* Top Row: Fixed/Docked Area */}
+        <motion.div
+          style={{ marginBottom: contentGap }}
+          className="flex justify-between items-center"
+        >
           <div className="flex items-center space-x-3">
             <div className="relative">
               <img
                 src={member?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'Board')}&background=ffffff&color=0097D7`}
                 alt="Avatar"
-                className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
               />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-jci-navy rounded-full"></div>
             </div>
             <div className="cursor-pointer group">
-              <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center space-x-1 text-blue-100 text-base sm:text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
                 <span>{member?.name}</span>
               </div>
-              <p className="font-medium text-sm tracking-wide text-blue-200">Board Member</p>
+              <p className="font-medium text-[10px] sm:text-xs tracking-wide text-blue-200 uppercase">Board Member</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <button
-              className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              className="relative p-2.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
             >
-              <Bell size={20} className="group-hover:rotate-12 transition-transform" />
+              <Bell size={18} className="group-hover:rotate-12 transition-transform" />
               {unreadNotifications.length > 0 && (
-                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
+                <span className="absolute top-1 right-1 min-w-[16px] h-[16px] bg-red-500 rounded-full border-2 border-jci-navy text-[8px] flex items-center justify-center font-black">
                   {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
                 </span>
               )}
@@ -462,50 +496,64 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                   showToast('Failed to logout', 'error');
                 }
               }}
-              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+              className="p-2.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
               title="Sign Out"
             >
-              <LogOut size={20} className="group-hover:scale-110 transition-transform" />
+              <LogOut size={18} className="group-hover:scale-110 transition-transform" />
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Greeting & Quick Summary */}
-        <div className="space-y-3">
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
-            Strategic Overview <br /> for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </h2>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
-              <Users size={16} className="text-blue-200" />
-              <p className="text-sm font-medium text-blue-50">
-                {metrics.totalMembers} Total Members
-              </p>
+        {/* Dynamic Animation Area */}
+        <div className="relative">
+          {/* Greeting: Dissolves and height shrinks */}
+          <motion.div
+            style={{
+              x: greetingX,
+              opacity: greetingOpacity,
+              maskImage: greetingMask,
+              WebkitMaskImage: greetingMask,
+              height: useTransform(scrollY, [0, 80], ["auto", "0px"]),
+              marginBottom: useTransform(scrollY, [0, 80], ["2rem", "0rem"]),
+              overflow: "hidden"
+            }}
+            className="space-y-3"
+          >
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+              Strategic Overview <br /> for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </h2>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-1.5 rounded-2xl border border-white/10 inline-flex shadow-sm">
+                <Users size={14} className="text-blue-200" />
+                <p className="text-xs font-medium text-blue-50">
+                  {metrics.totalMembers} Members
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-1.5 rounded-2xl border border-white/10 inline-flex shadow-sm">
+                <DollarSign size={14} className="text-green-300" />
+                <p className="text-xs font-medium text-blue-50">
+                  {formatCurrency(metrics.totalBankBalance)} Cash
+                </p>
+              </div>
             </div>
-            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
-              <DollarSign size={16} className="text-green-300" />
-              <p className="text-sm font-medium text-blue-50">
-                {formatCurrency(metrics.totalBankBalance)} Cash
-              </p>
-            </div>
-          </div>
-        </div>
+          </motion.div>
 
-        {/* Search Bar */}
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-            <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
+          {/* Search Bar Area */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+              <Search size={18} className="text-white/40 group-focus-within:text-white transition-colors" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search board reports, financials, or members..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="w-full bg-white/10 backdrop-blur-md text-white rounded-2xl py-3 pl-12 pr-4 shadow-xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-sm sm:text-base"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Search board reports, financials, or members..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
-          />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 
   return (
@@ -642,12 +690,13 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
             {/* Financial Overview */}
             {loadingFinance ? (
-              <Card title="Financial Overview" className="mb-6">
+              <Card title="Financial Overview" className="mb-6 p-4">
                 <div className="text-center py-8 text-slate-400 text-sm">Loading financial data...</div>
               </Card>
             ) : financialSummary ? (
               <Card
-                title="Financial Overview" className="mb-6"
+                noPadding
+                title="Financial Overview" className="mb-6 p-4"
                 action={
                   <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
                     <Eye size={18} />

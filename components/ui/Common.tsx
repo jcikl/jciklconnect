@@ -339,13 +339,17 @@ interface ModalProps {
   onClose: () => void;
   title: string | React.ReactNode;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
   /** When false, modal body does not scroll; inner content handles scroll (avoids double scrollbar) */
   scrollInBody?: boolean;
   /** Whether to show as a bottom drawer on mobile */
   drawerOnMobile?: boolean;
+  /** Whether to show as a bottom sheet on all screens */
+  bottomSheet?: boolean;
   /** Visual variant for the modal header */
   variant?: 'default' | 'jci';
+  /** Optional footer content */
+  footer?: React.ReactNode;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -356,7 +360,9 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
   scrollInBody = true,
   drawerOnMobile = false,
-  variant = 'default'
+  bottomSheet = false,
+  variant = 'default',
+  footer
 }) => {
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -386,6 +392,9 @@ export const Modal: React.FC<ModalProps> = ({
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
     '2xl': 'max-w-6xl',
+    '3xl': 'max-w-7xl',
+    '4xl': 'max-w-[1440px]',
+    '5xl': 'max-w-[1600px]',
   };
 
   const modalContent = (
@@ -400,10 +409,12 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         className={`
-          bg-white shadow-2xl w-full overflow-hidden flex flex-col max-h-screen md:max-h-[90vh] md:rounded-xl animate-scale-in
-          ${drawerOnMobile
-            ? 'fixed bottom-0 rounded-t-2xl md:relative md:rounded-xl ' + sizeClasses[size]
-            : 'rounded-xl max-w-[95vw] ' + sizeClasses[size]}
+          bg-white shadow-2xl w-full overflow-hidden flex flex-col max-h-screen md:max-h-[90vh] md:rounded-xl
+          ${(bottomSheet || drawerOnMobile)
+            ? (bottomSheet
+              ? 'fixed bottom-0 rounded-t-2xl md:bottom-4 md:rounded-2xl animate-slide-up ' + sizeClasses[size]
+              : 'fixed bottom-0 rounded-t-2xl md:relative md:rounded-xl animate-slide-up ' + sizeClasses[size])
+            : 'rounded-xl max-w-[95vw] animate-scale-in ' + sizeClasses[size]}
         `}
         style={!drawerOnMobile ? { maxWidth: size === 'sm' ? '448px' : size === 'md' ? '512px' : undefined } : {}}
       >
@@ -413,6 +424,9 @@ export const Modal: React.FC<ModalProps> = ({
             ? 'flex-none bg-gradient-to-r from-jci-blue via-sky-600 to-blue-700 px-6 py-5 text-white shadow-md'
             : 'p-4 border-b border-slate-100 bg-slate-50'}
         `}>
+          {(bottomSheet || drawerOnMobile) && (
+            <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-slate-300 rounded-full md:hidden" />
+          )}
           <div id="modal-title" className={variant === 'jci' ? 'flex-1' : 'font-bold text-slate-800'}>
             {typeof title === 'string' ? (
               <h3 className={variant === 'jci' ? 'text-xl font-bold uppercase tracking-tight' : ''}>{title}</h3>
@@ -436,6 +450,11 @@ export const Modal: React.FC<ModalProps> = ({
         <div className={`p-4 md:p-6 flex-1 min-h-0 flex flex-col ${scrollInBody ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           {children}
         </div>
+        {footer && (
+          <div className="flex-none p-4 border-t border-slate-100 bg-slate-50/50 backdrop-blur-sm">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

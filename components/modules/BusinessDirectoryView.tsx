@@ -18,28 +18,28 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
   const { members } = useMembers(); // Used to find owner name
   const { showToast } = useToast();
 
-  // Map each industry to a unique gradient for the banner background
-  const INDUSTRY_BANNER_MAP: Record<string, { from: string; to: string }> = {
-    'Advertising, Marketing & Media': { from: 'from-pink-200', to: 'to-purple-200' },
-    'Agriculture & Animals': { from: 'from-green-200', to: 'to-emerald-200' },
-    'Architecture, Engineering & Construction': { from: 'from-indigo-200', to: 'to-blue-200' },
-    'Art, Entertainment & Design': { from: 'from-rose-200', to: 'to-orange-200' },
-    'Automotive & Accessories': { from: 'from-gray-200', to: 'to-slate-200' },
-    'Food & Beverages': { from: 'from-yellow-200', to: 'to-amber-200' },
-    'Telecom, AI, Computers & IT': { from: 'from-cyan-200', to: 'to-teal-200' },
-    'Consulting & Professional Services': { from: 'from-purple-200', to: 'to-fuchsia-200' },
-    'Education & Training': { from: 'from-blue-200', to: 'to-sky-200' },
-    'Event & Hospitality': { from: 'from-pink-200', to: 'to-rose-200' },
-    'Crypto, Blockchain, Finance & Insurance': { from: 'from-indigo-200', to: 'to-violet-200' },
-    'Health & Wellness': { from: 'from-red-200', to: 'to-pink-200' },
-    'Legal, HR, Accounting & Tax': { from: 'from-emerald-200', to: 'to-green-200' },
-    'Manufacturing & Supply Chain': { from: 'from-orange-200', to: 'to-amber-200' },
-    'Wholesale, Retail & E-Commerce': { from: 'from-teal-200', to: 'to-cyan-200' },
-    'Personal, Beauty & Sports': { from: 'from-fuchsia-200', to: 'to-pink-200' },
-    'Real Estate & Property Services': { from: 'from-slate-200', to: 'to-gray-200' },
-    'Transport & Logistics': { from: 'from-amber-200', to: 'to-yellow-200' },
-    'Travel & Tourism': { from: 'from-sky-200', to: 'to-blue-200' },
-    'Other': { from: 'from-gray-200', to: 'to-slate-200' },
+  // Map each industry to a unique premium gradient and background image for the banner (referencing premium dashboard header patterns)
+  const INDUSTRY_BANNER_MAP: Record<string, { from: string; to: string; image: string }> = {
+    'Advertising, Marketing & Media': { from: 'from-pink-500', to: 'to-purple-600', image: 'https://images.unsplash.com/photo-1557838923-2985c318be48?auto=format&fit=crop&q=80' },
+    'Agriculture & Animals': { from: 'from-green-500', to: 'to-emerald-600', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80' },
+    'Architecture, Engineering & Construction': { from: 'from-indigo-500', to: 'to-blue-600', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80' },
+    'Art, Entertainment & Design': { from: 'from-rose-500', to: 'to-orange-500', image: 'https://images.unsplash.com/photo-1513364775202-741ef09e5981?auto=format&fit=crop&q=80' },
+    'Automotive & Accessories': { from: 'from-slate-600', to: 'to-gray-800', image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80' },
+    'Food & Beverages': { from: 'from-yellow-500', to: 'to-amber-600', image: 'https://images.unsplash.com/photo-1495195129352-aec329a2d7ea?auto=format&fit=crop&q=80' },
+    'Telecom, AI, Computers & IT': { from: 'from-cyan-500', to: 'to-teal-600', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80' },
+    'Consulting & Professional Services': { from: 'from-purple-500', to: 'to-fuchsia-600', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80' },
+    'Education & Training': { from: 'from-blue-500', to: 'to-sky-600', image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80' },
+    'Event & Hospitality': { from: 'from-pink-500', to: 'to-rose-500', image: 'https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&q=80' },
+    'Crypto, Blockchain, Finance & Insurance': { from: 'from-indigo-600', to: 'to-violet-700', image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80' },
+    'Health & Wellness': { from: 'from-red-500', to: 'to-pink-600', image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80' },
+    'Legal, HR, Accounting & Tax': { from: 'from-emerald-500', to: 'to-green-600', image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80' },
+    'Manufacturing & Supply Chain': { from: 'from-orange-500', to: 'to-amber-600', image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80' },
+    'Wholesale, Retail & E-Commerce': { from: 'from-teal-500', to: 'to-cyan-600', image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80' },
+    'Personal, Beauty & Sports': { from: 'from-fuchsia-500', to: 'to-pink-500', image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80' },
+    'Real Estate & Property Services': { from: 'from-slate-500', to: 'to-gray-600', image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80' },
+    'Transport & Logistics': { from: 'from-amber-500', to: 'to-yellow-600', image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80' },
+    'Travel & Tourism': { from: 'from-sky-500', to: 'to-blue-600', image: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80' },
+    'Other': { from: 'from-jci-navy', to: 'to-jci-blue', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80' },
   };
 
   const uniqueIndustries = useMemo(() => {
@@ -117,13 +117,19 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
                     const owner = members.find(m => m.id === biz.memberId);
                     return (
                       <Card key={biz.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
-                        {/* Industry‑specific banner */}
-                        <div className={`h-24 ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.from ?? 'from-slate-100'} ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.to ?? 'to-slate-200'} bg-gradient-to-r relative`}>
-                          <div className="absolute -bottom-6 left-2 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1">
+                        {/* Industry‑specific banner (Premium Gradient + Decorative Pattern) */}
+                        <div className={`h-24 bg-gradient-to-br ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.from ?? 'from-slate-100'} ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.to ?? 'to-slate-200'} relative`}>
+                          {/* Decorative Background Pattern */}
+                          <div
+                            className="absolute inset-0 bg-cover bg-center opacity-20 mix-blend-overlay"
+                            style={{ backgroundImage: `url('${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.image || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80'}')` }}
+                          ></div>
+
+                          <div className="absolute -bottom-6 left-2 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1 z-10 shadow-sm">
                             <img
                               src={biz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.companyName)}&background=0097D7&color=fff`}
                               alt="Logo"
-                              className="w-full h-full object-cover rounded"
+                              className="w-full h-full z-10 object-cover rounded"
                             />
                           </div>
                           <div className="absolute text-right top-2 right-2 flex flex-col items-end gap-1">

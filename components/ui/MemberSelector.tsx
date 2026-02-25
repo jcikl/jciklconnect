@@ -21,6 +21,7 @@ function matchesSearch(m: Member, q: string): boolean {
     m.email,
     m.phone,
     (m as unknown as Record<string, unknown>).fullName,
+    m.address,
   ]
     .filter(Boolean)
     .map(String)
