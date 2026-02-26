@@ -15,6 +15,7 @@ interface Permission {
   canManageAutomation: boolean;
   canViewReports: boolean;
   canManageSettings: boolean;
+  canApproveClaims: boolean;
 }
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
@@ -29,6 +30,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: false,
     canViewReports: false,
     canManageSettings: false,
+    canApproveClaims: false,
   },
   [UserRole.PROBATION_MEMBER]: {
     canViewMembers: true,
@@ -41,6 +43,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: false,
     canViewReports: false,
     canManageSettings: false,
+    canApproveClaims: false,
   },
   [UserRole.MEMBER]: {
     canViewMembers: true,
@@ -53,6 +56,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: false,
     canViewReports: false,
     canManageSettings: false,
+    canApproveClaims: false,
   },
   [UserRole.BOARD]: {
     canViewMembers: true,
@@ -65,6 +69,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: true,
     canViewReports: true,
     canManageSettings: true,
+    canApproveClaims: true,
   },
   [UserRole.ADMIN]: {
     canViewMembers: true,
@@ -77,6 +82,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: true,
     canViewReports: true,
     canManageSettings: true,
+    canApproveClaims: true,
   },
   [UserRole.ORGANIZATION_SECRETARY]: {
     canViewMembers: true,
@@ -89,6 +95,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: false,
     canViewReports: false,
     canManageSettings: false,
+    canApproveClaims: false,
   },
   [UserRole.ORGANIZATION_FINANCE]: {
     canViewMembers: true,
@@ -101,6 +108,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: false,
     canViewReports: true,
     canManageSettings: false,
+    canApproveClaims: false,
   },
   [UserRole.ACTIVITY_FINANCE]: {
     canViewMembers: true,
@@ -113,6 +121,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageAutomation: false,
     canViewReports: false,
     canManageSettings: false,
+    canApproveClaims: false,
   },
 };
 
@@ -128,23 +137,24 @@ const DEV_MODE_PERMISSIONS: Permission = {
   canManageAutomation: true,
   canViewReports: true,
   canManageSettings: true,
+  canApproveClaims: true,
 };
 
 export const usePermissions = () => {
   const { member, isDevMode: isDevModeFromAuth, simulatedRole } = useAuth();
   const devMode = isDevMode() || isDevModeFromAuth;
-  
+
   const permissions = useMemo(() => {
     // If role is being simulated in dev mode, use that role's permissions
     if (devMode && simulatedRole) {
       return ROLE_PERMISSIONS[simulatedRole] || ROLE_PERMISSIONS[UserRole.MEMBER];
     }
-    
+
     // Developer mode without simulation: grant all permissions
     if (devMode) {
       return DEV_MODE_PERMISSIONS;
     }
-    
+
     if (!member) {
       return ROLE_PERMISSIONS[UserRole.GUEST];
     }
@@ -189,7 +199,7 @@ export const usePermissions = () => {
 
   // Determine effective role (simulated role in dev mode, or actual member role)
   const effectiveRole = devMode && simulatedRole ? simulatedRole : (member?.role || UserRole.GUEST);
-  
+
   return {
     permissions,
     hasPermission,

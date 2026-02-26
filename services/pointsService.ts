@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
-import { Member, MemberTier } from '../types';
+import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 
@@ -95,13 +95,13 @@ export class PointsService {
         amount: points, // Preferred field
         category,
         description: desc,
-        ...(relatedEntityId && { 
+        ...(relatedEntityId && {
           sourceId: relatedEntityId, // Backward compatibility
-          relatedEntityId 
+          relatedEntityId
         }),
-        ...(relatedEntityType && { 
+        ...(relatedEntityType && {
           sourceType: relatedEntityType, // Backward compatibility
-          relatedEntityType 
+          relatedEntityType
         }),
         ...(metadata && { metadata }),
         createdAt: Timestamp.now(),
@@ -131,7 +131,7 @@ export class PointsService {
   ): Promise<string> {
     // Get point rule for event attendance
     const rule = await this.getPointRule(POINT_CATEGORIES.EVENT_ATTENDANCE);
-    
+
     let points = rule?.basePoints || 10; // Default points if no rule found
 
     // Apply multipliers based on event type and rule
@@ -187,17 +187,17 @@ export class PointsService {
   ): Promise<string> {
     // Get point rule for task completion
     const rule = await this.getPointRule(POINT_CATEGORIES.PROJECT_TASK);
-    
+
     let points = rule?.basePoints || 10; // Default points if no rule found
 
     // Apply priority multiplier
-    const priorityMultipliers: Record<string, number> = { 
-      Urgent: 2.0, 
-      High: 1.5, 
-      Medium: 1.0, 
-      Low: 0.5 
+    const priorityMultipliers: Record<string, number> = {
+      Urgent: 2.0,
+      High: 1.5,
+      Medium: 1.0,
+      Low: 0.5
     };
-    
+
     if (rule?.multiplier) {
       points = Math.floor(points * rule.multiplier * (priorityMultipliers[priority] || 1.0));
     } else {
@@ -288,7 +288,7 @@ export class PointsService {
         const data = doc.data() as any;
         const createdAt = data.createdAt?.toDate?.() || data.createdAt;
         const expiresAt = data.expiresAt?.toDate?.();
-        
+
         return {
           id: doc.id,
           memberId: data.memberId,
@@ -612,7 +612,7 @@ export class PointsService {
     // Group points by category
     const pointsByCategory: Record<string, number> = {};
     history.forEach(transaction => {
-      pointsByCategory[transaction.category] = 
+      pointsByCategory[transaction.category] =
         (pointsByCategory[transaction.category] || 0) + transaction.points;
     });
 
@@ -622,6 +622,291 @@ export class PointsService {
       pointsByCategory,
       recentTransactions: history.slice(0, 10),
     };
+  }
+
+  // --- JCI Gamification & Incentive Engine ---
+  private static mockStandards: IncentiveStandard[] = [
+    {
+      id: '2026_OUTREACH_01',
+      programId: '2026_MY',
+      category: 'outreach',
+      order: 1,
+      title: 'Local Organization E-Newsletter',
+      remarks: 'Publish a meaningful E-Newsletter representing the LO.',
+      targetType: 'LO',
+      pointCap: 60,
+      verificationType: 'MANUAL_UPLOAD',
+      milestones: [{
+        id: 'ms_01',
+        label: 'Q1 Submission',
+        points: 20,
+        deadline: '2026-03-31'
+      }]
+    }
+  ];
+
+  // Get active yearly program
+  static async getActiveProgram(): Promise<IncentiveProgram | null> {
+    if (isDevMode()) {
+      return {
+        id: '2026_MY',
+        year: 2026,
+        name: '2026 JCI Malaysia Incentive Program',
+        isActive: true,
+        categories: {
+          efficient: { label: 'Efficient Star', minScore: 100, isFundamental: true },
+          network: { label: 'Network Star', minScore: 250 },
+          experience: { label: 'Experience Star', minScore: 250 },
+          outreach: { label: 'Outreach Star', minScore: 250 },
+          impact: { label: 'Impact Star', minScore: 250 }
+        },
+        specialAwards: [
+          { name: 'Best of the Best', criteria: ['5 Stars', 'Growth > 10%', 'Good Financial'] }
+        ]
+      };
+    }
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.INCENTIVE_PROGRAMS),
+        where('isActive', '==', true),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as IncentiveProgram;
+    } catch (error) {
+      console.error('Error fetching active program:', error);
+      throw error;
+    }
+  }
+
+  // Get all standards for a given program
+  static async getStandards(programId: string): Promise<IncentiveStandard[]> {
+    if (isDevMode()) {
+      return this.mockStandards.filter(s => s.programId === programId);
+    }
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.INCENTIVE_STANDARDS),
+        where('programId', '==', programId),
+        orderBy('order', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as IncentiveStandard);
+    } catch (error) {
+      console.error('Error fetching standards:', error);
+      throw error;
+    }
+  }
+
+  // Submit an incentive claim
+  static async submitIncentiveClaim(
+    claim: Partial<IncentiveSubmission> & { standardId: string; loId: string; quantity: number }
+  ): Promise<string> {
+    if (isDevMode()) {
+      console.log('[DEV MODE] Submitting incentive claim:', claim);
+      return `mock-claim-${Date.now()}`;
+    }
+    try {
+      const submission: Omit<IncentiveSubmission, 'id'> = {
+        standardId: claim.standardId,
+        loId: claim.loId,
+        memberId: claim.memberId,
+        status: claim.status || 'PENDING',
+        evidenceFiles: claim.evidenceFiles || [],
+        evidenceText: claim.evidenceText,
+        quantity: claim.quantity,
+        submittedAt: Timestamp.now() as any, // Firebase deals with it
+        scoreAwarded: claim.scoreAwarded || 0,
+        approvedBy: claim.approvedBy,
+      };
+
+      const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS), submission);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error submitting incentive claim:', error);
+      throw error;
+    }
+  }
+
+  // Fetch submissions by LO
+  static async getLOSubmissions(loId: string): Promise<IncentiveSubmission[]> {
+    if (isDevMode()) return [];
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+        where('loId', '==', loId),
+        orderBy('submittedAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          submittedAt: data.submittedAt?.toDate ? data.submittedAt.toDate().toISOString() : data.submittedAt
+        } as IncentiveSubmission;
+      });
+    } catch (error) {
+      console.error('Error fetching LO submissions:', error);
+      throw error;
+    }
+  }
+
+  // Fetch user submissions
+  static async getUserSubmissions(memberId: string): Promise<IncentiveSubmission[]> {
+    if (isDevMode()) return [];
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+        where('memberId', '==', memberId),
+        orderBy('submittedAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          submittedAt: data.submittedAt?.toDate ? data.submittedAt.toDate().toISOString() : data.submittedAt
+        } as IncentiveSubmission;
+      });
+    } catch (error) {
+      console.error('Error fetching User submissions:', error);
+      throw error;
+    }
+  }
+
+  // Fetch pending submissions for approval
+  static async getPendingSubmissions(): Promise<IncentiveSubmission[]> {
+    if (isDevMode()) return [];
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+        where('status', '==', 'PENDING'),
+        orderBy('submittedAt', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          submittedAt: data.submittedAt?.toDate ? data.submittedAt.toDate().toISOString() : data.submittedAt
+        } as IncentiveSubmission;
+      });
+    } catch (error) {
+      console.error('Error fetching pending submissions:', error);
+      throw error;
+    }
+  }
+
+  // Approve a claim
+  static async approveClaim(submissionId: string, grantedPoints: number, approverId: string): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Approved claim ${submissionId} with ${grantedPoints} points.`);
+      return;
+    }
+    try {
+      await updateDoc(doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId), {
+        status: 'APPROVED',
+        scoreAwarded: grantedPoints,
+        approvedBy: approverId
+      });
+    } catch (error) {
+      console.error('Error approving claim:', error);
+      throw error;
+    }
+  }
+
+  // Reject a claim
+  static async rejectClaim(submissionId: string, reason: string, approverId: string): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Rejected claim ${submissionId}. Reason: ${reason}`);
+      return;
+    }
+    try {
+      await updateDoc(doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId), {
+        status: 'REJECTED',
+        rejectionReason: reason,
+        approvedBy: approverId
+      });
+    } catch (error) {
+      console.error('Error rejecting claim:', error);
+      throw error;
+    }
+  }
+
+  // Create a new incentive program
+  static async createIncentiveProgram(program: Omit<IncentiveProgram, 'id'>): Promise<string> {
+    if (isDevMode()) {
+      console.log('[DEV MODE] Creating incentive program:', program);
+      return 'mock-program-id';
+    }
+    try {
+      const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_PROGRAMS), {
+        ...program,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating incentive program:', error);
+      throw error;
+    }
+  }
+
+  // Save or update an incentive standard
+  static async saveStandard(standard: Omit<IncentiveStandard, 'id'> | IncentiveStandard): Promise<string> {
+    if (isDevMode()) {
+      console.log('[DEV MODE] Saving standard:', standard);
+      const id = 'id' in standard ? standard.id : `mock-std-${Date.now()}`;
+      const newStd = { ...standard, id } as IncentiveStandard;
+
+      const index = this.mockStandards.findIndex(s => s.id === id);
+      if (index >= 0) {
+        this.mockStandards[index] = newStd;
+      } else {
+        this.mockStandards.push(newStd);
+      }
+      return id;
+    }
+    try {
+      const { id, ...data } = standard as any;
+      if (id) {
+        await updateDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id), {
+          ...data,
+          updatedAt: Timestamp.now()
+        });
+        return id;
+      } else {
+        const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_STANDARDS), {
+          ...data,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+        return docRef.id;
+      }
+    } catch (error) {
+      console.error('Error saving incentive standard:', error);
+      throw error;
+    }
+  }
+
+  // Delete an incentive standard
+  static async deleteStandard(id: string): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Deleting standard ${id}`);
+      return;
+    }
+    try {
+      // We physically delete standards as they are configuration items
+      const { deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id));
+    } catch (error) {
+      console.error('Error deleting incentive standard:', error);
+      throw error;
+    }
   }
 }
 

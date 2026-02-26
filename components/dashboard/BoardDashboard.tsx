@@ -555,62 +555,62 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
           <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm bg-blue-50 text-jci-blue border-blue-100 group-hover:bg-blue-100`}>
             <Calendar size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Events Mgmt</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Projects</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('SURVEYS')}>
           <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 group-hover:bg-rose-100 transition-colors shadow-sm">
             <CheckSquare size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Survey View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Surveys</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('MEMBERS')}>
           <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100 group-hover:bg-purple-100 transition-colors shadow-sm">
             <Users size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Members View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Members</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('INVENTORY')}>
           <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 group-hover:bg-amber-100 transition-colors shadow-sm">
             <Package size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Inventory View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Inventories</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('EVENTS')}>
           <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600 border border-green-100 group-hover:bg-green-100 transition-colors shadow-sm">
             <Zap size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Event View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Calendar</span>
         </div>
 
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('COMMUNICATION')}>
           <div className="w-12 h-12 rounded-full bg-sky-50 flex items-center justify-center text-sky-600 border border-sky-100 group-hover:bg-sky-100 transition-colors shadow-sm">
             <Activity size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Comm View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Communication</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('KNOWLEDGE')}>
           <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 group-hover:bg-indigo-100 transition-colors shadow-sm">
             <BookOpen size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Knowledge View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Knowledge</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('CLUBS')}>
           <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 border border-pink-100 group-hover:bg-pink-100 transition-colors shadow-sm">
             <Heart size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Hobby View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Hobbies</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('FINANCE')}>
           <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:bg-emerald-100 transition-colors shadow-sm">
             <DollarSign size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Finance View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Finance</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('GAMIFICATION')}>
           <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-600 border border-orange-100 group-hover:bg-orange-100 transition-colors shadow-sm">
             <Target size={24} />
           </div>
-          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Gamify View</span>
+          <span className="text-[10px] sm:text-xs font-medium text-slate-600 text-center">Gamify</span>
         </div>
       </div>
 

@@ -89,6 +89,8 @@ export interface BatchImportConfig {
   sampleData?: string[][];
   /** 导入函数（处理单条数据） */
   importer: (row: Partial<any>, context?: ImportContext) => Promise<void>;
+  /** 批量导入函数（如果提供，则优先使用此函数处理所有有效行） */
+  batchImporter?: (rows: Partial<any>[], context?: ImportContext, onProgress?: (current: number, total: number) => void) => Promise<void>;
   /** 导入成功后的回调 */
   onSuccess?: () => void;
   /** 行后处理器，用于在验证后标记这行是新增还是更新等 */

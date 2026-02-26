@@ -29,68 +29,57 @@ export interface Badge {
   earnedDate?: string;
 }
 
-// Enhanced Badge System Types (from design document)
-export interface BadgeCriteria {
-  type: 'event_attendance' | 'project_completion' | 'points_threshold' | 'custom';
-  threshold: number;
-  conditions: Record<string, any>;
-}
-
-export interface BadgeAward {
-  id: string;
-  badgeId: string;
-  memberId: string;
-  awardedAt: Date;
-  awardedBy?: string; // for manual awards
-}
-
-export interface Achievement {
+export interface AwardDefinition {
   id?: string;
   name: string;
   description: string;
-  icon: string; // Icon name or emoji
+  icon: string;
   category: 'Event' | 'Project' | 'Leadership' | 'Training' | 'Recruitment' | 'Social' | 'Milestone' | 'Special';
-  tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
-  pointsReward: number;
-  criteria: AchievementCriteria;
+  tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Legendary';
+  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary';
+  pointsReward: number; // Points awarded when fully completed/earned
+  criteria: AwardCriteria;
+  milestones?: AwardMilestone[];
   active: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  // Enhanced with milestones from design document
-  milestones?: AchievementMilestone[];
+  createdAt?: any;
+  updatedAt?: any;
 }
 
-export interface AchievementMilestone {
+export interface AwardCriteria {
+  type: 'points_threshold' | 'event_count' | 'project_count' | 'consecutive_attendance' | 'role_held' | 'training_completed' | 'recruitment_count' | 'custom' | 'event_attendance' | 'project_completion';
+  value: number; // Threshold value
+  timeframe?: 'lifetime' | 'monthly' | 'quarterly' | 'yearly';
+  conditions?: Record<string, any>;
+  description?: string;
+}
+
+export interface AwardMilestone {
   level: string; // e.g., "Bronze", "Silver", "Gold"
   threshold: number;
   pointValue: number;
-  reward?: string;
+  reward?: string; // Optional message or badge variation
 }
 
-export interface MemberAchievementProgress {
-  memberId: string;
-  achievementId: string;
-  currentProgress: number;
-  completedMilestones: string[];
-  lastUpdated: Date;
-}
-
-export interface AchievementCriteria {
-  type: 'points_threshold' | 'event_count' | 'project_count' | 'consecutive_attendance' | 'role_held' | 'training_completed' | 'recruitment_count' | 'custom';
-  value: number; // Threshold value
-  timeframe?: 'lifetime' | 'monthly' | 'quarterly' | 'yearly'; // For time-based achievements
-  conditions?: Record<string, any>; // Additional conditions
-  description?: string; // Optional description of the criteria
-}
-
-export interface AchievementAward {
+export interface MemberAward {
   id?: string;
-  achievementId: string;
+  awardId: string;
   memberId: string;
-  earnedAt: string;
-  progress?: number; // Progress percentage (0-100) if achievement is in progress
-  metadata?: Record<string, any>; // Additional data about the award
+  earnedAt: any; // Date | Timestamp | string
+  progress?: number; // Current progress value
+  completedMilestones?: string[];
+  awardedBy?: string; // For manual awards
+  reason?: string;
+  metadata?: Record<string, any>;
 }
+
+// For backward compatibility while refactoring
+export type Achievement = AwardDefinition;
+export type BadgeDefinition = AwardDefinition;
+export type AchievementAward = MemberAward;
+export type BadgeAward = MemberAward;
+export type AchievementCriteria = AwardCriteria;
+export type AchievementMilestone = AwardMilestone;
+export type MemberAchievementProgress = MemberAward;
 
 // Points Rule Configuration Types
 export interface PointsRule {
@@ -170,6 +159,90 @@ export interface PointsRuleAnalytics {
     trigger: string;
     count: number;
   }>;
+}
+
+// JCI Gamification & Incentive Program Interfaces
+export interface IncentiveProgram {
+  id: string; // e.g., "2026_MY"
+  year: number; // e.g. 2026
+  name: string;
+  isActive: boolean;
+  categories: Record<string, { label: string; minScore: number; isFundamental?: boolean }>;
+  specialAwards: Array<{ name: string; criteria: string[] }>;
+}
+
+export enum IncentiveLogicId {
+  // Efficient Star logics
+  EFFICIENT_MEMBERSHIP_CONVERSION = 'EFFICIENT_MEMBERSHIP_CONVERSION',
+  EFFICIENT_DUES_PAYMENT = 'EFFICIENT_DUES_PAYMENT',
+  EFFICIENT_BOD_MEETINGS = 'EFFICIENT_BOD_MEETINGS',
+  EFFICIENT_MEMBERSHIP_GROWTH = 'EFFICIENT_MEMBERSHIP_GROWTH',
+
+  // Network Star logics
+  NETWORK_EVENT_ATTENDANCE = 'NETWORK_EVENT_ATTENDANCE',
+  NETWORK_HOSTING_RIGHTS = 'NETWORK_HOSTING_RIGHTS',
+
+  // Experience Star logics
+  EXPERIENCE_FIRST_YEAR = 'EXPERIENCE_FIRST_YEAR',
+  EXPERIENCE_TRAINER_GROOMING = 'EXPERIENCE_TRAINER_GROOMING',
+
+  // Impact Star logics
+  IMPACT_GMM_FREQUENCY = 'IMPACT_GMM_FREQUENCY',
+  IMPACT_MENTOR_MATCH = 'IMPACT_MENTOR_MATCH'
+}
+
+export interface IncentiveMilestone {
+  id: string;
+  label: string;
+  points: number;
+  deadline?: string;
+  logicThreshold?: number; // For automation, e.g., 0.6 for 60%
+  activityType?: string; // Linked activity type for auto calculation
+  minParticipants?: number; // Requirement for min activity attendees
+}
+
+export interface IncentiveStandard {
+  id: string; // e.g., "2026_EFFICIENT_01"
+  programId: string; // e.g., "2026_MY"
+  category: string; // e.g., "efficient" | "network" | "experience" | "outreach" | "impact"
+  order: number;
+  title: string;
+  remarks?: string; // Additional detailed explanation
+  targetType: 'LO' | 'MEMBER';
+  pointCap?: number;
+  verificationType: 'AUTO_SYSTEM' | 'MANUAL_UPLOAD' | 'HYBRID';
+  autoTriggerEvent?: string;
+  autoLogicId?: IncentiveLogicId; // Linked calculation logic
+  logicParams?: Record<string, any>; // Parameters for the logic (e.g., target percentage)
+  evidenceRequirements?: string[];
+  milestones?: IncentiveMilestone[];
+  isTiered?: boolean; // If true, only the highest achieved milestone counts (e.g., 8 meetings). If false, milestones are additive (e.g., AGM + ROY).
+}
+
+export interface IncentiveSubmission {
+  id: string;
+  standardId: string;
+  milestoneId?: string; // Optional: Links to a specific milestone ID if applicable
+  loId: string;
+  memberId?: string;
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  evidenceFiles: string[];
+  evidenceText?: string;
+  quantity: number;
+  submittedAt: string;
+  scoreAwarded: number;
+  approvedBy?: string;
+  rejectionReason?: string;
+}
+
+export interface LOStarProgress {
+  loId: string;
+  year: number;
+  categories: Record<string, { current: number; total: number; stars: number }>;
+  details: Record<string, boolean | number>;
+  totalPoints: number;
+  starsUnlocked: number;
+  lastUpdated: string;
 }
 
 export interface CareerMilestone {

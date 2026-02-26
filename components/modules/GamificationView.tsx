@@ -5,16 +5,18 @@ import { Input, Select } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { usePoints } from '../../hooks/usePoints';
 import { useAuth } from '../../hooks/useAuth';
-import { useAchievements } from '../../hooks/useAchievements';
-import { PointsService } from '../../services/pointsService';
 import { POINT_CATEGORIES } from '../../config/constants';
-import { PointRulesConfig } from './PointRulesConfig';
-import { BadgeManagementView } from './BadgeManagementView';
-import { BadgeProgressTracker } from './BadgeProgressTracker';
-import { AchievementManagementView } from './AchievementManagementView';
-import { BehavioralNudgingConfig } from './BehavioralNudgingConfig';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useBadges } from '../../hooks/useBadges';
+import { useGamification } from '../../hooks/useGamification';
+import { PointsService } from '../../services/pointsService';
+import { formatDate } from '../../utils/dateUtils';
+import { LOStarDashboard } from './LOStarDashboard';
+import { SubmitEvidenceView } from './SubmitEvidenceView';
+import { ApprovalWorkspaceView } from './ApprovalWorkspaceView';
+import { IncentiveProgramManager } from './IncentiveProgramManager';
+import { BehavioralNudgingConfig } from './BehavioralNudgingConfig';
+import { BadgeProgressTracker } from './BadgeProgressTracker';
+import { AwardsView } from './AwardsView';
 
 export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -23,9 +25,12 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
   const [isVisibilityModalOpen, setVisibilityModalOpen] = useState(false);
   const { member } = useAuth();
   const { hasPermission, isAdmin, isBoard } = usePermissions();
-  const { leaderboard, pointHistory, loading, error, loadLeaderboard } = usePoints();
-  const { memberAchievements, loading: achievementsLoading, loadMemberAchievements } = useAchievements();
-  const { badges, memberBadges } = useBadges();
+  const { leaderboard, loading, error, loadLeaderboard } = usePoints();
+  const {
+    awards,
+    memberAwards,
+    loading: gamificationLoading
+  } = useGamification(member?.id);
   const { showToast } = useToast();
 
   const filteredLeaderboard = useMemo(() => {
@@ -48,13 +53,6 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
     }
   }, [member]);
 
-  // Load member achievements when component mounts
-  React.useEffect(() => {
-    if (member && activeTab === 'overview') {
-      loadMemberAchievements(member.id);
-    }
-  }, [member, activeTab]);
-
   const handleUpdateVisibility = async (visibility: 'public' | 'members_only' | 'private') => {
     if (!member) return;
 
@@ -63,7 +61,6 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
       setLeaderboardVisibility(visibility);
       setVisibilityModalOpen(false);
       showToast('Leaderboard visibility updated', 'success');
-      // Reload leaderboard with new visibility
       await loadLeaderboard(50);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update visibility';
@@ -84,7 +81,6 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
     const amount = formData.get('amount') ? parseInt(formData.get('amount') as string) : 50;
 
     try {
-      // Award points for external activity
       await PointsService.awardPoints(
         member.id,
         category as string,
@@ -95,7 +91,7 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
       );
 
       await loadLeaderboard();
-      showToast('Activity submitted for verification (+50 pts pending)', 'success');
+      showToast('Activity submitted (+50 pts pending)', 'success');
       setLogModalOpen(false);
       e.currentTarget.reset();
     } catch (err) {
@@ -104,52 +100,53 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
     }
   }
 
-  // Check if user can manage point rules (admin or board members)
-  // Admin and board members can manage point rules
   const canManagePoints = isAdmin || isBoard || (hasPermission && hasPermission('canManageSettings'));
+  const canApprove = (hasPermission && hasPermission('canApproveClaims')) || isAdmin || isBoard;
 
-  const tabs = canManagePoints
-    ? ['overview', 'badges', 'achievements', 'rules', 'nudging']
-    : ['overview', 'badges', 'achievements'];
+  const availableTabs = [
+    { id: 'overview', label: 'My Profile' },
+    { id: 'lo_star', label: 'LO Star Rating' },
+    { id: 'submit_evidence', label: 'Submit Evidence' },
+    { id: 'awards', label: 'Awards' },
+  ];
+
+  if (canManagePoints) {
+    availableTabs.push({ id: 'rules', label: 'Program Config' });
+    availableTabs.push({ id: 'nudging', label: 'Behavioral Nudging' });
+  }
+
+  if (canApprove) {
+    availableTabs.push({ id: 'approvals', label: 'Approvals' });
+  }
+
+  const tabLabels = availableTabs.map(t => t.label);
+  const getTabLabel = (id: string) => availableTabs.find(t => t.id === id)?.label || 'My Profile';
+  const getTabId = (label: string) => availableTabs.find(t => t.label === label)?.id || 'overview';
 
   return (
     <div className="space-y-6">
-      {tabs.length > 1 && (
+      {availableTabs.length > 1 && (
         <Tabs
-          tabs={tabs.map(t =>
-            t === 'overview' ? 'Overview' :
-              t === 'badges' ? 'Badges' :
-                t === 'achievements' ? 'Achievements' :
-                  t === 'rules' ? 'Point Rules' :
-                    'Behavioral Nudging'
-          )}
-          activeTab={
-            activeTab === 'overview' ? 'Overview' :
-              activeTab === 'badges' ? 'Badges' :
-                activeTab === 'achievements' ? 'Achievements' :
-                  activeTab === 'rules' ? 'Point Rules' :
-                    'Behavioral Nudging'
-          }
-          onTabChange={(tab) => {
-            if (tab === 'Overview') setActiveTab('overview');
-            else if (tab === 'Badges') setActiveTab('badges');
-            else if (tab === 'Achievements') setActiveTab('achievements');
-            else if (tab === 'Point Rules') setActiveTab('rules');
-            else if (tab === 'Behavioral Nudging') setActiveTab('nudging');
-          }}
+          tabs={tabLabels}
+          activeTab={getTabLabel(activeTab)}
+          onTabChange={(tab) => setActiveTab(getTabId(tab))}
         />
       )}
 
       {activeTab === 'rules' ? (
-        <PointRulesConfig />
-      ) : activeTab === 'badges' ? (
-        <BadgeManagementView searchQuery={searchQuery} />
-      ) : activeTab === 'achievements' ? (
-        <AchievementManagementView searchQuery={searchQuery} />
+        <IncentiveProgramManager />
+      ) : activeTab === 'approvals' ? (
+        <ApprovalWorkspaceView />
+      ) : activeTab === 'lo_star' ? (
+        <LOStarDashboard />
+      ) : activeTab === 'submit_evidence' ? (
+        <SubmitEvidenceView />
+      ) : activeTab === 'awards' ? (
+        <AwardsView searchQuery={searchQuery} />
       ) : activeTab === 'nudging' ? (
         <BehavioralNudgingConfig />
       ) : (
-        <>
+        <LoadingState loading={gamificationLoading} empty={false}>
           {/* Hero Section */}
           <div className="relative rounded-2xl bg-gradient-to-r from-indigo-600 to-jci-blue text-white p-8 overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-10">
@@ -185,91 +182,87 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
           </div>
 
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Badges & Achievements */}
             <div className="lg:col-span-2 space-y-6">
-              <Card title="My Badges">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {member?.badges?.map(badge => (
-                    <div key={badge.id} className="flex flex-col items-center text-center p-4 rounded-xl bg-slate-50 border border-slate-100 hover:shadow-md transition-all group">
-                      <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300 filter drop-shadow-sm">{badge.icon}</div>
-                      <h4 className="font-bold text-slate-900 text-sm">{badge.name}</h4>
-                      <p className="text-xs text-slate-500 mt-1">{badge.description}</p>
-                    </div>
-                  ))}
-                  {/* Locked Badge Placeholder */}
-                  <div className="flex flex-col items-center text-center p-4 rounded-xl border border-dashed border-slate-200 opacity-60 grayscale">
-                    <div className="text-4xl mb-3">🌍</div>
-                    <h4 className="font-bold text-slate-900 text-sm">Global Citizen</h4>
-                    <p className="text-xs text-slate-500 mt-1">Attend 1 Intl Event</p>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Badge Progress Tracker */}
-              {member && (
-                <BadgeProgressTracker
-                  member={member}
-                  availableBadges={badges}
-                  earnedBadgeIds={memberBadges.map(mb => mb.id!)}
-                />
-              )}
-
-              <Card title="My Achievements">
-                {achievementsLoading ? (
-                  <div className="text-center py-8 text-slate-400">Loading achievements...</div>
-                ) : memberAchievements.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <Award className="mx-auto mb-2 text-slate-300" size={32} />
-                    <p className="text-sm">No achievements earned yet</p>
-                    <p className="text-xs text-slate-400 mt-1">Complete activities to unlock achievements!</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {memberAchievements.slice(0, 6).map(achievement => (
-                      <div key={achievement.id} className="flex flex-col items-center text-center p-4 rounded-xl bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200 hover:shadow-lg transition-all group">
-                        <div className="text-5xl mb-3 group-hover:scale-110 transition-transform duration-300 filter drop-shadow-md">
-                          {achievement.achievement?.icon || '🏆'}
-                        </div>
-                        <h4 className="font-bold text-slate-900 text-sm mb-1">{achievement.achievement?.name || 'Achievement'}</h4>
-                        <p className="text-xs text-slate-600 mb-2 line-clamp-2">{achievement.achievement?.description || ''}</p>
-                        <Badge variant="success" className="text-xs">
-                          {achievement.achievement?.tier || 'Bronze'}
-                        </Badge>
-                        {achievement.earnedAt && (
-                          <p className="text-xs text-slate-400 mt-2">
-                            Earned {new Date(achievement.earnedAt).toLocaleDateString()}
-                          </p>
-                        )}
+              <Card title="My Awards">
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {memberAwards.filter(a => a.isEarned).map(award => (
+                      <div key={award.id} className="flex flex-col items-center text-center p-4 rounded-xl bg-slate-50 border border-slate-100 hover:shadow-md transition-all group">
+                        <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300 filter drop-shadow-sm">{award.icon}</div>
+                        <h4 className="font-bold text-slate-900 text-sm">{award.name}</h4>
+                        <Badge variant="jci" className="text-[10px] mt-1">{award.category}</Badge>
                       </div>
                     ))}
-                  </div>
-                )}
-              </Card>
 
-              <Card title="Achievement Progress">
-                <div className="space-y-4">
-                  {memberAchievements.filter(a => a.progress !== undefined && a.progress !== null && a.progress < 100).slice(0, 3).map(achievement => (
-                    <div key={achievement.id}>
-                      <div className="flex justify-between mb-1">
-                        <span className="font-medium text-slate-800 text-sm">{achievement.achievement?.name}</span>
-                        <span className="text-xs text-slate-500">{achievement.progress || 0}%</span>
+                    {memberAwards.filter(a => a.isEarned).length === 0 && (
+                      <div className="col-span-full py-8 text-center text-slate-400">
+                        <Award className="mx-auto mb-2 opacity-20" size={48} />
+                        <p>No awards earned yet. Start your journey!</p>
                       </div>
-                      <ProgressBar progress={achievement.progress || 0} color="bg-indigo-500" />
-                      <p className="text-xs text-slate-400 mt-1">
-                        {achievement.achievement?.description || ''}
-                      </p>
-                    </div>
-                  ))}
-                  {memberAchievements.filter(a => a.progress !== undefined && a.progress !== null && a.progress < 100).length === 0 && (
-                    <div className="text-center py-4 text-slate-400 text-sm">
-                      All active achievements completed!
+                    )}
+                  </div>
+
+                  {memberAwards.filter(a => a.isEarned).length > 0 && (
+                    <div className="border-t border-slate-100 pt-4">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Recent Recognition</h4>
+                      <div className="space-y-2">
+                        {memberAwards.filter(a => a.isEarned).sort((a, b) => {
+                          const timeA = new Date(a.earnedAt?.toDate?.() || a.earnedAt || 0).getTime();
+                          const timeB = new Date(b.earnedAt?.toDate?.() || b.earnedAt || 0).getTime();
+                          return timeB - timeA;
+                        }).slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-slate-50">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{item.icon}</span>
+                              <div>
+                                <span className="font-medium text-slate-700">{item.name}</span>
+                                <span className="text-[10px] text-slate-400 ml-2 uppercase">{item.category}</span>
+                              </div>
+                            </div>
+                            <span className="text-xs text-slate-400">{formatDate(item.earnedAt)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               </Card>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <Card title="Progress to Awards">
+                  {member && (
+                    <BadgeProgressTracker
+                      member={member}
+                      availableBadges={awards}
+                      earnedBadgeIds={memberAwards.filter(a => a.isEarned).map(a => a.id!)}
+                    />
+                  )}
+                </Card>
+
+                <Card title="Top Achievements In Progress">
+                  <div className="space-y-4">
+                    {memberAwards.filter(a => !a.isEarned && (a.progress || 0) > 0).slice(0, 3).map(award => {
+                      const percent = award.progress || 0;
+                      return (
+                        <div key={award.id}>
+                          <div className="flex justify-between mb-1">
+                            <span className="font-medium text-slate-800 text-sm">{award.name}</span>
+                            <span className="text-xs text-slate-500">{percent}%</span>
+                          </div>
+                          <ProgressBar progress={percent} color="bg-jci-blue" />
+                        </div>
+                      );
+                    })}
+                    {memberAwards.filter(a => !a.isEarned && (a.progress || 0) > 0).length === 0 && (
+                      <div className="text-center py-4 text-slate-400 text-sm">
+                        Keep moving to see progress!
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </div>
             </div>
 
-            {/* Leaderboard */}
             <Card
               title={
                 <div className="flex items-center justify-between w-full">
@@ -316,7 +309,6 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
               <Button variant="outline" className="w-full mt-4 text-sm">View Full Ranking</Button>
             </Card>
 
-            {/* Leaderboard Visibility Settings Modal */}
             <Modal
               isOpen={isVisibilityModalOpen}
               onClose={() => setVisibilityModalOpen(false)}
@@ -405,7 +397,7 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
               </div>
             </form>
           </Modal>
-        </>
+        </LoadingState>
       )}
     </div>
   );

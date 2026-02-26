@@ -238,29 +238,38 @@ export const BatchImportModal: React.FC<Props> = ({
     let failureCount = 0;
 
     try {
-      // Process in chunks of 10 for better performance and stability
-      const CHUNK_SIZE = 10;
-      const results: { success: boolean }[] = [];
-
-      for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
-        const chunk = validRows.slice(i, i + CHUNK_SIZE);
-        const chunkResults = await Promise.all(
-          chunk.map(async (row) => {
-            try {
-              await config.importer(row.parsed, context);
-              return { success: true };
-            } catch (err) {
-              console.error(`Failed to import row ${row.index}:`, err);
-              return { success: false };
-            }
-          })
+      if (config.batchImporter) {
+        await config.batchImporter(
+          validRows.map(r => r.parsed),
+          context,
+          (current, total) => setImportProgress({ current, total })
         );
-        results.push(...chunkResults);
-        setImportProgress(prev => prev ? { ...prev, current: Math.min(prev.current + chunk.length, prev.total) } : null);
-      }
+        successCount = validRows.length;
+      } else {
+        // Process in chunks of 10 for better performance and stability
+        const CHUNK_SIZE = 10;
+        const results: { success: boolean }[] = [];
 
-      successCount = results.filter(r => r.success).length;
-      failureCount = results.filter(r => !r.success).length;
+        for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
+          const chunk = validRows.slice(i, i + CHUNK_SIZE);
+          const chunkResults = await Promise.all(
+            chunk.map(async (row) => {
+              try {
+                await config.importer(row.parsed, context);
+                return { success: true };
+              } catch (err) {
+                console.error(`Failed to import row ${row.index}:`, err);
+                return { success: false };
+              }
+            })
+          );
+          results.push(...chunkResults);
+          setImportProgress(prev => prev ? { ...prev, current: Math.min(prev.current + chunk.length, prev.total) } : null);
+        }
+
+        successCount = results.filter(r => r.success).length;
+        failureCount = results.filter(r => !r.success).length;
+      }
 
       showToast(
         `Import completed: ${successCount} success${failureCount > 0 ? `, ${failureCount} failed` : ''}`,

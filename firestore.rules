@@ -598,9 +598,7 @@ service cloud.firestore {
     
     // Behavioral nudging: nudge rules (Gamification — Behavioral Nudging config)
     match /nudgeRules/{docId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow read: if isMember();
       allow create, update, delete: if isBoard();
     }
     
@@ -614,7 +612,33 @@ service cloud.firestore {
     match /paymentRequests/{docId} {
       allow read, create, update, delete: if isMember();
     }
-    
+
+    // JCI Gamification & LO Star Rating (New)
+    match /incentivePrograms/{programId} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard();
+    }
+
+    match /incentiveStandards/{standardId} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard();
+    }
+
+    match /incentiveSubmissions/{submissionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.memberId == request.auth.uid || 
+        resource.data.loId == getMyLoId() ||
+        isBoard()
+      );
+      allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
+      allow update, delete: if isBoard();
+    }
+
+    match /loStarProgress/{progressId} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

@@ -60,6 +60,11 @@ export const COLLECTIONS = {
   /** 非会员留资（Story 9.1） */
   NON_MEMBER_LEADS: 'nonMemberLeads',
   STOCK_MOVEMENTS: 'stock_movements',
+  /** JCI Gamification refactoring */
+  INCENTIVE_PROGRAMS: 'incentivePrograms',
+  INCENTIVE_STANDARDS: 'incentiveStandards',
+  INCENTIVE_SUBMISSIONS: 'incentiveSubmissions',
+  LO_STAR_PROGRESS: 'loStarProgress',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */
