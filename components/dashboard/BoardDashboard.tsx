@@ -440,13 +440,13 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-4 sm:pb-6 lg:pb-8"
     >
       {/* Decorative Background Pattern */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
       </div>
 
       {/* Top Row: Fixed/Docked Area */}
-      <div className="sticky top-[0rem] z-20 w-full  pb-2">
+      <div className="sticky top-[0rem] z-20 pb-2">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-3">
             <div className="relative group">
@@ -633,7 +633,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
         {activeTab === 'overview' && (
           <>
             {/* Member Metrics Row */}
-            <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="min-w-0">
                 <StatCard
                   title="Total Members"
@@ -656,7 +656,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             </div>
 
             {/* Activity Metrics Row */}
-            <div className="grid grid-cols-2 gap-4 md:gap-6 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="min-w-0">
                 <StatCard
                   title="Upcoming Events"
@@ -685,7 +685,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             ) : financialSummary ? (
               <Card
                 noPadding
-                className="p-4"
+                className="p-4 mb-4"
                 title="Financial Overview"
                 action={
                   <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
@@ -693,7 +693,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                   </Button>
                 }
               >
-                <div className="grid grid-cols-2 gap-4 md:gap-6 mb-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="min-w-0 bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
                     <div className="flex items-center justify-between mb-1 md:mb-2">
                       <span className="text-xs md:text-sm font-medium text-green-700 truncate">Total Income</span>
@@ -726,11 +726,11 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             ) : null}
 
             {/* Main Content Grid */}
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-6">
                 {/* Member Engagement */}
                 <Card noPadding className="p-4" title="Member Engagement Metrics" >
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                         <div>
@@ -830,7 +830,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 </Card>
 
                 {/* Additional Metrics Grid */}
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-2 gap-4">
                   {/* Inventory Status */}
                   <Card
                     noPadding className="p-4"
@@ -1175,12 +1175,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
         {activeTab === 'analytics' && (
           <div className="space-y-6">
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-2 gap-4">
               <MemberGrowthChart members={members} />
               <PointsDistributionChart pointHistory={pointHistory} />
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-2 gap-4">
               <Card title="Engagement Trends">
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={engagementTrendData}>
@@ -1388,7 +1388,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             </Card>
 
             {/* Monthly Birthday Grid */}
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               {rotatedMonths.map((month) => {
                 const monthMembers = memberInsightsGroups[month.index];
                 if (monthMembers.length === 0 && !insightSearch && duesStatusFilter === 'All') {

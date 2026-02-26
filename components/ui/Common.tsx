@@ -213,7 +213,7 @@ export const StatCard: React.FC<{
 );
 
 export const StatCardsContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-6 ${className}`}>
+  <div className={`grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-4 ${className}`}>
     {React.Children.map(children, (child) => (
       <div className="w-full">
         {child}
