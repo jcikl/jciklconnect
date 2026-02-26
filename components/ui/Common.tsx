@@ -350,6 +350,8 @@ interface ModalProps {
   variant?: 'default' | 'jci';
   /** Optional footer content */
   footer?: React.ReactNode;
+  /** Optional header content */
+  header?: React.ReactNode;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -362,7 +364,8 @@ export const Modal: React.FC<ModalProps> = ({
   drawerOnMobile = false,
   bottomSheet = false,
   variant = 'default',
-  footer
+  footer,
+  header,
 }) => {
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {

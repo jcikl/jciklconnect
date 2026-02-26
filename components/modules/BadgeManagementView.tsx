@@ -281,6 +281,7 @@ export const BadgeManagementView: React.FC<{ searchQuery?: string }> = ({ search
       {/* Create Badge Modal */}
       {canManage && (
         <Modal
+          isOpen={isCreateModalOpen}
           onClose={() => setCreateModalOpen(false)}
           title="Create Badge"
           size="lg"

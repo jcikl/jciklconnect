@@ -35,8 +35,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   const { scrollY } = useScroll({ container: scrollRef });
 
   // Transform Greeting: Move left and fade out via vertical mask
-  const greetingX = useTransform(scrollY, [0, 120], [0, -40]);
-  const greetingOpacity = useTransform(scrollY, [0, 80], [1, 0]);
+  const greetingX = useTransform(scrollY, [0, 120], [0, 120]);
+  const greetingOpacity = useTransform(scrollY, [0, 120], [1, 0]);
 
   // Mask wipe effect: as we scroll, the mask moves down
   const maskProgress = useTransform(scrollY, [0, 120], [0, 100]);
@@ -436,21 +436,20 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   }, [currentMonthIndex]);
 
   const renderHeader = () => (
-    <motion.div
-      style={{ y: headerY }}
-      className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8"
+    <div
+      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-4 sm:pb-6 lg:pb-8"
     >
       {/* Decorative Background Pattern */}
-      <motion.div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-      </motion.div>
+      </div>
 
-      <div className="relative z-10 pt-4 pb-4 sm:pb-6 lg:pb-8">
-        {/* Top Row: Fixed/Docked Area (Counter-animated to stay fixed) */}
-        <motion.div style={{ y: counterY }} className="flex justify-between items-center mb-4">
+      {/* Top Row: Fixed/Docked Area */}
+      <div className="sticky top-[0rem] z-20 w-full  pb-2">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-3">
-            <div className="relative">
+            <div className="relative group">
               <img
                 src={member?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'Board')}&background=ffffff&color=0097D7`}
                 alt="Avatar"
@@ -493,56 +492,57 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
               <LogOut size={20} className="group-hover:scale-110 transition-transform" />
             </button>
           </div>
-        </motion.div>
-
-        {/* Dynamic Animation Area */}
-        <div className="relative">
-          {/* Greeting: Dissolves into the top row as we scroll */}
-          <motion.div
-            style={{
-              y: counterY,
-              x: greetingX,
-              opacity: greetingOpacity,
-              maskImage: greetingMask,
-              WebkitMaskImage: greetingMask
-            }}
-            className="space-y-3 mb-4"
-          >
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
-              Strategic Overview <br /> for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </h2>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
-                <Users size={16} className="text-blue-200" />
-                <p className="text-sm font-medium text-blue-50">
-                  {metrics.totalMembers} Total Members
-                </p>
-              </div>
-              <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
-                <DollarSign size={16} className="text-green-300" />
-                <p className="text-sm font-medium text-blue-50">
-                  {formatCurrency(metrics.totalBankBalance)} Cash
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Search Bar: Slides up to join the Top Row */}
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-              <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search board reports, financials, or members..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
-            />
-          </div>
         </div>
       </div>
-    </motion.div>
+
+      {/* Dynamic Animation Area */}
+      <div className="relative">
+        {/* Greeting: Dissolves into the top row as we scroll */}
+        <motion.div
+          style={{
+            y: counterY,
+            x: greetingX,
+            opacity: greetingOpacity,
+            maskImage: greetingMask,
+            WebkitMaskImage: greetingMask
+          }}
+          className="space-y-3 mb-4"
+        >
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+            Strategic Overview <br /> for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h2>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
+              <Users size={16} className="text-blue-200" />
+              <p className="text-sm font-medium text-blue-50">
+                {metrics.totalMembers} Total Members
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
+              <DollarSign size={16} className="text-green-300" />
+              <p className="text-sm font-medium text-blue-50">
+                {formatCurrency(metrics.totalBankBalance)} Cash
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Search Bar: Slides up to join the Top Row */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+            <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search board reports, financials, or members..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
+          />
+        </div>
+      </div>
+
+    </div>
   );
 
   return (
@@ -679,13 +679,14 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
             {/* Financial Overview */}
             {loadingFinance ? (
-              <Card title="Financial Overview" className="mb-6 p-4">
+              <Card noPadding className="p-4" title="Financial Overview">
                 <div className="text-center py-8 text-slate-400 text-sm">Loading financial data...</div>
               </Card>
             ) : financialSummary ? (
               <Card
                 noPadding
-                title="Financial Overview" className="mb-6 p-4"
+                className="p-4"
+                title="Financial Overview"
                 action={
                   <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
                     <Eye size={18} />
@@ -728,7 +729,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
                 {/* Member Engagement */}
-                <Card title="Member Engagement Metrics">
+                <Card noPadding className="p-4" title="Member Engagement Metrics" >
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
@@ -809,7 +810,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 </Card>
 
                 {/* Project Status */}
-                <Card title="Project Status Overview">
+                <Card noPadding className="p-4" title="Project Status Overview">
                   <div className="space-y-4">
                     {projects.slice(0, 5).map(project => (
                       <div key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
@@ -832,6 +833,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Inventory Status */}
                   <Card
+                    noPadding className="p-4"
                     title="Inventory Status"
                     action={
                       <Button variant="ghost" size="sm" onClick={() => onNavigate?.('INVENTORY')}>
@@ -867,7 +869,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                   </Card>
 
                   {/* Bank Accounts */}
-                  <Card title="Bank Accounts">
+                  <Card noPadding className="p-4" title="Bank Accounts">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                         <div className="flex items-center gap-3">
@@ -911,7 +913,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                   </Card>
 
                   {/* Hobby Clubs Activity */}
-                  <Card title="Hobby Clubs Activity">
+                  <Card noPadding className="p-4" title="Hobby Clubs Activity">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                         <div className="flex items-center gap-3">
@@ -950,7 +952,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                   </Card>
 
                   {/* Business Directory Engagement */}
-                  <Card title="Business Directory">
+                  <Card noPadding className="p-4" title="Business Directory">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                         <div className="flex items-center gap-3">
@@ -996,7 +998,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
               <div className="space-y-6">
                 {/* Quick Actions */}
-                <Card title="Quick Actions">
+                <Card noPadding className="p-4" title="Quick Actions">
                   <div className="space-y-2">
                     <Button
                       variant="ghost"
@@ -1053,7 +1055,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 </Card>
 
                 {/* AI Insights & Predictions */}
-                <Card title="AI Insights & Predictions" className="border-l-4 border-l-purple-500">
+                <Card noPadding className="p-4 border-l-4 border-l-purple-500" title="AI Insights & Predictions">
                   <div className="space-y-4">
                     {loadingAI ? (
                       <div className="text-center py-4 text-slate-400 text-sm">Loading AI insights...</div>
@@ -1143,7 +1145,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 </Card>
 
                 {/* Top Performers */}
-                <Card title="Top Performers">
+                <Card noPadding className="p-4" title="Top Performers">
                   <div className="space-y-3">
                     {leaderboard.slice(0, 5).map((member, index) => (
                       <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
