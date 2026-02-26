@@ -105,7 +105,8 @@ export class IncentiveCalculatorService {
         // If standard has milestones, calculate which are achieved
         if (standard.milestones && standard.milestones.length > 0) {
             const achieved = standard.milestones.filter(ms => {
-                const threshold = ms.logicThreshold || (parseFloat(ms.label.match(/\d+/)?.[0] || '0'));
+                // Priority: Explicit logicThreshold > Extracted from label > Default 60
+                const threshold = ms.logicThreshold !== undefined ? ms.logicThreshold : (parseFloat(ms.label.match(/\d+/)?.[0] || '60'));
                 return ratio >= threshold;
             });
             return { quantity: ratio, score: 0, milestones: achieved };
@@ -141,7 +142,7 @@ export class IncentiveCalculatorService {
     /**
      * Logic: BOD Meeting frequency
      */
-    private static async calcBODMeetings(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number }> {
+    private static async calcBODMeetings(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: any[] }> {
         const q = query(
             collection(db, COLLECTIONS.EVENTS),
             where('loId', '==', loId),
@@ -150,6 +151,15 @@ export class IncentiveCalculatorService {
         );
         const snapshot = await getDocs(q);
         const count = snapshot.docs.length;
+
+        if (standard.milestones && standard.milestones.length > 0) {
+            const achieved = standard.milestones.filter(ms => {
+                const threshold = ms.logicThreshold !== undefined ? ms.logicThreshold : (parseInt(ms.label.match(/\d+/)?.[0] || '8'));
+                return count >= threshold;
+            });
+            return { quantity: count, score: 0, milestones: achieved };
+        }
+
         const required = standard.logicParams?.minMeetings || 8;
         const fallbackPoints = standard.milestones?.[0]?.points || 0;
 
@@ -181,15 +191,23 @@ export class IncentiveCalculatorService {
     /**
      * Logic: Membership Growth vs Baseline
      */
-    private static async calcMembershipGrowth(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number }> {
+    private static async calcMembershipGrowth(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: any[] }> {
         const q = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', loId));
         const snapshot = await getDocs(q);
         const currentCount = snapshot.docs.length;
 
         const baselineCount = standard.logicParams?.baselineCount || 20;
-
         const growth = ((currentCount - baselineCount) / baselineCount) * 100;
-        const target = standard.logicParams?.targetPercent || 10; // e.g. 10% growth
+
+        if (standard.milestones && standard.milestones.length > 0) {
+            const achieved = standard.milestones.filter(ms => {
+                const threshold = ms.logicThreshold !== undefined ? ms.logicThreshold : (parseFloat(ms.label.match(/\d+/)?.[0] || '10'));
+                return growth >= threshold;
+            });
+            return { quantity: growth, score: 0, milestones: achieved };
+        }
+
+        const target = standard.logicParams?.targetPercent || 10;
         const fallbackPoints = standard.milestones?.[0]?.points || 20;
 
         if (growth >= target) {

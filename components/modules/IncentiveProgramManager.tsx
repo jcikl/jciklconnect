@@ -3,16 +3,21 @@ import { Card, Button, Badge, useToast, Modal, ProgressBar } from '../ui/Common'
 import { Input, Select, Textarea } from '../ui/Form';
 import { PointsService } from '../../services/pointsService';
 import { IncentiveProgram, IncentiveStandard, IncentiveLogicId } from '../../types';
-import { Save, RefreshCw, Star, Settings, Plus, Trash2, Edit, List, Zap, ClipboardList } from 'lucide-react';
+import { Save, RefreshCw, Star, Settings, Plus, Trash2, Edit, List, Zap, ClipboardList, Square, CheckSquare } from 'lucide-react';
 import { IncentiveCalculatorService } from '../../services/incentiveCalculatorService';
 import { StandardBatchImportModal } from './Incentive/StandardBatchImportModal';
 
 export const IncentiveProgramManager: React.FC = () => {
     const [program, setProgram] = useState<IncentiveProgram | null>(null);
+    const [allPrograms, setAllPrograms] = useState<IncentiveProgram[]>([]);
     const [standards, setStandards] = useState<IncentiveStandard[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalculating, setIsCalculating] = useState(false);
+    const [isNewYearModalOpen, setNewYearModalOpen] = useState(false);
+    const [newYearValue, setNewYearValue] = useState(new Date().getFullYear() + 1);
     const { showToast } = useToast();
+    const [activeCategory, setActiveCategory] = useState<string>('efficient');
+    const [selectedStandards, setSelectedStandards] = useState<string[]>([]);
 
     // Modal State
     const [isStandardModalOpen, setStandardModalOpen] = useState(false);
@@ -27,25 +32,151 @@ export const IncentiveProgramManager: React.FC = () => {
         verificationType: 'HYBRID',
         evidenceRequirements: [],
         milestones: [],
-        isTiered: false
+        isTiered: true
     });
 
     useEffect(() => {
         loadActiveProgram();
     }, []);
 
-    const loadActiveProgram = async () => {
+    const loadActiveProgram = async (year?: number) => {
         setLoading(true);
         try {
-            const active = await PointsService.getActiveProgram();
-            setProgram(active);
-            if (active) {
-                const stds = await PointsService.getStandards(active.id);
-                setStandards(stds);
+            const all = await PointsService.getIncentivePrograms();
+
+            // Deduplicate programs by year to ensure each year appears only once in the selector
+            const uniquePrograms = all.reduce((acc: IncentiveProgram[], current) => {
+                const x = acc.find(item => item.year === current.year);
+                if (!x) {
+                    return acc.concat([current]);
+                } else {
+                    // Keep the one that is active if multiple exist
+                    if (current.isActive) {
+                        const index = acc.findIndex(item => item.year === current.year);
+                        acc[index] = current;
+                    }
+                    return acc;
+                }
+            }, []);
+
+            setAllPrograms(uniquePrograms);
+
+            let current = year ? uniquePrograms.find(p => p.year === year) : uniquePrograms.find(p => p.isActive);
+            if (!current && uniquePrograms.length > 0) current = uniquePrograms[0];
+
+            setProgram(current || null);
+            if (current) {
+                const stds = await PointsService.getStandards(current.id);
+                // Deduplicate standards by ID to avoid key warnings
+                const uniqueStds = stds.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+                setStandards(uniqueStds);
+                if (current.categories && !activeCategory) {
+                    setActiveCategory(Object.keys(current.categories)[0]);
+                }
             }
         } catch (err) {
             showToast('Failed to load program configuration', 'error');
         } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleYearChange = (year: number) => {
+        loadActiveProgram(year);
+    };
+
+    const handleStartNewYear = async () => {
+        // Prevent duplicate year creation
+        const existingYear = allPrograms.find(p => p.year === newYearValue);
+        if (existingYear) {
+            showToast(`Program for ${newYearValue} already exists. Switching to it.`, 'info');
+            setNewYearModalOpen(false);
+            loadActiveProgram(newYearValue);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Clone from current if exists, else fresh
+            const sourceId = program?.id;
+            let newId;
+            if (sourceId) {
+                newId = await PointsService.cloneProgram(sourceId, newYearValue);
+                showToast(`New program for ${newYearValue} cloned from previous cycle!`, 'success');
+            } else {
+                const defaultProgram = {
+                    year: newYearValue,
+                    name: `${newYearValue} JCI Incentive Program`,
+                    isActive: true,
+                    categories: {
+                        efficient: { label: 'Efficient Star', minScore: 100, isFundamental: true },
+                        network: { label: 'Network Star', minScore: 250 },
+                        experience: { label: 'Experience Star', minScore: 250 },
+                        outreach: { label: 'Outreach Star', minScore: 250 },
+                        impact: { label: 'Impact Star', minScore: 250 }
+                    },
+                    specialAwards: []
+                };
+                newId = await PointsService.createIncentiveProgram(defaultProgram);
+                showToast(`Initialized fresh program for ${newYearValue}`, 'success');
+            }
+            setNewYearModalOpen(false);
+            loadActiveProgram(newYearValue);
+        } catch (err) {
+            showToast('Failed to start new year', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        const categoryStandards = standards.filter(s => s.category === activeCategory);
+        const categoryIds = categoryStandards.map(s => s.id!).filter(Boolean);
+
+        const allInCategorySelected = categoryIds.every(id => selectedStandards.includes(id));
+
+        if (allInCategorySelected) {
+            setSelectedStandards(prev => prev.filter(id => !categoryIds.includes(id)));
+        } else {
+            setSelectedStandards(prev => [...new Set([...prev, ...categoryIds])]);
+        }
+    };
+
+    const toggleSelectStandard = (id: string) => {
+        setSelectedStandards(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedStandards.length === 0) return;
+        if (!confirm(`Are you sure you want to delete ${selectedStandards.length} selected standards?`)) return;
+
+        try {
+            await PointsService.bulkDeleteStandards(selectedStandards);
+            showToast(`${selectedStandards.length} standards deleted`, 'success');
+            setSelectedStandards([]);
+            loadActiveProgram(program?.year);
+        } catch (err) {
+            showToast('Failed to delete standards', 'error');
+        }
+    };
+
+    const handleDeleteProgram = async () => {
+        if (!program) return;
+        const confirmText = `Are you absolutely sure? This will delete the entire ${program.year} program and ALL its associated standards. 
+        \nThis action is permanent and cannot be undone.`;
+
+        if (!window.confirm(confirmText)) return;
+
+        setLoading(true);
+        try {
+            await PointsService.deleteIncentiveProgram(program.id);
+            showToast(`${program.year} Program and its standards have been removed.`, 'success');
+            // Reload without specific year to find next available/active
+            await loadActiveProgram();
+        } catch (err) {
+            showToast('Failed to delete program', 'error');
             setLoading(false);
         }
     };
@@ -67,8 +198,7 @@ export const IncentiveProgramManager: React.FC = () => {
     const handleSave = async () => {
         if (!program) return;
         try {
-            // Update the program object in Firestore (KPIs)
-            await PointsService.createIncentiveProgram(program);
+            await PointsService.updateIncentiveProgram(program.id, program);
             showToast(`KPI thresholds for ${program.year} updated successfully!`, 'success');
         } catch (err) {
             showToast('Failed to update KPI thresholds', 'error');
@@ -123,7 +253,24 @@ export const IncentiveProgramManager: React.FC = () => {
 
     const updateMilestone = (index: number, field: string, value: any) => {
         const currentMilestones = [...(standardFormData.milestones || [])];
-        currentMilestones[index] = { ...currentMilestones[index], [field]: value };
+        let processedValue = value;
+
+        // Handle date formatting for input type="date"
+        if (field === 'deadline' && value) {
+            // If it's already YYYY-MM-DD, keep it. If not, try to convert.
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                try {
+                    const d = new Date(value);
+                    if (!isNaN(d.getTime())) {
+                        processedValue = d.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    // Fallback to original
+                }
+            }
+        }
+
+        currentMilestones[index] = { ...currentMilestones[index], [field]: processedValue };
         setStandardFormData({
             ...standardFormData,
             milestones: currentMilestones
@@ -203,110 +350,200 @@ export const IncentiveProgramManager: React.FC = () => {
 
     if (loading) return <div className="p-8 text-center text-slate-500">Loading Configuration...</div>;
 
-    if (!program) return (
-        <div className="p-12 text-center max-w-md mx-auto">
-            <div className="bg-slate-50 rounded-2xl p-8 border-2 border-dashed border-slate-200">
-                <Settings size={48} className="mx-auto mb-4 text-slate-300" />
-                <h3 className="text-lg font-bold text-slate-900 mb-2">No Active Program Found</h3>
-                <p className="text-slate-500 mb-6 text-sm">
-                    No active incentive program was found for the current cycle. Admin needs to initialize a program to start tracking KPIs.
-                </p>
-                <Button onClick={handleInitialize} className="w-full">
-                    Initialize {new Date().getFullYear()} Program
-                </Button>
-            </div>
-        </div>
-    );
-
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900">{program.year} LO Star KPI Configuration</h2>
-                    <p className="text-slate-500">Set the minimum point thresholds required to unlock each star level.</p>
+            {!program ? (
+                <div className="p-12 text-center max-w-md mx-auto">
+                    <div className="bg-white rounded-3xl p-10 shadow-xl border border-slate-100 flex flex-col items-center">
+                        <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
+                            <Star size={40} className="text-indigo-500 animate-pulse" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-2">No Program Found</h3>
+                        <p className="text-slate-500 mb-8 leading-relaxed">
+                            It looks like there's no active incentive program configured for the current cycle.
+                        </p>
+                        <Button
+                            size="lg"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 py-6 rounded-2xl font-bold font-sans"
+                            onClick={() => setNewYearModalOpen(true)}
+                        >
+                            Initialize {newYearValue} Program
+                        </Button>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setBatchImportOpen(true)}>
-                        <ClipboardList size={16} className="mr-2" /> Batch Import
-                    </Button>
-                    <Button variant="outline" onClick={handleRecalculateAll} isLoading={isCalculating}>
-                        <Zap size={16} className="mr-2 text-yellow-500" /> Recalculate Scores
-                    </Button>
-                    <Button variant="outline" onClick={loadActiveProgram}>
-                        <RefreshCw size={16} className="mr-2" /> Reload
-                    </Button>
-                    <Button onClick={handleSave}>
-                        <Save size={16} className="mr-2" /> Save Changes
-                    </Button>
-                </div>
-            </div>
+            ) : (
+                <>
+                    <div className="w-full md:w-auto">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight">KPI Configuration</h2>
+                            <select
+                                value={program.year}
+                                onChange={(e) => handleYearChange(parseInt(e.target.value))}
+                                className="bg-slate-100 hover:bg-slate-200 border-none rounded-lg px-3 py-1 text-sm font-bold text-indigo-600 focus:ring-0 cursor-pointer transition-colors"
+                            >
+                                {allPrograms.map(p => (
+                                    <option key={p.id} value={p.year}>{p.year}{p.isActive ? ' (Active)' : ''}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleDeleteProgram}
+                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                                title={`Delete ${program.year} Program`}
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                        <p className="text-xs md:text-sm text-slate-500">Managing standards for {program.name}</p>
+                    </div>
+                    <div className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Object.entries(program.categories).map(([key, cat]) => (
-                    <Card key={key} title={
-                        <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
-                                <Star size={18} className={cat.isFundamental ? "text-indigo-500 fill-current" : "text-yellow-500 fill-current"} />
-                                <span>{cat.label}</span>
-                            </div>
-                            <Button size="sm" variant="ghost" onClick={() => handleOpenStandardModal(undefined, key)}>
-                                <Plus size={14} />
+                        <div className="grid grid-cols-3 md:flex md:flex-wrap gap-2 w-full md:w-auto">
+                            <Button variant="outline" size="sm" onClick={() => setNewYearModalOpen(true)} className="flex-1 md:flex-none border-indigo-200 text-indigo-600 hover:bg-indigo-50">
+                                <Plus size={14} className="md:mr-2" /> <span className="text-xs">Start New Year</span>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setBatchImportOpen(true)} className="flex-1 md:flex-none">
+                                <ClipboardList size={14} className="md:mr-2" /> <span className="hidden md:inline text-xs">Batch Import</span><span className="md:hidden text-[10px]">Import</span>
+                            </Button>
+                            <Button size="sm" onClick={handleSave} className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700">
+                                <Save size={14} className="md:mr-2" /> <span className="hidden md:inline text-xs">Save</span><span className="md:hidden text-[10px]">Save</span>
                             </Button>
                         </div>
-                    }>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Star Threshold (KPI Points)</label>
-                                <Input
-                                    type="number"
-                                    value={cat.minScore}
-                                    onChange={(e) => handleUpdateKPI(key, parseInt(e.target.value) || 0)}
-                                    placeholder="e.g. 250"
-                                />
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Standards Configuration</label>
-                                <div className="space-y-2 mb-4">
-                                    {standards.filter(s => s.category === key).map(std => (
-                                        <div key={std.id} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100 group">
-                                            <div className="truncate flex-1 pr-2">
-                                                <p className="text-xs font-semibold text-slate-700 truncate">{std.title}</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">
-                                                    {std.milestones?.length ? `${std.milestones.reduce((acc, m) => acc + m.points, 0)} pts total` : '0 pts'}
-                                                </p>
-                                            </div>
-                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleOpenStandardModal(std)} className="p-1 hover:text-jci-blue"><Edit size={12} /></button>
-                                                <button onClick={() => handleDeleteStandard(std.id!)} className="p-1 hover:text-red-500"><Trash2 size={12} /></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {standards.filter(s => s.category === key).length === 0 && (
-                                        <p className="text-xs text-slate-400 italic text-center py-2">No standards added yet.</p>
-                                    )}
-                                </div>
+                    </div>
 
-
-                            </div>
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                <span className="text-xs text-slate-500">Requirement Type:</span>
-                                <Badge variant={cat.isFundamental ? "jci" : "neutral"}>
-                                    {cat.isFundamental ? "Fundamental" : "Standard Star"}
-                                </Badge>
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {/* Categories Navigation */}
+                        <div className="md:w-64 flex-shrink-0">
+                            <div className="flex md:flex-col gap-1 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+                                {Object.entries(program.categories).map(([key, cat]) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => setActiveCategory(key)}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap md:whitespace-normal text-left ${activeCategory === key
+                                            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100 translate-x-1"
+                                            : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                                            }`}
+                                    >
+                                        <Star size={16} className={cat.isFundamental ? (activeCategory === key ? "text-indigo-200 fill-current" : "text-indigo-500 fill-current") : (activeCategory === key ? "text-yellow-200 fill-current" : "text-yellow-500 fill-current")} />
+                                        <span className="flex-1">{cat.label}</span>
+                                        {activeCategory === key && (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-white hidden md:block" />
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                    </Card>
-                ))}
-            </div>
 
-            <Card title="Program Details">
-                <div className="grid md:grid-cols-2 gap-4">
-                    <Input label="Program Name" value={program.name} readOnly />
-                    <Input label="Year" value={program.year} readOnly />
-                </div>
-                <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-                    <RefreshCw size={14} />
-                    <span>Last automated sync: {new Date().toLocaleDateString()}</span>
-                </div>
-            </Card>
+                        {/* Active Category Content */}
+                        <div className="flex-1 min-w-0">
+                            {activeCategory && program.categories[activeCategory] && (
+                                <Card title={
+                                    <div className="flex items-center justify-between w-full pr-2">
+                                        <div className="flex items-center gap-2">
+                                            <Star size={18} className={program.categories[activeCategory].isFundamental ? "text-indigo-500 fill-current" : "text-yellow-500 fill-current"} />
+                                            <span className="font-bold text-slate-900">{program.categories[activeCategory].label}</span>
+                                        </div>
+                                        <div>
+                                            <Button size="sm" className="bg-slate-900 hover:bg-black text-white rounded-full h-8 px-4" onClick={() => handleOpenStandardModal(undefined, activeCategory)}>
+                                                <Plus size={14} className="mr-1" /> <span className="text-xs">Add Standard</span>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                }>
+                                    <div className="space-y-6">
+                                        <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+                                            <div className="flex items-center gap-2">
+                                                <label className="block text-xs font-bold text-indigo-900 uppercase tracking-wider">Category Star Threshold</label>
+                                                <div className="flex-1">
+                                                    <Input
+                                                        type="number"
+                                                        value={program.categories[activeCategory].minScore}
+                                                        onChange={(e) => handleUpdateKPI(activeCategory, parseInt(e.target.value) || 0)}
+                                                        placeholder="Required points..."
+                                                        className="bg-white border-indigo-200 focus:border-indigo-500"
+                                                    />
+                                                </div>
+                                                <div className="text-xs text-indigo-600 font-medium">
+                                                    {program.categories[activeCategory].isFundamental ? "Fundamental Goal" : "Secondary Star"}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between mb-3 px-1">
+                                                <div className="flex items-center gap-4">
+                                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Included Standards ({standards.filter(s => s.category === activeCategory).length})</h4>
+                                                    {standards.filter(s => s.category === activeCategory).length > 0 && (
+                                                        <button
+                                                            onClick={toggleSelectAll}
+                                                            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                                                        >
+                                                            {standards.filter(s => s.category === activeCategory).every(s => selectedStandards.includes(s.id!))
+                                                                ? <><CheckSquare size={14} /> Deselect All</>
+                                                                : <><Square size={14} /> Select All</>
+                                                            }
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {selectedStandards.length > 0 && (
+                                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
+                                                        <span className="text-xs font-bold text-slate-500">{selectedStandards.length} Selected</span>
+                                                        <Button size="sm" variant="outline" className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50" onClick={handleBulkDelete}>
+                                                            <Trash2 size={12} className="mr-1" /> Delete
+                                                        </Button>
+                                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedStandards([])}>
+                                                            Cancel
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="grid gap-3">
+                                                {standards.filter(s => s.category === activeCategory).sort((a, b) => a.title.localeCompare(b.title)).map(std => (
+                                                    <div
+                                                        key={std.id}
+                                                        className={`flex items-center gap-3 bg-white p-4 rounded-xl border transition-all group ${selectedStandards.includes(std.id!)
+                                                            ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/10'
+                                                            : 'border-slate-200 hover:border-indigo-300 hover:shadow-md'
+                                                            }`}
+                                                    >
+                                                        <button
+                                                            onClick={() => toggleSelectStandard(std.id!)}
+                                                            className={`shrink-0 transition-colors ${selectedStandards.includes(std.id!) ? 'text-indigo-600' : 'text-slate-300 hover:text-indigo-400'}`}
+                                                        >
+                                                            {selectedStandards.includes(std.id!) ? <CheckSquare size={20} /> : <Square size={20} />}
+                                                        </button>
+
+                                                        <div className="flex-1 cursor-pointer" onClick={() => toggleSelectStandard(std.id!)}>
+                                                            <p className="text-sm font-bold text-slate-800 mb-0.5">{std.title}</p>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                                                                    {std.milestones?.length ? (std.isTiered ? `${Math.max(...std.milestones.map(m => m.points))} PTS` : `${std.milestones.reduce((acc, m) => acc + m.points, 0)} PTS`) : '0 PTS'}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-400 font-medium">
+                                                                    {std.verificationType === 'AUTO_SYSTEM' ? 'Automated' : 'Manual Evidence'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenStandardModal(std); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"><Edit size={16} /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteStandard(std.id!); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={16} /></button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {standards.filter(s => s.category === activeCategory).length === 0 && (
+                                                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                                        <List size={32} className="mx-auto text-slate-300 mb-2" />
+                                                        <p className="text-xs text-slate-400 font-medium">No standards configured for this category.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* Standard Configuration Modal */}
             <Modal
@@ -389,25 +626,8 @@ export const IncentiveProgramManager: React.FC = () => {
                                     { label: 'Event Attendance (Network)', value: IncentiveLogicId.NETWORK_EVENT_ATTENDANCE }
                                 ]}
                             />
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    label="Target Value (e.g. 60%)"
-                                    type="number"
-                                    value={standardFormData.logicParams?.targetPercent || ''}
-                                    onChange={(e) => setStandardFormData({
-                                        ...standardFormData,
-                                        logicParams: { ...standardFormData.logicParams, targetPercent: parseInt(e.target.value) }
-                                    })}
-                                />
-                                <Input
-                                    label="Min Count (e.g. 8 meetings)"
-                                    type="number"
-                                    value={standardFormData.logicParams?.minMeetings || ''}
-                                    onChange={(e) => setStandardFormData({
-                                        ...standardFormData,
-                                        logicParams: { ...standardFormData.logicParams, minMeetings: parseInt(e.target.value) }
-                                    })}
-                                />
+                            <div className="text-[10px] text-indigo-600 bg-white/50 p-2 rounded border border-indigo-100 italic">
+                                Logic parameters (thresholds, counts) are now configured inside each <strong>Milestone</strong> below.
                             </div>
                         </div>
                     )}
@@ -457,7 +677,7 @@ export const IncentiveProgramManager: React.FC = () => {
                                             <Input
                                                 label="Deadline"
                                                 type="date"
-                                                value={ms.deadline || ''}
+                                                value={ms.deadline ? (ms.deadline.includes('-') && ms.deadline.split('-')[0].length === 4 ? ms.deadline : new Date(ms.deadline).toISOString().split('T')[0]) : ''}
                                                 onChange={(e) => updateMilestone(idx, 'deadline', e.target.value)}
                                             />
                                         </div>
@@ -471,20 +691,36 @@ export const IncentiveProgramManager: React.FC = () => {
                                             <Trash2 size={14} />
                                         </Button>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <Select
-                                            label="Activity Type (Auto-sync)"
-                                            value={ms.activityType || ''}
-                                            onChange={(e) => updateMilestone(idx, 'activityType', e.target.value)}
-                                            options={[
-                                                { label: '-- Manual Only --', value: '' },
-                                                { label: 'Community Project', value: 'Community' },
-                                                { label: 'Training Workshop', value: 'Training' },
-                                                { label: 'Business Meeting', value: 'Meeting' },
-                                                { label: 'Social Event', value: 'Social' },
-                                                { label: 'International Sync', value: 'International' }
-                                            ]}
-                                        />
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {standardFormData.autoLogicId ? (
+                                            <Input
+                                                label={
+                                                    standardFormData.autoLogicId.includes('MEMBERSHIP') || standardFormData.autoLogicId.includes('GROWTH')
+                                                        ? 'Threshold (%)'
+                                                        : standardFormData.autoLogicId.includes('BOD_MEETINGS')
+                                                            ? 'Min Count (Meetings)'
+                                                            : 'Logic Threshold'
+                                                }
+                                                type="number"
+                                                value={ms.logicThreshold || ''}
+                                                onChange={(e) => updateMilestone(idx, 'logicThreshold', parseFloat(e.target.value) || 0)}
+                                                placeholder="e.g. 60 or 8"
+                                            />
+                                        ) : (
+                                            <Select
+                                                label="Activity Type (Auto-sync)"
+                                                value={ms.activityType || ''}
+                                                onChange={(e) => updateMilestone(idx, 'activityType', e.target.value)}
+                                                options={[
+                                                    { label: '-- Manual Only --', value: '' },
+                                                    { label: 'Community Project', value: 'Community' },
+                                                    { label: 'Training Workshop', value: 'Training' },
+                                                    { label: 'Business Meeting', value: 'Meeting' },
+                                                    { label: 'Social Event', value: 'Social' },
+                                                    { label: 'International Sync', value: 'International' }
+                                                ]}
+                                            />
+                                        )}
                                         <Input
                                             label="Min Participants"
                                             type="number"
@@ -515,19 +751,50 @@ export const IncentiveProgramManager: React.FC = () => {
                 </form>
             </Modal>
 
-            {
-                program && (
-                    <StandardBatchImportModal
-                        isOpen={isBatchImportOpen}
-                        onClose={() => setBatchImportOpen(false)}
-                        onImported={() => {
-                            showToast('Standards imported successfully', 'success');
-                            loadActiveProgram();
-                        }}
-                        programId={program.id}
+            {program && (
+                <StandardBatchImportModal
+                    isOpen={isBatchImportOpen}
+                    onClose={() => setBatchImportOpen(false)}
+                    onImported={() => {
+                        showToast('Standards imported successfully', 'success');
+                        loadActiveProgram();
+                    }}
+                    programId={program.id}
+                />
+            )}
+
+            {/* New Year Initialize Modal */}
+            <Modal
+                isOpen={isNewYearModalOpen}
+                onClose={() => setNewYearModalOpen(false)}
+                title="Initialize New Year Program"
+                size="sm"
+                footer={
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setNewYearModalOpen(false)} className="flex-1">Cancel</Button>
+                        <Button onClick={handleStartNewYear} className="flex-1 bg-indigo-600">Initialize</Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4 py-2">
+                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                        <p className="text-xs text-amber-700">
+                            <strong>Note:</strong> Starting a new year will automatically clone all Categories and Standards from the current active program ({program?.year || 'Initial'}).
+                        </p>
+                    </div>
+                    <Input
+                        label="New Program Year"
+                        type="number"
+                        value={newYearValue}
+                        onChange={(e) => setNewYearValue(parseInt(e.target.value))}
+                        min={2020}
+                        max={2100}
                     />
-                )
-            }
-        </div >
+                    <p className="text-[10px] text-slate-500">
+                        Once initialized, the new program will become the <strong>Active</strong> program for the entire system.
+                    </p>
+                </div>
+            </Modal>
+        </div>
     );
 };

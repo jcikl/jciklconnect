@@ -41,7 +41,7 @@ export class MembersService {
         q = query(collection(db, COLLECTIONS.MEMBERS));
       }
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) } as Member));
+      return snapshot.docs.map(d => ({ ...(d.data() as any), id: d.id } as Member));
     } catch (error) {
       if (isDevMode()) {
         const list = loIdFilter
@@ -65,7 +65,7 @@ export class MembersService {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as Member;
+        return { ...docSnap.data(), id: docSnap.id } as Member;
       }
       return null;
     } catch (error) {
@@ -208,8 +208,8 @@ export class MembersService {
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
-        id: doc.id,
         ...(doc.data() as any),
+        id: doc.id,
       } as Member));
     } catch (error) {
       console.error('Error fetching members by role:', error);
@@ -235,7 +235,7 @@ export class MembersService {
 
       // Return the first match
       const doc = snapshot.docs[0];
-      return { id: doc.id, ...(doc.data() as any) } as Member;
+      return { ...(doc.data() as any), id: doc.id } as Member;
     } catch (error) {
       console.error('Error fetching member by email:', error);
       throw error;
@@ -252,8 +252,8 @@ export class MembersService {
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
-        id: doc.id,
         ...(doc.data() as any),
+        id: doc.id,
       } as Member));
     } catch (error) {
       console.error('Error fetching members at risk:', error);

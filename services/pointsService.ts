@@ -370,8 +370,8 @@ export class PointsService {
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
-        id: doc.id,
         ...doc.data(),
+        id: doc.id,
       } as Member));
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -625,6 +625,25 @@ export class PointsService {
   }
 
   // --- JCI Gamification & Incentive Engine ---
+  private static mockPrograms: IncentiveProgram[] = [
+    {
+      id: '2026_MY',
+      year: 2026,
+      name: '2026 JCI Malaysia Incentive Program',
+      isActive: true,
+      categories: {
+        efficient: { label: 'Efficient Star', minScore: 100, isFundamental: true },
+        network: { label: 'Network Star', minScore: 250 },
+        experience: { label: 'Experience Star', minScore: 250 },
+        outreach: { label: 'Outreach Star', minScore: 250 },
+        impact: { label: 'Impact Star', minScore: 250 }
+      },
+      specialAwards: [
+        { name: 'Best of the Best', criteria: ['5 Stars', 'Growth > 10%', 'Good Financial'] }
+      ]
+    }
+  ];
+
   private static mockStandards: IncentiveStandard[] = [
     {
       id: '2026_OUTREACH_01',
@@ -648,22 +667,9 @@ export class PointsService {
   // Get active yearly program
   static async getActiveProgram(): Promise<IncentiveProgram | null> {
     if (isDevMode()) {
-      return {
-        id: '2026_MY',
-        year: 2026,
-        name: '2026 JCI Malaysia Incentive Program',
-        isActive: true,
-        categories: {
-          efficient: { label: 'Efficient Star', minScore: 100, isFundamental: true },
-          network: { label: 'Network Star', minScore: 250 },
-          experience: { label: 'Experience Star', minScore: 250 },
-          outreach: { label: 'Outreach Star', minScore: 250 },
-          impact: { label: 'Impact Star', minScore: 250 }
-        },
-        specialAwards: [
-          { name: 'Best of the Best', criteria: ['5 Stars', 'Growth > 10%', 'Good Financial'] }
-        ]
-      };
+      // Return the active mock program, or the first one, or null
+      const active = this.mockPrograms.find(p => p.isActive);
+      return active || this.mockPrograms[0] || null;
     }
     try {
       const q = query(
@@ -673,9 +679,121 @@ export class PointsService {
       );
       const snapshot = await getDocs(q);
       if (snapshot.empty) return null;
-      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as IncentiveProgram;
+      return { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as IncentiveProgram;
     } catch (error) {
       console.error('Error fetching active program:', error);
+      throw error;
+    }
+  }
+
+  // Get all yearly programs
+  static async getIncentivePrograms(): Promise<IncentiveProgram[]> {
+    if (isDevMode()) return [...this.mockPrograms].sort((a, b) => b.year - a.year);
+    try {
+      const q = query(collection(db, COLLECTIONS.INCENTIVE_PROGRAMS), orderBy('year', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveProgram));
+    } catch (error) {
+      console.error('Error fetching programs:', error);
+      throw error;
+    }
+  }
+
+  // Get program by year
+  static async getProgramByYear(year: number): Promise<IncentiveProgram | null> {
+    if (isDevMode()) return this.mockPrograms.find(p => p.year === year) || null;
+    try {
+      const q = query(collection(db, COLLECTIONS.INCENTIVE_PROGRAMS), where('year', '==', year), limit(1));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      return { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as IncentiveProgram;
+    } catch (error) {
+      console.error('Error fetching program by year:', error);
+      throw error;
+    }
+  }
+
+  // Clone a program and its standards to a new year
+  static async cloneProgram(sourceId: string, targetYear: number): Promise<string> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Cloning program ${sourceId} to ${targetYear}`);
+      const source = this.mockPrograms.find(p => p.id === sourceId);
+      if (!source) {
+        console.error('[DEV MODE] Source program not found:', sourceId);
+        throw new Error('Source program not found');
+      }
+      // Deactivate all other programs
+      this.mockPrograms.forEach(p => p.isActive = false);
+      // Create cloned program
+      const newId = `cloned-${targetYear}-${Date.now()}`;
+      const cloned: IncentiveProgram = {
+        ...source,
+        id: newId,
+        year: targetYear,
+        name: `${targetYear} JCI Incentive Program`,
+        isActive: true
+      };
+      this.mockPrograms.push(cloned);
+      // Clone standards
+      const sourceStds = this.mockStandards.filter(s => s.programId === sourceId);
+      sourceStds.forEach(std => {
+        this.mockStandards.push({
+          ...std,
+          id: `${std.id}_clone_${targetYear}`,
+          programId: newId
+        });
+      });
+      return newId;
+    }
+
+    try {
+      // 1. Get source program
+      const sourceDoc = await getDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, sourceId));
+      if (!sourceDoc.exists()) {
+        console.error('Source program not found:', sourceId);
+        throw new Error('Source program not found');
+      }
+      const sourceData = sourceDoc.data() as IncentiveProgram;
+      const { id: _, ...dataToClone } = sourceData as any;
+
+      // 2. Disable current active if target is active
+      const programs = await this.getIncentivePrograms();
+      const batch = writeBatch(db);
+
+      programs.forEach(p => {
+        if (p.isActive) {
+          batch.update(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, p.id), { isActive: false });
+        }
+      });
+
+      // 3. Create new program
+      const newProgramRef = doc(collection(db, COLLECTIONS.INCENTIVE_PROGRAMS));
+      batch.set(newProgramRef, {
+        ...dataToClone,
+        year: targetYear,
+        name: `${targetYear} JCI Incentive Program`,
+        isActive: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      });
+
+      // 4. Clone standards
+      const standards = await this.getStandards(sourceId);
+      for (const std of standards) {
+        const { id, ...stdData } = std;
+        const newStdRef = doc(collection(db, COLLECTIONS.INCENTIVE_STANDARDS));
+        batch.set(newStdRef, {
+          ...stdData,
+          programId: newProgramRef.id,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+      }
+
+      await batch.commit();
+      return newProgramRef.id;
+    } catch (error) {
+      console.error('Error cloning program:', error);
       throw error;
     }
   }
@@ -692,7 +810,7 @@ export class PointsService {
         orderBy('order', 'asc')
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as IncentiveStandard);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as IncentiveStandard);
     } catch (error) {
       console.error('Error fetching standards:', error);
       throw error;
@@ -841,17 +959,73 @@ export class PointsService {
   static async createIncentiveProgram(program: Omit<IncentiveProgram, 'id'>): Promise<string> {
     if (isDevMode()) {
       console.log('[DEV MODE] Creating incentive program:', program);
-      return 'mock-program-id';
+      const newId = `mock-program-${Date.now()}`;
+      // If the new program is active, deactivate others
+      if ((program as any).isActive) {
+        this.mockPrograms.forEach(p => p.isActive = false);
+      }
+      this.mockPrograms.push({ ...program, id: newId } as IncentiveProgram);
+      return newId;
     }
     try {
+      const { id: _, ...dataToSave } = program as any;
       const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_PROGRAMS), {
-        ...program,
+        ...dataToSave,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
       return docRef.id;
     } catch (error) {
       console.error('Error creating incentive program:', error);
+      throw error;
+    }
+  }
+
+  // Update an existing incentive program
+  static async updateIncentiveProgram(id: string, program: Partial<IncentiveProgram>): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Updating incentive program ${id}:`, program);
+      const idx = this.mockPrograms.findIndex(p => p.id === id);
+      if (idx !== -1) {
+        this.mockPrograms[idx] = { ...this.mockPrograms[idx], ...program, id };
+      }
+      return;
+    }
+    try {
+      const { id: _, ...data } = program;
+      await updateDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id), {
+        ...data,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error updating incentive program:', error);
+      throw error;
+    }
+  }
+
+  // Delete an entire incentive program and its standards
+  static async deleteIncentiveProgram(id: string): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Deleting incentive program ${id}`);
+      this.mockPrograms = this.mockPrograms.filter(p => p.id !== id);
+      this.mockStandards = this.mockStandards.filter(s => s.programId !== id);
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+
+      // 1. Delete all standards for this program
+      const standards = await this.getStandards(id);
+      standards.forEach(std => {
+        batch.delete(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, std.id));
+      });
+
+      // 2. Delete the program itself
+      batch.delete(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id));
+
+      await batch.commit();
+    } catch (error) {
+      console.error('Error deleting incentive program:', error);
       throw error;
     }
   }
@@ -893,20 +1067,31 @@ export class PointsService {
     }
   }
 
-  // Delete an incentive standard
-  static async deleteStandard(id: string): Promise<void> {
+  // Delete multiple incentive standards
+  static async bulkDeleteStandards(ids: string[]): Promise<void> {
     if (isDevMode()) {
-      console.log(`[DEV MODE] Deleting standard ${id}`);
+      console.log(`[DEV MODE] Deleting ${ids.length} standards`);
+      // Update local mock if it exists
+      if (this.mockStandards) {
+        this.mockStandards = this.mockStandards.filter(s => !ids.includes(s.id!));
+      }
       return;
     }
     try {
-      // We physically delete standards as they are configuration items
-      const { deleteDoc } = await import('firebase/firestore');
-      await deleteDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id));
+      const batch = writeBatch(db);
+      for (const id of ids) {
+        batch.delete(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id));
+      }
+      await batch.commit();
     } catch (error) {
-      console.error('Error deleting incentive standard:', error);
+      console.error('Error bulk deleting standards:', error);
       throw error;
     }
+  }
+
+  // Delete an incentive standard
+  static async deleteStandard(id: string): Promise<void> {
+    return this.bulkDeleteStandards([id]);
   }
 }
 

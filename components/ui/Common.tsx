@@ -141,7 +141,7 @@ export const Card: React.FC<CardProps> = ({ children, className = '', title, act
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${props.onClick ? 'cursor-pointer hover:shadow-md transition-all active:scale-[0.98]' : ''} ${className}`} {...props}>
       {(title || action) && (
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="px-4 py-4 border-b border-slate-100 justify-between items-center bg-slate-50/50">
           {title && <h3 className="font-semibold text-slate-800 text-base">{title}</h3>}
           {action && <div className="flex items-center gap-2">{action}</div>}
         </div>
