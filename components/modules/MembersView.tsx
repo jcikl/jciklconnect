@@ -1423,61 +1423,75 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       )}
 
       {/* Header Card */}
-      <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="h-32 bg-gradient-to-r from-jci-blue to-jci-navy"></div>
-        <div className="flex items-end gap-4 px-6 -mt-12 pb-6">
-          <div className="relative">
-            <img src={member.avatar || undefined} className="w-24 h-24 rounded-full border-4 border-white bg-slate-100 shadow-md" alt="" />
-            <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-white ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' :
-              member.role === UserRole.PROBATION_MEMBER ? 'bg-amber-500' : 'bg-slate-500'
-              }`} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold text-slate-900 truncate">{member.name}</h1>
-              <Badge variant={member.tier.toLowerCase() as any}>{member.tier}</Badge>
+      <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md group">
+        <div className="h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
+          <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+        </div>
+
+        <div className="px-6 pb-6">
+          <div className="flex flex-col md:flex-row items-center md:items-end gap-6 -mt-16 relative z-10">
+            <div className="relative">
+              <div className="p-1 bg-white rounded-full shadow-xl">
+                <img
+                  src={member.avatar || undefined}
+                  className="w-32 h-32 rounded-full border-4 border-slate-50 bg-slate-100 object-cover"
+                  alt={member.name}
+                />
+              </div>
+              <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' :
+                member.role === UserRole.PROBATION_MEMBER ? 'bg-amber-500' : 'bg-slate-500'
+                }`}
+                title={member.role}
+              />
             </div>
-            <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-              <span className="flex items-center gap-1.5"><Mail size={14} />{member.email}</span>
-              {member.phone && <span className="flex items-center gap-1.5"><Phone size={14} />{member.phone}</span>}
-              <span className="flex items-center gap-1.5"><Briefcase size={14} />{member.role}</span>
-              {member.introducer && (
-                <span className="flex items-center gap-1.5 text-jci-blue font-medium">
-                  <UserPlus size={14} />
-                  Introduced by: {member.introducer}
-                </span>
+
+            <div className="flex-1 text-center md:text-left space-y-3">
+              <div className="flex flex-col md:flex-row items-center gap-3">
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight break-words">{member.name}</h1>
+                <Badge variant={member.tier.toLowerCase() as any} className="px-3 py-0.5 text-xs font-bold uppercase tracking-wider">{member.tier}</Badge>
+              </div>
+
+              <div className="flex flex-wrap justify-center md:justify-start gap-y-2 gap-x-4 text-sm font-medium text-slate-500">
+                <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100"><Mail size={14} className="text-jci-blue" />{member.email}</span>
+                {member.phone && <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100"><Phone size={14} className="text-jci-blue" />{member.phone}</span>}
+                <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100"><Briefcase size={14} className="text-jci-blue" />{member.role}</span>
+                {member.introducer && (
+                  <span className="flex items-center gap-2 px-2 py-1 bg-blue-50 text-jci-blue rounded-lg border border-blue-100">
+                    <UserPlus size={14} />
+                    Introduced by: {member.introducer}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 w-full md:w-auto">
+              {(canEditMembers || isSelfView) && (
+                <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)} className="flex-1 md:flex-none h-10 px-6 font-bold">Edit Profile</Button>
+              )}
+              {(isAdmin || (isDeveloper && effectiveRole === UserRole.ADMIN)) && !isSelfView && (
+                <Button variant="outline" size="sm" className="flex-1 md:flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            {(canEditMembers || isSelfView) && (
-              <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>Edit Profile</Button>
-            )}
-            {(isAdmin || (isDeveloper && effectiveRole === UserRole.ADMIN)) && !isSelfView && (
-              <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
-            )}
-            {!isSelfView && (
-              <Button variant="outline" size="sm" className="hidden md:flex">Message</Button>
-            )}
-          </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-50 border-t border-slate-100">
-          <div className="text-center md:text-left">
-            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Total Points</p>
-            <p className="text-xl font-bold text-jci-blue">{member.points.toLocaleString()}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-t border-slate-100 divide-x divide-slate-100 bg-slate-50/50">
+          <div className="p-6 text-center hover:bg-white transition-colors">
+            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Total Points</p>
+            <p className="text-2xl font-black text-jci-blue">{member.points.toLocaleString()}</p>
           </div>
-          <div className="text-center md:text-left">
-            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Join Date</p>
-            <p className="text-xl font-bold text-slate-900">{formatDateToDDMMMYYYY(member.joinDate)}</p>
+          <div className="p-6 text-center hover:bg-white transition-colors">
+            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Join Date</p>
+            <p className="text-2xl font-black text-slate-900">{formatDateToDDMMMYYYY(member.joinDate)}</p>
           </div>
-          <div className="text-center md:text-left">
-            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Attendance</p>
-            <p className="text-xl font-bold text-slate-900">{member.attendanceRate}%</p>
+          <div className="p-6 text-center hover:bg-white transition-colors">
+            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Attendance</p>
+            <p className="text-2xl font-black text-slate-900">{member.attendanceRate}%</p>
           </div>
-          <div className="text-center md:text-left">
-            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Dues Status</p>
-            <Badge variant={member.duesStatus === 'Paid' ? 'success' : member.duesStatus === 'Overdue' ? 'error' : 'warning'}>
+          <div className="p-6 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
+            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">Dues Status</p>
+            <Badge variant={member.duesStatus === 'Paid' ? 'success' : member.duesStatus === 'Overdue' ? 'error' : 'warning'} className="px-4 font-black">
               {member.duesStatus}
             </Badge>
           </div>
@@ -2195,31 +2209,34 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
 
   return (
     <div className="space-y-6">
-      {/* Guests Section */}
-      <Card title="Pending Guest Approvals">
-        {guests.length === 0 ? (
-          <p className="text-center text-slate-500 py-4">No guests pending approval</p>
-        ) : (
-          <div className="space-y-3">
+      {/* Guests Section - Rendered directly without outer Card wrapper */}
+      <div className="space-y-4">
+        {guests.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4">
             {guests.map(guest => (
-              <div key={guest.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 gap-4">
-                <div className="flex items-center gap-3">
-                  <img src={guest.avatar || undefined} className="w-10 h-10 rounded-full" alt={guest.name} />
+              <div key={guest.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="relative">
+                    <img src={guest.avatar || undefined} className="w-12 h-12 rounded-full border border-slate-100" alt={guest.name} />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-500 border-2 border-white rounded-full"></div>
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="font-medium text-slate-900 truncate">{guest.name}</div>
-                      <Badge variant="neutral">Guest</Badge>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="font-bold text-slate-900 break-words">{guest.name}</div>
+                      <Badge variant="neutral" className="bg-slate-100 text-slate-600 border-none px-2 py-0 text-[10px] uppercase font-bold tracking-wider shrink-0">Guest</Badge>
                     </div>
-                    <div className="text-sm text-slate-500 truncate">{guest.email}</div>
-                    {guest.phone && <div className="text-xs text-slate-400">{guest.phone}</div>}
+                    <div className="flex flex-col gap-0.5 text-xs text-slate-500">
+                      <span className="flex items-center gap-1"><Mail size={12} className="shrink-0" /> {guest.email}</span>
+                      {guest.phone && <span className="flex items-center gap-1"><Phone size={12} className="shrink-0" /> {guest.phone}</span>}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                <div className="flex items-center gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => onSelect(guest.id)}
-                    className="flex-1 sm:flex-none"
+                    className="flex-1 sm:flex-none h-9 px-4 rounded-lg font-medium text-slate-600 hover:text-jci-blue hover:border-jci-blue hover:bg-jci-blue/5 transition-colors"
                   >
                     <FileText size={14} className="mr-2" />
                     Review
@@ -2231,7 +2248,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
                         setSelectedGuest(guest);
                         setShowApprovalModal(true);
                       }}
-                      className="flex-1 sm:flex-none"
+                      className="flex-1 sm:flex-none h-9 px-4 rounded-lg font-bold bg-jci-blue hover:bg-jci-navy text-white shadow-sm shadow-jci-blue/20 transition-colors"
                     >
                       <UserCheck size={14} className="mr-2" />
                       Approve
@@ -2241,74 +2258,13 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
               </div>
             ))}
           </div>
-        )}
-      </Card>
-
-      {/* Probation Members Section */}
-      <Card title="Probation Members">
-        {probationMembers.length === 0 ? (
-          <p className="text-center text-slate-500 py-4">No probation members</p>
         ) : (
-          <div className="space-y-3">
-            {probationMembers.map(member => {
-              const tasks = member.probationTasks || [];
-              const completedTasks = tasks.filter(t => t.status === 'Completed' || t.status === 'Verified').length;
-              const totalTasks = tasks.length;
-              const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-              const allCompleted = totalTasks > 0 && completedTasks === totalTasks;
-
-              return (
-                <div key={member.id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                    <div className="flex items-center gap-3">
-                      <img src={member.avatar || undefined} className="w-10 h-10 rounded-full" alt={member.name} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                          <div className="font-medium text-slate-900 truncate">{member.name}</div>
-                          <Badge variant={allCompleted ? 'success' : 'warning'}>
-                            {allCompleted ? 'Ready for Promotion' : 'Probation'}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-slate-500 truncate">{member.email}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onSelect(member.id)}
-                        className="flex-1 sm:flex-none font-medium"
-                      >
-                        <FileText size={14} className="mr-2" />
-                        Review
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => {
-                          setSelectedProbationMember(member);
-                          setShowProbationTasksModal(true);
-                        }}
-                        className="flex-1 sm:flex-none"
-                      >
-                        <Clock size={14} className="mr-2" />
-                        Tasks
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Progress: {completedTasks}/{totalTasks} tasks</span>
-                      <span className="font-medium text-slate-900">{Math.round(progress)}%</span>
-                    </div>
-                    <ProgressBar progress={progress} color={allCompleted ? 'bg-green-500' : 'bg-blue-500'} />
-                  </div>
-                </div>
-              );
-            })}
+          <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+            <Users className="mx-auto text-slate-300 mb-3" size={32} />
+            <p className="text-slate-500 font-medium">No guests pending approval</p>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Approval Modal */}
       {showApprovalModal && selectedGuest && (
