@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Save, Calendar, Users, UserPlus, Plus, Trash2, ChevronRight, Award, Shield, RefreshCw } from 'lucide-react';
 import { Card, Button, useToast, Badge, Modal } from '../../ui/Common';
 import { Select, Input } from '../../ui/Form';
+import { MemberSelector } from '../../ui/MemberSelector';
 import { BoardManagementService } from '../../../services/boardManagementService';
 import { BoardMember, Member } from '../../../types';
 
@@ -138,10 +139,34 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
     }
   };
 
-  const memberOptions = useMemo(() =>
-    members.map(m => ({ value: m.id, label: m.name })),
-    [members]
-  );
+  const sortedMembers = useMemo(() => {
+    return [...members].sort((a, b) => {
+      const nameA = (a.fullName || a.name || '').toLowerCase();
+      const nameB = (b.fullName || b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [members]);
+
+  const getMemberLabel = (m: Member) => {
+    if (!m) return '';
+    const namePart = m.name;
+    const fullNamePart = m.fullName || '';
+    const idPart = m.idNumber ? `(${m.idNumber})` : '';
+    
+    if (fullNamePart || idPart) {
+      return `${fullNamePart} ${idPart} - ${namePart}`.trim();
+    }
+    return namePart;
+  };
+
+  const allAssignedIds = useMemo(() => {
+    const ids = new Set<string>();
+    Object.values(assignments).forEach(data => {
+      if (data.memberId) ids.add(data.memberId);
+      data.commissionDirectorIds.forEach(id => ids.add(id));
+    });
+    return ids;
+  }, [assignments]);
 
   if (loading && terms.length === 0) {
     return (
@@ -214,17 +239,26 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
         title={`Configure Board of Directors - ${selectedTerm}`}
         size="xl"
         drawerOnMobile
+        footer={
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setShowManageModal(false)}>Cancel</Button>
+            {canManage && (
+              <Button className="flex-1 gap-2" onClick={handleSave} disabled={saving}>
+                <Save size={18} /> {saving ? 'Saving...' : 'Update Board'}
+              </Button>
+            )}
+          </div>
+        }
       >
-        <div className="space-y-6 pb-20 sm:pb-0">
+        <div className="space-y-6">
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
             <Shield className="text-blue-500 shrink-0 mt-1" size={20} />
             <p className="text-sm text-blue-700">
-              Only members assigned to the board for the current active year will receive <strong>Board Permissions</strong>.
+              Only members assigned to the board for the current active year will receive <strong>Board Permissions</strong>. Commission Directors do not receive Board Permissions.
             </p>
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-6 scrollbar-thin">
-            {positions.map(position => (
+          {positions.map(position => (
               <div key={position} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -237,11 +271,16 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                     </div>
                   </div>
 
-                  <div className="w-full sm:w-64">
-                    <Select
+                  <div className="w-full sm:w-80">
+                    <MemberSelector
+                      label=""
+                      members={sortedMembers.filter(m => !allAssignedIds.has(m.id) || m.id === (assignments[position]?.memberId || ''))}
+                      getOptionLabel={getMemberLabel}
                       value={assignments[position]?.memberId || ''}
-                      onChange={(e) => handleAssignmentChange(position, e.target.value)}
-                      options={[{ value: '', label: 'Select Member...' }, ...memberOptions]}
+                      onChange={(id) => handleAssignmentChange(position, id)}
+                      selfOption={false}
+                      showLookupFields={false}
+                      placeholder="Search member..."
                       disabled={!canManage}
                     />
                   </div>
@@ -252,11 +291,16 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                     <div className="flex items-center justify-between">
                       <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Commission Directors</h5>
                       {canManage && (
-                        <div className="w-48">
-                          <Select
+                        <div className="w-80">
+                          <MemberSelector
+                            label=""
+                            members={sortedMembers.filter(m => !allAssignedIds.has(m.id))}
+                            getOptionLabel={getMemberLabel}
                             value=""
-                            onChange={(e) => handleAddCommissionDirector(position, e.target.value)}
-                            options={[{ value: '', label: '+ Add Director' }, ...memberOptions]}
+                            onChange={(id) => handleAddCommissionDirector(position, id)}
+                            selfOption={false}
+                            showLookupFields={false}
+                            placeholder="+ Add Director"
                           />
                         </div>
                       )}
@@ -288,16 +332,6 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                 )}
               </div>
             ))}
-          </div>
-
-          <div className="flex gap-3 pt-6 border-t mt-6">
-            <Button variant="outline" className="flex-1" onClick={() => setShowManageModal(false)}>Cancel</Button>
-            {canManage && (
-              <Button className="flex-1 gap-2" onClick={handleSave} disabled={saving}>
-                <Save size={18} /> {saving ? 'Saving...' : 'Update Board'}
-              </Button>
-            )}
-          </div>
         </div>
       </Modal>
     </div>

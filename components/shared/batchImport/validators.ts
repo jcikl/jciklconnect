@@ -58,7 +58,7 @@ export const isValidAmount = (value: any): string | null => {
 export const isValidTier = (tier: string): string | null => {
   if (!tier) return null; // Optional field
   const validTiers = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'];
-  if (!validTiers.includes(tier)) {
+  if (!validTiers.includes(tier.toUpperCase())) {
     return `Invalid tier: "${tier}" (must be: ${validTiers.join(', ')})`;
   }
   return null;

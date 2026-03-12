@@ -5,6 +5,8 @@ import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { useMembers } from '../../hooks/useMembers';
 import { BusinessProfile } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
+import { Input, Textarea } from '../ui/Form';
 
 
 export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
@@ -13,10 +15,19 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'directory' | 'international'>('directory');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('All');
+  const [isInquiryModalOpen, setInquiryModalOpen] = useState(false);
+  const [inquiryForm, setInquiryForm] = useState({
+    name: '',
+    company: '',
+    phone: '',
+    requirements: ''
+  });
+  const [inquiryErrors, setInquiryErrors] = useState<Record<string, string>>({});
 
   const { businesses, loading, error } = useBusinessDirectory();
   const { members } = useMembers(); // Used to find owner name
   const { showToast } = useToast();
+  const { member: currentUser } = useAuth();
 
   // Map each industry to a unique premium gradient and background image for the banner (referencing premium dashboard header patterns)
   const INDUSTRY_BANNER_MAP: Record<string, { from: string; to: string; image: string }> = {
@@ -65,8 +76,40 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
 
   const handleContact = () => {
     setDetailModalOpen(false);
+    
+    // Auto-fill form from current user info
+    setInquiryForm({
+      name: currentUser?.name || '',
+      company: currentUser?.companyName || '',
+      phone: currentUser?.phone || '',
+      requirements: ''
+    });
+    setInquiryErrors({});
+    setInquiryModalOpen(true);
+  };
+
+  const handleSendInquiry = () => {
+    // Validate
+    const errors: Record<string, string> = {};
+    if (!inquiryForm.name.trim()) errors.name = 'Name is required';
+    if (!inquiryForm.phone.trim()) errors.phone = 'Phone number is required';
+    if (!inquiryForm.requirements.trim()) errors.requirements = 'Requirements are required';
+
+    if (Object.keys(errors).length > 0) {
+      setInquiryErrors(errors);
+      return;
+    }
+
+    // Submission logic (placeholder)
+    console.log('Inquiry submitted:', {
+      businessId: selectedBiz?.id,
+      businessName: selectedBiz?.companyName,
+      ...inquiryForm
+    });
+
+    setInquiryModalOpen(false);
     setSelectedBiz(null);
-    showToast('Inquiry sent to owner', 'success');
+    showToast('Your inquiry has been sent successfully', 'success');
   };
 
   return (
@@ -250,6 +293,67 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
           </div>
         </Modal>
       )}
+
+      {/* Inquiry Form Modal */}
+      <Modal
+        isOpen={isInquiryModalOpen}
+        onClose={() => setInquiryModalOpen(false)}
+        title={selectedBiz ? `Inquiry for ${selectedBiz.companyName}` : 'Inquiry'}
+        drawerOnMobile
+      >
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-slate-500 mb-4">
+            Please fill in your details and requirements. The business owner will contact you shortly.
+          </p>
+
+          <Input
+            label="Name"
+            placeholder="Your full name"
+            required
+            value={inquiryForm.name}
+            error={inquiryErrors.name}
+            onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
+          />
+
+          <Input
+            label="Company"
+            placeholder="Your company name (optional)"
+            value={inquiryForm.company}
+            onChange={(e) => setInquiryForm({ ...inquiryForm, company: e.target.value })}
+          />
+
+          <Input
+            label="Phone Number"
+            placeholder="E.g. +60123456789"
+            required
+            value={inquiryForm.phone}
+            error={inquiryErrors.phone}
+            onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
+          />
+
+          <Textarea
+            label="Requirements"
+            placeholder="What products or services are you looking for?"
+            required
+            value={inquiryForm.requirements}
+            error={inquiryErrors.requirements}
+            onChange={(e) => setInquiryForm({ ...inquiryForm, requirements: e.target.value })}
+          />
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setInquiryModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button className="flex-1" onClick={handleSendInquiry}>
+              <Send size={16} className="mr-2" /> Send Inquiry
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

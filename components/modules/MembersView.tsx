@@ -35,6 +35,7 @@ import { BoardOfDirectorsSection } from './MemberManagement/BoardOfDirectorsSect
 import { MemberBatchImportModal } from './Members/MemberBatchImportModal';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useBatchMode } from '../../contexts/BatchModeContext';
+import { formatDateToDDMMMYYYY } from '../../utils/dateUtils';
 
 const HOBBY_OPTIONS = [
   "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
@@ -130,7 +131,7 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div><span className="text-slate-500">姓名</span><p className="font-medium">{member.name}</p></div>
           <div><span className="text-slate-500">角色</span><p className="font-medium">{member.role}</p></div>
-          <div><span className="text-slate-500">入会日期</span><p className="font-medium">{member.joinDate}</p></div>
+          <div><span className="text-slate-500">入会日期</span><p className="font-medium">{formatDateToDDMMMYYYY(member.joinDate)}</p></div>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {MEMBER_SELF_EDITABLE_FIELDS.map((key) => (
@@ -161,7 +162,7 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
           </div>
           <div>
             <span className="text-slate-500 text-sm">Last Payment Date</span>
-            <p className="font-medium">{member.duesPaidDate ?? '—'}</p>
+            <p className="font-medium">{formatDateToDDMMMYYYY(member.duesPaidDate)}</p>
           </div>
         </div>
         {loadingExtra ? (
@@ -562,7 +563,6 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   <Button onClick={() => setAddModalOpen(true)}><UserPlus size={16} className="mr-2" /> Add Member</Button>
                 </>
               )}
-              <Button variant="outline"><Sparkles size={16} className="mr-2" /> AI Analysis</Button>
             </div>
           </div>
 
@@ -617,7 +617,7 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               )}
 
               {activeTab === 'guest' && (
-                <GuestManagementView searchQuery={searchQuery} />
+                <GuestManagementView searchQuery={searchQuery} onSelect={setSelectedMemberId} />
               )}
 
               {activeTab === 'statistics' && (
@@ -1469,7 +1469,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
           <div className="text-center md:text-left">
             <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Join Date</p>
-            <p className="text-xl font-bold text-slate-900">{member.joinDate}</p>
+            <p className="text-xl font-bold text-slate-900">{formatDateToDDMMMYYYY(member.joinDate)}</p>
           </div>
           <div className="text-center md:text-left">
             <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Attendance</p>
@@ -1511,7 +1511,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 </div>
                 <div>
                   <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
-                  <p className="font-medium text-slate-900">{member.dateOfBirth || 'Not provided'}</p>
+                  <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
                 </div>
               </div>
 
@@ -2037,7 +2037,7 @@ const ChurnPredictionModal: React.FC<ChurnPredictionModalProps> = ({ member, pre
 };
 
 // Guest Management View Component
-const GuestManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: string) => void }> = ({ searchQuery, onSelect }) => {
   const { members, updateMember } = useMembers();
   const { member: currentMember } = useAuth();
   const { isBoard, isAdmin } = usePermissions();
@@ -2202,17 +2202,28 @@ const GuestManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }
         ) : (
           <div className="space-y-3">
             {guests.map(guest => (
-              <div key={guest.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+              <div key={guest.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 gap-4">
                 <div className="flex items-center gap-3">
                   <img src={guest.avatar || undefined} className="w-10 h-10 rounded-full" alt={guest.name} />
-                  <div>
-                    <div className="font-medium text-slate-900">{guest.name}</div>
-                    <div className="text-sm text-slate-500">{guest.email}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="font-medium text-slate-900 truncate">{guest.name}</div>
+                      <Badge variant="neutral">Guest</Badge>
+                    </div>
+                    <div className="text-sm text-slate-500 truncate">{guest.email}</div>
                     {guest.phone && <div className="text-xs text-slate-400">{guest.phone}</div>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="neutral">Guest</Badge>
+                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onSelect(guest.id)}
+                    className="flex-1 sm:flex-none"
+                  >
+                    <FileText size={14} className="mr-2" />
+                    Review
+                  </Button>
                   {canApprove && (
                     <Button
                       size="sm"
@@ -2220,6 +2231,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }
                         setSelectedGuest(guest);
                         setShowApprovalModal(true);
                       }}
+                      className="flex-1 sm:flex-none"
                     >
                       <UserCheck size={14} className="mr-2" />
                       Approve
@@ -2247,27 +2259,40 @@ const GuestManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }
 
               return (
                 <div key={member.id} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
                     <div className="flex items-center gap-3">
                       <img src={member.avatar || undefined} className="w-10 h-10 rounded-full" alt={member.name} />
-                      <div>
-                        <div className="font-medium text-slate-900">{member.name}</div>
-                        <div className="text-sm text-slate-500">{member.email}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                          <div className="font-medium text-slate-900 truncate">{member.name}</div>
+                          <Badge variant={allCompleted ? 'success' : 'warning'}>
+                            {allCompleted ? 'Ready for Promotion' : 'Probation'}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-slate-500 truncate">{member.email}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={allCompleted ? 'success' : 'warning'}>
-                        {allCompleted ? 'Ready for Promotion' : 'Probation'}
-                      </Badge>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => onSelect(member.id)}
+                        className="flex-1 sm:flex-none font-medium"
+                      >
+                        <FileText size={14} className="mr-2" />
+                        Review
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
                         onClick={() => {
                           setSelectedProbationMember(member);
                           setShowProbationTasksModal(true);
                         }}
+                        className="flex-1 sm:flex-none"
                       >
-                        View Tasks
+                        <Clock size={14} className="mr-2" />
+                        Tasks
                       </Button>
                     </div>
                   </div>
@@ -2352,27 +2377,30 @@ const GuestManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }
                         : 'bg-slate-50 border-slate-200'
                       }`}
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-slate-900">{task.title}</h4>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-3 gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-slate-900 truncate">{task.title}</h4>
+                          <Badge
+                            className="shrink-0"
+                            variant={
+                              task.status === 'Verified'
+                                ? 'success'
+                                : task.status === 'Completed'
+                                  ? 'info'
+                                  : 'neutral'
+                            }
+                          >
+                            {task.status}
+                          </Badge>
+                        </div>
                         {task.description && (
-                          <p className="text-sm text-slate-600 mt-1">{task.description}</p>
+                          <p className="text-sm text-slate-600 mb-2">{task.description}</p>
                         )}
                         {task.category && (
-                          <Badge variant="neutral" className="mt-2">{task.category}</Badge>
+                          <Badge variant="neutral">{task.category}</Badge>
                         )}
                       </div>
-                      <Badge
-                        variant={
-                          task.status === 'Verified'
-                            ? 'success'
-                            : task.status === 'Completed'
-                              ? 'info'
-                              : 'neutral'
-                        }
-                      >
-                        {task.status}
-                      </Badge>
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       {task.status === 'Pending' && (

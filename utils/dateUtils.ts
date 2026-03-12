@@ -24,6 +24,29 @@ export const formatDate = (date: string | Date | undefined | null): string => {
   });
 };
 
+/**
+ * Format a date string or Date object to "DD MMM YYYY" format (e.g., 01 Jan 1990)
+ * @param date Value to format
+ * @returns Formatted date string or original value if invalid
+ */
+export const formatDateToDDMMMYYYY = (date: any): string => {
+  if (!date) return '—';
+  
+  const d = new Date(date);
+  
+  // Check if date is valid
+  if (isNaN(d.getTime())) {
+    return String(date);
+  }
+  
+  const day = d.getDate().toString().padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  
+  return `${day} ${month} ${year}`;
+};
+
 export const formatDateTime = (date: string | Date): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleString('en-US', {

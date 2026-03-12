@@ -43,6 +43,8 @@ export interface MemberSelectorProps {
   error?: string;
   /** 选中后是否展示主档带出区域 */
   showLookupFields?: boolean;
+  /** Custom function to render option labels */
+  getOptionLabel?: (m: Member) => string;
 }
 
 export const MemberSelector: React.FC<MemberSelectorProps> = ({
@@ -57,6 +59,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
   loading = false,
   error,
   showLookupFields = true,
+  getOptionLabel,
 }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -112,7 +115,9 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
     }
   };
 
-  const displayValue = selectedMember ? selectedMember.name : selfOption && !value ? selfLabel : '';
+  const displayValue = selectedMember
+    ? (getOptionLabel ? getOptionLabel(selectedMember) : selectedMember.name)
+    : selfOption && !value ? selfLabel : '';
 
   return (
     <div ref={containerRef} className="w-full">
@@ -168,7 +173,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => handleSelect(m.id)}
                 >
-                  {m.name}
+                  {getOptionLabel ? getOptionLabel(m) : m.name}
                   {!m.id && selfOption && <span className="text-slate-400 ml-1">（当前登录）</span>}
                 </li>
               ))

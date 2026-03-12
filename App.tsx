@@ -17,6 +17,7 @@ import { UserRole, Notification, Event } from './types';
 import { EventCalendarView } from './components/modules/EventCalendarView';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { usePermissions } from './hooks/usePermissions';
+import { useMembers } from './hooks/useMembers';
 import { useEvents } from './hooks/useEvents';
 import { useProjects } from './hooks/useProjects';
 import { useCommunication } from './hooks/useCommunication';
@@ -1017,6 +1018,144 @@ const NotificationDrawer: React.FC<{ isOpen: boolean, onClose: () => void, notif
   )
 }
 
+const SearchDrawer: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  onNavigate: (view: ViewType) => void;
+}> = ({ isOpen, onClose, searchQuery, onSearchChange, onNavigate }) => {
+  const { members } = useMembers(); // These hooks are already imported or available
+  const { events } = useEvents();
+  const { projects } = useProjects();
+
+  const filteredMembers = searchQuery ? members.filter(m =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    m.email.toLowerCase().includes(searchQuery.toLowerCase())
+  ).slice(0, 5) : [];
+
+  const filteredEvents = searchQuery ? events.filter(e =>
+    e.title.toLowerCase().includes(searchQuery.toLowerCase())
+  ).slice(0, 5) : [];
+
+  const filteredProjects = searchQuery ? projects.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ).slice(0, 5) : [];
+
+  const totalResults = filteredMembers.length + filteredEvents.length + filteredProjects.length;
+
+  return (
+    <Drawer isOpen={isOpen} onClose={onClose} title="Global Search">
+      <div className="space-y-6">
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <Search size={18} className="text-slate-400 group-focus-within:text-jci-blue transition-colors" />
+          </div>
+          <input
+            autoFocus
+            type="text"
+            placeholder="Search members, events, or projects..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-12 pr-4 focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none transition-all text-sm"
+          />
+        </div>
+
+        {searchQuery && totalResults === 0 && (
+          <div className="text-center py-10 text-slate-400">
+            <Search size={32} className="mx-auto mb-2 opacity-20" />
+            <p>No results found for "{searchQuery}"</p>
+          </div>
+        )}
+
+        {filteredMembers.length > 0 && (
+          <div>
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Users size={12} /> Members
+            </h4>
+            <div className="space-y-2">
+              {filteredMembers.map(m => (
+                <div
+                  key={m.id}
+                  onClick={() => { onNavigate('MEMBERS'); onClose(); }}
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
+                >
+                  <img
+                    src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=0097D7&color=fff`}
+                    className="w-8 h-8 rounded-full object-cover"
+                    alt=""
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{m.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{m.email}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filteredEvents.length > 0 && (
+          <div>
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Calendar size={12} /> Events
+            </h4>
+            <div className="space-y-2">
+              {filteredEvents.map(e => (
+                <div
+                  key={e.id}
+                  onClick={() => { onNavigate('EVENTS'); onClose(); }}
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-jci-blue flex items-center justify-center flex-shrink-0">
+                    <Calendar size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{e.title}</p>
+                    <p className="text-xs text-slate-500 truncate">{new Date(e.date).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filteredProjects.length > 0 && (
+          <div>
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Briefcase size={12} /> Projects
+            </h4>
+            <div className="space-y-2">
+              {filteredProjects.map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => { onNavigate('PROJECTS'); onClose(); }}
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0">
+                    <Briefcase size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{p.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{p.status}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!searchQuery && (
+          <div className="text-center py-10 text-slate-400">
+            <Search size={32} className="mx-auto mb-2 opacity-20" />
+            <p className="text-sm">Start typing to search across the platform</p>
+          </div>
+        )}
+      </div>
+    </Drawer>
+  )
+}
+
 // --- Main App Shell ---
 
 
@@ -1028,6 +1167,7 @@ export const JCIKLApp: React.FC = () => {
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [isSearchDrawerOpen, setSearchDrawerOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [leadFormSubmitted, setLeadFormSubmitted] = useState(false);
   const [leadFormSubmitting, setLeadFormSubmitting] = useState(false);
@@ -1288,11 +1428,19 @@ export const JCIKLApp: React.FC = () => {
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
         if (isBoard || isAdmin) {
-          return <BoardDashboard onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+          return <BoardDashboard
+            onNavigate={handleViewChange}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            scrollRef={scrollRef}
+            onOpenNotifications={() => setNotificationDrawerOpen(true)}
+            onOpenSearch={() => setSearchDrawerOpen(true)}
+          />;
         }
         return <DashboardHome
           userRole={member?.role || UserRole.MEMBER}
           onOpenNotifications={() => setNotificationDrawerOpen(true)}
+          onOpenSearch={() => setSearchDrawerOpen(true)}
           onNavigate={handleViewChange}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -1616,6 +1764,14 @@ export const JCIKLApp: React.FC = () => {
 
                   <div className="flex items-center space-x-2 sm:space-x-3">
                     <button
+                      onClick={() => setSearchDrawerOpen(true)}
+                      className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+                      title="Search"
+                    >
+                      <Search size={20} className="group-hover:scale-110 transition-transform" />
+                    </button>
+
+                    <button
                       onClick={() => setNotificationDrawerOpen(true)}
                       className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
                     >
@@ -1636,20 +1792,6 @@ export const JCIKLApp: React.FC = () => {
                     </button>
                   </div>
                 </div>
-
-                {/* Search Bar */}
-                <div className="relative group max-w-3xl">
-                  <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-                    <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search members, activities, or docs..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-4 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
-                  />
-                </div>
               </div>
             </div>
           )}
@@ -1668,6 +1810,14 @@ export const JCIKLApp: React.FC = () => {
           isOpen={isNotificationDrawerOpen}
           onClose={() => setNotificationDrawerOpen(false)}
           notifications={notifications}
+        />
+
+        <SearchDrawer
+          isOpen={isSearchDrawerOpen}
+          onClose={() => setSearchDrawerOpen(false)}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onNavigate={handleViewChange}
         />
 
         <Modal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} title="Help / New Process Guide" size="lg">

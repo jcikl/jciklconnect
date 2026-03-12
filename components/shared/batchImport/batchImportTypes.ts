@@ -27,6 +27,8 @@ export interface TableColumnDefinition {
   label: string;
   /** 列宽度 (像素) */
   width?: number;
+  /** 自定义显示格式化函数 */
+  formatter?: (value: any) => string;
 }
 
 export interface ColumnMapping {

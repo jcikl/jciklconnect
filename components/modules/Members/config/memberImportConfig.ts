@@ -25,6 +25,7 @@ import {
   splitCommaPreprocessor,
 } from '../../../shared/batchImport/batchImportUtils';
 import { MembersService } from '../../../../services/membersService';
+import { formatDateToDDMMMYYYY } from '../../../../utils/dateUtils';
 
 export const memberImportConfig: BatchImportConfig = {
   name: 'Members',
@@ -333,12 +334,12 @@ export const memberImportConfig: BatchImportConfig = {
     { key: 'phone', label: 'Phone', width: 130 },
     { key: 'tier', label: 'Tier', width: 100 },
     { key: 'idNumber', label: 'National ID', width: 120 },
-    { key: 'dateOfBirth', label: 'DOB', width: 100 },
+    { key: 'dateOfBirth', label: 'DOB', width: 120, formatter: formatDateToDDMMMYYYY },
     { key: 'gender', label: 'Gender', width: 80 },
     { key: 'nationality', label: 'Nationality', width: 100 },
     { key: 'companyName', label: 'Company', width: 150 },
     { key: 'departmentAndPosition', label: 'Position', width: 120 },
-    { key: 'joinDate', label: 'Join Date', width: 100 },
+    { key: 'joinDate', label: 'Join Date', width: 120, formatter: formatDateToDDMMMYYYY },
     { key: 'membershipType', label: 'Membership Type', width: 120 },
     { key: 'introducer', label: 'Introducer', width: 120 },
     { key: 'fullName', label: 'Full Name', width: 120 },
@@ -374,7 +375,7 @@ export const memberImportConfig: BatchImportConfig = {
       name: row.name,
       email: row.email,
       phone: row.phone || '',
-      tier: row.tier || 'Bronze',
+      tier: (row.tier?.charAt(0).toUpperCase() + row.tier?.slice(1).toLowerCase()) || 'Bronze',
       idNumber: row.idNumber || '',
       dateOfBirth: row.dateOfBirth || '',
       gender: row.gender || '',

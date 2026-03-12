@@ -27,6 +27,7 @@ import { useState, useEffect } from 'react';
 interface DashboardHomeProps {
   userRole: import('../../types').UserRole;
   onOpenNotifications: () => void;
+  onOpenSearch?: () => void;
   onNavigate?: (view: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -36,6 +37,7 @@ interface DashboardHomeProps {
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
   userRole,
   onOpenNotifications,
+  onOpenSearch,
   onNavigate,
   searchQuery,
   onSearchChange,
@@ -199,6 +201,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
           <div className="flex items-center space-x-3">
             <button
+              onClick={onOpenSearch}
+              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              title="Search"
+            >
+              <Search size={20} className="group-hover:scale-110 transition-transform" />
+            </button>
+
+            <button
               onClick={onOpenNotifications}
               className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
             >
@@ -276,20 +286,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               <p className="text-blue-100/70 font-medium">Ready to make an impact? Check out the latest.</p>
             )}
           </motion.div>
-
-          {/* Search Bar: Slides up */}
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-              <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search events, members, or projects..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-4 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
-            />
-          </div>
         </div>
       </div>
     </motion.div>

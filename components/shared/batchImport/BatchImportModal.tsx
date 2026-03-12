@@ -649,6 +649,9 @@ export const BatchImportModal: React.FC<Props> = ({
                             ) : (
                               (() => {
                                 const val = row.parsed[col.key];
+                                if (col.formatter) {
+                                  return col.formatter(val);
+                                }
                                 if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) {
                                   return '—';
                                 }

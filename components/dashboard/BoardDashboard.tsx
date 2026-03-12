@@ -23,12 +23,14 @@ import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell
 
 interface BoardDashboardProps {
   onNavigate?: (view: any) => void;
+  onOpenNotifications: () => void;
+  onOpenSearch: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
-export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, searchQuery, onSearchChange, scrollRef }) => {
+export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOpenNotifications, onOpenSearch, searchQuery, onSearchChange, scrollRef }) => {
   const { member, signOut } = useAuth();
 
   // Header Scroll Animations
@@ -461,12 +463,21 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
               <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
                 <span>{member?.name}</span>
               </div>
-              <p className="font-medium text-sm tracking-wide text-blue-200">Board Member</p>
+              <p className="font-medium text-sm tracking-wide text-blue-200">{member?.role}</p>
             </div>
           </div>
 
           <div className="flex items-center space-x-3">
             <button
+              onClick={onOpenSearch}
+              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              title="Search"
+            >
+              <Search size={20} className="group-hover:scale-110 transition-transform" />
+            </button>
+
+            <button
+              onClick={onOpenNotifications}
               className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
             >
               <Bell size={20} className="group-hover:rotate-12 transition-transform" />
@@ -526,20 +537,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             </div>
           </div>
         </motion.div>
-
-        {/* Search Bar: Slides up to join the Top Row */}
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-            <Search size={20} className="text-white/40 group-focus-within:text-white transition-colors" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search board reports, financials, or members..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-white/10 backdrop-blur-md text-white rounded-3xl py-4 pl-14 pr-14 shadow-2xl focus:ring-4 focus:ring-white/10 outline-none transition-all placeholder:text-white/50 border border-white/20 text-base"
-          />
-        </div>
       </div>
 
     </div>
