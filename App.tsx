@@ -1161,7 +1161,10 @@ const SearchDrawer: React.FC<{
 
 
 export const JCIKLApp: React.FC = () => {
-  const [view, setView] = useState<ViewType>('GUEST');
+  const [view, setView] = useState<ViewType>(() => {
+    const savedView = localStorage.getItem('jc_last_view');
+    return (savedView as ViewType) || 'GUEST';
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
@@ -1234,6 +1237,11 @@ export const JCIKLApp: React.FC = () => {
     };
     const pageTitle = titles[view] ?? 'JCI LO Management';
     document.title = `${pageTitle} | JCI Kuala Lumpur`;
+
+    // Persist non-guest views to localStorage
+    if (view && !view.startsWith('GUEST')) {
+      localStorage.setItem('jc_last_view', view);
+    }
   }, [view]);
 
   React.useEffect(() => {
@@ -1250,12 +1258,24 @@ export const JCIKLApp: React.FC = () => {
   React.useEffect(() => {
     if (!authLoading) {
       if (user && member) {
-        // Redirect to /roadmap after login
+        // Authenticated
         navigate('/roadmap');
-        setView('DASHBOARD');
+        
+        // If the current view is a GUEST view, switch to DASHBOARD
+        // Otherwise, keep the current view (likely restored from localStorage)
+        if (view.startsWith('GUEST')) {
+          setView('DASHBOARD');
+        }
         setSearchQuery('');
       } else {
-        setView('GUEST');
+        // Not authenticated
+        const savedView = localStorage.getItem('jc_last_view');
+        // If we have a saved guest view, use it, otherwise default to GUEST
+        if (savedView && savedView.startsWith('GUEST')) {
+          setView(savedView as ViewType);
+        } else {
+          setView('GUEST');
+        }
         setSearchQuery('');
       }
     }
@@ -1293,9 +1313,17 @@ export const JCIKLApp: React.FC = () => {
       if (guestPaths.includes(path)) {
         // Redirect authenticated users away from guest pages
         navigate('/roadmap', { replace: true });
-        setView('DASHBOARD');
+        // Only set to DASHBOARD if we're coming from a guest page
+        if (view.startsWith('GUEST')) {
+          setView('DASHBOARD');
+        }
       } else if (path === '/roadmap') {
-        setView('DASHBOARD');
+        // We're already on roadmap. If view is still a guest view, 
+        // it means we just loaded/refreshed and need to default to DASHBOARD
+        // OR restore from local state (handled by the other useEffect)
+        if (view.startsWith('GUEST')) {
+          setView('DASHBOARD');
+        }
       }
     }
   }, [location.pathname, user, member, navigate]);
@@ -1307,6 +1335,7 @@ export const JCIKLApp: React.FC = () => {
   const handleLogout = async () => {
     try {
       await signOut();
+      localStorage.removeItem('jc_last_view'); // Clear persisted view on logout
       navigate('/', { replace: true });
       setView('GUEST');
       showToast('Logged out successfully', 'success');
