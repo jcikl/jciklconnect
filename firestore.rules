@@ -639,6 +639,12 @@ service cloud.firestore {
       allow write: if isBoard();
     }
 
+    // System configuration (e.g., birthday_processor)
+    match /system_config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard() || isAuthenticated(); // Allow members to update (e.g. birthday processing)
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

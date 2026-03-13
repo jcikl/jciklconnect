@@ -904,6 +904,7 @@ export interface PaymentRequest {
   activityRef?: string | null;
   referenceNumber: string;
   status: PaymentRequestStatus;
+  attachmentUrls?: string[];
   loId: string;
   createdAt: string;
   updatedAt: string;
