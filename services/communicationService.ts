@@ -407,5 +407,97 @@ export class CommunicationService {
       throw error;
     }
   }
+
+  /**
+   * Processes daily birthday notifications at 1 PM.
+   * Checks if today's birthdays have already been processed and if it's past 1 PM.
+   */
+  static async processDailyBirthdays(): Promise<{ processed: boolean; count: number }> {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const currentHour = today.getHours();
+
+    // Check if it's past 1 PM (13:00)
+    if (currentHour < 13 && !isDevMode()) {
+      return { processed: false, count: 0 };
+    }
+
+    if (isDevMode()) {
+      console.log('[DEV MODE] processDailyBirthdays: Checking birthdays...');
+    }
+
+    try {
+      // Check if already processed today using a system config document
+      const configRef = doc(db, 'system_config', 'birthday_processor');
+      const configSnap = await getDoc(configRef);
+      
+      if (configSnap.exists() && configSnap.data().lastProcessedDate === todayStr && !isDevMode()) {
+        return { processed: false, count: 0 };
+      }
+
+      // Fetch all members
+      const { MembersService } = await import('./membersService');
+      const allMembers = await MembersService.getAllMembers();
+      
+      const todayMonth = today.getMonth() + 1;
+      const todayDate = today.getDate();
+      
+      const birthdayMembers = allMembers.filter(m => {
+        if (!m.dateOfBirth) return false;
+        const [y, mStr, dStr] = m.dateOfBirth.split('-');
+        return parseInt(mStr) === todayMonth && parseInt(dStr) === todayDate;
+      });
+
+      if (birthdayMembers.length === 0) {
+        // Still update the date so we don't keep checking every 15 mins for nothing
+        if (!isDevMode()) {
+          await updateDoc(configRef, { lastProcessedDate: todayStr, updatedAt: Timestamp.now() });
+        }
+        return { processed: true, count: 0 };
+      }
+
+      // Create a persistent announcement for all members
+      const birthdayNames = birthdayMembers.map(m => m.name).join(', ');
+      await this.createAnnouncement({
+        title: `🎂 Happy Birthday!`,
+        content: `Today we celebrate the birthday${birthdayMembers.length > 1 ? 's' : ''} of: ${birthdayNames}. Let's wish them a fantastic day!`,
+        priority: 'Normal',
+        targetAudience: 'All Members',
+        sendNotification: true,
+        sendEmail: false
+      }, 'system-admin'); // Triggered as system admin
+
+      // Mark as processed
+      if (!isDevMode()) {
+        await updateDoc(configRef, { 
+          lastProcessedDate: todayStr, 
+          updatedAt: Timestamp.now() 
+        });
+      } else {
+        console.log(`[DEV MODE] processDailyBirthdays: Processed birthdays for ${birthdayNames}`);
+      }
+
+      return { processed: true, count: birthdayMembers.length };
+    } catch (error) {
+      console.error('Error processing daily birthdays:', error);
+      // If document doesn't exist, create it (excluding dev mode)
+      if (!isDevMode()) {
+        try {
+          const configRef = doc(db, 'system_config', 'birthday_processor');
+          const configSnap = await getDoc(configRef);
+          if (!configSnap.exists()) {
+             const { setDoc } = await import('firebase/firestore');
+             await setDoc(configRef, { 
+               lastProcessedDate: '', 
+               updatedAt: Timestamp.now() 
+             });
+          }
+        } catch (e) {
+          console.error('Failed to initialize birthday_processor config:', e);
+        }
+      }
+      throw error;
+    }
+  }
 }
 

@@ -30,6 +30,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { AsyncErrorBoundary } from './components/ui/AsyncErrorBoundary';
 import { errorLoggingService } from './services/errorLoggingService';
 import { NonMemberLeadService } from './services/nonMemberLeadService';
+import { CommunicationService } from './services/communicationService';
 import { DEFAULT_LO_ID } from './config/constants';
 
 // Module Imports
@@ -965,54 +966,80 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
 // --- Authenticated Dashboard Views ---
 
 
-const NotificationDrawer: React.FC<{ isOpen: boolean, onClose: () => void, notifications: Notification[] }> = ({ isOpen, onClose, notifications: initialNotifications }) => {
+const NotificationDrawer: React.FC<{
+  isOpen: boolean,
+  onClose: () => void,
+  notifications: Notification[],
+  onMarkAsRead: (id: string) => Promise<void>
+}> = ({ isOpen, onClose, notifications, onMarkAsRead }) => {
   const { showToast } = useToast();
-  const [notifications, setNotifications] = useState(initialNotifications.filter(n => !n.read));
+  const [activeTab, setActiveTab] = useState<'Active' | 'History'>('Active');
 
-  const handleAction = (id: string, type: string) => {
-    setNotifications(notifications.filter(n => n.id !== id));
-    showToast(type === 'dismiss' ? 'Notification dismissed' : 'Action taken successfully', type === 'dismiss' ? 'info' : 'success');
+  const handleAction = async (id: string, type: string) => {
+    try {
+      await onMarkAsRead(id);
+      showToast(type === 'dismiss' ? 'Notification moved to history' : 'Action taken successfully', type === 'dismiss' ? 'info' : 'success');
+    } catch (error) {
+      showToast('Failed to update notification', 'error');
+    }
   }
 
-  const handleClearAll = () => {
-    setNotifications([]);
-    showToast('All notifications cleared', 'info');
-  }
+  const filteredNotifications = notifications.filter(n =>
+    activeTab === 'Active' ? !n.read : n.read
+  );
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title="Action Center">
       <div className="space-y-4">
-        <div className="flex justify-between items-center text-xs text-slate-500 uppercase font-bold tracking-wider">
-          <span>Pending Items</span>
-          <button onClick={handleClearAll} className="text-jci-blue hover:underline">Clear All</button>
+        <div className="flex flex-col gap-4">
+          <div className="flex bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('Active')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Active ({notifications.filter(n => !n.read).length})
+            </button>
+            <button
+              onClick={() => setActiveTab('History')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'History' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              History
+            </button>
+          </div>
         </div>
 
-        {notifications.map(note => (
-          <div key={note.id} className="p-4 border border-slate-200 rounded-lg shadow-sm bg-white hover:border-jci-blue transition-colors">
-            <div className="flex items-start gap-3 mb-3">
-              <div className={`p-2 rounded-full flex-shrink-0 ${note.type === 'ai' ? 'bg-purple-100 text-purple-600' : note.type === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                {note.type === 'ai' ? <Sparkles size={16} /> : note.type === 'warning' ? <AlertTriangle size={16} /> : <Bell size={16} />}
+        <div className="space-y-3">
+          {filteredNotifications.map(note => (
+            <div key={note.id} className={`p-4 border rounded-lg shadow-sm transition-colors ${note.read ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-jci-blue'}`}>
+              <div className="flex items-start gap-3 mb-3">
+                <div className={`p-2 rounded-full flex-shrink-0 ${note.type === 'ai' ? 'bg-purple-100 text-purple-600' : note.type === 'warning' ? 'bg-amber-100 text-amber-600' : note.title.includes('🎂') ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
+                  {note.type === 'ai' ? <Sparkles size={16} /> : note.type === 'warning' ? <AlertTriangle size={16} /> : note.title.includes('🎂') ? <Gift size={16} /> : <Bell size={16} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className={`text-sm font-bold truncate ${note.read ? 'text-slate-600' : 'text-slate-900'}`}>{note.title}</h4>
+                  <p className="text-[10px] text-slate-500">
+                    {note.timestamp === 'Today' ? 'Today' : (isNaN(new Date(note.timestamp).getTime()) ? note.timestamp : new Date(note.timestamp).toLocaleString())}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">{note.title}</h4>
-                <p className="text-xs text-slate-500">{note.timestamp}</p>
-              </div>
-            </div>
-            <p className="text-sm text-slate-600 mb-4">{note.message}</p>
+              <p className={`text-sm mb-4 ${note.read ? 'text-slate-500' : 'text-slate-600'}`}>{note.message}</p>
 
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1 text-xs h-8" onClick={() => handleAction(note.id, 'act')}><Check size={14} className="mr-1" /> Approve/Act</Button>
-              <Button size="sm" variant="outline" className="flex-1 text-xs h-8" onClick={() => handleAction(note.id, 'dismiss')}><X size={14} className="mr-1" /> Dismiss</Button>
+              {!note.read && !note.id.startsWith('birthday-') && (
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 text-xs h-8" onClick={() => handleAction(note.id, 'act')}><Check size={14} className="mr-1" /> Approve/Act</Button>
+                  <Button size="sm" variant="outline" className="flex-1 text-xs h-8" onClick={() => handleAction(note.id, 'dismiss')}><X size={14} className="mr-1" /> Dismiss</Button>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          ))}
 
-        {notifications.length === 0 && (
-          <div className="text-center py-10 text-slate-400">
-            <Bell size={32} className="mx-auto mb-2 opacity-20" />
-            <p>No new notifications.</p>
-          </div>
-        )}
+          {filteredNotifications.length === 0 && (
+            <div className="text-center py-10 text-slate-400">
+              <Bell size={32} className="mx-auto mb-2 opacity-20" />
+              <p>{activeTab === 'Active' ? 'No new notifications.' : 'No notification history.'}</p>
+            </div>
+          )}
+        </div>
       </div>
     </Drawer>
   )
@@ -1199,9 +1226,60 @@ export const JCIKLApp: React.FC = () => {
 
   // useCommunication hook is safe to call even without authentication
   // It handles the case when member is null internally
-  const { notifications } = useCommunication();
+  const { notifications, markNotificationAsRead } = useCommunication();
+  const { members } = useMembers();
 
-  const unreadNotifications = notifications.filter(n => !n.read);
+  // Generate birthday notifications
+  const birthdayNotifications: Notification[] = React.useMemo(() => {
+    if (!members.length) return [];
+
+    const today = new Date();
+    const todayMonth = today.getMonth() + 1;
+    const todayDate = today.getDate();
+
+    return members
+      .filter(m => {
+        if (!m.dateOfBirth) return false;
+        const [y, mStr, dStr] = m.dateOfBirth.split('-');
+        return parseInt(mStr) === todayMonth && parseInt(dStr) === todayDate;
+      })
+      .map(m => ({
+        id: `birthday-${m.id}-${today.toISOString().split('T')[0]}`,
+        title: `🎂 Member Birthday Today!`,
+        message: `It's ${m.name}'s birthday today! Let's send them some warm wishes.`,
+        type: 'info' as const,
+        read: false,
+        timestamp: 'Today'
+      }));
+  }, [members]);
+
+  // Combined notifications (stable order: birthdays first)
+  const allNotifications = React.useMemo(() => {
+    return [...birthdayNotifications, ...notifications];
+  }, [birthdayNotifications, notifications]);
+
+  const unreadNotifications = allNotifications.filter(n => !n.read);
+
+  // Background trigger for daily 1 PM birthday notifications
+  React.useEffect(() => {
+    // Only admins or board members trigger the system-wide check to minimize overhead
+    if (!member || !['ADMIN', 'BOARD', 'MEMBER'].includes(member.role)) return;
+
+    const checkBirthdays = async () => {
+      try {
+        await CommunicationService.processDailyBirthdays();
+      } catch (error) {
+        console.error('Background birthday check failed:', error);
+      }
+    };
+
+    // Run once on mount
+    checkBirthdays();
+
+    // Then every 15 minutes
+    const interval = setInterval(checkBirthdays, 15 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [member]);
 
   // Sync document.title for accessibility (WCAG 2.4.2)
   React.useEffect(() => {
@@ -1260,7 +1338,7 @@ export const JCIKLApp: React.FC = () => {
       if (user && member) {
         // Authenticated
         navigate('/roadmap');
-        
+
         // If the current view is a GUEST view, switch to DASHBOARD
         // Otherwise, keep the current view (likely restored from localStorage)
         if (view.startsWith('GUEST')) {
@@ -1838,7 +1916,14 @@ export const JCIKLApp: React.FC = () => {
         <NotificationDrawer
           isOpen={isNotificationDrawerOpen}
           onClose={() => setNotificationDrawerOpen(false)}
-          notifications={notifications}
+          notifications={allNotifications}
+          onMarkAsRead={async (id) => {
+            if (id.startsWith('birthday-')) {
+              // Virtual notification, just close or ignore
+              return;
+            }
+            await markNotificationAsRead(id);
+          }}
         />
 
         <SearchDrawer
