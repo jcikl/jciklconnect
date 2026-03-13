@@ -449,7 +449,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
 
       {/* Top Row: Fixed/Docked Area */}
       <div className="sticky top-[0rem] z-20 pb-2">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center">
           <div className="flex items-center space-x-3">
             <div className="relative group">
               <img
