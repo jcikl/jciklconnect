@@ -37,7 +37,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
   const { scrollY } = useScroll({ container: scrollRef });
 
   // Transform Greeting: Move left and fade out via vertical mask
-  const greetingX = useTransform(scrollY, [0, 120], [0, 120]);
+  const greetingX = useTransform(scrollY, [0, 120], [0, 0]);
   const greetingOpacity = useTransform(scrollY, [0, 120], [1, 0]);
 
   // Mask wipe effect: as we scroll, the mask moves down

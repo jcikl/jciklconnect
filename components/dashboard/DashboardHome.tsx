@@ -46,19 +46,17 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const { scrollY } = useScroll({ container: scrollRef });
 
   // Transform Greeting: Move left and fade out via vertical mask
-  const greetingX = useTransform(scrollY, [0, 100], [0, -30]);
-  const greetingOpacity = useTransform(scrollY, [0, 80], [1, 0]);
+  const greetingX = useTransform(scrollY, [0, 120], [0, 0]);
+  const greetingOpacity = useTransform(scrollY, [0, 120], [1, 0]);
 
-  // Mask wipe effect
-  const maskProgress = useTransform(scrollY, [0, 100], [0, 100]);
+  // Mask wipe effect: as we scroll, the mask moves down
+  const maskProgress = useTransform(scrollY, [0, 120], [0, 100]);
   const greetingMask = useTransform(maskProgress, (p) =>
-    `linear-gradient(to bottom, transparent ${p}%, black ${p}%)`
+    `linear-gradient(to top, transparent ${p}%, black ${p}%)`
   );
 
-  // Transform Search Bar: Move up
-  const searchY = useTransform(scrollY, [0, 100], [0, -180]);
-  const backgroundY = useTransform(scrollY, [0, 100], [0, -180]);
-  const headerY = useTransform(scrollY, [0, 100], [0, -180]);
+  // Transform Search Bar: Move up to dock with Top Row
+  const headerY = useTransform(scrollY, [0, 120], [0, -150]);
   const counterY = useTransform(headerY, (y) => -Number(y));
 
   const { showToast } = useToast();
@@ -169,21 +167,20 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }
 
   const renderHeader = () => (
-    <motion.div
-      style={{ y: headerY }}
-      className="sticky top-[-1rem] sm:top-[-1.5rem] lg:top-[-2rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative overflow-hidden -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8"
+    <div
+      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-4 sm:pb-6 lg:pb-8"
     >
       {/* Decorative Background Pattern */}
-      <motion.div style={{ y: backgroundY }} className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-      </motion.div>
+      </div>
 
-      <div className="relative z-10 pt-8 pb-4 sm:pb-6 lg:pb-8 flex flex-col">
-        {/* Top Row: Fixed Area (Counter-animated) */}
-        <motion.div style={{ y: counterY }} className="flex justify-between items-center mb-8">
+      {/* Top Row: Fixed/Docked Area */}
+      <div className="sticky top-[0rem] z-20 pb-2">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center space-x-3">
-            <div className="relative">
+            <div className="relative group">
               <img
                 src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
                 alt="Avatar"
@@ -195,7 +192,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
                 <span>{member.name}</span>
               </div>
-              <p className="font-medium text-sm tracking-wide">{member.role}</p>
+              <p className="font-medium text-sm tracking-wide text-blue-200">{member.role}</p>
             </div>
           </div>
 
@@ -235,60 +232,60 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               <LogOut size={20} className="group-hover:scale-110 transition-transform" />
             </button>
           </div>
-        </motion.div>
-
-        {/* Dynamic Animation Area */}
-        <div className="relative">
-          {/* Greeting: Animates away and dissolves */}
-          <motion.div
-            style={{
-              x: greetingX,
-              opacity: greetingOpacity,
-              maskImage: greetingMask,
-              WebkitMaskImage: greetingMask
-            }}
-            className="space-y-3 mb-8"
-          >
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
-              What would you <br /> prefer to do today?
-            </h2>
-            {topRecommendation ? (
-              <div
-                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
-                onClick={() => {
-                  if (topRecommendation.actionUrl) {
-                    const view = topRecommendation.actionUrl.replace('/', '').toUpperCase();
-                    onNavigate?.(view);
-                  }
-                }}
-              >
-                <Sparkles size={16} className="text-yellow-400 animate-pulse" />
-                <p className="text-sm font-medium text-blue-50">
-                  AI Suggests: <span className="underline decoration-yellow-400/50 underline-offset-4">{topRecommendation.itemName}</span>
-                </p>
-              </div>
-            ) : nudges.length > 0 ? (
-              <div
-                className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
-                onClick={() => {
-                  if (nudges[0].actionUrl) {
-                    const view = nudges[0].actionUrl.replace('/', '').toUpperCase();
-                    onNavigate?.(view);
-                  }
-                }}
-              >
-                <Zap size={16} className="text-amber-400 animate-pulse" />
-                <p className="text-sm font-medium text-blue-50">
-                  {nudges[0].title}
-                </p>
-              </div>
-            ) : (
-              <p className="text-blue-100/70 font-medium">Ready to make an impact? Check out the latest.</p>
-            )}
-          </motion.div>
         </div>
       </div>
-    </motion.div>
+
+      {/* Dynamic Animation Area */}
+      <div className="relative">
+        <motion.div
+          style={{
+            y: counterY,
+            x: greetingX,
+            opacity: greetingOpacity,
+            maskImage: greetingMask,
+            WebkitMaskImage: greetingMask
+          }}
+          className="space-y-3 mb-4"
+        >
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+            What would you <br /> prefer to do today?
+          </h2>
+          {topRecommendation ? (
+            <div
+              className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
+              onClick={() => {
+                if (topRecommendation.actionUrl) {
+                  const view = topRecommendation.actionUrl.replace('/', '').toUpperCase();
+                  onNavigate?.(view);
+                }
+              }}
+            >
+              <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+              <p className="text-sm font-medium text-blue-50">
+                AI Suggests: <span className="underline decoration-yellow-400/50 underline-offset-4">{topRecommendation.itemName}</span>
+              </p>
+            </div>
+          ) : nudges.length > 0 ? (
+            <div
+              className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
+              onClick={() => {
+                if (nudges[0].actionUrl) {
+                  const view = nudges[0].actionUrl.replace('/', '').toUpperCase();
+                  onNavigate?.(view);
+                }
+              }}
+            >
+              <Zap size={16} className="text-amber-400 animate-pulse" />
+              <p className="text-sm font-medium text-blue-50">
+                {nudges[0].title}
+              </p>
+            </div>
+          ) : (
+            <p className="text-blue-100/70 font-medium">Ready to make an impact? Check out the latest.</p>
+          )}
+        </motion.div>
+      </div>
+    </div>
   );
 
   return (
