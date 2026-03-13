@@ -12,7 +12,6 @@ import { Input, Textarea } from '../ui/Form';
 export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
-  const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'directory' | 'international'>('directory');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('All');
   const [isInquiryModalOpen, setInquiryModalOpen] = useState(false);
@@ -75,8 +74,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
   }, [businesses, searchTerm, searchQuery, selectedIndustry]);
 
   const handleContact = () => {
-    setDetailModalOpen(false);
-    
     // Auto-fill form from current user info
     setInquiryForm({
       name: currentUser?.name || '',
@@ -220,7 +217,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
                               className="flex-1"
                               onClick={() => {
                                 setSelectedBiz(biz);
-                                setDetailModalOpen(true);
+                                handleContact();
                               }}
                             >
                               Contact
@@ -249,50 +246,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
         </div>
       </Card>
 
-      {/* Contact Modal */}
-      {selectedBiz && (
-        <Modal
-          isOpen={isDetailModalOpen}
-          onClose={() => { setDetailModalOpen(false); setSelectedBiz(null); }}
-          title={`Contact ${selectedBiz.companyName}`}
-          drawerOnMobile
-        >
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 mb-4">
-              <img
-                src={selectedBiz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedBiz.companyName)}&background=0097D7&color=fff`}
-                alt={selectedBiz.companyName}
-                className="w-16 h-16 rounded-lg"
-              />
-              <div>
-                <h3 className="font-bold text-slate-900">{selectedBiz.companyName}</h3>
-                <p className="text-sm text-slate-500">{selectedBiz.industry}</p>
-              </div>
-            </div>
-            <p className="text-sm text-slate-600">{selectedBiz.description}</p>
-            {selectedBiz.offer && (
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">JCI Member Deal</span>
-                <p className="text-sm font-medium text-blue-900 mt-1">{selectedBiz.offer}</p>
-              </div>
-            )}
-            <div className="flex gap-2 pt-4">
-              {selectedBiz.website && (
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => window.open(selectedBiz.website!.startsWith('http') ? selectedBiz.website : `https://${selectedBiz.website}`, '_blank')}
-                >
-                  <Globe size={16} className="mr-2" /> Visit Website
-                </Button>
-              )}
-              <Button className="flex-1" onClick={handleContact}>
-                <Send size={16} className="mr-2" /> Send Inquiry
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+
 
       {/* Inquiry Form Modal */}
       <Modal

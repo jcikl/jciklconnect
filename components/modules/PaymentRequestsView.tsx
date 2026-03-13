@@ -3,11 +3,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Trash2, Eye } from 'lucide-react';
 import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
+import { Combobox } from '../ui/Combobox';
 import { MemberSelector } from '../ui/MemberSelector';
 import { FirstUseBanner } from '../ui/FirstUseBanner';
 import { useHelpModal } from '../../contexts/HelpModalContext';
 import { LoadingState } from '../ui/Loading';
 import { PaymentRequestService } from '../../services/paymentRequestService';
+import { getAdministrativeProjectIds } from '../../utils/administrativeProjectsStorage';
 import { FinanceService } from '../../services/financeService';
 import { ProjectsService } from '../../services/projectsService';
 import { PaymentRequest, PaymentRequestStatus, PaymentRequestItem, BankAccount, Project } from '../../types';
@@ -66,6 +68,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   // Data for Selects
   const [projects, setProjects] = useState<Project[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [adminAccountOptions, setAdminAccountOptions] = useState<string[]>([]);
 
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
@@ -107,6 +110,26 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       // Try to find current position if any
     }
   }, [submitModalOpen, user, member]);
+
+  // Load admin account options when modal opens
+  useEffect(() => {
+    const loadAdminAccounts = async () => {
+      if (!submitModalOpen) return;
+      try {
+        const accounts = new Set<string>(getAdministrativeProjectIds());
+        const allTx = await FinanceService.getAllTransactions();
+        allTx.forEach(t => {
+          if (t.category === 'Administrative' && t.projectId && t.projectId.trim() !== '') {
+            accounts.add(t.projectId.trim());
+          }
+        });
+        setAdminAccountOptions(Array.from(accounts).sort());
+      } catch (e) {
+        console.error('Failed to load admin account options:', e);
+      }
+    };
+    loadAdminAccounts();
+  }, [submitModalOpen]);
 
   const loadMyList = useCallback(async () => {
     if (!user?.uid) return;
@@ -905,13 +928,15 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                 required
               />
             ) : (
-              <Input
-                label="Admin Account"
-                value={formActivityId}
-                onChange={(e) => setFormActivityId(e.target.value)}
-                placeholder="e.g. Maintenance / Utilities"
-                required
-              />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Admin Account</label>
+                <Combobox
+                  options={adminAccountOptions}
+                  value={formActivityId}
+                  onChange={(value) => setFormActivityId(value)}
+                  placeholder="Select or type admin account..."
+                />
+              </div>
             )}
           </div>
 
