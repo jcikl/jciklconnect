@@ -536,15 +536,15 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         }
 
         const finalPdfBytes = await mergedPdf.save();
-        const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+        const blob = new Blob([finalPdfBytes as BlobPart], { type: 'application/pdf' });
         finalBlobUrl = URL.createObjectURL(blob);
       } catch (mergeErr) {
         console.error('PDF merging failed, falling back to basic PDF:', mergeErr);
         showToast('PDF merging failed. Generating basic PDF without attachments.', 'warning');
-        finalBlobUrl = doc.output('bloburl');
+        finalBlobUrl = doc.output('bloburl').toString();
       }
     } else {
-      finalBlobUrl = doc.output('bloburl');
+      finalBlobUrl = doc.output('bloburl').toString();
     }
 
     if (finalBlobUrl) {
