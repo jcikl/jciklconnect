@@ -20,6 +20,7 @@ import { jsPDF } from 'jspdf';
 import { PDFDocument } from 'pdf-lib';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../config/firebase';
+import imageCompression from 'browser-image-compression';
 
 const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
   draft: 'Draft',
@@ -517,7 +518,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
               } else {
                 image = await mergedPdf.embedJpg(fileBytes);
               }
-              
+
               const page = mergedPdf.addPage();
               const { width, height } = page.getSize();
               const imgDims = image.scaleToFit(width - 40, height - 40);
@@ -530,6 +531,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
             }
           } catch (fileErr) {
             console.error('Failed to attach file:', url, fileErr);
+            showToast(`Failed to load an attachment (CORS or Network error)`, 'error');
           }
         }
 
@@ -538,6 +540,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         finalBlobUrl = URL.createObjectURL(blob);
       } catch (mergeErr) {
         console.error('PDF merging failed, falling back to basic PDF:', mergeErr);
+        showToast('PDF merging failed. Generating basic PDF without attachments.', 'warning');
         finalBlobUrl = doc.output('bloburl');
       }
     } else {
@@ -600,8 +603,29 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       const attachmentUrls: string[] = [];
       if (formAttachments.length > 0) {
         for (const file of formAttachments) {
-          const fileRef = ref(storage, `payment-requests/${loId}/${Date.now()}_${file.name}`);
-          const snapshot = await uploadBytes(fileRef, file);
+          let fileToUpload = file;
+
+          // Compress image if it's an image file
+          if (file.type.startsWith('image/')) {
+            try {
+              const options = {
+                maxSizeMB: 1, // Compress down to max 1MB
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              const compressedFile = await imageCompression(file, options);
+              // browser-image-compression returns a File/Blob. Reconstruct File object to maintain original name
+              fileToUpload = new File([compressedFile], file.name, {
+                type: compressedFile.type,
+                lastModified: Date.now(),
+              });
+            } catch (error) {
+              console.error('Image compression failed, using original file:', error);
+            }
+          }
+
+          const fileRef = ref(storage, `payment-requests/${loId}/${Date.now()}_${fileToUpload.name}`);
+          const snapshot = await uploadBytes(fileRef, fileToUpload);
           const url = await getDownloadURL(snapshot.ref);
           attachmentUrls.push(url);
         }
@@ -785,12 +809,37 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
       <Modal
         isOpen={submitModalOpen}
-        onClose={() => !submitting && setSubmitModalOpen(false)}
-        title="Submit Payment Request"
-        size="lg"
-        drawerOnMobile
+        onClose={() => setSubmitModalOpen(false)}
+        title={
+          <div className="flex items-center gap-2 text-jci-blue">
+            <div className="bg-sky-100 p-2 rounded-lg">
+              <FileText size={20} className="text-jci-blue w-5 h-5" />
+            </div>
+            <span className="font-bold text-lg">Submit Payment Request</span>
+          </div>
+        }
+        size="2xl"
+        footer={
+          <div className="flex justify-end gap-3 w-full">
+            <Button type="button" variant="secondary" onClick={() => setSubmitModalOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="submit" form="payment-request-form" disabled={submitting} className="min-w-[120px]">
+              {submitting ? (
+                <>
+                  <RefreshCw size={16} className="mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : 'Submit Request'}
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
+          <p className="text-sm text-blue-800">Please provide detailed itemization. You can upload multiple receipts as PDF or image files. For mileage claims, please consult the treasurer for the standard rate.</p>
+        </div>
+
+        <form id="payment-request-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <MemberSelector
               label="Applicant"
@@ -821,19 +870,29 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
-            <Select
-              label="Category"
-              value={formCategory}
-              onChange={(e) => {
-                setFormCategory(e.target.value as any);
-                setFormActivityId('');
-              }}
-              options={[
-                { value: 'administrative', label: 'Administrative' },
-                { value: 'projects_activities', label: 'Projects & Activities' },
-              ]}
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => { setFormCategory('administrative'); setFormActivityId(''); }}
+                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${
+                    formCategory === 'administrative' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Administrative
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setFormCategory('projects_activities'); setFormActivityId(''); }}
+                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${
+                    formCategory === 'projects_activities' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Projects & Activities
+                </button>
+              </div>
+            </div>
             {formCategory === 'projects_activities' ? (
               <Select
                 label="Associated Project"
@@ -903,6 +962,49 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           </div>
 
           <div className="space-y-4 border-t pt-4">
+            <h4 className="font-bold text-slate-900">Attachments (Receipts / Invoices)</h4>
+            <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setFormAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
+                  }
+                }}
+                className="hidden"
+                id="file-upload"
+              />
+              <label htmlFor="file-upload" className="flex flex-col items-center cursor-pointer">
+                <Plus size={24} className="text-slate-400 mb-2" />
+                <span className="text-sm font-medium text-slate-600">Click to upload images or PDF</span>
+                <span className="text-xs text-slate-400 mt-1">Maximum 5MB per file</span>
+              </label>
+
+              {formAttachments.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {formAttachments.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        {file.type.includes('pdf') ? <FileText size={16} className="text-red-500" /> : <Eye size={16} className="text-blue-500" />}
+                        <span className="text-xs text-slate-700 truncate">{file.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormAttachments(prev => prev.filter((_, i) => i !== idx))}
+                        className="text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t pt-4">
             <h4 className="font-bold text-slate-900">Payment Details (Remit to)</h4>
             <div className="grid md:grid-cols-2 gap-4">
               <Select
@@ -947,62 +1049,6 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
             placeholder="Add any additional notes here..."
           />
 
-          <div className="space-y-4 border-t pt-4">
-            <h4 className="font-bold text-slate-900">Attachments (Receipts / Invoices)</h4>
-            <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-              <input
-                type="file"
-                multiple
-                accept="image/*,.pdf"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setFormAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
-                  }
-                }}
-                className="hidden"
-                id="file-upload"
-              />
-              <label htmlFor="file-upload" className="flex flex-col items-center cursor-pointer">
-                <Plus size={24} className="text-slate-400 mb-2" />
-                <span className="text-sm font-medium text-slate-600">Click to upload images or PDF</span>
-                <span className="text-xs text-slate-400 mt-1">Maximum 5MB per file</span>
-              </label>
-
-              {formAttachments.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {formAttachments.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        {file.type.includes('pdf') ? <FileText size={16} className="text-red-500" /> : <Eye size={16} className="text-blue-500" />}
-                        <span className="text-xs text-slate-700 truncate">{file.name}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormAttachments(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-slate-400 hover:text-red-500 transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="secondary" onClick={() => setSubmitModalOpen(false)} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting} className="min-w-[120px]">
-              {submitting ? (
-                <>
-                  <RefreshCw size={16} className="mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : 'Submit Request'}
-            </Button>
-          </div>
         </form>
       </Modal>
     </div>

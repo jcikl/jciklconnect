@@ -13,19 +13,19 @@ service firebase.storage {
     
     function isMember() {
       return isAuthenticated() && 
-             exists(/databases/(default)/documents/members/$(request.auth.uid));
+             firestore.exists(/databases/(default)/documents/members/$(request.auth.uid));
     }
     
     function isBoard() {
       return isAuthenticated() && 
-             exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
-             get(/databases/(default)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+             firestore.exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
+             firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
     }
     
     function isAdmin() {
       return isAuthenticated() && 
-             exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
-             get(/databases/(default)/documents/members/$(request.auth.uid)).data.role == 'ADMIN';
+             firestore.exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
+             firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.role == 'ADMIN';
     }
     
     function isValidImageFile() {
@@ -143,6 +143,15 @@ service firebase.storage {
                             (isValidImageFile() || isValidDocumentFile()) && 
                             isValidFileSize(20); // 20MB limit for temp files
       allow delete: if isOwner(userId) || isAdmin();
+    }
+    
+    // Payment requests attachments
+    match /payment-requests/{loId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isMember() && 
+                      (isValidImageFile() || isValidDocumentFile()) && 
+                      isValidFileSize(10); // 10MB limit
+      allow delete: if isBoard();
     }
     
     // System backups (admin only)
