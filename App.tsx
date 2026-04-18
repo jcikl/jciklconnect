@@ -6,7 +6,7 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Target
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -18,6 +18,7 @@ import { EventCalendarView } from './components/modules/EventCalendarView';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { usePermissions } from './hooks/usePermissions';
 import { useMembers } from './hooks/useMembers';
+import { useBusinessDirectory } from './hooks/useBusinessDirectory';
 import { useEvents } from './hooks/useEvents';
 import { useProjects } from './hooks/useProjects';
 import { useCommunication } from './hooks/useCommunication';
@@ -58,11 +59,12 @@ import { RoleSimulator } from './components/dev/RoleSimulator';
 import { BoardDashboard } from './components/dashboard/BoardDashboard';
 import { DashboardHome } from './components/dashboard/DashboardHome';
 import { DeveloperInterface } from './components/modules/DeveloperInterface';
+import { BountyMarketplaceView } from './components/modules/BountyMarketplaceView';
 import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 
 // --- View Definitions ---
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER';
 
 // --- Helper Components ---
 
@@ -1050,11 +1052,12 @@ const SearchDrawer: React.FC<{
   onClose: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onNavigate: (view: ViewType) => void;
+  onNavigate: (view: ViewType, selectedId?: string) => void;
 }> = ({ isOpen, onClose, searchQuery, onSearchChange, onNavigate }) => {
   const { members } = useMembers(); // These hooks are already imported or available
   const { events } = useEvents();
   const { projects } = useProjects();
+  const { businesses } = useBusinessDirectory();
 
   const filteredMembers = searchQuery ? members.filter(m =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1069,7 +1072,12 @@ const SearchDrawer: React.FC<{
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   ).slice(0, 5) : [];
 
-  const totalResults = filteredMembers.length + filteredEvents.length + filteredProjects.length;
+  const filteredBusinesses = searchQuery ? businesses.filter(b =>
+    (b.companyName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (b.industry || '').toLowerCase().includes(searchQuery.toLowerCase())
+  ).slice(0, 5) : [];
+
+  const totalResults = filteredMembers.length + filteredEvents.length + filteredProjects.length + filteredBusinesses.length;
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title="Global Search">
@@ -1104,7 +1112,7 @@ const SearchDrawer: React.FC<{
               {filteredMembers.map(m => (
                 <div
                   key={m.id}
-                  onClick={() => { onNavigate('MEMBERS'); onClose(); }}
+                  onClick={() => { onNavigate('MEMBERS', m.id); onClose(); }}
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
                 >
                   <img
@@ -1131,7 +1139,7 @@ const SearchDrawer: React.FC<{
               {filteredEvents.map(e => (
                 <div
                   key={e.id}
-                  onClick={() => { onNavigate('EVENTS'); onClose(); }}
+                  onClick={() => { onNavigate('EVENTS', e.id); onClose(); }}
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
                 >
                   <div className="w-8 h-8 rounded-lg bg-blue-50 text-jci-blue flex items-center justify-center flex-shrink-0">
@@ -1156,7 +1164,7 @@ const SearchDrawer: React.FC<{
               {filteredProjects.map(p => (
                 <div
                   key={p.id}
-                  onClick={() => { onNavigate('PROJECTS'); onClose(); }}
+                  onClick={() => { onNavigate('PROJECTS', p.id); onClose(); }}
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
                 >
                   <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0">
@@ -1165,6 +1173,31 @@ const SearchDrawer: React.FC<{
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{p.name}</p>
                     <p className="text-xs text-slate-500 truncate">{p.status}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filteredBusinesses.length > 0 && (
+          <div>
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <Building2 size={12} /> Directory
+            </h4>
+            <div className="space-y-2">
+              {filteredBusinesses.map(b => (
+                <div
+                  key={b.id}
+                  onClick={() => { onNavigate('DIRECTORY', b.id); onClose(); }}
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <Building2 size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{b.companyName}</p>
+                    <p className="text-xs text-slate-500 truncate">{b.industry}</p>
                   </div>
                 </div>
               ))}
@@ -1207,6 +1240,10 @@ export const JCIKLApp: React.FC = () => {
   const [leadInterests, setLeadInterests] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [initialSelectedMemberId, setInitialSelectedMemberId] = useState<string | null>(null);
+  const [initialSelectedEventId, setInitialSelectedEventId] = useState<string | null>(null);
+  const [initialSelectedProjectId, setInitialSelectedProjectId] = useState<string | null>(null);
+  const [initialSelectedBusinessId, setInitialSelectedBusinessId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { isBatchMode } = useBatchMode();
@@ -1312,6 +1349,7 @@ export const JCIKLApp: React.FC = () => {
       ACTIVITY_PLANS: 'Activity Plans',
       REPORTS: 'Reports',
       DEVELOPER: 'Developer Interface',
+      BOUNTIES: 'Bounty Marketplace',
     };
     const pageTitle = titles[view] ?? 'JCI LO Management';
     document.title = `${pageTitle} | JCI Kuala Lumpur`;
@@ -1422,9 +1460,13 @@ export const JCIKLApp: React.FC = () => {
     }
   };
 
-  const handleViewChange = (newView: ViewType) => {
+  const handleViewChange = (newView: ViewType, selectedId?: string) => {
     setSearchQuery('');
     setView(newView);
+    if (newView === 'MEMBERS' && selectedId) setInitialSelectedMemberId(selectedId);
+    if (newView === 'EVENTS' && selectedId) setInitialSelectedEventId(selectedId);
+    if (newView === 'PROJECTS' && selectedId) setInitialSelectedProjectId(selectedId);
+    if (newView === 'DIRECTORY' && selectedId) setInitialSelectedBusinessId(selectedId);
   };
 
   const openRegistration = () => setRegisterModalOpen(true);
@@ -1509,15 +1551,16 @@ export const JCIKLApp: React.FC = () => {
   // Note: Cannot use hooks inside this function - use values from component scope
   const renderCurrentView = (scrollRef?: React.RefObject<HTMLDivElement>) => {
     switch (view) {
-      case 'MEMBERS': return <MembersView searchQuery={searchQuery} />;
+      case 'BOUNTIES': return <BountyMarketplaceView />;
+      case 'MEMBERS': return <MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />;
       case 'ACTIVITIES': return <ActivityPlansView searchQuery={searchQuery} />;
-      case 'PROJECTS': return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
-      case 'EVENTS': return <EventsView searchQuery={searchQuery} />;
+      case 'PROJECTS': return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
+      case 'EVENTS': return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
       case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
       case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
       case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
-      case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} />;
+      case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />;
       case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
       case 'COMMUNICATION': return <CommunicationView searchQuery={searchQuery} />;
@@ -1612,6 +1655,13 @@ export const JCIKLApp: React.FC = () => {
                 label="Dashboard"
                 isActive={view === 'DASHBOARD'}
                 onClick={() => { handleViewChange('DASHBOARD'); setIsSidebarOpen(false); }}
+                isCollapsed={isSidebarCollapsed}
+              />
+              <SidebarItem
+                icon={<Target size={18} className="text-orange-500" />}
+                label="Marketplace"
+                isActive={view === 'BOUNTIES'}
+                onClick={() => { handleViewChange('BOUNTIES'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
               {!(isMember || isGuest) && (
@@ -1832,7 +1882,7 @@ export const JCIKLApp: React.FC = () => {
         {/* Main Content */}
         <main id="main-content" className="flex-1 flex flex-col min-w-0 h-full overflow-hidden" tabIndex={-1} role="main">
           <h1 className="sr-only">
-            {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Advertisements' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
+            {view === 'DASHBOARD' ? 'Dashboard' : view === 'BOUNTIES' ? 'Bounty Marketplace' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Advertisements' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 

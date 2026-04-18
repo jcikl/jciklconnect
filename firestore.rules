@@ -613,6 +613,24 @@ service cloud.firestore {
       allow read, create, update, delete: if isMember();
     }
 
+    // Wolf-like Competition System Collections
+    match /bounties/{bountyId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+    match /contracts/{contractId} {
+      allow read: if isAuthenticated() && (resource.data.memberId == request.auth.uid || getUserRole() in ['BOARD', 'ADMIN']);
+      allow create, update, delete: if isAuthenticated();
+    }
+    match /opportunityDrops/{dropId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && getUserRole() in ['BOARD', 'ADMIN'];
+    }
+    match /pointEscrow/{escrowId} {
+      allow read: if isAuthenticated() && (resource.data.memberId == request.auth.uid || getUserRole() in ['BOARD', 'ADMIN']);
+      allow create, update, delete: if isAuthenticated();
+    }
+
     // JCI Gamification & LO Star Rating (New)
     match /incentivePrograms/{programId} {
       allow read: if isAuthenticated();

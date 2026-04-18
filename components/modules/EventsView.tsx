@@ -21,7 +21,7 @@ import { formatDate } from '../../utils/dateUtils';
 
 type ViewMode = 'list' | 'calendar';
 
-export const EventsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedEventId, onClearSelection }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -30,6 +30,16 @@ export const EventsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) 
   const { showToast } = useToast();
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
   const { members: memberOptions } = useMembers(loId);
+
+  useEffect(() => {
+    if (initialSelectedEventId && events.length > 0) {
+      const eventToSelect = events.find(e => e.id === initialSelectedEventId);
+      if (eventToSelect) {
+        setSelectedEvent(eventToSelect);
+        if (onClearSelection) onClearSelection();
+      }
+    }
+  }, [initialSelectedEventId, events, onClearSelection]);
 
   const filteredEvents = useMemo(() => {
     const today = new Date();

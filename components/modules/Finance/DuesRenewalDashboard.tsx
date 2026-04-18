@@ -10,7 +10,8 @@ import {
   Send,
   RefreshCw,
   Download,
-  Plus
+  Plus,
+  Edit
 } from 'lucide-react';
 import { DuesRenewalService } from '../../../services/duesRenewalService';
 import {
@@ -423,12 +424,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 <table className="w-full">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">日期</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">描述</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">项目</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">会员</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">金额</th>
-                      {hasEditPermission && <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">操作</th>}
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">日期 / 描述</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">会员 / 项目</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">金额 / 操作</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -436,22 +434,32 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                       .map((tx) => (
                         <tr key={tx.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-600">{fmtDate(tx.date)}</td>
-                          <td className="px-4 py-2 text-sm font-medium text-gray-900 truncate max-w-[120px]" title={tx.description}>{tx.description}</td>
-                          <td className="px-4 py-2 text-sm text-gray-600">{tx.projectId || '—'}</td>
-                          <td className="px-4 py-2 text-sm text-gray-600">{tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}</td>
-                          <td className="px-4 py-2 text-sm text-right font-medium text-gray-900">{tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}</td>
-                          {hasEditPermission && (
-                            <td className="px-4 py-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                              >
-                                编辑
-                              </button>
-                            </td>
-                          )}
+                          <td className="px-4 py-2">
+                            <div className="text-sm text-gray-900 font-medium whitespace-nowrap">{fmtDate(tx.date)}</div>
+                            <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.description}>{tx.description}</div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}>
+                              {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.projectId || '—'}>{tx.projectId || '—'}</div>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-sm font-medium text-gray-900">
+                                {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
+                              </span>
+                              {hasEditPermission && (
+                                <button
+                                  type="button"
+                                  onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                  className="text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
+                                >
+                                  <Edit size={12} /> 编辑
+                                </button>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                   </tbody>

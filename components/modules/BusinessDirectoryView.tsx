@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Building2, Globe, Search, Send, MapPin, Users, Network } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift } from 'lucide-react';
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
@@ -9,7 +9,31 @@ import { useAuth } from '../../hooks/useAuth';
 import { Input, Textarea } from '../ui/Form';
 
 
-export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+// Map each industry to a unique premium gradient and background image for the banner (referencing premium dashboard header patterns)
+const INDUSTRY_BANNER_MAP: Record<string, { from: string; to: string }> = {
+  'Advertising, Marketing & Media': { from: 'from-pink-500', to: 'to-purple-600' },
+  'Agriculture & Animals': { from: 'from-green-500', to: 'to-emerald-600' },
+  'Architecture, Engineering & Construction': { from: 'from-indigo-500', to: 'to-blue-600' },
+  'Art, Entertainment & Design': { from: 'from-rose-500', to: 'to-orange-500' },
+  'Automotive & Accessories': { from: 'from-slate-600', to: 'to-gray-800' },
+  'Food & Beverages': { from: 'from-yellow-500', to: 'to-amber-600' },
+  'Telecom, AI, Computers & IT': { from: 'from-cyan-500', to: 'to-teal-600' },
+  'Consulting & Professional Services': { from: 'from-purple-500', to: 'to-fuchsia-600' },
+  'Education & Training': { from: 'from-blue-500', to: 'to-sky-600' },
+  'Event & Hospitality': { from: 'from-pink-500', to: 'to-rose-500' },
+  'Crypto, Blockchain, Finance & Insurance': { from: 'from-indigo-600', to: 'to-violet-700' },
+  'Health & Wellness': { from: 'from-red-500', to: 'to-pink-600' },
+  'Legal, HR, Accounting & Tax': { from: 'from-emerald-500', to: 'to-green-600' },
+  'Manufacturing & Supply Chain': { from: 'from-orange-500', to: 'to-amber-600' },
+  'Wholesale, Retail & E-Commerce': { from: 'from-teal-500', to: 'to-cyan-600' },
+  'Personal, Beauty & Sports': { from: 'from-fuchsia-500', to: 'to-pink-500' },
+  'Real Estate & Property Services': { from: 'from-slate-500', to: 'to-gray-600' },
+  'Transport & Logistics': { from: 'from-amber-500', to: 'to-yellow-600' },
+  'Travel & Tourism': { from: 'from-sky-500', to: 'to-blue-600' },
+  'Other': { from: 'from-jci-navy', to: 'to-jci-blue' },
+};
+
+export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
   const [activeTab, setActiveTab] = useState<'directory' | 'international'>('directory');
@@ -28,29 +52,23 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
   const { showToast } = useToast();
   const { member: currentUser } = useAuth();
 
-  // Map each industry to a unique premium gradient and background image for the banner (referencing premium dashboard header patterns)
-  const INDUSTRY_BANNER_MAP: Record<string, { from: string; to: string; image: string }> = {
-    'Advertising, Marketing & Media': { from: 'from-pink-500', to: 'to-purple-600', image: 'https://images.unsplash.com/photo-1557838923-2985c318be48?auto=format&fit=crop&q=80' },
-    'Agriculture & Animals': { from: 'from-green-500', to: 'to-emerald-600', image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80' },
-    'Architecture, Engineering & Construction': { from: 'from-indigo-500', to: 'to-blue-600', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80' },
-    'Art, Entertainment & Design': { from: 'from-rose-500', to: 'to-orange-500', image: 'https://images.unsplash.com/photo-1513364775202-741ef09e5981?auto=format&fit=crop&q=80' },
-    'Automotive & Accessories': { from: 'from-slate-600', to: 'to-gray-800', image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&q=80' },
-    'Food & Beverages': { from: 'from-yellow-500', to: 'to-amber-600', image: 'https://images.unsplash.com/photo-1495195129352-aec329a2d7ea?auto=format&fit=crop&q=80' },
-    'Telecom, AI, Computers & IT': { from: 'from-cyan-500', to: 'to-teal-600', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80' },
-    'Consulting & Professional Services': { from: 'from-purple-500', to: 'to-fuchsia-600', image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80' },
-    'Education & Training': { from: 'from-blue-500', to: 'to-sky-600', image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80' },
-    'Event & Hospitality': { from: 'from-pink-500', to: 'to-rose-500', image: 'https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&q=80' },
-    'Crypto, Blockchain, Finance & Insurance': { from: 'from-indigo-600', to: 'to-violet-700', image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80' },
-    'Health & Wellness': { from: 'from-red-500', to: 'to-pink-600', image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&q=80' },
-    'Legal, HR, Accounting & Tax': { from: 'from-emerald-500', to: 'to-green-600', image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80' },
-    'Manufacturing & Supply Chain': { from: 'from-orange-500', to: 'to-amber-600', image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80' },
-    'Wholesale, Retail & E-Commerce': { from: 'from-teal-500', to: 'to-cyan-600', image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80' },
-    'Personal, Beauty & Sports': { from: 'from-fuchsia-500', to: 'to-pink-500', image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80' },
-    'Real Estate & Property Services': { from: 'from-slate-500', to: 'to-gray-600', image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80' },
-    'Transport & Logistics': { from: 'from-amber-500', to: 'to-yellow-600', image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80' },
-    'Travel & Tourism': { from: 'from-sky-500', to: 'to-blue-600', image: 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80' },
-    'Other': { from: 'from-jci-navy', to: 'to-jci-blue', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80' },
-  };
+  useEffect(() => {
+    if (initialSelectedBusinessId && businesses.length > 0) {
+      const bizToSelect = businesses.find(b => b.id === initialSelectedBusinessId);
+      if (bizToSelect) {
+        setSelectedBiz(bizToSelect);
+        setInquiryForm({
+          name: currentUser?.name || '',
+          company: currentUser?.companyName || '',
+          phone: currentUser?.phone || '',
+          requirements: ''
+        });
+        setInquiryErrors({});
+        setInquiryModalOpen(true);
+        if (onClearSelection) onClearSelection();
+      }
+    }
+  }, [initialSelectedBusinessId, businesses, currentUser, onClearSelection]);
 
   const uniqueIndustries = useMemo(() => {
     const industries = new Set(businesses.map(b => b.industry).filter(Boolean));
@@ -127,31 +145,32 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
             onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
           />
         </div>
-        <div className="p-4">
+
+        {/* Global Category Filter for both Tabs */}
+        <div className="px-4 md:px-6 py-3 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-1 -mx-1">
+            {uniqueIndustries.map(ind => {
+              const isActive = selectedIndustry === ind;
+              return (
+                <button
+                  key={ind}
+                  onClick={() => setSelectedIndustry(ind)}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full whitespace-nowrap transition-all duration-200 flex-shrink-0 ${isActive
+                    ? 'bg-jci-blue text-white font-medium shadow-md shadow-jci-blue/20'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-jci-blue hover:border-blue-200 font-medium shadow-sm'
+                    }`}
+                >
+                  <span className="text-sm">{ind}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="p-4 md:p-6 bg-slate-50/30">
           {activeTab === 'directory' ? (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-bold text-slate-700 mb-3 px-1">Categories</h3>
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 px-1 -mx-1">
-                  {uniqueIndustries.map(ind => {
-                    const isActive = selectedIndustry === ind;
-                    return (
-                      <button
-                        key={ind}
-                        onClick={() => setSelectedIndustry(ind)}
-                        className={`flex items-center gap-2 px-4 py-1.5 rounded-full whitespace-nowrap transition-colors flex-shrink-0 ${isActive
-                          ? 'bg-jci-blue text-white font-medium shadow-md shadow-jci-blue/20'
-                          : 'bg-blue-50 text-jci-blue hover:bg-blue-100 font-medium'
-                          }`}
-                      >
-                        <span className="text-sm">{ind}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found">
+              <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredBusinesses.map(biz => {
                     const owner = members.find(m => m.id === biz.memberId);
@@ -159,11 +178,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
                       <Card key={biz.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
                         {/* Industry‑specific banner (Premium Gradient + Decorative Pattern) */}
                         <div className={`h-24 bg-gradient-to-br ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.from ?? 'from-slate-100'} ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.to ?? 'to-slate-200'} relative`}>
-                          {/* Decorative Background Pattern */}
-                          <div
-                            className="absolute inset-0 bg-cover bg-center opacity-20 mix-blend-overlay"
-                            style={{ backgroundImage: `url('${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.image || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80'}')` }}
-                          ></div>
 
                           <div className="absolute -bottom-6 left-2 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1 z-10 shadow-sm">
                             <img
@@ -241,70 +255,164 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
               </LoadingState>
             </div>
           ) : (
-            <InternationalNetworkTab businesses={filteredBusinesses} />
+            <InternationalNetworkTab
+              businesses={filteredBusinesses}
+              members={members}
+              onContact={(biz) => {
+                setSelectedBiz(biz);
+                setInquiryForm({
+                  name: currentUser?.name || '',
+                  company: currentUser?.companyName || '',
+                  phone: currentUser?.phone || '',
+                  requirements: ''
+                });
+                setInquiryErrors({});
+                setInquiryModalOpen(true);
+              }}
+            />
           )}
         </div>
       </Card>
 
 
 
-      {/* Inquiry Form Modal */}
+      {/* Inquiry Form Modal / Business Profile */}
       <Modal
         isOpen={isInquiryModalOpen}
         onClose={() => setInquiryModalOpen(false)}
-        title={selectedBiz ? `Inquiry for ${selectedBiz.companyName}` : 'Inquiry'}
+        title={selectedBiz ? selectedBiz.companyName : 'Inquiry'}
         drawerOnMobile
+        size="2xl"
       >
-        <div className="space-y-4 pt-2">
-          <p className="text-sm text-slate-500 mb-4">
-            Please fill in your details and requirements. The business owner will contact you shortly.
-          </p>
+        <div className={selectedBiz ? "grid md:grid-cols-2 gap-6 pt-2" : "space-y-4 pt-2"}>
+          {/* Left Column: Business Info */}
+          {selectedBiz && (
+            <div className="space-y-4 border-b md:border-b-0 md:border-r border-slate-100 pb-6 md:pb-0 md:pr-6">
+              <div className="flex items-start gap-4 mb-4 mt-2">
+                <img
+                  src={selectedBiz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedBiz.companyName)}&background=0097D7&color=fff`}
+                  alt={selectedBiz.companyName}
+                  className="w-16 h-16 rounded-lg object-cover border border-slate-200 shadow-sm"
+                />
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 leading-tight">{selectedBiz.companyName}</h3>
+                  <Badge variant="neutral" className="mt-2">{selectedBiz.industry}</Badge>
+                </div>
+              </div>
 
-          <Input
-            label="Name"
-            placeholder="Your full name"
-            required
-            value={inquiryForm.name}
-            error={inquiryErrors.name}
-            onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
-          />
+              <div className="space-y-4 text-sm mt-2">
+                <div>
+                  <span className="font-bold text-slate-700 block mb-1 uppercase text-[10px] tracking-widest">About</span>
+                  <p className="text-slate-600 leading-relaxed min-h-[60px]">{selectedBiz.description || 'No description provided.'}</p>
+                </div>
 
-          <Input
-            label="Company"
-            placeholder="Your company name (optional)"
-            value={inquiryForm.company}
-            onChange={(e) => setInquiryForm({ ...inquiryForm, company: e.target.value })}
-          />
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-50">
+                  <div>
+                    <span className="font-bold text-slate-700 block uppercase text-[10px] tracking-widest mb-1">Owner</span>
+                    <span className="text-slate-600 font-medium">{members.find(m => m.id === selectedBiz.memberId)?.name || 'Unknown'}</span>
+                  </div>
+                  {selectedBiz.website && (
+                    <div>
+                      <span className="font-bold text-slate-700 block uppercase text-[10px] tracking-widest mb-1">Website</span>
+                      <a href={selectedBiz.website.startsWith('http') ? selectedBiz.website : `https://${selectedBiz.website}`} target="_blank" rel="noopener noreferrer" className="text-jci-blue hover:text-sky-600 hover:underline break-all font-medium transition-colors">
+                        Visit Site
+                      </a>
+                    </div>
+                  )}
+                </div>
 
-          <Input
-            label="Phone Number"
-            placeholder="E.g. +60123456789"
-            required
-            value={inquiryForm.phone}
-            error={inquiryErrors.phone}
-            onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
-          />
+                {(() => {
+                  const ownerCats = members.find(m => m.id === selectedBiz.memberId)?.businessCategory;
+                  const bizCatsStr = selectedBiz.businessCategory;
+                  const showCats = bizCatsStr ? [bizCatsStr] : ownerCats;
 
-          <Textarea
-            label="Requirements"
-            placeholder="What products or services are you looking for?"
-            required
-            value={inquiryForm.requirements}
-            error={inquiryErrors.requirements}
-            onChange={(e) => setInquiryForm({ ...inquiryForm, requirements: e.target.value })}
-          />
+                  return (showCats && showCats.length > 0) ? (
+                    <div className="pt-3 border-t border-slate-50">
+                      <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Categories</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {showCats.map((cat, idx) => (
+                          <Badge key={idx} variant="info" className="bg-blue-50/50 text-blue-600 border border-blue-100">{cat}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
 
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setInquiryModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button className="flex-1" onClick={handleSendInquiry}>
-              <Send size={16} className="mr-2" /> Send Inquiry
-            </Button>
+                {selectedBiz.offer && (
+                  <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 rounded-xl p-4 shadow-inner">
+                    <span className="text-[10px] font-black text-blue-800 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                      <Gift size={14} className="text-blue-500" /> JCI Member Deal
+                    </span>
+                    <p className="text-slate-700 font-medium leading-relaxed">{selectedBiz.offer}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Right Column: Inquiry Form */}
+          <div className="space-y-4">
+            {selectedBiz ? (
+              <div className="mb-4 mt-2">
+                <h4 className="font-black text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+                  <Send size={18} className="text-jci-blue" /> Submit Inquiry
+                </h4>
+                <p className="text-xs text-slate-500 mt-3 font-medium">
+                  Please fill in your details and requirements. The business owner will contact you shortly.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 mb-4">
+                Please fill in your details and requirements. The business owner will contact you shortly.
+              </p>
+            )}
+
+            <Input
+              label="Name"
+              placeholder="Your full name"
+              required
+              value={inquiryForm.name}
+              error={inquiryErrors.name}
+              onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
+            />
+
+            <Input
+              label="Company"
+              placeholder="Your company name (optional)"
+              value={inquiryForm.company}
+              onChange={(e) => setInquiryForm({ ...inquiryForm, company: e.target.value })}
+            />
+
+            <Input
+              label="Phone Number"
+              placeholder="E.g. +60123456789"
+              required
+              value={inquiryForm.phone}
+              error={inquiryErrors.phone}
+              onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
+            />
+
+            <Textarea
+              label="Requirements"
+              placeholder="What products or services are you looking for?"
+              required
+              value={inquiryForm.requirements}
+              error={inquiryErrors.requirements}
+              onChange={(e) => setInquiryForm({ ...inquiryForm, requirements: e.target.value })}
+            />
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setInquiryModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={handleSendInquiry}>
+                <Send size={16} className="mr-2" /> Send Inquiry
+              </Button>
+            </div>
           </div>
         </div>
       </Modal>
@@ -315,69 +423,125 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string }> = ({ sear
 // International Network Tab Component
 interface InternationalNetworkTabProps {
   businesses: BusinessProfile[];
+  members: any[];
+  onContact: (biz: BusinessProfile) => void;
 }
 
-const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ businesses }) => {
-  const businessesWithConnections = businesses.filter(b =>
-    b.internationalConnections && b.internationalConnections.length > 0
-  );
+const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ businesses, members, onContact }) => {
+  const businessesWithConnections = businesses.filter(business => {
+    const owner = members.find(m => m.id === business.memberId);
+    const acceptStatus = business.acceptsInternationalBusiness || owner?.acceptInternationalBusiness;
+    const hasConnections = business.internationalConnections && business.internationalConnections.length > 0;
+    return hasConnections || acceptStatus === 'Yes' || acceptStatus === 'Willing to Explore' || acceptStatus === true;
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">Global JCI Network Connections</h3>
-          <p className="text-sm text-slate-500">Connect your business with JCI chapters worldwide</p>
-        </div>
-      </div>
-
       {businessesWithConnections.length === 0 ? (
-        <div className="text-center py-12 bg-slate-50 rounded-lg">
+        <div className="text-center py-16 bg-white border border-slate-100 shadow-sm rounded-xl">
           <Network size={48} className="mx-auto mb-4 text-slate-300" />
-          <h4 className="text-lg font-bold text-slate-900 mb-2">No International Connections Yet</h4>
-          <p className="text-slate-600 mb-4">Business connections will appear here.</p>
+          <h4 className="text-lg font-bold text-slate-900 mb-2">No International Connections Found</h4>
+          <p className="text-slate-500 mb-4 text-sm max-w-sm mx-auto">Either no businesses have joined the international network yet, or none match your selected category filter.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {businessesWithConnections.map(business => (
-            <Card key={business.id} className="hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {business.logo && (
-                    <img src={business.logo} alt={business.companyName} className="w-12 h-12 rounded-lg" />
-                  )}
-                  <div>
-                    <h4 className="font-bold text-slate-900">{business.companyName}</h4>
-                    <p className="text-sm text-slate-500">{business.industry}</p>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {businessesWithConnections.map(business => {
+            const owner = members.find(m => m.id === business.memberId);
+            const status = business.acceptsInternationalBusiness || owner?.acceptInternationalBusiness;
+            return (
+              <Card key={business.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
+                {/* Industry‑specific banner */}
+                <div className={`h-24 bg-gradient-to-br ${INDUSTRY_BANNER_MAP[business.industry ?? 'Other']?.from ?? 'from-slate-100'} ${INDUSTRY_BANNER_MAP[business.industry ?? 'Other']?.to ?? 'to-slate-200'} relative`}>
+                  <div className="absolute -bottom-6 left-2 w-16 h-16 bg-white rounded-lg border border-slate-200 p-1 z-10 shadow-sm">
+                    <img
+                      src={business.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(business.companyName)}&background=0097D7&color=fff`}
+                      alt="Logo"
+                      className="w-full h-full z-10 object-cover rounded"
+                    />
+                  </div>
+                  <div className="absolute text-right top-2 right-2 flex flex-col items-end gap-1">
+                    <Badge variant="neutral">{business.industry}</Badge>
+
+                    {(business.businessCategory || (owner?.businessCategory && owner.businessCategory.length > 0)) && (
+                      <Badge variant="info" className="text-[10px]">
+                        {business.businessCategory || owner?.businessCategory?.join(', ')}
+                      </Badge>
+                    )}
+
+                    {status === 'Yes' || status === true ? (
+                      <Badge variant="success" className="text-[10px]">Accepts International BIZ</Badge>
+                    ) : status === 'Willing to Explore' ? (
+                      <Badge variant="warning" className="text-[10px]">Exploring International BIZ</Badge>
+                    ) : null}
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-3">
-                {business.internationalConnections?.map((connection, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <MapPin size={16} className="text-slate-400" />
-                        <span className="font-semibold text-slate-900">{connection.jciChapter}</span>
-                        <Badge variant="neutral">{connection.country}</Badge>
-                      </div>
-                      <Badge variant="info">{connection.connectionType}</Badge>
-                    </div>
-                    {connection.contactPerson && (
-                      <p className="text-sm text-slate-600 mb-1">
-                        <Users size={14} className="inline mr-1" />
-                        Contact: {connection.contactPerson}
-                      </p>
+                {/* Card Body */}
+                <div className="pt-8 px-2 pb-6 flex-1 flex flex-col">
+                  <h3 className="text-lg font-bold text-slate-900">{owner?.name || 'Unknown'}</h3>
+                  <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                    {business.companyName}
+                  </p>
+                  <div className="flex gap-2 mb-4">
+                    {business.website && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => window.open(business.website.startsWith('http') ? business.website : `https://${business.website}`, '_blank')}
+                      >
+                        <Globe size={14} className="mr-2" /> Website
+                      </Button>
                     )}
-                    {connection.notes && (
-                      <p className="text-xs text-slate-500 mt-2">{connection.notes}</p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => onContact(business)}
+                    >
+                      Contact
+                    </Button>
+                  </div>
+
+                  {/* International Connections Area */}
+                  <div className="flex-1 space-y-3">
+                    {business.internationalConnections && business.internationalConnections.length > 0 ? (
+                      business.internationalConnections.map((connection, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin size={16} className="text-slate-400" />
+                              <span className="font-semibold text-slate-900 text-sm max-w-[150px] truncate" title={connection.jciChapter}>{connection.jciChapter}</span>
+                            </div>
+                            <Badge variant="neutral" className="text-[10px]">{connection.country}</Badge>
+                          </div>
+                          <div className="mb-2">
+                            <Badge variant="info" className="text-[10px]">{connection.connectionType}</Badge>
+                          </div>
+                          {connection.contactPerson && (
+                            <p className="text-xs text-slate-600 mb-1">
+                              <Users size={14} className="inline mr-1" />
+                              Contact: {connection.contactPerson}
+                            </p>
+                          )}
+                          {connection.notes && (
+                            <p className="text-[10px] text-slate-500 mt-2">{connection.notes}</p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex items-center justify-center p-3 bg-amber-50/50 rounded-lg border border-amber-100 min-h-[100px]">
+                        <div className="text-center">
+                          <Globe size={24} className="text-amber-500 mx-auto mb-2" />
+                          <p className="text-xs text-amber-700 font-medium leading-tight">Looking for international opportunities</p>
+                        </div>
+                      </div>
                     )}
                   </div>
-                ))}
-              </div>
-            </Card>
-          ))}
+                </div>
+              </Card>
+            )
+          })}
         </div>
       )}
     </div>

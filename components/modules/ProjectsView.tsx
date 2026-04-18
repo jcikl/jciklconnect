@@ -29,8 +29,8 @@ import { useBatchMode } from '../../contexts/BatchModeContext';
 
 const PENDING_USE_TEMPLATE_KEY = 'jci_pending_use_template_id';
 
-export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searchQuery?: string }> = ({ onNavigate, searchQuery }) => {
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searchQuery?: string; initialSelectedProjectId?: string | null; onClearSelection?: () => void }> = ({ onNavigate, searchQuery, initialSelectedProjectId, onClearSelection }) => {
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialSelectedProjectId ?? null);
   const [isProposalModalOpen, setProposalModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'projects' | 'past-projects' | 'templates'>('projects');
   const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
@@ -57,6 +57,15 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   }, [selectedProjectIds.size, setIsBatchMode]);
   const [isBatchStatusModalOpen, setIsBatchStatusModalOpen] = useState(false);
   const [batchOperationProgress, setBatchOperationProgress] = useState<{ current: number; total: number } | null>(null);
+
+  useEffect(() => {
+    if (initialSelectedProjectId && projects.length > 0) {
+      if (projects.some(p => p.id === initialSelectedProjectId)) {
+        setSelectedProjectId(initialSelectedProjectId);
+        if (onClearSelection) onClearSelection();
+      }
+    }
+  }, [initialSelectedProjectId, projects, onClearSelection]);
 
   const displayedProjects = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];

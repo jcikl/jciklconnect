@@ -12,6 +12,7 @@ import {
   limit,
   Timestamp,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
@@ -624,7 +625,204 @@ export class PointsService {
     };
   }
 
-  // --- JCI Gamification & Incentive Engine ---
+  // --- NEW: Wolf-like Resource Competition Engine Methods ---
+
+  /**
+   * Transfer points between members (Competitive Business Logic)
+   */
+  static async transferPoints(
+    senderId: string,
+    receiverId: string,
+    amount: number,
+    description: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    if (amount <= 0) throw new Error('Transfer amount must be positive');
+    
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Transferring ${amount} from ${senderId} to ${receiverId}`);
+      return;
+    }
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const senderRef = doc(db, COLLECTIONS.MEMBERS, senderId);
+        const receiverRef = doc(db, COLLECTIONS.MEMBERS, receiverId);
+        
+        const senderDoc = await transaction.get(senderRef);
+        const receiverDoc = await transaction.get(receiverRef);
+
+        if (!senderDoc.exists() || !receiverDoc.exists()) {
+          throw new Error('Sender or Receiver not found');
+        }
+
+        const senderPoints = senderDoc.data().points || 0;
+        if (senderPoints < amount) {
+          throw new Error('Insufficient points for transfer');
+        }
+
+        // Update balances
+        transaction.update(senderRef, { 
+          points: senderPoints - amount,
+          updatedAt: Timestamp.now() 
+        });
+        transaction.update(receiverRef, { 
+          points: (receiverDoc.data().points || 0) + amount,
+          updatedAt: Timestamp.now() 
+        });
+
+        // Record transactions
+        const senderTxRef = doc(collection(db, COLLECTIONS.POINTS));
+        const receiverTxRef = doc(collection(db, COLLECTIONS.POINTS));
+
+        transaction.set(senderTxRef, {
+          memberId: senderId,
+          amount: -amount,
+          points: -amount,
+          category: 'Transfer_Out',
+          description: `To ${receiverDoc.data().name}: ${description}`,
+          metadata: { ...metadata, relatedMemberId: receiverId },
+          createdAt: Timestamp.now()
+        });
+
+        transaction.set(receiverTxRef, {
+          memberId: receiverId,
+          amount,
+          points: amount,
+          category: 'Transfer_In',
+          description: `From ${senderDoc.data().name}: ${description}`,
+          metadata: { ...metadata, relatedMemberId: senderId },
+          createdAt: Timestamp.now()
+        });
+      });
+    } catch (error) {
+      console.error('Error during point transfer:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Lock points in Escrow (for Bounties/Contracts)
+   * This triggers 'Loss Aversion' as points are deducted but not yet used.
+   */
+  static async lockPointsForEscrow(
+    memberId: string,
+    amount: number,
+    purpose: 'BOUNTY' | 'CONTRACT',
+    relatedEntityId: string,
+    description: string
+  ): Promise<string> {
+    if (isDevMode()) return `mock-escrow-${Date.now()}`;
+
+    try {
+      return await runTransaction(db, async (transaction) => {
+        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+        const memberDoc = await transaction.get(memberRef);
+
+        if (!memberDoc.exists()) throw new Error('Member not found');
+        
+        const currentPoints = memberDoc.data().points || 0;
+        if (currentPoints < amount) throw new Error('Insufficient points to lock for escrow');
+
+        // Deduct from member
+        transaction.update(memberRef, { 
+          points: currentPoints - amount,
+          updatedAt: Timestamp.now()
+        });
+
+        // Create Escrow Record
+        const escrowRef = doc(collection(db, COLLECTIONS.POINT_ESCROW));
+        transaction.set(escrowRef, {
+          memberId,
+          amount,
+          purpose,
+          relatedEntityId,
+          status: 'Locked',
+          description,
+          createdAt: Timestamp.now()
+        });
+
+        // Record the transaction as 'Escrow_Locked'
+        const txRef = doc(collection(db, COLLECTIONS.POINTS));
+        transaction.set(txRef, {
+          memberId,
+          amount: -amount,
+          points: -amount,
+          category: 'Escrow_Locked',
+          description: `Locked for ${purpose}: ${description}`,
+          relatedEntityId,
+          createdAt: Timestamp.now()
+        });
+
+        return escrowRef.id;
+      });
+    } catch (error) {
+      console.error('Error locking points:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Release Escrow to a target (Completing a bounty)
+   */
+  static async releaseEscrow(
+    escrowId: string,
+    targetMemberId: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    if (isDevMode()) return;
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, escrowId);
+        const escrowDoc = await transaction.get(escrowRef);
+
+        if (!escrowDoc.exists()) throw new Error('Escrow record not found');
+        if (escrowDoc.data().status !== 'Locked') throw new Error('Escrow is not locked');
+
+        const { amount, purpose, relatedEntityId, description, memberId: originalOwnerId } = escrowDoc.data();
+        const targetRef = doc(db, COLLECTIONS.MEMBERS, targetMemberId);
+        const targetDoc = await transaction.get(targetRef);
+
+        if (!targetDoc.exists()) throw new Error('Target member not found');
+
+        // Add to target
+        transaction.update(targetRef, { 
+          points: (targetDoc.data().points || 0) + amount,
+          updatedAt: Timestamp.now()
+        });
+
+        // Close Escrow
+        transaction.update(escrowRef, { 
+          status: 'Released',
+          releasedTo: targetMemberId,
+          releasedAt: Timestamp.now()
+        });
+
+        // Record receiving transaction
+        const txRef = doc(collection(db, COLLECTIONS.POINTS));
+        const txDescription = purpose === 'CONTRACT' 
+          ? `Contract fulfillment: ${description}` 
+          : `Bounty payout for: ${description}`;
+
+        transaction.set(txRef, {
+          memberId: targetMemberId,
+          amount,
+          points: amount,
+          category: 'Escrow_Released',
+          description: txDescription,
+          relatedEntityId,
+          metadata: { ...metadata, escrowId, originalOwnerId, purpose },
+          createdAt: Timestamp.now()
+        });
+      });
+    } catch (error) {
+      console.error('Error releasing escrow:', error);
+      throw error;
+    }
+  }
+
+  // --- End of Competitive Engine Methods ---
   private static mockPrograms: IncentiveProgram[] = [
     {
       id: '2026_MY',

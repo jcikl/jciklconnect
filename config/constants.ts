@@ -65,6 +65,11 @@ export const COLLECTIONS = {
   INCENTIVE_STANDARDS: 'incentiveStandards',
   INCENTIVE_SUBMISSIONS: 'incentiveSubmissions',
   LO_STAR_PROGRESS: 'loStarProgress',
+  /** Wolf-like Competition System Collections */
+  BOUNTIES: 'bounties',
+  CONTRACTS: 'contracts',
+  OPPORTUNITY_DROPS: 'opportunityDrops',
+  POINT_ESCROW: 'pointEscrow', // For holding funds during bounty/contract
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */
@@ -370,4 +375,38 @@ export const JOIN_US_SURVEY_QUESTIONS = [
     ]
   }
 ];
+
+/** 
+ * Wolf-like Competition System Logic Enums 
+ * Designed to trigger psychological urgency (FOMO, Greed, Loss Aversion)
+ */
+export const BOUNTY_STATUS = {
+  OPEN: 'Open',           // Waiting for a hunter
+  CLAIMED: 'Claimed',     // Hunter working on it, points escrowed
+  COMPLETED: 'Completed', // Success, points transferred
+  DISPUTED: 'Disputed',   // Conflict, needs admin
+  CANCELLED: 'Cancelled', // Refunded
+} as const;
+
+export const CONTRACT_STATUS = {
+  ACTIVE: 'Active',       // Under commitment
+  VERIFYING: 'Verifying', // Proof submitted
+  FULFILLED: 'Fulfilled', // Reward granted
+  FAILED: 'Failed',       // Penalty triggered (Loss Aversion)
+  EXPIRED: 'Expired',
+} as const;
+
+export const OPPORTUNITY_URGENCY = {
+  SCARCE: 'Scarce',     // < 3 slots
+  LIMIT_REACHED: 'Full', 
+  ENDING_SOON: 'Ending', // < 24h
+} as const;
+
+/** Points Tiers with privilege descriptions */
+export const MEMBER_PRIVILEGES = {
+  BRONZE: ['Basic Community Access'],
+  SILVER: ['Bounty Hunting Allowed', 'Business Directory Listing'],
+  GOLD: ['Priority Opportunity Drops', 'Matching Service'],
+  PLATINUM: ['Exclusive Boardroom Access', 'Global HQ Referral'],
+} as const;
 

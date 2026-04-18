@@ -5,8 +5,10 @@ import {
   Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users,
   TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw,
   Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
-  Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog
+  Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog,
+  Target, Coins, ArrowUpRight
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs } from '../ui/Common';
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MemberEditForm } from './MemberEditForm';
@@ -205,8 +207,8 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
   );
 };
 
-export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMemberId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedMemberId, onClearSelection }) => {
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(initialSelectedMemberId ?? null);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -233,6 +235,16 @@ export const MembersView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     setIsBatchMode(selectedIds.size > 1);
     return () => setIsBatchMode(false);
   }, [selectedIds.size, setIsBatchMode]);
+
+  useEffect(() => {
+    if (initialSelectedMemberId && members.length > 0) {
+      if (members.some(m => m.id === initialSelectedMemberId)) {
+        setSelectedMemberId(initialSelectedMemberId);
+        if (onClearSelection) onClearSelection();
+      }
+    }
+  }, [initialSelectedMemberId, members, onClearSelection]);
+
   const [isBatchActionModalOpen, setIsBatchActionModalOpen] = useState(false);
   const [batchActionType, setBatchActionType] = useState<'delete' | 'set' | null>(null);
   const [batchSetField, setBatchSetField] = useState<string>('');
@@ -1497,6 +1509,81 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
         </div>
       </section>
+
+      {/* NEW: Wolf-like Persona & Ambition Visualizer (Phase 1) */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white border-none shadow-xl overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <Target size={120} />
+          </div>
+          <div className="relative z-10 p-2">
+            <h3 className="text-sm font-black text-blue-300 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Sparkles size={16} /> JCI Pillar Diagnosis
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Individual', val: member.attendanceRate > 80 ? 95 : 65, color: 'bg-blue-400' },
+                { label: 'Business', val: member.acceptInternationalBusiness === 'Yes' ? 90 : 40, color: 'bg-emerald-400' },
+                { label: 'Community', val: member.role !== UserRole.GUEST ? 85 : 30, color: 'bg-purple-400' },
+                { label: 'International', val: member.acceptInternationalBusiness === 'Willing to Explore' ? 75 : 20, color: 'bg-orange-400' }
+              ].map((p, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                    <span>{p.label}</span>
+                    <span>{p.val}%</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${p.val}%` }}
+                      className={`h-full ${p.color} shadow-[0_0_8px_rgba(255,255,255,0.3)]`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 p-3 bg-white/5 rounded-xl border border-white/10">
+              <p className="text-[10px] text-blue-200 font-bold uppercase mb-1">Dominant Persona</p>
+              <p className="text-lg font-black italic text-white flex items-center gap-2">
+                {member.acceptInternationalBusiness === 'Yes' ? 'GLOBAL ASSET HUNTER' : 'LOCAL COMMUNITY LEADER'}
+                <Badge className="bg-jci-blue text-blue text-[8px]">AI Profile</Badge>
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-white border-2 border-slate-900 border-b-8 border-r-8 hover:translate-x-1 hover:translate-y-1 transition-all">
+          <div className="p-2">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Coins size={16} className="text-amber-500" /> Ambition & Resources
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <span className="text-[10px] font-black text-slate-400 uppercase leading-none">Wants (From Assessment)</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {Array.isArray(member.interestedIndustries) && member.interestedIndustries.map(ind => (
+                    <Badge key={ind} className="bg-slate-100 text-slate-900 border-none font-bold italic">{ind}</Badge>
+                  ))}
+                  {(!member.interestedIndustries || member.interestedIndustries.length === 0) && <span className="text-xs text-slate-400 italic">No explicit wants on file.</span>}
+                </div>
+              </div>
+              <div className="pt-3 border-t border-slate-100">
+                <span className="text-[10px] font-black text-slate-400 uppercase leading-none">Needs (Matchable Capital)</span>
+                <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-100 relative group">
+                  <div className="flex items-center gap-2 text-amber-900 font-black text-sm">
+                    <Zap size={14} className="fill-amber-500" />
+                    {member.specialOffer || 'Ready for Strategic Partnership'}
+                  </div>
+                  <p className="text-[10px] text-amber-700 mt-1 uppercase font-bold">Available as Bounty Reward</p>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowUpRight size={16} className="text-amber-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="space-y-6">
