@@ -1801,124 +1801,228 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       {moduleTab === 'Project Account' && (
         <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 space-y-6">
-            <Card title="Project Statistics">
-              <div className="mb-4">
-                <Select
-                  label="Filter by Year"
-                  value={projectAccountYearFilter.toString()}
-                  onChange={(e) => setProjectAccountYearFilter(parseInt(e.target.value, 10))}
-                  options={[
-                    { label: 'All Years', value: '0' },
-                    ...projectAccountYearOptions.map(year => ({
-                      label: year.toString(),
-                      value: year.toString()
-                    }))
-                  ]}
-                />
-              </div>
-              <p className="text-sm text-slate-500 mb-2">
-                Total Projects: <span className="font-medium text-slate-900">{filteredProjectAccounts.length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Total Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Avg. Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Positive Balance: <span className="font-medium text-green-600">{filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Negative Balance: <span className="font-medium text-red-600">{filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Unassigned Transactions: <span className="font-medium text-slate-900">{uncategorizedProjectTxCount}</span>
-              </p>
-            </Card>
-            <Card title="Project Accounts">
-              <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
-                <div className="divide-y divide-slate-100">
-                  {[
-                    ...(uncategorizedProjectTxCount > 0 ? [{
-                      id: 'uncategorized',
-                      projectId: UNASSIGNED_PROJECT_ID,
-                      projectName: 'Unassigned',
-                      currentBalance: 0, // Placeholder, actual balance not tracked here
-                      totalIncome: 0,
-                      totalExpenses: 0,
-                    }] : []),
-                    ...filteredProjectAccounts
-                  ].map(acc => {
-                    const isActive = selectedProjectFilter === acc.projectId;
+          <div className="lg:col-span-1">
+            {/* Desktop View: Sidebar with Statistics and Accounts */}
+            <div className="hidden lg:block space-y-6">
+              <Card title="Project Statistics">
+                <div className="mb-4">
+                  <Select
+                    label="Filter by Year"
+                    value={projectAccountYearFilter.toString()}
+                    onChange={(e) => setProjectAccountYearFilter(parseInt(e.target.value, 10))}
+                    options={[
+                      { label: 'All Years', value: '0' },
+                      ...projectAccountYearOptions.map(year => ({
+                        label: year.toString(),
+                        value: year.toString()
+                      }))
+                    ]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Total Projects</span>
+                    <span className="font-medium text-slate-900">{filteredProjectAccounts.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Total Balance</span>
+                    <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Avg. Balance</span>
+                    <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Positive Balance</span>
+                    <span className="font-medium text-green-600">{filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Negative Balance</span>
+                    <span className="font-medium text-red-600">{filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Unassigned</span>
+                    <span className="font-medium text-slate-900">{uncategorizedProjectTxCount}</span>
+                  </div>
+                </div>
+              </Card>
 
-                    // Logic for PT vs Bank comparison
-                    const bankIncome = acc.totalIncome || 0;
-                    const bankExpenses = acc.totalExpenses || 0;
-                    const bankNet = bankIncome - bankExpenses;
+              <Card title="Project Accounts">
+                <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No accounts found.">
+                  <div className="divide-y divide-slate-100">
+                    {[
+                      ...(uncategorizedProjectTxCount > 0 ? [{
+                        id: 'uncategorized',
+                        projectId: UNASSIGNED_PROJECT_ID,
+                        projectName: 'Unassigned',
+                        currentBalance: 0,
+                        totalIncome: 0,
+                        totalExpenses: 0,
+                      }] : []),
+                      ...filteredProjectAccounts
+                    ].map(acc => {
+                      const isActive = selectedProjectFilter === acc.projectId;
+                      const bankIncome = acc.totalIncome || 0;
+                      const bankExpenses = acc.totalExpenses || 0;
+                      const bankNet = bankIncome - bankExpenses;
+                      const ptData = projectTrackerSummary[acc.projectId] || { income: 0, expenses: 0 };
+                      const ptIncome = ptData.income;
+                      const ptExpenses = ptData.expenses;
+                      const ptNet = ptIncome - ptExpenses;
+                      const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
 
-                    // PT Values from projectTrackerSummary
-                    const ptData = projectTrackerSummary[acc.projectId] || { income: 0, expenses: 0 };
-                    const ptIncome = ptData.income;
-                    const ptExpenses = ptData.expenses;
-                    const ptNet = ptIncome - ptExpenses;
-
-                    // Match logic: Check if values match exactly
-                    const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
-
-                    return (
-                      <div
-                        key={acc.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedProjectFilter(isActive ? null : acc.projectId)}
-                        onKeyDown={(e) => e.key === 'Enter' && setSelectedProjectFilter(isActive ? null : acc.projectId)}
-                        className={`py-3 px-2 cursor-pointer rounded-lg transition-colors ${isActive ? 'bg-jci-blue/10 ring-1 ring-jci-blue/30' : 'hover:bg-slate-50'}`}
-                      >
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-2">
-                            <Briefcase size={18} className={`text-slate-600 ${isActive ? 'text-jci-blue' : ''}`} />
-                            <span className={`font-medium ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>{acc.projectName}</span>
-                            {/* Green check logic: Only show if NOT unassigned and matches perfectly */}
-                            {acc.projectId !== UNASSIGNED_PROJECT_ID && isMatch && (
-                              <CheckCircle size={16} className="text-green-600 ml-1" />
-                            )}
+                      return (
+                        <div
+                          key={acc.id}
+                          onClick={() => setSelectedProjectFilter(isActive ? null : acc.projectId)}
+                          className={`py-3 px-2 cursor-pointer rounded-lg transition-colors ${isActive ? 'bg-jci-blue/10 ring-1 ring-jci-blue/30' : 'hover:bg-slate-50'}`}
+                        >
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-2">
+                              <Briefcase size={18} className={isActive ? 'text-jci-blue' : 'text-slate-600'} />
+                              <span className={`font-medium ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>{acc.projectName}</span>
+                              {acc.projectId !== UNASSIGNED_PROJECT_ID && isMatch && <CheckCircle size={16} className="text-green-600 ml-1" />}
+                            </div>
                           </div>
-                          {acc.projectId === UNASSIGNED_PROJECT_ID && (
-                            <div className="font-medium text-slate-500 text-sm">{uncategorizedProjectTxCount} entries</div>
+                          {acc.projectId !== UNASSIGNED_PROJECT_ID && (
+                            <div className="bg-white/50 rounded-md p-2 text-[10px]">
+                              <div className="grid grid-cols-3 gap-2 border-b pb-1 mb-1 font-semibold text-slate-500">
+                                <div></div><div className="text-right">PT</div><div className="text-right">HT</div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 py-0.5">
+                                <div>In</div><div className="text-right font-mono">{formatCurrency(ptIncome)}</div><div className="text-right font-mono">{formatCurrency(bankIncome)}</div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 py-0.5">
+                                <div>Out</div><div className="text-right font-mono">{formatCurrency(ptExpenses)}</div><div className="text-right font-mono">{formatCurrency(bankExpenses)}</div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 py-0.5 border-t mt-1 pt-1 font-bold">
+                                <div>Net</div>
+                                <div className={`text-right font-mono ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(ptNet)}</div>
+                                <div className={`text-right font-mono ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(bankNet)}</div>
+                              </div>
+                            </div>
                           )}
                         </div>
+                      );
+                    })}
+                  </div>
+                </LoadingState>
+              </Card>
+            </div>
 
-                        {acc.projectId !== UNASSIGNED_PROJECT_ID && (
-                          <div className="bg-white/50 rounded-md p-2 text-xs">
-                            <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-1 mb-1 font-semibold text-slate-500">
-                              <div></div>
-                              <div className="text-right">PT</div>
-                              <div className="text-right">HT</div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 py-0.5">
-                              <div className="text-slate-500">Incomes</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(ptIncome)}</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(bankIncome)}</div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 py-0.5">
-                              <div className="text-slate-500">Expenses</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(ptExpenses)}</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(bankExpenses)}</div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 py-0.5 border-t border-slate-200 mt-1 pt-1 font-medium">
-                              <div className="text-slate-900">Net</div>
-                              <div className={`text-right font-mono ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(ptNet)}</div>
-                              <div className={`text-right font-mono ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(bankNet)}</div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+            {/* Mobile View: Horizontal Scroll Carousel */}
+            <div className="lg:hidden space-y-4 mb-6">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Project Accounts</h3>
+                <div className="w-24">
+                  <select
+                    value={projectAccountYearFilter.toString()}
+                    onChange={(e) => setProjectAccountYearFilter(parseInt(e.target.value, 10))}
+                    className="text-[10px] w-full border-slate-200 rounded-md py-1 px-2 focus:ring-jci-blue focus:border-jci-blue bg-white border outline-none"
+                  >
+                    <option value="0">All Years</option>
+                    {projectAccountYearOptions.map(year => (
+                      <option key={year} value={year.toString()}>{year}</option>
+                    ))}
+                  </select>
                 </div>
-              </LoadingState>
-            </Card>
+              </div>
+              
+              <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory px-2">
+                {/* Summary Statistics Card */}
+                <div className="flex-shrink-0 w-[240px] snap-start bg-gradient-to-br from-slate-900 to-slate-800 p-4 rounded-2xl shadow-lg text-white">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3">Project Summary</p>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-[10px] text-slate-400 font-medium">Total Balance</p>
+                        <p className="text-lg font-bold">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-400 font-medium">Projects</p>
+                        <p className="text-lg font-bold">{filteredProjectAccounts.length}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10">
+                      <div>
+                        <p className="text-[10px] text-slate-400">Avg. Balance</p>
+                        <p className="text-xs font-semibold">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-400">Unassigned</p>
+                        <p className="text-xs font-semibold">{uncategorizedProjectTxCount}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account Cards */}
+                {[
+                  ...(uncategorizedProjectTxCount > 0 ? [{
+                    id: 'uncategorized',
+                    projectId: UNASSIGNED_PROJECT_ID,
+                    projectName: 'Unassigned',
+                    currentBalance: 0,
+                    totalIncome: 0,
+                    totalExpenses: 0,
+                  }] : []),
+                  ...filteredProjectAccounts
+                ].map(acc => {
+                  const isActive = selectedProjectFilter === acc.projectId;
+                  const bankIncome = acc.totalIncome || 0;
+                  const bankExpenses = acc.totalExpenses || 0;
+                  const bankNet = bankIncome - bankExpenses;
+                  const ptData = projectTrackerSummary[acc.projectId] || { income: 0, expenses: 0 };
+                  const ptIncome = ptData.income;
+                  const ptExpenses = ptData.expenses;
+                  const ptNet = ptIncome - ptExpenses;
+                  const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
+
+                  return (
+                    <div
+                      key={acc.id}
+                      onClick={() => setSelectedProjectFilter(isActive ? null : acc.projectId)}
+                      className={`flex-shrink-0 w-[240px] snap-start p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                        isActive 
+                          ? 'bg-blue-50 border-jci-blue ring-1 ring-jci-blue shadow-md' 
+                          : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Briefcase size={16} className={isActive ? 'text-jci-blue' : 'text-slate-400'} />
+                          <span className={`text-xs font-bold truncate ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>{acc.projectName}</span>
+                        </div>
+                        {acc.projectId !== UNASSIGNED_PROJECT_ID && isMatch && <CheckCircle size={14} className="text-green-600" />}
+                      </div>
+
+                      {acc.projectId === UNASSIGNED_PROJECT_ID ? (
+                        <div className="h-[74px] flex items-center justify-center bg-slate-50 rounded-xl">
+                          <p className="text-xs text-slate-500 font-medium">{uncategorizedProjectTxCount} entries</p>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 rounded-xl p-2 text-[10px]">
+                          <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-1 mb-1 font-bold text-slate-400">
+                            <div></div><div className="text-right">PT</div><div className="text-right">HT</div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 py-0.5">
+                            <div className="text-slate-500">In</div><div className="text-right font-mono">{formatCurrency(ptIncome)}</div><div className="text-right font-mono">{formatCurrency(bankIncome)}</div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 py-0.5">
+                            <div className="text-slate-500">Out</div><div className="text-right font-mono">{formatCurrency(ptExpenses)}</div><div className="text-right font-mono">{formatCurrency(bankExpenses)}</div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 py-0.5 border-t border-slate-200 mt-1 pt-1 font-bold">
+                            <div className="text-slate-900">Net</div>
+                            <div className={`text-right font-mono ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(ptNet)}</div>
+                            <div className={`text-right font-mono ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(bankNet)}</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
           <div className="lg:col-span-2">
             <Card
