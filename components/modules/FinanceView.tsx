@@ -1817,24 +1817,37 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   ]}
                 />
               </div>
-              <p className="text-sm text-slate-500 mb-2">
-                Total Projects: <span className="font-medium text-slate-900">{filteredProjectAccounts.length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Total Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Avg. Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Positive Balance: <span className="font-medium text-green-600">{filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Negative Balance: <span className="font-medium text-red-600">{filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Unassigned Transactions: <span className="font-medium text-slate-900">{uncategorizedProjectTxCount}</span>
-              </p>
+              
+              <div className="grid grid-cols-2 md:grid-cols-1 gap-3 md:gap-2">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Projects</p>
+                  <p className="text-lg font-bold text-slate-900">{filteredProjectAccounts.length}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Balance</p>
+                  <p className="text-lg font-bold text-slate-900">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 col-span-2 md:col-span-1">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Avg. Balance</p>
+                      <p className="text-sm font-bold text-slate-900">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Unassigned</p>
+                      <p className="text-sm font-bold text-orange-600">{uncategorizedProjectTxCount}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 bg-green-50/50 rounded-xl border border-green-100/50">
+                  <p className="text-[10px] text-green-600 uppercase font-bold tracking-wider mb-1">Positive</p>
+                  <p className="text-lg font-bold text-green-700">{filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}</p>
+                </div>
+                <div className="p-3 bg-red-50/50 rounded-xl border border-red-100/50">
+                  <p className="text-[10px] text-red-600 uppercase font-bold tracking-wider mb-1">Negative</p>
+                  <p className="text-lg font-bold text-red-700">{filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}</p>
+                </div>
+              </div>
             </Card>
             <Card title="Project Accounts">
               <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
