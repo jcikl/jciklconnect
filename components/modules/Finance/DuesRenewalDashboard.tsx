@@ -415,7 +415,8 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
@@ -479,6 +480,47 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4 p-4">
+              {displayRenewals.map((renewal) => {
+                const m = members.find(mem => mem.id === renewal.memberId);
+                return (
+                  <div key={renewal.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-900">{m?.name || renewal.memberId}</span>
+                        <div className="mt-1">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${membershipTypeColors[renewal.membershipType]}`}>
+                            {renewal.membershipType}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-gray-900">RM{(renewal.amount ?? 0).toLocaleString()}</div>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[renewal.status]}`}>
+                          {renewal.status}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-y-2 pt-3 border-t border-gray-50 text-[11px]">
+                      <div className="text-gray-500">Due: <span className="text-gray-900 font-medium">{fmtDate(renewal.dueDate)}</span></div>
+                      <div className="text-gray-500 text-right">Reminders: <span className="text-gray-900 font-medium">{renewal.remindersSent || 0}</span></div>
+                      {renewal.status === 'paid' && (
+                        <div className="text-gray-500 col-span-2">Paid on: <span className="text-green-600 font-medium">{renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}</span></div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {displayRenewals.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 text-sm italic">No records found</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {/* 会费流水 Card */}
@@ -500,49 +542,85 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                   <p className="text-gray-500 text-sm">暂无会费流水（{selectedYear} 年）</p>
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">日期 / 描述</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">会员 / 项目</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">金额 / 操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredByYear
-                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                      .map((tx) => (
-                        <tr key={tx.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2">
-                            <div className="text-sm text-gray-900 font-medium whitespace-nowrap">{fmtDate(tx.date)}</div>
-                            <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.description}>{tx.description}</div>
-                          </td>
-                          <td className="px-4 py-2">
-                            <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}>
-                              {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.projectId || '—'}>{tx.projectId || '—'}</div>
-                          </td>
-                          <td className="px-4 py-2 text-right">
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="text-sm font-medium text-gray-900">
-                                {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
-                              </span>
-                              {hasEditPermission && (
-                                <button
-                                  type="button"
-                                  onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
-                                  className="text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
-                                >
-                                  <Edit size={12} /> 编辑
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+                <>
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">日期 / 描述</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">会员 / 项目</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">金额 / 操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredByYear
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((tx) => (
+                          <tr key={tx.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2">
+                              <div className="text-sm text-gray-900 font-medium whitespace-nowrap">{fmtDate(tx.date)}</div>
+                              <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.description}>{tx.description}</div>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}>
+                                {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.projectId || '—'}>{tx.projectId || '—'}</div>
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
+                                </span>
+                                {hasEditPermission && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                    className="text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
+                                  >
+                                    <Edit size={12} /> 编辑
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View */}
+                <div className="md:hidden space-y-3 p-4">
+                  {filteredByYear
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .map((tx) => (
+                      <div key={tx.id} className="bg-slate-50 border border-slate-100 rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[10px] text-gray-400 font-medium">{fmtDate(tx.date)}</span>
+                          <span className={`text-xs font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-gray-800 mb-1 truncate">{tx.description}</div>
+                        <div className="flex justify-between items-center mt-2">
+                          <div className="text-[10px] text-gray-500 truncate max-w-[150px]">
+                            {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
+                          </div>
+                          {hasEditPermission && (
+                            <button
+                              type="button"
+                              onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                              className="text-blue-600 text-[10px] font-bold"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+                </>
               );
             })()}
           </div>

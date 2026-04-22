@@ -1231,7 +1231,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               >
                 <LoadingState loading={loading} error={error} empty={transactions.length === 0} emptyMessage="No transactions found">
                   <>
-                    <div className="overflow-x-auto">
+                    {/* Desktop View */}
+                    <div className="hidden md:block overflow-x-auto">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 text-slate-500">
                           <tr>
@@ -1259,6 +1260,25 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                           ))}
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden space-y-3">
+                      {transactions.slice(0, 10).map(tx => (
+                        <div key={tx.id} className="p-3 border border-slate-100 rounded-lg bg-white shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
+                            <Badge variant="neutral" className="text-[10px]">{tx.category}</Badge>
+                          </div>
+                          <div className="font-medium text-slate-900 text-sm mb-1">
+                            {tx.description}
+                            {tx.status === 'Pending' && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-amber-400"></span>}
+                          </div>
+                          <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </>
                 </LoadingState>
@@ -1561,7 +1581,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         : adminTransactionsWithFilter;
                       return (
                         <LoadingState loading={loading} error={error} empty={filteredAdminTx.length === 0} emptyMessage={adminProjectIdFilter ? `No transactions for this account.` : "No admin transactions found. Use 'New Transaction' above to add one."}>
-                          <div className="overflow-x-auto">
+                          {/* Desktop View */}
+                          <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-sm">
                               <thead className="bg-slate-50 text-slate-500">
                                 <tr>
@@ -1619,6 +1640,59 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                   ))}
                               </tbody>
                             </table>
+                          </div>
+
+                          {/* Mobile View */}
+                          <div className="md:hidden space-y-4 p-2">
+                            {filteredAdminTx
+                              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                              .map(tx => (
+                                <div key={tx.id} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div className="flex flex-col">
+                                      <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
+                                      <span className="text-sm font-bold text-slate-900 mt-1">{tx.description}</span>
+                                    </div>
+                                    <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                      {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-2 mb-3">
+                                    <div>
+                                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Account</span>
+                                      <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
+                                      <p className="text-xs text-slate-700 truncate">{tx.referenceNumber ?? '—'}</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                                    <div className="flex gap-2">
+                                      <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px]">{tx.type}</Badge>
+                                      {(() => {
+                                        const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                        const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                        if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split</Badge>;
+                                        if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
+                                        return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
+                                      })()}
+                                    </div>
+                                    {hasPermission('canEditFinance') && (
+                                      <div className="flex gap-1">
+                                        <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1">
+                                          <Edit size={16} className="text-slate-500" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1">
+                                          <Trash2 size={16} className="text-red-500" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
                           </div>
                         </LoadingState>
                       );
@@ -1857,7 +1931,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 const filteredProjectTx = projectTransactions;
                 return (
                   <LoadingState loading={loading} error={error} empty={filteredProjectTx.length === 0} emptyMessage={selectedProjectFilter ? `No transactions for this project.` : "No project transactions found. Use 'New Transaction' above to add one."}>
-                    <div className="overflow-x-auto">
+                    {/* Desktop View */}
+                    <div className="hidden md:block overflow-x-auto">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 text-slate-500">
                           <tr>
@@ -1916,6 +1991,59 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden space-y-4 p-2">
+                      {filteredProjectTx
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map(tx => (
+                          <div key={tx.id} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex flex-col">
+                                <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
+                                <span className="text-sm font-bold text-slate-900 mt-1">{tx.description}</span>
+                              </div>
+                              <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Project</span>
+                                <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}</p>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
+                                <p className="text-xs text-slate-700 truncate">{tx.referenceNumber ?? '—'}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                              <div className="flex gap-2">
+                                <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px]">{tx.type}</Badge>
+                                {(() => {
+                                  const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                  const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                  if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split</Badge>;
+                                  if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
+                                  return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
+                                })()}
+                              </div>
+                              {hasPermission('canEditFinance') && (
+                                <div className="flex gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1">
+                                    <Edit size={16} className="text-slate-500" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1">
+                                    <Trash2 size={16} className="text-red-500" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   </LoadingState>
                 );
               })()}
@@ -1954,7 +2082,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
 
             <LoadingState loading={loading} error={error} empty={transactions.length === 0} emptyMessage="No transactions found">
-              <div className="overflow-x-auto">
+              {/* Desktop View */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
@@ -2172,6 +2301,100 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile View */}
+              <div className="md:hidden space-y-4 p-2">
+                {displayTransactions.map(tx => (
+                  <div key={tx.id} className={`bg-white border border-slate-100 rounded-xl p-4 shadow-sm relative ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}`}>
+                    <div className="absolute top-4 left-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedTxIds.has(tx.id)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          const nextTx = new Set(selectedTxIds);
+                          const nextSplits = new Set(selectedSplitIds);
+                          if (checked) {
+                            nextTx.add(tx.id);
+                            if (tx.isSplit && transactionSplits[tx.id]) {
+                              transactionSplits[tx.id].forEach(s => nextSplits.add(s.id));
+                            }
+                          } else {
+                            nextTx.delete(tx.id);
+                            if (tx.isSplit && transactionSplits[tx.id]) {
+                              transactionSplits[tx.id].forEach(s => nextSplits.delete(s.id));
+                            }
+                          }
+                          setSelectedTxIds(nextTx);
+                          setSelectedSplitIds(nextSplits);
+                        }}
+                        className="accent-blue-600 w-4 h-4 cursor-pointer"
+                      />
+                    </div>
+                    <div className="pl-8">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-500 font-medium">{formatDate(tx.date)}</span>
+                          <span className="text-sm font-bold text-slate-900 mt-1 leading-tight">{tx.description}</span>
+                        </div>
+                        <div className={`text-right font-mono font-bold text-base ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                          {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <Badge variant={tx.isSplit ? "info" : "neutral"} className="text-[10px]">{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
+                        {(() => {
+                          const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                          const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                          if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split Details</Badge>;
+                          if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
+                          return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
+                        })()}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          Bal: {formatCurrency(tx.runningBalance)}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1.5 h-8 w-8">
+                            <Edit size={16} className="text-slate-500" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 h-8 w-8">
+                            <Trash2 size={16} className="text-red-500" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setSelectedTransaction(tx);
+                            setIsSplitModalOpen(true);
+                            if (members.length === 0) loadMembers();
+                            if (projects.length === 0) loadProjects();
+                          }} className="text-blue-600 text-xs px-2 font-bold h-8">
+                            {tx.isSplit ? 'Edit' : 'Split'}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Mobile Split Details */}
+                      {tx.isSplit && transactionSplits[tx.id] && (
+                        <div className="mt-3 space-y-2 bg-blue-50/30 p-2 rounded-lg border border-blue-100/50">
+                          {transactionSplits[tx.id].map((split, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-[11px]">
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className="text-blue-400">↳</span>
+                                <span className="text-slate-600 truncate">{split.description}</span>
+                              </div>
+                              <span className={`font-mono font-medium whitespace-nowrap ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
               {hasMoreTransactions && (
                 <div className="mt-4 flex justify-center">
@@ -2488,20 +2711,20 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       {/* Fixed Bottom Action Bar for Batch Selection */}
       {moduleTab === 'Transactions' && displayTransactions.length > 0 && (selectedTxIds.size + selectedSplitIds.size) > 1 && (
-        <div className="fixed bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[40] animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center justify-around md:justify-start gap-0 md:gap-6 bg-slate-900/95 backdrop-blur-md px-2 md:px-6 py-3 md:py-4 rounded-[40px] md:rounded-2xl shadow-2xl border border-white/10 h-20 md:h-auto">
-            <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:pr-4 md:border-r border-slate-700 min-w-[70px] md:min-w-0">
-              <div className="p-1.5 bg-blue-500 rounded-lg md:w-8 md:h-8 flex items-center justify-center">
-                <Layers size={20} className="text-white md:w-4 md:h-4" />
+        <div className="fixed bottom-6 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[40] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center justify-between md:justify-start gap-2 md:gap-6 bg-slate-900/95 backdrop-blur-md px-4 md:px-6 py-3 md:py-4 rounded-2xl shadow-2xl border border-white/10">
+            <div className="flex items-center gap-3 pr-2 md:pr-4 md:border-r border-slate-700">
+              <div className="p-1.5 bg-blue-500 rounded-lg flex items-center justify-center">
+                <Layers size={18} className="text-white" />
               </div>
-              <div className="flex flex-col items-center md:items-start">
-                <span className="text-[9px] md:text-sm font-bold md:font-bold text-white leading-none uppercase md:capitalize tracking-widest md:tracking-normal">
+              <div className="flex flex-col">
+                <span className="text-[11px] md:text-sm font-bold text-white leading-tight">
                   {batchOperationProgress
                     ? `Processing...`
                     : `${selectedTxIds.size + selectedSplitIds.size} Selected`
                   }
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium hidden md:block mt-1">
+                <span className="text-[10px] text-slate-400 font-medium hidden sm:block mt-0.5">
                   {batchOperationProgress
                     ? `${batchOperationProgress.current}/${batchOperationProgress.total}`
                     : `${selectedTxIds.size} main • ${selectedSplitIds.size} splits`
@@ -2511,42 +2734,39 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
 
             {batchOperationProgress ? (
-              <div className="flex-1 max-w-[200px] md:w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div className="flex-1 max-w-[200px] md:w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
                 <div
                   className="h-full bg-blue-500 transition-all duration-300 ease-out"
                   style={{ width: `${(batchOperationProgress.current / batchOperationProgress.total) * 100}%` }}
                 />
               </div>
             ) : (
-              <>
+              <div className="flex items-center gap-1 sm:gap-4">
                 <button
                   onClick={() => setIsBatchCategoryModalOpen(true)}
-                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-blue-400 hover:text-blue-300 transition-all min-w-[70px] md:min-w-0"
+                  className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-blue-400 hover:text-blue-300 transition-all px-2 py-1 rounded-lg hover:bg-white/5"
                 >
-                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
-                    <Settings size={20} className="md:w-4 md:h-4" />
-                  </div>
-                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Batch Set</span>
+                  <Settings size={18} />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Batch Set</span>
                 </button>
                 <button
                   onClick={handleBatchDelete}
-                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"
+                  className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-red-400 hover:text-red-300 transition-all px-2 py-1 rounded-lg hover:bg-white/5"
                 >
-                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
-                    <Trash2 size={20} className="md:w-4 md:h-4" />
-                  </div>
-                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Delete</span>
+                  <Trash2 size={18} />
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Delete</span>
                 </button>
                 <button
-                  onClick={() => { setSelectedTxIds(new Set()); setSelectedSplitIds(new Set()); }}
-                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-slate-400 hover:text-white transition-all min-w-[70px] md:min-w-0"
+                  onClick={() => {
+                    setSelectedTxIds(new Set());
+                    setSelectedSplitIds(new Set());
+                  }}
+                  className="ml-2 p-1.5 text-slate-400 hover:text-white transition-colors"
+                  title="Clear selection"
                 >
-                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
-                    <X size={20} className="md:w-4 md:h-4" />
-                  </div>
-                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Clear</span>
+                  <X size={18} />
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>
