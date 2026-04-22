@@ -239,7 +239,18 @@ export const TransactionForm: React.FC<Props> = ({
             {isEdit ? (
               <>
                 {editingTransaction?.category === 'Membership' && (
-                  <Select name="memberId" label="Member" value={(editingTransaction?.memberId as string) || ''} onChange={(e) => setEditingTransaction?.({ ...editingTransaction!, memberId: e.target.value })} options={[{ label: 'Select...', value: '' }, ...members.map(m => ({ label: m.name, value: m.id }))]} required />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Member</label>
+                    <Combobox
+                      options={members.map(m => m.name)}
+                      value={members.find(m => m.id === editingTransaction?.memberId)?.name || ''}
+                      onChange={(value) => {
+                        const member = members.find(m => m.name === value);
+                        setEditingTransaction?.({ ...editingTransaction!, memberId: member?.id || '' });
+                      }}
+                      placeholder="Select or type to search member..."
+                    />
+                  </div>
                 )}
 
                 {editingTransaction?.category === 'Projects & Activities' && (
@@ -259,7 +270,19 @@ export const TransactionForm: React.FC<Props> = ({
             ) : (
               <>
                 {recordFormCategory === 'Membership' && (
-                  <Select name="memberId" label="Member" value={recordFormMemberId} onChange={(e) => setRecordFormMemberId?.(e.target.value)} options={[{ label: 'Select...', value: '' }, ...members.map(m => ({ label: m.name, value: m.id }))]} required />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Member</label>
+                    <Combobox
+                      options={members.map(m => m.name)}
+                      value={members.find(m => m.id === recordFormMemberId)?.name || ''}
+                      onChange={(value) => {
+                        const member = members.find(m => m.name === value);
+                        setRecordFormMemberId?.(member?.id || '');
+                      }}
+                      placeholder="Select or type to search member..."
+                    />
+                    <input type="hidden" name="memberId" value={recordFormMemberId} />
+                  </div>
                 )}
 
                 {recordFormCategory === 'Projects & Activities' && (

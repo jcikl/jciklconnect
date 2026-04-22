@@ -32,7 +32,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageSettings: false,
     canApproveClaims: false,
   },
-  [UserRole.PROBATION_MEMBER]: {
+  [UserRole.PROBATION]: {
     canViewMembers: true,
     canEditMembers: false,
     canViewFinance: false,
@@ -206,7 +206,7 @@ export const usePermissions = () => {
     hasAnyPermission,
     hasAllPermissions,
     isGuest: effectiveRole === UserRole.GUEST,
-    isProbationMember: effectiveRole === UserRole.PROBATION_MEMBER,
+    isProbationMember: effectiveRole === UserRole.PROBATION,
     isMember: effectiveRole === UserRole.MEMBER,
     isBoard: effectiveRole === UserRole.BOARD,
     isAdmin: effectiveRole === UserRole.ADMIN,

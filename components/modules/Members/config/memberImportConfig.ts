@@ -61,7 +61,6 @@ export const memberImportConfig: BatchImportConfig = {
       required: false,
       aliases: ['Tier', '等级', 'Level', 'Membership Level', 'Status', 'Member Type'],
       validators: [isValidTier],
-      defaultValue: 'Bronze',
       preprocessor: trimUpperPreprocessor,
     },
     {
@@ -146,7 +145,6 @@ export const memberImportConfig: BatchImportConfig = {
       required: false,
       aliases: ['Nationality', '国籍', 'Country', 'Citizenship'],
       validators: [],
-      defaultValue: 'Malaysia',
       preprocessor: trimPreprocessor,
     },
     {
@@ -299,7 +297,6 @@ export const memberImportConfig: BatchImportConfig = {
       required: false,
       aliases: ['T-Shirt Status', 'T恤状态', 'Uniform Status', 'Apparel Status'],
       validators: [],
-      defaultValue: 'NA',
       preprocessor: trimPreprocessor,
     },
     {
@@ -359,9 +356,8 @@ export const memberImportConfig: BatchImportConfig = {
 
   // Import function - called for each valid row
   importer: async (row, context) => {
-    // If it's an update, we should update instead of create
+    // Find existing member by email
     const email = row.email?.toLowerCase();
-
     let existingId = row._existingId;
 
     if (!existingId && email && context?.members && Array.isArray(context.members)) {
@@ -371,52 +367,98 @@ export const memberImportConfig: BatchImportConfig = {
       }
     }
 
-    const payload = {
-      name: row.name,
-      email: row.email,
-      phone: row.phone || '',
-      tier: (row.tier?.charAt(0).toUpperCase() + row.tier?.slice(1).toLowerCase()) || 'Bronze',
-      idNumber: row.idNumber || '',
-      dateOfBirth: row.dateOfBirth || '',
-      gender: row.gender || '',
-      address: row.address || '',
-      emergencyContactName: row.emergencyContactName || '',
-      emergencyContactPhone: row.emergencyContactPhone || '',
-      areaId: row.areaId || null,
-      nationality: row.nationality || 'Malaysia',
-      companyName: row.companyName || '',
-      departmentAndPosition: row.departmentAndPosition || '',
-      linkedin: row.linkedin || '',
-      facebook: row.facebook || '',
-      instagram: row.instagram || '',
-      wechat: row.wechat || '',
-      hobbies: row.hobbies || [],
-      // New extended fields
-      joinDate: row.joinDate || new Date().toISOString().split('T')[0],
-      membershipType: row.membershipType || 'GUEST',
-      introducer: row.introducer || '',
-      fullName: row.fullName || row.name,
-      ethnicity: row.ethnicity || '',
-      businessCategory: row.businessCategory || [],
-      industry: row.industry || '',
-      cutStyle: row.cutStyle || '',
-      tshirtSize: row.tshirtSize || '',
-      jacketSize: row.jacketSize || '',
-      embroideredName: row.embroideredName || '',
-      tshirtStatus: row.tshirtStatus || 'NA',
-      companyWebsite: row.companyWebsite || '',
-      acceptInternationalBusiness: row.acceptInternationalBusiness || 'No',
-      companyDescription: row.companyDescription || '',
+    const isUpdate = !!existingId;
 
-      // System-set fields
-      status: 'Active',
-      role: 'MEMBER',
-      ...(!existingId && { points: 0, avatar: '', skills: [], churnRisk: 'Low', attendanceRate: 0, duesStatus: 'Pending', badges: [] })
-    } as Parameters<typeof MembersService.createMember>[0];
+    // Helper to check if a value is "empty" for import purposes (should not overwrite)
+    const isEmptyValue = (val: any) => {
+      return val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0);
+    };
 
-    if (existingId) {
-      await MembersService.updateMember(existingId, payload);
+    if (isUpdate) {
+      // UPDATE MODE: Partial update, ignoring empty fields in the import data
+      const updates: any = {};
+      
+      // List of all fields that can be updated from the import row
+      const updateableFields = [
+        'name', 'email', 'phone', 'tier', 'idNumber', 'dateOfBirth', 'gender', 
+        'address', 'emergencyContactName', 'emergencyContactPhone', 'areaId', 
+        'nationality', 'companyName', 'departmentAndPosition', 'linkedin', 
+        'facebook', 'instagram', 'wechat', 'hobbies', 'joinDate', 
+        'membershipType', 'introducer', 'fullName', 'ethnicity', 
+        'businessCategory', 'industry', 'cutStyle', 'tshirtSize', 
+        'jacketSize', 'embroideredName', 'tshirtStatus', 'companyWebsite', 
+        'acceptInternationalBusiness', 'companyDescription'
+      ];
+
+      updateableFields.forEach(field => {
+        let val = row[field];
+        
+        // Special formatting for tier
+        if (field === 'tier' && typeof val === 'string' && val.length > 0) {
+          val = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+        }
+
+        // Only include in update if the value is not empty
+        if (!isEmptyValue(val)) {
+          updates[field] = val;
+        }
+      });
+
+      if (Object.keys(updates).length > 0) {
+        await MembersService.updateMember(existingId, updates);
+      }
     } else {
+      // CREATE MODE: Build full payload with defaults for new records
+      const payload = {
+        name: row.name,
+        email: row.email,
+        phone: row.phone || '',
+        tier: (row.tier && typeof row.tier === 'string') 
+          ? (row.tier.charAt(0).toUpperCase() + row.tier.slice(1).toLowerCase()) 
+          : 'Bronze',
+        idNumber: row.idNumber || '',
+        dateOfBirth: row.dateOfBirth || '',
+        gender: row.gender || '',
+        address: row.address || '',
+        emergencyContactName: row.emergencyContactName || '',
+        emergencyContactPhone: row.emergencyContactPhone || '',
+        areaId: row.areaId || null,
+        nationality: row.nationality || 'Malaysia',
+        companyName: row.companyName || '',
+        departmentAndPosition: row.departmentAndPosition || '',
+        linkedin: row.linkedin || '',
+        facebook: row.facebook || '',
+        instagram: row.instagram || '',
+        wechat: row.wechat || '',
+        hobbies: row.hobbies || [],
+        joinDate: row.joinDate || new Date().toISOString().split('T')[0],
+        membershipType: row.membershipType || 'GUEST',
+        introducer: row.introducer || '',
+        fullName: row.fullName || row.name,
+        ethnicity: row.ethnicity || '',
+        businessCategory: row.businessCategory || [],
+        industry: row.industry || '',
+        cutStyle: row.cutStyle || '',
+        tshirtSize: row.tshirtSize || '',
+        jacketSize: row.jacketSize || '',
+        embroideredName: row.embroideredName || '',
+        tshirtStatus: row.tshirtStatus || 'NA',
+        companyWebsite: row.companyWebsite || '',
+        acceptInternationalBusiness: row.acceptInternationalBusiness || 'No',
+        companyDescription: row.companyDescription || '',
+        
+        // System-set fields for new members
+        status: 'Active',
+        role: 'MEMBER',
+        points: 0,
+        avatar: '',
+        skills: [],
+        churnRisk: 'Low',
+        attendanceRate: 0,
+        duesStatus: 'Pending',
+        badges: []
+      } as Parameters<typeof MembersService.createMember>[0];
+      
       await MembersService.createMember(payload);
     }
   },

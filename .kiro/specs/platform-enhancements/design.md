@@ -837,7 +837,7 @@ Election (1) ─── (N) ElectionBallots
 **Validates: Requirements 14.5**
 
 **Property 34: Associate member promotion requirement tracking**
-*For any* Associate Member, the promotion progress must accurately reflect completion status of all four requirements (BOD meeting, organizing committee, event participation, JCI Inspire).
+*For any* Associate Member, the promotion progress must accurately reflect completion status of all four requirements (BOD meeting, organizing committee, event participation, JCIM Inspire).
 **Validates: Requirements 19.1, 19.2, 19.3, 19.4**
 
 **Property 35: Automatic promotion trigger**

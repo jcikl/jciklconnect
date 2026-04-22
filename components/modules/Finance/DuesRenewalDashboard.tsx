@@ -15,12 +15,15 @@ import {
 } from 'lucide-react';
 import { DuesRenewalService } from '../../../services/duesRenewalService';
 import {
-  DuesRenewalSummary,
-  DuesRenewalTransaction,
   MembershipType,
-  MembershipDues
+  MembershipDues,
+  DuesRenewalTransaction,
+  DuesRenewalSummary,
+  MembershipRecord,
+  MembershipStatus
 } from '../../../types';
 import type { Transaction } from '../../../types';
+// Re-scan trigger
 
 interface DuesRenewalDashboardProps {
   year?: number;
@@ -32,7 +35,17 @@ interface DuesRenewalDashboardProps {
   formatCurrency?: (amount: number) => string;
   formatDate?: (date: string) => string;
   /** 会员列表，用于显示 memberId 对应的姓名 */
-  members?: Array<{ id: string; name: string }>;
+  members?: Array<{
+    id: string;
+    name: string;
+    fullName?: string;
+    membershipType?: MembershipType;
+    introducer?: string;
+    tshirtSize?: string;
+    jacketSize?: string;
+    joinDate?: string;
+    membership?: Record<string, MembershipRecord>;
+  }>;
 }
 
 export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
@@ -56,7 +69,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
 
   const [selectedYear, setSelectedYear] = useState(year);
   const [filterType, setFilterType] = useState<MembershipType | 'all'>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'pending' | 'overdue'>('all');
+  const [filterStatus, setFilterStatus] = useState<MembershipStatus | 'all'>('all');
   const [creatingRenewals, setCreatingRenewals] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
 
@@ -113,13 +126,65 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     }
   };
 
-  const filteredRenewals = renewals.filter(renewal => {
-    if (filterType !== 'all' && renewal.membershipType !== filterType) return false;
-    if (filterStatus !== 'all' && renewal.status !== filterStatus) return false;
-    return true;
-  });
+  const displayRenewals = React.useMemo(() => {
+    // Only show people who joined in or before the selected year
+    const yearMembers = members.filter(m => m.joinDate && new Date(m.joinDate).getFullYear() <= selectedYear);
+
+    const existingMap = new Map<string, DuesRenewalTransaction>();
+    renewals.forEach(r => existingMap.set(r.memberId, r));
+
+    const merged = yearMembers.map(m => {
+      // Check for structured membership record in member object first
+      const membershipData = m.membership?.[String(selectedYear)];
+
+      if (membershipData) {
+        return {
+          id: `summary-${m.id}-${selectedYear}`,
+          memberId: m.id,
+          membershipType: membershipData.type,
+          duesYear: selectedYear,
+          amount: membershipData.amount,
+          status: membershipData.status,
+          dueDate: new Date(selectedYear, 2, 31).toISOString(),
+          isRenewal: true,
+        } as DuesRenewalTransaction;
+      }
+
+      // Fallback to duesRenewals collection if no summary found
+      const existing = existingMap.get(m.id);
+      if (existing) return existing;
+
+      const type = (m.membershipType && MembershipDues[m.membershipType])
+        ? m.membershipType
+        : 'Probation';
+
+      return {
+        id: `virtual-${m.id}`,
+        memberId: m.id,
+        membershipType: type,
+        duesYear: selectedYear,
+        amount: 0,
+        status: 'pending',
+        dueDate: new Date(selectedYear, 2, 31).toISOString(),
+        isRenewal: false,
+      } as DuesRenewalTransaction;
+    });
+
+    return merged.filter(renewal => {
+      if (filterType !== 'all' && renewal.membershipType !== filterType) return false;
+      if (filterStatus === 'all') return true;
+
+      // Special case: 'paid' filter also shows 'over paid'
+      if (filterStatus === 'paid') {
+        return renewal.status === 'paid' || renewal.status === 'over paid';
+      }
+
+      return renewal.status === filterStatus;
+    });
+  }, [renewals, members, selectedYear, filterType, filterStatus]);
 
   const membershipTypeColors: Record<MembershipType, string> = {
+    Guest: 'bg-blue-100 text-blue-800',
     Probation: 'bg-blue-100 text-blue-800',
     Full: 'bg-green-100 text-green-800',
     Honorary: 'bg-purple-100 text-purple-800',
@@ -127,10 +192,12 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     Visiting: 'bg-orange-100 text-orange-800',
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     paid: 'bg-green-100 text-green-800',
     pending: 'bg-yellow-100 text-yellow-800',
     overdue: 'bg-red-100 text-red-800',
+    partial: 'bg-orange-100 text-orange-800',
+    'over paid': 'bg-purple-100 text-purple-800',
   };
 
   if (loading) {
@@ -353,29 +420,38 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type / Size</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reminders</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredRenewals.map((renewal) => (
+                  {displayRenewals.map((renewal) => (
                     <tr key={renewal.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{renewal.memberId}</div>
-                        <div className="text-sm text-gray-500">
-                          {renewal.isRenewal ? 'Renewal' : 'New Member'}
-                        </div>
+                        {(() => {
+                          const m = members.find(mem => mem.id === renewal.memberId);
+                          return (
+                            <div className="flex flex-col">
+                              <div className="text-sm font-medium text-gray-900">
+                                {m?.name || renewal.memberId}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${membershipTypeColors[renewal.membershipType]}`}>
-                          {renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1)}
-                        </span>
+                        <div className="mb-1">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${membershipTypeColors[renewal.membershipType]}`}>
+                            {renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1)}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        RM{renewal.amount.toLocaleString()}
+                        RM{(renewal.amount ?? 0).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[renewal.status]}`}>
@@ -383,7 +459,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(renewal.dueDate).toLocaleDateString()}
+                        {fmtDate(renewal.dueDate)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {renewal.remindersSent || 0}
@@ -393,7 +472,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 </tbody>
               </table>
 
-              {filteredRenewals.length === 0 && (
+              {displayRenewals.length === 0 && (
                 <div className="text-center py-12">
                   <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">No renewal transactions found for the selected filters.</p>

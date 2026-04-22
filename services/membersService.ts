@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
-import { Member, UserRole } from '../types';
+import { Member, UserRole, MembershipDues, MembershipStatus } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MOCK_MEMBERS } from './mockData';
 
@@ -109,6 +109,33 @@ export class MembersService {
   static async updateMember(memberId: string, updates: Partial<Member>, updatedBy?: string): Promise<void> {
     try {
       const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+      
+      // Check for GUEST -> PROBATION transition to initialize membership record (if not already handled by caller)
+      if (updates.role === UserRole.PROBATION && !updates.membership) {
+        const currentSnap = await getDoc(memberRef);
+        if (currentSnap.exists()) {
+          const currentData = currentSnap.data() as Member;
+          // If moving from GUEST (or no role) to PROBATION
+          if (currentData.role === UserRole.GUEST || !currentData.role) {
+            const joinDate = updates.joinDate || currentData.joinDate;
+            const yearStr = joinDate ? String(new Date(joinDate).getFullYear()) : String(new Date().getFullYear());
+            
+            const membership = currentData.membership || {};
+            if (!membership[yearStr]) {
+              membership[yearStr] = {
+                year: parseInt(yearStr),
+                dues: MembershipDues.Probation, // 350
+                type: 'Probation',
+                amount: 0,
+                status: 'pending',
+                transactionId: []
+              };
+              updates.membership = membership;
+              console.log(`Initialized membership record for member ${memberId} for year ${yearStr}`);
+            }
+          }
+        }
+      }
 
       const cleanUpdates: Record<string, any> = {
         updatedAt: Timestamp.now(),

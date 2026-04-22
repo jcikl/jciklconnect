@@ -12,10 +12,11 @@ import {
   orderBy,
   limit,
   Timestamp,
+  getDoc as getFirestoreDoc,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType } from '../types';
+import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
@@ -118,6 +119,11 @@ export class FinanceService {
 
       // Sync with inventory if linked
       await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
+
+      // Sync with Member Membership if category is Membership
+      if (transactionData.category === 'Membership' && transactionData.memberId) {
+        await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
+      }
 
       return docRef.id;
     } catch (error) {
@@ -573,6 +579,21 @@ export class FinanceService {
         }
       }
 
+      // Sync with Member Membership if category is Membership or was Membership
+      if (updates.category === 'Membership' || currentTransaction.category === 'Membership') {
+        const memberId = updates.memberId || currentTransaction.memberId;
+        const projectId = updates.projectId || currentTransaction.projectId;
+        
+        if (memberId) {
+          await this.syncMemberMembership(memberId as string, projectId);
+        }
+        
+        // If memberId changed, sync the old member too
+        if (updates.memberId && currentTransaction.memberId && updates.memberId !== currentTransaction.memberId) {
+          await this.syncMemberMembership(currentTransaction.memberId as string, currentTransaction.projectId);
+        }
+      }
+
     } catch (error) {
       console.error('Error updating transaction:', error);
       throw error;
@@ -724,6 +745,11 @@ export class FinanceService {
       }
 
       await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+
+      // Sync with Member Membership if category is Membership
+      if (transaction && transaction.category === 'Membership' && transaction.memberId) {
+        await this.syncMemberMembership(transaction.memberId as string, transaction.projectId);
+      }
     } catch (error) {
       console.error('Error deleting transaction:', error);
       throw error;
@@ -793,12 +819,89 @@ export class FinanceService {
       await InventoryService.updateVariantQuantity(
         inventoryLinkId,
         inventoryVariant,
-        inventoryQuantity,
+          inventoryQuantity,
         operation,
         (transaction as any).id
       );
     } catch (error) {
-      console.error('Failed to sync transaction with inventory:', error);
+      console.error('Error syncing transaction with inventory:', error);
+    }
+  }
+
+  /**
+   * Synchronize member membership summary based on transactions
+   */
+  static async syncMemberMembership(memberId: string, projectId?: string): Promise<void> {
+    if (isDevMode()) return;
+
+    try {
+      // 1. Parse year from projectId (e.g., "2026 membership")
+      const yearMatch = projectId?.match(/^(\d+)/);
+      if (!yearMatch) return;
+      const year = yearMatch[1];
+      const yearNum = parseInt(year, 10);
+
+      // 2. Fetch all transactions for this member, category Membership, and same projectId
+      const q = query(
+        collection(db, COLLECTIONS.TRANSACTIONS),
+        where('memberId', '==', memberId),
+        where('category', '==', 'Membership'),
+        where('projectId', '==', projectId)
+      );
+      const snapshot = await getDocs(q);
+      const transactions = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction));
+
+      // 3. Calculate total amount
+      const totalAmount = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      const latestTx = transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+      const transactionIds = transactions.map(t => t.id);
+
+      // 4. Fetch the member to get current membershipType and existing membership data
+      const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+      const memberDoc = await getFirestoreDoc(memberRef);
+      if (!memberDoc.exists()) return;
+      const member = memberDoc.data() as any;
+      const currentMembership = member.membership || {};
+      const yearStr = year;
+
+      const type = member.membershipType || 'Probation';
+      const duesAmount = currentMembership[yearStr]?.dues || MembershipDues[type as keyof typeof MembershipDues] || 0;
+
+      // 5. Determine status based on amount - dues
+      let status: MembershipStatus = 'pending';
+      const balance = totalAmount - duesAmount;
+      
+      if (totalAmount === 0) {
+        status = 'pending';
+      } else if (balance === 0) {
+        status = 'paid';
+      } else if (balance > 0) {
+        status = 'over paid';
+      } else {
+        status = 'partial';
+      }
+
+      // 6. Update member.membership[year] - Unified update logic
+      if (currentMembership[yearStr] || transactions.length > 0) {
+        currentMembership[yearStr] = {
+          year: yearNum,
+          dues: duesAmount,
+          type: currentMembership[yearStr]?.type || (type as MembershipType),
+          amount: totalAmount,
+          status: status,
+          transactionId: transactionIds,
+          paymentDate: latestTx ? latestTx.date : null
+        };
+      }
+
+      await updateDoc(memberRef, {
+        membership: currentMembership,
+        updatedAt: Timestamp.now()
+      });
+
+      console.log(`Synced membership for member ${memberId} year ${year}. Status: ${status}, Amount: ${totalAmount}`);
+    } catch (error) {
+      console.error('Error syncing member membership:', error);
     }
   }
 
@@ -1107,6 +1210,7 @@ export class FinanceService {
             status: 'Pending',
             date: renewalDate.toISOString(),
             transactionType: 'dues',
+            projectId: `${year} Membership`,
           });
 
           renewalsByType[membershipType]++;
@@ -1122,11 +1226,7 @@ export class FinanceService {
             notificationsSent++;
           }
 
-          // Update member's dues status
-          await MembersService.updateMember(memberId, {
-            duesStatus: duesAmount > 0 ? 'Pending' : 'Paid',
-            duesYear: duesAmount === 0 ? year : member.duesYear, // Senators auto-paid
-          });
+          // Member membership record will be automatically synced by createTransaction
         } catch (memberError) {
           console.error(`Error processing renewal for member ${memberId}:`, memberError);
           validationErrors.push({
@@ -1329,7 +1429,7 @@ export class FinanceService {
 
       for (const member of allMembers) {
         const membershipType = member.membershipType || 'Full';
-        const duesYear = member.duesYear || new Date().getFullYear();
+        const duesYear = new Date().getFullYear(); // Default to current year or derive from context
         const duesAmount = MembershipDues[membershipType as keyof typeof MembershipDues];
 
         // Find member's dues transaction for the year
@@ -1374,7 +1474,7 @@ export class FinanceService {
           duesYear,
           duesAmount,
           paymentStatus,
-          paymentDate: member.duesPaidDate,
+          paymentDate: undefined, // Will be updated when fully migrated
           isRenewal,
         });
       }
@@ -1442,12 +1542,7 @@ export class FinanceService {
         date: paymentDate,
       });
 
-      // Update member status
-      await MembersService.updateMember(memberId, {
-        duesStatus: 'Paid',
-        duesYear,
-        duesPaidDate: paymentDate,
-      });
+      // Member membership record will be automatically synced by updateTransaction
 
       return { success: true };
     } catch (error) {

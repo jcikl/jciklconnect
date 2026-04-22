@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, CheckCircle, Clock, Award, AlertCircle,
-  Calendar, FileText, User, Users, RefreshCw, Check, X
+  Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3
 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, Modal, useToast } from '../../ui/Common';
 import { PromotionService } from '../../../services/promotionService';
+import { MembersService } from '../../../services/membersService';
 import {
   PromotionProgress,
   PromotionHistory,
   ManualPromotionRequest
 } from '../../../types';
+
+// Map requirement type to promotionProgress field key
+const REQUIREMENT_FIELD_MAP: Record<string, 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted'> = {
+  'bod_meeting_attendance': 'bodMeetingAttended',
+  'event_organizing_committee': 'eventOrganizerParticipation',
+  'event_participation': 'eventParticipation',
+  'jci_inspire_completion': 'jciInspireCompleted'
+};
+
+const REQUIREMENT_PLACEHOLDER: Record<string, string> = {
+  'bod_meeting_attendance': 'e.g. 2026-03-15 BOD Meeting #3',
+  'event_organizing_committee': 'e.g. Charity Fundraiser 2026 - Logistics',
+  'event_participation': 'e.g. Leadership Training Workshop',
+  'jci_inspire_completion': 'e.g. JCIM Inspire 2026 - Completed'
+};
 
 export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [probationMembers, setProbationMembers] = useState<any[]>([]);
@@ -19,6 +35,9 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [loading, setLoading] = useState(false);
   const [showManualPromotionModal, setShowManualPromotionModal] = useState(false);
   const [manualPromotionReason, setManualPromotionReason] = useState('');
+  // Editable text inputs for each requirement
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [savingField, setSavingField] = useState<string | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -47,10 +66,39 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       const progress = await PromotionService.getPromotionProgress(memberId);
       setPromotionProgress(progress);
       setSelectedMemberId(memberId);
+
+      // Load existing values from member record
+      const member = await MembersService.getMemberById(memberId);
+      const pp = member?.promotionProgress || {};
+      setEditValues({
+        'bod_meeting_attendance': pp.bodMeetingAttended || '',
+        'event_organizing_committee': pp.eventOrganizerParticipation || '',
+        'event_participation': pp.eventParticipation || '',
+        'jci_inspire_completion': pp.jciInspireCompleted || ''
+      });
     } catch (err) {
       showToast('Failed to load promotion progress', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveField = async (reqType: string) => {
+    if (!selectedMemberId) return;
+    const field = REQUIREMENT_FIELD_MAP[reqType];
+    if (!field) return;
+
+    setSavingField(reqType);
+    try {
+      await PromotionService.savePromotionProgressField(selectedMemberId, field, editValues[reqType] || '');
+      // Refresh progress
+      const progress = await PromotionService.getPromotionProgress(selectedMemberId);
+      setPromotionProgress(progress);
+      showToast('Progress saved', 'success');
+    } catch (err) {
+      showToast('Failed to save progress', 'error');
+    } finally {
+      setSavingField(null);
     }
   };
 
@@ -217,6 +265,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         onClose={() => {
           setPromotionProgress(null);
           setSelectedMemberId(null);
+          setEditValues({});
         }}
         title="Promotion Progress"
       >
@@ -236,7 +285,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
               />
             </div>
 
-            {/* Requirements Checklist */}
+            {/* Requirements with editable text inputs */}
             <div className="space-y-3">
               <h4 className="font-semibold text-slate-900">Requirements</h4>
               {promotionProgress.requirements.map(req => (
@@ -247,7 +296,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                     : 'border-slate-200 bg-white'
                     }`}
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between mb-2">
                     <div className="flex items-start space-x-3">
                       <div className={`mt-0.5 ${req.isCompleted ? 'text-green-600' : 'text-slate-400'}`}>
                         {req.isCompleted ? <CheckCircle size={20} /> : <Clock size={20} />}
@@ -255,16 +304,35 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                       <div>
                         <div className="font-medium text-slate-900">{req.name}</div>
                         <div className="text-sm text-slate-600 mt-1">{req.description}</div>
-                        {req.isCompleted && req.completedAt && (
-                          <div className="text-xs text-green-600 mt-2">
-                            Completed: {new Date(req.completedAt).toLocaleDateString()}
-                          </div>
-                        )}
                       </div>
                     </div>
                     {req.isCompleted && (
                       <Badge variant="success">Complete</Badge>
                     )}
+                  </div>
+                  {/* Editable text input */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder={REQUIREMENT_PLACEHOLDER[req.type] || 'Enter details...'}
+                        value={editValues[req.type] || ''}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, [req.type]: e.target.value }))}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={editValues[req.type]?.trim() ? 'primary' : 'outline'}
+                      onClick={() => handleSaveField(req.type)}
+                      disabled={savingField === req.type}
+                    >
+                      {savingField === req.type ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <Save size={14} />
+                      )}
+                    </Button>
                   </div>
                 </div>
               ))}

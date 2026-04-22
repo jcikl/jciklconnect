@@ -27,21 +27,21 @@ describe('Member Management Properties', () => {
             role: newRole,
             permissions: getRolePermissions(newRole),
           };
-          
+
           // Property: Role should be updated
           expect(updatedMember.role).toBe(newRole);
-          
+
           // Property: Permissions should match the new role
           const expectedPermissions = getRolePermissions(newRole);
           expect(updatedMember.permissions).toEqual(expectedPermissions);
-          
+
           // Property: Board members should have board permissions
           if (newRole === UserRole.BOARD) {
             expect(updatedMember.permissions).toContain('manage_events');
             expect(updatedMember.permissions).toContain('view_reports');
             expect(updatedMember.permissions).toContain('manage_projects');
           }
-          
+
           // Property: Admin members should have all permissions
           if (newRole === UserRole.ADMIN) {
             expect(updatedMember.permissions).toContain('manage_members');
@@ -90,22 +90,22 @@ describe('Member Management Properties', () => {
             transitionYear: transitionYear,
             status: 'archived',
           }));
-          
+
           // Property: All outgoing board members should be archived
           expect(archivedRecords.length).toBe(validBoardMembers.length);
-          
+
           // Property: All archived records should be marked as inactive
           archivedRecords.forEach(record => {
             expect(record.isActive).toBe(false);
             expect(record.status).toBe('archived');
           });
-          
+
           // Property: All archived records should have the correct transition year
           archivedRecords.forEach(record => {
             expect(record.transitionYear).toBe(transitionYear);
             expect(record.archivedAt).toBeInstanceOf(Date);
           });
-          
+
           // Property: Original member data should be preserved in archive
           validBoardMembers.forEach((originalMember, index) => {
             const archivedRecord = archivedRecords[index];
@@ -152,59 +152,59 @@ describe('Member Management Properties', () => {
           // Calculate compatibility score based on multiple factors
           let compatibilityScore = 0;
           const maxScore = 100;
-          
+
           // Experience gap scoring (mentors should have more experience)
           const experienceValues = { 'Junior': 1, 'Mid': 2, 'Senior': 3 };
           const mentorExp = experienceValues[mentor.experience];
           const menteeExp = experienceValues[mentee.experience];
           const experienceGap = mentorExp - menteeExp;
-          
+
           if (experienceGap > 0) {
             compatibilityScore += 25; // Good experience gap
           } else if (experienceGap === 0) {
             compatibilityScore += 10; // Same level, some value
           }
           // Negative gap (mentee more experienced) adds no points
-          
+
           // Interest alignment scoring
-          const commonInterests = mentor.interests.filter(interest => 
+          const commonInterests = mentor.interests.filter(interest =>
             mentee.interests.includes(interest)
           );
           const interestScore = Math.min(25, (commonInterests.length / Math.max(mentor.interests.length, mentee.interests.length)) * 25);
           compatibilityScore += interestScore;
-          
+
           // Goal compatibility scoring
-          const commonGoals = mentor.goals.filter(goal => 
+          const commonGoals = mentor.goals.filter(goal =>
             mentee.goals.includes(goal)
           );
           const goalScore = Math.min(25, (commonGoals.length / Math.max(mentor.goals.length, mentee.goals.length)) * 25);
           compatibilityScore += goalScore;
-          
+
           // Availability matching scoring
           const availabilityValues = { 'High': 3, 'Medium': 2, 'Low': 1 };
           const availabilityMatch = Math.min(availabilityValues[mentor.availability], availabilityValues[mentee.availability]);
           const availabilityScore = (availabilityMatch / 3) * 25;
           compatibilityScore += availabilityScore;
-          
+
           // Property: Score should be between 0 and 100
           expect(compatibilityScore).toBeGreaterThanOrEqual(0);
           expect(compatibilityScore).toBeLessThanOrEqual(maxScore);
-          
+
           // Property: Better experience gap should result in higher score
           if (experienceGap > 0) {
             expect(compatibilityScore).toBeGreaterThan(interestScore + goalScore + availabilityScore);
           }
-          
+
           // Property: More common interests should increase score
           if (commonInterests.length > 0) {
             expect(interestScore).toBeGreaterThan(0);
           }
-          
+
           // Property: More common goals should increase score
           if (commonGoals.length > 0) {
             expect(goalScore).toBeGreaterThan(0);
           }
-          
+
           // Property: Higher availability should contribute to higher score
           expect(availabilityScore).toBeGreaterThanOrEqual(0);
           expect(availabilityScore).toBeLessThanOrEqual(25);
@@ -237,10 +237,10 @@ describe('Member Management Properties', () => {
         (importData) => {
           // Validate the data and collect errors
           const errors: Array<{ row: number; field?: string; message: string; severity: 'error' | 'warning' }> = [];
-          
+
           importData.forEach((row, index) => {
             const rowNumber = index + 2; // +2 because index is 0-based and we skip header row
-            
+
             // Required field validation
             if (!row.name || row.name === '') {
               errors.push({
@@ -250,7 +250,7 @@ describe('Member Management Properties', () => {
                 severity: 'error'
               });
             }
-            
+
             if (!row.email || row.email === '') {
               errors.push({
                 row: rowNumber,
@@ -259,7 +259,7 @@ describe('Member Management Properties', () => {
                 severity: 'error'
               });
             }
-            
+
             // Email format validation
             if (row.email && row.email !== '' && !isValidEmail(row.email)) {
               errors.push({
@@ -269,7 +269,7 @@ describe('Member Management Properties', () => {
                 severity: 'error'
               });
             }
-            
+
             // Enum validation
             if (row.membershipType && !['Full', 'Probation', 'Honorary', 'Visiting', 'Senator'].includes(row.membershipType)) {
               errors.push({
@@ -279,7 +279,7 @@ describe('Member Management Properties', () => {
                 severity: 'error'
               });
             }
-            
+
             if (row.status && !['Active', 'Inactive', 'Suspended', 'Pending'].includes(row.status)) {
               errors.push({
                 row: rowNumber,
@@ -288,7 +288,7 @@ describe('Member Management Properties', () => {
                 severity: 'error'
               });
             }
-            
+
             // Date validation
             if (row.dateOfBirth && row.dateOfBirth !== '' && !isValidDate(row.dateOfBirth)) {
               errors.push({
@@ -299,20 +299,20 @@ describe('Member Management Properties', () => {
               });
             }
           });
-          
+
           // Property: Each error must have a row number
           errors.forEach(error => {
             expect(error.row).toBeGreaterThan(1); // Row numbers start from 2 (after header)
             expect(error.row).toBeLessThanOrEqual(importData.length + 1);
           });
-          
+
           // Property: Each error must have a descriptive message
           errors.forEach(error => {
             expect(error.message).toBeDefined();
             expect(error.message.length).toBeGreaterThan(0);
             expect(typeof error.message).toBe('string');
           });
-          
+
           // Property: Field-specific errors must include field name
           errors.filter(error => error.field).forEach(error => {
             expect(error.field).toBeDefined();
@@ -320,14 +320,14 @@ describe('Member Management Properties', () => {
             // The error message should either contain the field name or be descriptive enough
             expect(error.message.length).toBeGreaterThan(0);
           });
-          
+
           // Property: Each error must have a severity level
           errors.forEach(error => {
             expect(['error', 'warning']).toContain(error.severity);
           });
-          
+
           // Property: Required field errors should be marked as 'error' severity
-          const requiredFieldErrors = errors.filter(error => 
+          const requiredFieldErrors = errors.filter(error =>
             error.message.includes('is required')
           );
           requiredFieldErrors.forEach(error => {
@@ -354,11 +354,11 @@ describe('Member Management Properties', () => {
           // Define field permissions based on user role
           const fieldPermissions: Record<UserRole, string[]> = {
             [UserRole.ADMIN]: [
-              'id', 'name', 'email', 'phone', 'dateOfBirth', 'membershipType', 
+              'id', 'name', 'email', 'phone', 'dateOfBirth', 'membershipType',
               'status', 'joinDate', 'address', 'emergencyContact', 'ssn', 'bankAccount'
             ],
             [UserRole.BOARD]: [
-              'id', 'name', 'email', 'phone', 'membershipType', 
+              'id', 'name', 'email', 'phone', 'membershipType',
               'status', 'joinDate', 'address'
             ],
             [UserRole.MEMBER]: [
@@ -380,10 +380,10 @@ describe('Member Management Properties', () => {
               'id', 'name', 'email', 'membershipType', 'status'
             ]
           };
-          
+
           const allowedFields = fieldPermissions[userRole];
           const restrictedFields = ['ssn', 'bankAccount', 'password', 'privateNotes'];
-          
+
           // Filter requested fields based on permissions
           const filteredFields = requestedFields.filter(field => {
             // Remove restricted fields for non-admin users
@@ -393,28 +393,28 @@ describe('Member Management Properties', () => {
             // Only include fields the user has permission to view
             return allowedFields.includes(field);
           });
-          
+
           // Property: Filtered fields should be a subset of requested fields
           filteredFields.forEach(field => {
             expect(requestedFields).toContain(field);
           });
-          
+
           // Property: Filtered fields should only contain allowed fields
           filteredFields.forEach(field => {
             expect(allowedFields).toContain(field);
           });
-          
+
           // Property: Non-admin users should not have access to restricted fields
           if (userRole !== UserRole.ADMIN) {
-            const hasRestrictedFields = filteredFields.some(field => 
+            const hasRestrictedFields = filteredFields.some(field =>
               restrictedFields.includes(field)
             );
             expect(hasRestrictedFields).toBe(false);
           }
-          
+
           // Property: Admin users should have access to all requested fields (except truly restricted ones)
           if (userRole === UserRole.ADMIN) {
-            const adminAllowedFields = requestedFields.filter(field => 
+            const adminAllowedFields = requestedFields.filter(field =>
               !['password'].includes(field) // Some fields are restricted even for admins
             );
             adminAllowedFields.forEach(field => {
@@ -423,14 +423,14 @@ describe('Member Management Properties', () => {
               }
             });
           }
-          
+
           // Property: Member role should have most restrictive access
           if (userRole === UserRole.MEMBER) {
             const memberRestrictedFields = [
-              'ssn', 'bankAccount', 'password', 'privateNotes', 
+              'ssn', 'bankAccount', 'password', 'privateNotes',
               'emergencyContact', 'address', 'dateOfBirth'
             ];
-            const hasRestrictedAccess = filteredFields.some(field => 
+            const hasRestrictedAccess = filteredFields.some(field =>
               memberRestrictedFields.includes(field)
             );
             expect(hasRestrictedAccess).toBe(false);
@@ -445,7 +445,7 @@ describe('Member Management Properties', () => {
   it('Property 34: Probation member promotion requirement tracking', () => {
     /**
      * Feature: platform-enhancements, Property 34: Probation member promotion requirement tracking
-     * For any Probation Member, the system must accurately track completion of all four promotion requirements: BOD meeting attendance, event organizing committee participation, event participation, and JCI Inspire course completion.
+     * For any Probation Member, the system must accurately track completion of all four promotion requirements: BOD meeting attendance, event organizing committee participation, event participation, and JCIM Inspire course completion.
      * Validates: Requirements 19.1, 19.2, 19.3, 19.4
      */
     fc.assert(
@@ -493,7 +493,7 @@ describe('Member Management Properties', () => {
             {
               id: 'jci_inspire',
               type: 'jci_inspire_completion' as const,
-              name: 'JCI Inspire Course',
+              name: 'JCIM Inspire Course',
               isCompleted: memberData.jciInspireCompleted,
               completedAt: memberData.jciInspireCompleted ? new Date() : undefined,
               evidence: memberData.jciInspireCompleted ? [memberData.jciInspireCertificate || 'jci_inspire_cert.pdf'] : undefined
@@ -565,8 +565,8 @@ describe('Member Management Properties', () => {
         }),
         (memberData) => {
           // Simulate promotion system behavior
-          const shouldTriggerAutomaticPromotion = 
-            memberData.allRequirementsCompleted && 
+          const shouldTriggerAutomaticPromotion =
+            memberData.allRequirementsCompleted &&
             memberData.automaticPromotionEnabled;
 
           let promotionTriggered = false;
@@ -719,7 +719,7 @@ function getRolePermissions(role: UserRole): string[] {
     case UserRole.ADMIN:
       return [
         'manage_members',
-        'manage_finances', 
+        'manage_finances',
         'system_admin',
         'manage_events',
         'view_reports',
@@ -730,7 +730,7 @@ function getRolePermissions(role: UserRole): string[] {
     case UserRole.BOARD:
       return [
         'manage_events',
-        'view_reports', 
+        'view_reports',
         'manage_projects',
         'manage_workflows',
         'view_finances'

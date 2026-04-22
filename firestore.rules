@@ -21,7 +21,7 @@ service cloud.firestore {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              getUserRole() != null &&
-             getUserRole() in ['GUEST', 'PROBATION_MEMBER', 'MEMBER', 'BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'];
+             getUserRole() in ['GUEST', 'PROBATION', 'MEMBER', 'BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE', 'INACTIVE'];
     }
     
     function isBoard() {

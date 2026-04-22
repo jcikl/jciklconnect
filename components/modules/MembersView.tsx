@@ -16,7 +16,7 @@ import { LoadingState } from '../ui/Loading';
 import { useMembers } from '../../hooks/useMembers';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
-import { UserRole, Member, MemberTier, ProbationTask } from '../../types';
+import { UserRole, Member, MemberTier, ProbationTask, MembershipDues } from '../../types';
 import { MembersService } from '../../services/membersService';
 import { MEMBER_SELF_EDITABLE_FIELDS } from '../../config/constants';
 import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
@@ -155,16 +155,16 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
         <h3 className="font-semibold text-slate-800 mb-4">Dues Status & Participation History</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <span className="text-slate-500 text-sm">Dues Status</span>
-            <p className="font-medium">{DUES_STATUS_LABEL[member.duesStatus] ?? member.duesStatus ?? '—'}</p>
+            <span className="text-slate-500 text-sm">Dues Status ({new Date().getFullYear()})</span>
+            <p className="font-medium capitalize">{member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}</p>
           </div>
           <div>
-            <span className="text-slate-500 text-sm">Dues Year</span>
-            <p className="font-medium">{member.duesYear ?? '—'}</p>
+            <span className="text-slate-500 text-sm">Total Paid This Year</span>
+            <p className="font-medium">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</p>
           </div>
           <div>
             <span className="text-slate-500 text-sm">Last Payment Date</span>
-            <p className="font-medium">{formatDateToDDMMMYYYY(member.duesPaidDate)}</p>
+            <p className="font-medium">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</p>
           </div>
         </div>
         {loadingExtra ? (
@@ -480,7 +480,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`,
         churnRisk: (formData.get('churnRisk') as any) || 'Low',
         attendanceRate: parseInt(formData.get('attendanceRate') as string) || 100,
-        duesStatus: (formData.get('duesStatus') as any) || 'Pending',
         badges: [],
         skills,
         hobbies,
@@ -499,8 +498,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
         // Membership
         membershipType: (formData.get('membershipType') as any) || undefined,
-        duesYear: formData.get('duesYear') ? parseInt(formData.get('duesYear') as string) : undefined,
-        duesPaidDate: formData.get('duesPaidDate') as string || undefined,
         senatorCertified: formData.get('senatorCertified') === 'on',
 
         // Professional
@@ -826,7 +823,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 <div className="grid grid-cols-2 gap-4">
                   <Select name="role" label="System Role" defaultValue={UserRole.MEMBER} options={Object.values(UserRole).map(r => ({ label: r, value: r }))} />
                   <Select name="membershipType" label="Membership Type" options={['Full', 'Probation', 'Honorary', 'Visiting', 'Senator'].map(t => ({ label: t, value: t }))} />
-                  <Select name="duesStatus" label="Dues Status" defaultValue="Pending" options={['Paid', 'Pending', 'Overdue'].map(s => ({ label: s, value: s }))} />
                   <Input name="introducer" label="Introducer Name" placeholder="Who brought them in?" />
                 </div>
               </section>
@@ -1452,7 +1448,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 />
               </div>
               <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' :
-                member.role === UserRole.PROBATION_MEMBER ? 'bg-amber-500' : 'bg-slate-500'
+                member.role === UserRole.PROBATION ? 'bg-amber-500' : 'bg-slate-500'
                 }`}
                 title={member.role}
               />
@@ -1502,9 +1498,16 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             <p className="text-2xl font-black text-slate-900">{member.attendanceRate}%</p>
           </div>
           <div className="p-6 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
-            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">Dues Status</p>
-            <Badge variant={member.duesStatus === 'Paid' ? 'success' : member.duesStatus === 'Overdue' ? 'error' : 'warning'} className="px-4 font-black">
-              {member.duesStatus}
+            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">Dues Status ({new Date().getFullYear()})</p>
+            <Badge 
+              variant={
+                (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' || 
+                 member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' : 
+                member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+              } 
+              className="px-4 font-black capitalize"
+            >
+              {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
             </Badge>
           </div>
         </div>
@@ -1743,18 +1746,25 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
               <div className="grid grid-cols-1 gap-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Payment Status:</span>
-                  <Badge variant={member.duesStatus === 'Paid' ? 'success' : member.duesStatus === 'Overdue' ? 'error' : 'warning'}>
-                    {member.duesStatus}
+                  <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
+                  <Badge 
+                    variant={
+                      (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' || 
+                       member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' : 
+                      member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+                    }
+                    className="capitalize"
+                  >
+                    {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Dues Paid Year:</span>
-                  <span className="font-bold">{member.duesYear || 'N/A'}</span>
+                  <span className="text-slate-500">Last Payment Amount:</span>
+                  <span className="font-bold">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Payment Date:</span>
-                  <span className="font-medium">{member.duesPaidDate || 'N/A'}</span>
+                  <span className="text-slate-500">Last Payment Date:</span>
+                  <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</span>
                 </div>
               </div>
             </div>
@@ -2149,6 +2159,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showProbationTasksModal, setShowProbationTasksModal] = useState(false);
   const [selectedProbationMember, setSelectedProbationMember] = useState<Member | null>(null);
+  const [approvalYear, setApprovalYear] = useState(new Date().getFullYear());
   const canApprove = isBoard || isAdmin;
 
   useEffect(() => {
@@ -2165,10 +2176,17 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
     };
 
     const guestList = members.filter(m => m.role === UserRole.GUEST && filterFn(m));
-    const probationList = members.filter(m => m.role === UserRole.PROBATION_MEMBER && filterFn(m));
+    const probationList = members.filter(m => m.role === UserRole.PROBATION && filterFn(m));
     setGuests(guestList);
     setProbationMembers(probationList);
   }, [members, searchQuery]);
+
+  useEffect(() => {
+    if (selectedGuest) {
+      const joinYear = selectedGuest.joinDate ? new Date(selectedGuest.joinDate).getFullYear() : new Date().getFullYear();
+      setApprovalYear(joinYear);
+    }
+  }, [selectedGuest]);
 
   const handleApproveGuest = async (guestId: string) => {
     if (!canApprove) {
@@ -2205,11 +2223,25 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
         },
       ];
 
+      const yearStr = String(approvalYear);
+      
       await updateMember(guestId, {
-        role: UserRole.PROBATION_MEMBER,
+        role: UserRole.PROBATION,
+        membershipType: 'Probation',
         probationTasks: defaultTasks,
         probationApprovedBy: currentMember?.id,
         probationApprovedAt: new Date().toISOString(),
+        membership: {
+          ...(selectedGuest?.membership || {}),
+          [yearStr]: {
+            year: approvalYear,
+            dues: MembershipDues.Probation, // 350
+            type: 'Probation',
+            amount: 0,
+            status: 'pending',
+            transactionId: []
+          }
+        }
       });
 
       showToast('Guest approved and moved to probation member', 'success');
@@ -2315,6 +2347,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
                     <div className="flex flex-col gap-0.5 text-xs text-slate-500">
                       <span className="flex items-center gap-1"><Mail size={12} className="shrink-0" /> {guest.email}</span>
                       {guest.phone && <span className="flex items-center gap-1"><Phone size={12} className="shrink-0" /> {guest.phone}</span>}
+                      <span className="flex items-center gap-1"><Calendar size={12} className="shrink-0" /> Joined: {formatDateToDDMMMYYYY(guest.joinDate)}</span>
                     </div>
                   </div>
                 </div>
@@ -2333,6 +2366,11 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
                       size="sm"
                       onClick={() => {
                         setSelectedGuest(guest);
+                        if (guest.joinDate) {
+                          setApprovalYear(new Date(guest.joinDate).getFullYear());
+                        } else {
+                          setApprovalYear(new Date().getFullYear());
+                        }
                         setShowApprovalModal(true);
                       }}
                       className="flex-1 sm:flex-none h-9 px-4 rounded-lg font-bold bg-jci-blue hover:bg-jci-navy text-white shadow-sm shadow-jci-blue/20 transition-colors"
@@ -2374,6 +2412,20 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
                 <li>• Complete Member Profile</li>
                 <li>• Attend First Event</li>
               </ul>
+            </div>
+
+            <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <label className="block text-sm font-bold text-amber-700 mb-1">Set Initiation Year:</label>
+              <select 
+                value={approvalYear} 
+                onChange={(e) => setApprovalYear(parseInt(e.target.value))}
+                className="w-full rounded-lg border-2 border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900 focus:border-amber-500"
+              >
+                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 2 - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-amber-600 italic">This will set the year for the initial membership record.</p>
             </div>
             <div className="flex gap-2 justify-end">
               <Button

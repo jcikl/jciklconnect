@@ -63,7 +63,7 @@ New governance capabilities will include:
 - **Member Promotion**: The process of upgrading an Associate Member to Full Member status upon completing required activities
 - **BOD Meeting**: Board of Directors meeting
 - **Organizing Committee**: Team members responsible for planning and executing an event
-- **JCI Inspire**: A JCI training course required for Associate Member promotion
+- **JCIM Inspire**: A JCI training course required for Associate Member promotion
 - **Honorary Member**: A Member over 40 years old who has paid RM50 dues
 - **Senator**: A Member with senator certification who is exempt from dues
 - **Visiting Member**: A non-Malaysian citizen Member who has paid RM500 dues
@@ -709,7 +709,7 @@ Associate Members can be promoted to Full Member status by completing four speci
 1. Attend at least one BOD (Board of Directors) meeting
 2. Serve as organizing committee member for at least one event
 3. Participate in at least one event
-4. Complete the JCI Inspire course
+4. Complete the JCIM Inspire course
 
 The system will:
 - Track Associate Member progress toward promotion requirements
@@ -724,7 +724,7 @@ The system will:
    - BOD meeting attendance records
    - Event organizing committee participation
    - Event participation records
-   - JCI Inspire course completion status
+   - JCIM Inspire course completion status
 2. **Progress Dashboard**: Displays each Associate Member's progress toward promotion with checklist
 3. **Automatic Promotion Engine**: Detects when all four requirements are met and triggers promotion
 4. **Status Updater**: Changes membership type from Associate to Full Member
@@ -738,7 +738,7 @@ The system will:
 1. WHEN an Associate Member attends a BOD meeting, THE Platform SHALL record the attendance and update promotion progress
 2. WHEN an Associate Member serves on an event organizing committee, THE Platform SHALL record the participation and update promotion progress
 3. WHEN an Associate Member participates in an event, THE Platform SHALL record the participation and update promotion progress
-4. WHEN an Associate Member completes the JCI Inspire course, THE Platform SHALL record the completion and update promotion progress
+4. WHEN an Associate Member completes the JCIM Inspire course, THE Platform SHALL record the completion and update promotion progress
 5. WHEN an Associate Member completes all four requirements, THE Platform SHALL automatically promote the member to Full Member status
 6. WHEN a member is promoted to Full Member, THE Platform SHALL update the dues amount from RM350 to RM300 for future renewals
 7. WHEN a member is promoted, THE Platform SHALL send a notification congratulating the member on their promotion

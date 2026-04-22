@@ -74,8 +74,8 @@ export class PromotionService {
       {
         id: 'jci_inspire',
         type: 'jci_inspire_completion',
-        name: 'JCI Inspire Course',
-        description: 'Complete the JCI Inspire course',
+        name: 'JCIM Inspire Course',
+        description: 'Complete the JCIM Inspire course',
         isCompleted: false
       }
     ];
@@ -98,7 +98,7 @@ export class PromotionService {
    * Check a specific requirement for a member
    */
   static async checkRequirement(
-    memberId: string, 
+    memberId: string,
     requirementType: PromotionRequirement['type']
   ): Promise<{
     completedAt: Date;
@@ -109,16 +109,16 @@ export class PromotionService {
     switch (requirementType) {
       case 'bod_meeting_attendance':
         return this.checkBODMeetingAttendance(memberId);
-      
+
       case 'event_organizing_committee':
         return this.checkEventOrganizingCommittee(memberId);
-      
+
       case 'event_participation':
         return this.checkEventParticipation(memberId);
-      
+
       case 'jci_inspire_completion':
         return this.checkJCIInspireCompletion(memberId);
-      
+
       default:
         return null;
     }
@@ -153,8 +153,8 @@ export class PromotionService {
    * Promote a Probation Member to Full Member
    */
   static async promoteToFullMember(
-    memberId: string, 
-    promotedBy: string, 
+    memberId: string,
+    promotedBy: string,
     method: 'automatic' | 'manual' = 'automatic',
     reason?: string
   ): Promise<PromotionHistory | null> {
@@ -174,7 +174,10 @@ export class PromotionService {
     }
 
     // Update member status
-    await this.updateMembershipType(memberId, 'Full');
+    await MembersService.updateMember(memberId, {
+      membershipType: 'Full',
+      role: UserRole.MEMBER
+    });
     await this.updateMemberDues(memberId, this.FULL_MEMBER_DUES);
 
     // Create promotion history record
@@ -188,8 +191,8 @@ export class PromotionService {
       promotionMethod: method,
       promotedBy,
       requirementsCompleted: progress.requirements.filter(req => req.isCompleted),
-    oldDuesAmount: this.PROBATION_DUES,
-    newDuesAmount: this.FULL_MEMBER_DUES,
+      oldDuesAmount: this.PROBATION_DUES,
+      newDuesAmount: this.FULL_MEMBER_DUES,
       notificationSent: false,
       notes: reason
     };
@@ -234,6 +237,12 @@ export class PromotionService {
     };
 
     await this.saveManualPromotionRequest(request);
+
+    // If override is true, perform promotion immediately to ensure roll and membershipType update
+    if (overrideRequirements) {
+      await this.promoteToFullMember(memberId, requestedBy, 'manual', reason);
+    }
+
     return request;
   }
 
@@ -290,7 +299,7 @@ export class PromotionService {
       if (progress?.isEligibleForPromotion) {
         eligibleForPromotion++;
       }
-      
+
       progress?.requirements.forEach(req => {
         if (req.isCompleted) {
           requirementCounts[req.type]++;
@@ -345,76 +354,111 @@ export class PromotionService {
   }
 
   private static async checkBODMeetingAttendance(memberId: string) {
-    // Simulate checking BOD meeting attendance
-    const hasAttended = Math.random() > 0.5;
-    return hasAttended ? {
-      completedAt: new Date('2023-06-15'),
-      details: {
-        meetingId: 'bod_meeting_2023_06',
-        meetingDate: new Date('2023-06-15')
-      },
-      evidence: ['attendance_record_bod_2023_06.pdf']
-    } : null;
+    const member = await this.getMemberById(memberId);
+    const value = member?.promotionProgress?.bodMeetingAttended;
+    if (value && value.trim()) {
+      return {
+        completedAt: new Date(),
+        details: { meetingId: value },
+        evidence: [] as string[]
+      };
+    }
+    return null;
   }
 
   private static async checkEventOrganizingCommittee(memberId: string) {
-    // Simulate checking organizing committee participation
-    const hasParticipated = Math.random() > 0.6;
-    return hasParticipated ? {
-      completedAt: new Date('2023-07-20'),
-      details: {
-        eventId: 'event_2023_07_charity',
-        eventName: 'Charity Fundraiser 2023',
-        role: 'Logistics Coordinator'
-      },
-      evidence: ['organizing_committee_certificate.pdf']
-    } : null;
+    const member = await this.getMemberById(memberId);
+    const value = member?.promotionProgress?.eventOrganizerParticipation;
+    if (value && value.trim()) {
+      return {
+        completedAt: new Date(),
+        details: { eventName: value },
+        evidence: [] as string[]
+      };
+    }
+    return null;
   }
 
   private static async checkEventParticipation(memberId: string) {
-    // Simulate checking event participation
-    const hasParticipated = Math.random() > 0.3;
-    return hasParticipated ? {
-      completedAt: new Date('2023-05-10'),
-      details: {
-        eventId: 'event_2023_05_training',
-        eventName: 'Leadership Training Workshop'
-      },
-      evidence: ['participation_certificate.pdf']
-    } : null;
+    const member = await this.getMemberById(memberId);
+    const value = member?.promotionProgress?.eventParticipation;
+    if (value && value.trim()) {
+      return {
+        completedAt: new Date(),
+        details: { eventName: value },
+        evidence: [] as string[]
+      };
+    }
+    return null;
   }
 
   private static async checkJCIInspireCompletion(memberId: string) {
-    // Simulate checking JCI Inspire course completion
-    const hasCompleted = Math.random() > 0.7;
-    return hasCompleted ? {
-      completedAt: new Date('2023-08-01'),
-      details: {
-        courseId: 'jci_inspire_2023',
-        courseName: 'JCI Inspire Leadership Course',
-        completionCertificate: 'jci_inspire_certificate_2023.pdf'
-      },
-      evidence: ['jci_inspire_certificate_2023.pdf']
-    } : null;
+    const member = await this.getMemberById(memberId);
+    const value = member?.promotionProgress?.jciInspireCompleted;
+    if (value && value.trim()) {
+      return {
+        completedAt: new Date(),
+        details: { courseName: value },
+        evidence: [] as string[]
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Save a single promotion progress field for a member
+   */
+  static async savePromotionProgressField(
+    memberId: string,
+    field: 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted',
+    value: string
+  ): Promise<void> {
+    await MembersService.updateMember(memberId, {
+      promotionProgress: {
+        ...((await this.getMemberById(memberId))?.promotionProgress || {}),
+        [field]: value
+      }
+    } as any);
   }
 
   private static async updateMembershipType(memberId: string, newType: string): Promise<void> {
-    // Simulate database update
+    await MembersService.updateMember(memberId, { membershipType: newType as any });
     console.log(`Updated member ${memberId} to ${newType} membership`);
   }
 
   private static async updateMemberDues(memberId: string, newAmount: number): Promise<void> {
-    // Simulate database update
+    const currentYear = new Date().getFullYear();
+    const member = await this.getMemberById(memberId);
+    
+    if (member?.membership) {
+      const yearStr = currentYear.toString();
+      const updatedMembership = { ...member.membership };
+      
+      if (updatedMembership[yearStr]) {
+        updatedMembership[yearStr] = {
+          ...updatedMembership[yearStr],
+          dues: newAmount
+        };
+        
+        await MembersService.updateMember(memberId, { membership: updatedMembership });
+      }
+    }
     console.log(`Updated member ${memberId} dues to RM${newAmount}`);
   }
 
   private static async savePromotionHistory(promotion: PromotionHistory): Promise<void> {
-    // Simulate database save
+    await addDoc(collection(db, 'promotionHistory'), {
+      ...promotion,
+      promotionDate: serverTimestamp()
+    });
     console.log(`Saved promotion history for member ${promotion.memberId}`);
   }
 
   private static async saveManualPromotionRequest(request: ManualPromotionRequest): Promise<void> {
-    // Simulate database save
+    await addDoc(collection(db, 'manualPromotionRequests'), {
+      ...request,
+      requestedAt: serverTimestamp()
+    });
     console.log(`Saved manual promotion request for member ${request.memberId}`);
   }
 
@@ -439,8 +483,8 @@ export class PromotionService {
   }
 
   private static async recordMemberActivity(
-    memberId: string, 
-    activityType: string, 
+    memberId: string,
+    activityType: string,
     activityData: any
   ): Promise<void> {
     // Simulate recording activity

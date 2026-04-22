@@ -610,7 +610,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         name: m.fullName && m.name
           ? `${m.fullName} (${m.name})`
           : (m.fullName || m.name || m.email || m.id),
+        fullName: m.fullName,
         membershipType: m.membershipType,
+        tshirtSize: m.tshirtSize,
+        jacketSize: m.jacketSize,
+        introducer: m.introducer,
+        joinDate: m.joinDate,
       }));
       setMembers(mappedMembers);
       return mappedMembers;
@@ -765,8 +770,14 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         name: m.fullName && m.name
           ? `${m.fullName} (${m.name})`
           : (m.fullName || m.name || m.email || m.id),
+        fullName: m.fullName,
         membershipType: m.membershipType,
-      }));
+        tshirtSize: m.tshirtSize,
+        jacketSize: m.jacketSize,
+        introducer: m.introducer,
+        joinDate: m.joinDate,
+        membership: m.membership,
+      })).sort((a, b) => a.name.localeCompare(b.name));
       setMembers(mappedMembers);
 
       const allSplits = await FinanceService.getAllTransactionSplits();

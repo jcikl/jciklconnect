@@ -13,12 +13,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { 
-  Member, 
-  MembershipType, 
-  MembershipDues, 
-  DuesRenewalTransaction, 
-  DuesRenewalSummary 
+import {
+  Member,
+  MembershipType,
+  MembershipDues,
+  DuesRenewalTransaction,
+  DuesRenewalSummary
 } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MOCK_DUES_RENEWAL_TRANSACTIONS, MOCK_MEMBERS } from './mockData';
@@ -37,28 +37,28 @@ export class DuesRenewalService {
           return { valid: false, reason: 'Honorary members must be over 40 years old' };
         }
         break;
-      
+
       case 'Senator':
         if (!member.senatorCertified) {
           return { valid: false, reason: 'Senator certification required' };
         }
         break;
-      
+
       case 'Visiting':
         if (member.nationality === 'Malaysia') {
           return { valid: false, reason: 'Visiting members must be non-Malaysian citizens' };
         }
         break;
-      
+
       case 'Probation':
       case 'Full':
         // No special validation required
         break;
-      
+
       default:
         return { valid: false, reason: 'Invalid membership type' };
     }
-    
+
     return { valid: true };
   }
 
@@ -81,11 +81,9 @@ export class DuesRenewalService {
       // Get all members who paid dues in the previous year
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
-        where('duesYear', '==', year - 1),
-        where('duesStatus', '==', 'Paid'),
         orderBy('name', 'asc')
       );
-      
+
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -115,7 +113,7 @@ export class DuesRenewalService {
 
     try {
       const eligibleMembers = await this.getEligibleMembersForRenewal(year);
-      const targetMembers = memberIds 
+      const targetMembers = memberIds
         ? eligibleMembers.filter(m => memberIds.includes(m.id))
         : eligibleMembers;
 
@@ -142,7 +140,7 @@ export class DuesRenewalService {
 
           // Calculate dues amount
           const amount = this.calculateDuesAmount(membershipType);
-          
+
           // Create renewal transaction
           const renewalData: Omit<DuesRenewalTransaction, 'id'> = {
             memberId: member.id,
@@ -164,12 +162,12 @@ export class DuesRenewalService {
 
           // Send notification
           await this.sendRenewalNotification(member, renewalData);
-          
+
           created++;
         } catch (error) {
-          errors.push({ 
-            memberId: member.id, 
-            error: error instanceof Error ? error.message : 'Unknown error' 
+          errors.push({
+            memberId: member.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
@@ -185,7 +183,7 @@ export class DuesRenewalService {
    * Get renewal transaction for a member and year
    */
   static async getRenewalTransaction(
-    memberId: string, 
+    memberId: string,
     year: number
   ): Promise<DuesRenewalTransaction | null> {
     if (isDevMode()) {
@@ -200,7 +198,7 @@ export class DuesRenewalService {
         where('memberId', '==', memberId),
         where('duesYear', '==', year)
       );
-      
+
       const snapshot = await getDocs(q);
       if (snapshot.empty) {
         return null;
@@ -237,7 +235,7 @@ export class DuesRenewalService {
         where('duesYear', '==', year),
         orderBy('createdAt', 'desc')
       );
-      
+
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -302,7 +300,7 @@ export class DuesRenewalService {
     try {
       const docRef = doc(db, COLLECTIONS.DUES_RENEWALS, transactionId);
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         return null;
       }
@@ -361,8 +359,9 @@ export class DuesRenewalService {
     try {
       // Import services dynamically to avoid circular dependencies
       const { CommunicationService } = await import('./communicationService');
-      
+
       const membershipTypeNames: Record<MembershipType, string> = {
+        Guest: 'Guest (准会员)',
         Probation: 'Probation Member (试用会员)',
         Full: 'Full Member (正式会员)',
         Honorary: 'Honorary Member (特友会员)',
@@ -370,7 +369,7 @@ export class DuesRenewalService {
         Visiting: 'Visiting Member (访问会员)',
       };
 
-      const message = renewal.membershipType === 'Senator' 
+      const message = renewal.membershipType === 'Senator'
         ? `As a Senator, you are exempt from annual dues for ${renewal.duesYear}. Your membership status remains active.`
         : `Your ${membershipTypeNames[renewal.membershipType]} dues of RM${renewal.amount} for ${renewal.duesYear} are now due. Please complete payment by ${new Date(renewal.dueDate).toLocaleDateString()} to maintain your active membership status.`;
 
@@ -410,7 +409,7 @@ export class DuesRenewalService {
           // Import services dynamically
           const { MembersService } = await import('./membersService');
           const { CommunicationService } = await import('./communicationService');
-          
+
           const member = await MembersService.getMemberById(renewal.memberId);
           if (!member) continue;
 
@@ -446,30 +445,51 @@ export class DuesRenewalService {
    */
   static async generateRenewalSummary(year: number): Promise<DuesRenewalSummary> {
     if (isDevMode()) {
-      const renewals = MOCK_DUES_RENEWAL_TRANSACTIONS.filter(r => r.duesYear === year);
       const byMembershipType: DuesRenewalSummary['byMembershipType'] = {
+        Guest: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Probation: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Full: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Honorary: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Senator: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Visiting: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
       };
+
+      const yearMembers = MOCK_MEMBERS.filter((m: any) => m.joinDate && new Date(m.joinDate).getFullYear() <= year);
+      const renewals = MOCK_DUES_RENEWAL_TRANSACTIONS.filter(r => r.duesYear === year);
+
+      const summaryRenewals = yearMembers.map((m: any) => {
+        const existing = renewals.find(r => r.memberId === m.id);
+        if (existing) return existing;
+        return {
+          memberId: m.id,
+          membershipType: m.membershipType as MembershipType || 'Probation',
+          amount: MembershipDues[m.membershipType as MembershipType || 'Probation'] || 0,
+          status: 'pending',
+          isRenewal: false,
+        };
+      });
+
       let totalAmount = 0, paidAmount = 0, pendingAmount = 0, overdueAmount = 0;
-      renewals.forEach(r => {
-        const t = byMembershipType[r.membershipType];
+      summaryRenewals.forEach(r => {
+        const type = (r.membershipType && byMembershipType[r.membershipType as MembershipType])
+          ? r.membershipType as MembershipType
+          : 'Probation';
+        const t = byMembershipType[type];
         t.total++;
         t.totalAmount += r.amount;
         totalAmount += r.amount;
+
         if (r.status === 'paid') { t.paid++; t.paidAmount += r.amount; paidAmount += r.amount; }
         else if (r.status === 'pending') { t.pending++; pendingAmount += r.amount; }
         else if (r.status === 'overdue') { t.overdue++; overdueAmount += r.amount; }
       });
+
       const collectionRate = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 1000) / 10 : 0;
       return {
         year,
-        totalMembers: renewals.length,
-        renewalMembers: renewals.filter(r => r.isRenewal).length,
-        newMembers: renewals.filter(r => !r.isRenewal).length,
+        totalMembers: yearMembers.length,
+        renewalMembers: yearMembers.filter((m: any) => m.joinDate && new Date(m.joinDate).getFullYear() < year).length,
+        newMembers: yearMembers.filter((m: any) => m.joinDate && new Date(m.joinDate).getFullYear() === year).length,
         byMembershipType,
         overallStats: { totalAmount, paidAmount, pendingAmount, overdueAmount, collectionRate },
       };
@@ -480,6 +500,7 @@ export class DuesRenewalService {
       const eligibleMembers = await this.getEligibleMembersForRenewal(year);
 
       const byMembershipType: DuesRenewalSummary['byMembershipType'] = {
+        Guest: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Probation: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Full: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Honorary: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
@@ -487,27 +508,58 @@ export class DuesRenewalService {
         Visiting: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
       };
 
-      let totalAmount = 0;
-      let paidAmount = 0;
-      let pendingAmount = 0;
-      let overdueAmount = 0;
+      // Fetch members who joined in or before this year
+      const membersQuery = query(
+        collection(db, COLLECTIONS.MEMBERS),
+        where('joinDate', '<=', `${year}-12-31`)
+      );
+      const membersSnapshot = await getDocs(membersQuery);
+      const yearMembers = membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member));
 
-      renewals.forEach(renewal => {
-        const typeStats = byMembershipType[renewal.membershipType];
+      const summaryRenewals = yearMembers.map(m => {
+        const membershipYearData = m.membership?.[String(year)];
+        if (membershipYearData) {
+          return {
+            membershipType: membershipYearData.type,
+            amount: membershipYearData.amount,
+            status: membershipYearData.status,
+            dues: MembershipDues[membershipYearData.type] || 0
+          };
+        }
+
+        return {
+          membershipType: m.membershipType || 'Probation',
+          amount: 0,
+          status: 'pending' as const,
+          dues: MembershipDues[m.membershipType || 'Probation'] || 0
+        };
+      });
+
+      let totalAmount = 0, paidAmount = 0, pendingAmount = 0, overdueAmount = 0;
+      summaryRenewals.forEach(r => {
+        const type = (r.membershipType && byMembershipType[r.membershipType as MembershipType])
+          ? r.membershipType as MembershipType
+          : 'Probation';
+        const typeStats = byMembershipType[type];
+
+        const dues = r.dues || MembershipDues[type] || 0;
         typeStats.total++;
-        typeStats.totalAmount += renewal.amount;
-        totalAmount += renewal.amount;
+        typeStats.totalAmount += dues;
+        totalAmount += dues;
 
-        if (renewal.status === 'paid') {
+        if (r.status === 'paid' || r.status === 'over paid') {
           typeStats.paid++;
-          typeStats.paidAmount += renewal.amount;
-          paidAmount += renewal.amount;
-        } else if (renewal.status === 'pending') {
+          typeStats.paidAmount += r.amount;
+          paidAmount += r.amount;
+        } else if (r.status === 'pending') {
           typeStats.pending++;
-          pendingAmount += renewal.amount;
-        } else if (renewal.status === 'overdue') {
-          typeStats.overdue++;
-          overdueAmount += renewal.amount;
+          pendingAmount += dues;
+        } else if (r.status === 'partial') {
+          // For summary, partial is still counted in pending/overdue logic? 
+          // Let's count the remaining as pending amount.
+          pendingAmount += (dues - r.amount);
+          paidAmount += r.amount;
+          typeStats.paidAmount += r.amount;
         }
       });
 
@@ -515,9 +567,9 @@ export class DuesRenewalService {
 
       return {
         year,
-        totalMembers: renewals.length,
-        renewalMembers: renewals.filter(r => r.isRenewal).length,
-        newMembers: renewals.filter(r => !r.isRenewal).length,
+        totalMembers: yearMembers.length,
+        renewalMembers: yearMembers.filter(m => m.joinDate && new Date(m.joinDate).getFullYear() < year).length,
+        newMembers: yearMembers.filter(m => m.joinDate && new Date(m.joinDate).getFullYear() === year).length,
         byMembershipType,
         overallStats: {
           totalAmount,

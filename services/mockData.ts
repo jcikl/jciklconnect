@@ -12,7 +12,9 @@ export const CURRENT_USER: Member = {
   skills: ['Leadership', 'Marketing', 'Public Speaking'],
   churnRisk: 'Low',
   attendanceRate: 92,
-  duesStatus: 'Paid',
+  membership: {
+    '2024': { year: 2024, dues: 300, type: 'Full', amount: 300, status: 'paid', transactionId: ['t-mock-1'] }
+  },
   badges: [
     { id: 'b1', name: 'Project Lead', icon: '🚀', description: 'Led a successful project' },
     { id: 'b2', name: 'Super Recruiter', icon: '🤝', description: 'Recruited 5+ members' }
@@ -51,7 +53,9 @@ export const MOCK_DEV_ADMIN: Member = {
   skills: ['Leadership', 'Management', 'Development', 'Public Speaking'],
   churnRisk: 'Low',
   attendanceRate: 100,
-  duesStatus: 'Paid',
+  membership: {
+    '2024': { year: 2024, dues: 300, type: 'Full', amount: 300, status: 'paid', transactionId: ['t-mock-admin-1'] }
+  },
   badges: [
     { id: 'b-admin-1', name: 'Chapter Admin', icon: '🛡️', description: 'System administrator' },
     { id: 'b-admin-2', name: 'Leadership', icon: '⭐', description: 'Board member' },
@@ -60,8 +64,6 @@ export const MOCK_DEV_ADMIN: Member = {
   phone: '+60 12-345 6789',
   alternatePhone: '+60 12-345 6788',
   membershipType: 'Full',
-  duesYear: 2024,
-  duesPaidDate: '2024-01-10',
   mentorId: undefined,
   menteeIds: ['u1', 'u2', 'u3'],
   careerHistory: [
@@ -109,7 +111,7 @@ export const MOCK_MEMBERS: Member[] = [
     id: 'u2',
     name: 'Sarah Chen',
     email: 'sarah.c@jci.local',
-    role: UserRole.PROBATION_MEMBER,
+    role: UserRole.PROBATION,
     tier: MemberTier.SILVER,
     points: 850,
     joinDate: '2022-02-10',
@@ -117,7 +119,9 @@ export const MOCK_MEMBERS: Member[] = [
     skills: ['Finance', 'Event Planning'],
     churnRisk: 'Low',
     attendanceRate: 85,
-    duesStatus: 'Paid',
+    membership: {
+      '2024': { year: 2024, dues: 350, type: 'Probation', amount: 350, status: 'paid', transactionId: ['t-mock-sarah-1'] }
+    },
     badges: [{ id: 'b3', name: 'Early Bird', icon: '🐦', description: 'Paid dues in Jan' }],
     careerHistory: [
       { year: '2022', role: 'Member', description: 'Joined' },
@@ -138,7 +142,9 @@ export const MOCK_MEMBERS: Member[] = [
     skills: ['Web Dev'],
     churnRisk: 'High',
     attendanceRate: 40,
-    duesStatus: 'Overdue',
+    membership: {
+      '2024': { year: 2024, dues: 350, type: 'Probation', amount: 100, status: 'partial', transactionId: ['t-mock-michael-1'] }
+    },
     badges: [],
     mentorId: 'u1',
     membershipType: 'Probation'
@@ -155,7 +161,9 @@ export const MOCK_MEMBERS: Member[] = [
     skills: ['Strategy', 'Mentorship', 'Sales'],
     churnRisk: 'Low',
     attendanceRate: 98,
-    duesStatus: 'Paid',
+    membership: {
+      '2024': { year: 2024, dues: 300, type: 'Full', amount: 300, status: 'paid', transactionId: ['t-mock-jess-1'] }
+    },
     badges: [
       { id: 'b1', name: 'Project Lead', icon: '🚀', description: 'Led a successful project' },
       { id: 'b4', name: 'Mentor', icon: '🎓', description: 'Mentored 3 members' }
@@ -440,6 +448,33 @@ const DUES_YEAR = 2024;
 const DUE_DATE = `${DUES_YEAR}-03-31`;
 
 export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
+  {
+    id: 'dues-2026-1',
+    memberId: 'u1',
+    membershipType: 'Full' as MembershipType,
+    duesYear: 2026,
+    amount: 300,
+    status: 'pending',
+    dueDate: '2026-03-31',
+    isRenewal: true,
+    createdAt: '2026-01-05T09:00:00.000Z',
+    updatedAt: '2026-01-05T09:00:00.000Z',
+    remindersSent: 0,
+  },
+  {
+    id: 'dues-2026-2',
+    memberId: 'u2',
+    membershipType: 'Full' as MembershipType,
+    duesYear: 2026,
+    amount: 300,
+    status: 'paid',
+    dueDate: '2026-03-31',
+    paidDate: '2026-02-10',
+    isRenewal: true,
+    createdAt: '2026-01-05T09:00:00.000Z',
+    updatedAt: '2026-02-10T10:00:00.000Z',
+    remindersSent: 0,
+  },
   {
     id: 'dues-1',
     memberId: 'u1',

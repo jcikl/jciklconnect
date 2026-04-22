@@ -2,7 +2,7 @@
 
 export enum UserRole {
   GUEST = 'GUEST',
-  PROBATION_MEMBER = 'PROBATION_MEMBER',
+  PROBATION = 'PROBATION',
   MEMBER = 'MEMBER',
   BOARD = 'BOARD',
   ADMIN = 'ADMIN',
@@ -11,7 +11,8 @@ export enum UserRole {
   /** 组织财政长：组织级财务与对账 */
   ORGANIZATION_FINANCE = 'ORGANIZATION_FINANCE',
   /** 活动财政：仅本活动相关财务与数据 */
-  ACTIVITY_FINANCE = 'ACTIVITY_FINANCE'
+  ACTIVITY_FINANCE = 'ACTIVITY_FINANCE',
+  INACTIVE = 'INACTIVE'
 }
 
 export enum MemberTier {
@@ -321,15 +322,13 @@ export interface Member {
   skills: string[];
   churnRisk: 'Low' | 'Medium' | 'High';
   attendanceRate: number;
-  duesStatus: 'Paid' | 'Pending' | 'Overdue';
   badges: Badge[];
-  // Membership type and dues information
-  membershipType?: MembershipType;
-  introducer?: string; // Name of the person who introduced the member
-  duesYear?: number; // Current dues year paid
-  duesPaidDate?: string; // Date when current year dues were paid
-  senatorCertified?: boolean; // For senator membership type
-  age?: number; // For honorary member validation
+  // Membership structured history
+  membershipType: MembershipType;
+  membership?: Record<string, MembershipRecord>; // Key is year as string, e.g., "2026"
+  introducer?: string;
+  senatorCertified?: boolean;
+  age?: number;
   // New fields for Deep Profiling
   bio?: string;
   phone?: string;
@@ -350,6 +349,16 @@ export interface Member {
   probationApprovedBy?: string; // Member ID who approved the probation
   probationApprovedAt?: string; // Date when approved to probation
   probationCompletedAt?: string; // Date when probation tasks were completed
+
+  // Promotion progress: manual text input for each requirement
+  promotionProgress?: {
+    bodMeetingAttended?: string;           // e.g. "2026-03-15 BOD Meeting #3"
+    eventOrganizerParticipation?: string;  // e.g. "Charity Fundraiser 2026 - Logistics"
+    eventParticipation?: string;           // e.g. "Leadership Training Workshop"
+    jciInspireCompleted?: string;          // e.g. "JCIM Inspire 2026 - Completed"
+    promotedToFull?: boolean;
+    completedDate?: any;
+  };
 
   // 1. 基本信息 (Basic Information)
   fullName?: string; // 身份证全名
@@ -797,9 +806,10 @@ export interface TransactionSplit {
 }
 
 // Membership Types and Dues
-export type MembershipType = 'Probation' | 'Full' | 'Honorary' | 'Senator' | 'Visiting';
+export type MembershipType = 'Guest' | 'Probation' | 'Full' | 'Honorary' | 'Senator' | 'Visiting';
 
 export const MembershipDues: Record<MembershipType, number> = {
+  Guest: 0,
   Probation: 350,
   Full: 300,
   Honorary: 50,
@@ -807,13 +817,26 @@ export const MembershipDues: Record<MembershipType, number> = {
   Visiting: 500,
 };
 
+// Status values for membership records
+export type MembershipStatus = 'pending' | 'paid' | 'overdue' | 'partial' | 'over paid';
+
+export interface MembershipRecord {
+  year: number;
+  dues: number; // Target fee for this year
+  type: MembershipType; // Type at the time of payment
+  amount: number; // Cumulative total paid for this year
+  paymentDate?: string; // Latest payment date
+  transactionId: string[]; // List of transaction IDs
+  status: MembershipStatus;
+}
+
 export interface DuesRenewalTransaction {
   id?: string;
   memberId: string;
   membershipType: MembershipType;
   duesYear: number;
   amount: number;
-  status: 'pending' | 'paid' | 'overdue';
+  status: MembershipStatus;
   dueDate: string;
   paidDate?: string;
   isRenewal: boolean; // true for renewal, false for new member

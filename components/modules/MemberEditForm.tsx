@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Tabs } from '../ui/Common';
-import { Member, UserRole, MemberTier } from '../../types';
+import { Member, UserRole, MemberTier, MembershipType, MembershipDues } from '../../types';
+import { usePermissions } from '../../hooks/usePermissions';
 import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS } from '../../config/constants';
 
 interface MemberEditFormProps {
@@ -46,9 +47,6 @@ function initFormValues(member: Member) {
     tier: member.tier,
     membershipType: member.membershipType || '',
     senatorCertified: member.senatorCertified || false,
-    duesStatus: member.duesStatus,
-    duesYear: member.duesYear ?? new Date().getFullYear(),
-    duesPaidDate: member.duesPaidDate || '',
     attendanceRate: member.attendanceRate ?? 0,
     churnRisk: member.churnRisk,
 
@@ -82,10 +80,13 @@ function initFormValues(member: Member) {
     jacketSize: member.jacketSize || '',
     embroideredName: member.embroideredName || '',
     tshirtStatus: (member.tshirtStatus as string) || 'NA',
+    // Approval year for GUEST -> PROBATION transition
+    membershipYear: member.joinDate ? new Date(member.joinDate).getFullYear() : new Date().getFullYear(),
   };
 }
 
 export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit, onCancel, selfEditableOnly = false }) => {
+  const { isAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'membership'>(selfEditableOnly ? 'contact' : 'basic');
   const [formValues, setFormValues] = useState(() => initFormValues(member));
 
@@ -94,7 +95,21 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   }, [member.id]);
 
   const handleChange = (field: string, value: string | number | boolean | string[]) => {
-    setFormValues(prev => ({ ...prev, [field]: value }));
+    setFormValues(prev => {
+      const newValues = { ...prev, [field]: value };
+      
+      // If role changed to PROBATION, default the year to joinDate year (from original member or form)
+      if (field === 'role' && value === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role)) {
+        if (member.joinDate) {
+          newValues.membershipYear = new Date(member.joinDate).getFullYear();
+        } else {
+          newValues.membershipYear = new Date().getFullYear();
+        }
+        newValues.membershipType = 'Probation';
+      }
+      
+      return newValues;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -118,11 +133,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       role: (formValues.role as UserRole) || member.role,
       tier: (formValues.tier as MemberTier) || member.tier,
       attendanceRate: typeof formValues.attendanceRate === 'number' ? formValues.attendanceRate : member.attendanceRate,
-      duesStatus: formValues.duesStatus || member.duesStatus,
       churnRisk: formValues.churnRisk || member.churnRisk,
-      membershipType: (formValues.membershipType as Member['membershipType']) || undefined,
-      duesYear: formValues.duesYear ? Number(formValues.duesYear) : undefined,
-      duesPaidDate: formValues.duesPaidDate || undefined,
+      membershipType: (formValues.membershipType as Member['membershipType']) || member.membershipType,
       senatorCertified: formValues.senatorCertified,
 
       fullName: formValues.fullName || undefined,
@@ -160,6 +172,22 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       embroideredName: formValues.embroideredName || undefined,
       tshirtStatus: (formValues.tshirtStatus as Member['tshirtStatus']) || undefined,
     };
+
+    // Handle GUEST -> PROBATION membership initialization
+    if (formValues.role === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role)) {
+      const yearStr = String(formValues.membershipYear);
+      updates.membership = {
+        ...(member.membership || {}),
+        [yearStr]: {
+          year: formValues.membershipYear,
+          dues: MembershipDues.Probation, // 350
+          type: 'Probation',
+          amount: 0,
+          status: 'pending',
+          transactionId: []
+        }
+      };
+    }
 
     const filteredUpdates = selfEditableOnly
       ? (Object.fromEntries(
@@ -287,6 +315,22 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   {['Bronze', 'Silver', 'Gold', 'Platinum'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
+
+              {/* Show year selection only when approving a Guest */}
+              {formValues.role === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role) && (
+                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                  <label className="w-40 shrink-0 text-sm font-bold text-amber-600">Initiation Year</label>
+                  <select 
+                    value={formValues.membershipYear} 
+                    onChange={(e) => handleChange('membershipYear', parseInt(e.target.value))}
+                    className="flex-1 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                  >
+                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 2 - i).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Introducer</label>
                 <input name="introducer" value={formValues.introducer} onChange={(e) => handleChange('introducer', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
@@ -294,10 +338,18 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
             </div>
             <div className="flex items-center gap-3">
               <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Membership Type</label>
-              <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
+              <div className={`flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 ${!isAdmin ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                 {['Full', 'Probation', 'Honorary', 'Visiting', 'Senator'].map(opt => (
-                  <label key={opt} className="cursor-pointer flex-1 flex">
-                    <input type="radio" name="membershipType" value={opt} checked={formValues.membershipType === opt} onChange={(e) => handleChange('membershipType', e.target.value)} className="hidden" />
+                  <label key={opt} className={`flex-1 flex ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                    <input 
+                      type="radio" 
+                      name="membershipType" 
+                      value={opt} 
+                      checked={formValues.membershipType === opt} 
+                      onChange={(e) => isAdmin && handleChange('membershipType', e.target.value)} 
+                      disabled={!isAdmin}
+                      className="hidden" 
+                    />
                     <span className={`flex-1 text-center px-2 py-2 text-sm font-medium transition-colors whitespace-nowrap ${formValues.membershipType === opt ? 'bg-jci-blue text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{opt}</span>
                   </label>
                 ))}
@@ -313,20 +365,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   </div>
                 </div>
               )}
-              <div className="flex items-center gap-3">
-                <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Dues Payment Status</label>
-                <select name="duesStatus" value={formValues.duesStatus} onChange={(e) => handleChange('duesStatus', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20">
-                  {['Paid', 'Pending', 'Overdue'].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Dues Paid Year</label>
-                <input name="duesYear" type="number" value={String(formValues.duesYear)} onChange={(e) => { const v = parseInt(e.target.value, 10); handleChange('duesYear', isNaN(v) ? new Date().getFullYear() : v); }} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Dues Paid Date</label>
-                <input name="duesPaidDate" type="date" value={formValues.duesPaidDate} onChange={(e) => handleChange('duesPaidDate', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
-              </div>
               <div className="flex items-center gap-3">
                 <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Attendance Rate (%)</label>
                 <input name="attendanceRate" type="number" value={String(formValues.attendanceRate)} onChange={(e) => { const v = parseInt(e.target.value, 10); handleChange('attendanceRate', isNaN(v) ? 0 : v); }} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
