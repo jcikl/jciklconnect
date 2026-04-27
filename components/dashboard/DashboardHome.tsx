@@ -66,14 +66,14 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
           ))}
         </div>
         <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-blue-200 uppercase font-bold">Your Rank</span>
-              <span className="text-xl font-black italic">#{members.findIndex(m => m.id === currentUser?.id) + 1 || '?'}</span>
-            </div>
-            <div className="flex items-center gap-2 text-amber-400 hover:gap-3 transition-all cursor-pointer">
-              <span className="text-xs font-bold uppercase">Climb Up</span>
-              <ArrowUpRight size={16} />
-            </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] text-blue-200 uppercase font-bold">Your Rank</span>
+            <span className="text-xl font-black italic">#{members.findIndex(m => m.id === currentUser?.id) + 1 || '?'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-amber-400 hover:gap-3 transition-all cursor-pointer">
+            <span className="text-xs font-bold uppercase">Climb Up</span>
+            <ArrowUpRight size={16} />
+          </div>
         </div>
       </div>
     </Card>
@@ -239,7 +239,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const renderHeader = () => (
     <div
-      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-4 sm:pb-6 lg:pb-8"
+      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-2 sm:pb-2 lg:pb-2"
     >
       {/* Decorative Background Pattern */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
@@ -307,7 +307,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       </div>
 
       {/* Dynamic Animation Area */}
-      <div className="relative">
+      <div className="relative pt-5">
         <motion.div
           style={{
             y: counterY,
@@ -497,28 +497,28 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 </div>
                 <Badge variant="jci" className="bg-red-500 text-white animate-pulse">SCARCE</Badge>
               </div>
-              
+
               {/* NEW: Active Commitments (Phase 3) */}
               {contracts.filter(c => c.status === 'Active').length > 0 && (
                 <div className="mb-4 space-y-3">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Your Active Bets</p>
-                   {contracts.filter(c => c.status === 'Active').map(c => (
-                     <div key={c.id} className="p-4 bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_rgba(15,23,42,0.1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all">
-                        <div className="flex justify-between items-start mb-2">
-                           <h4 className="text-xs font-black text-slate-900 uppercase italic">Goal: {c.goalTitle}</h4>
-                           <div className="flex items-center gap-1 text-red-600 font-black">
-                              -{c.stakedPoints} <Target size={12} className="fill-red-600" />
-                           </div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Your Active Bets</p>
+                  {contracts.filter(c => c.status === 'Active').map(c => (
+                    <div key={c.id} className="p-4 bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_rgba(15,23,42,0.1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="text-xs font-black text-slate-900 uppercase italic">Goal: {c.goalTitle}</h4>
+                        <div className="flex items-center gap-1 text-red-600 font-black">
+                          -{c.stakedPoints} <Target size={12} className="fill-red-600" />
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                           <Clock size={12} />
-                           Ends: {new Date(c.deadline?.seconds * 1000).toLocaleDateString()}
-                        </div>
-                        <div className="mt-3 text-[10px] p-2 bg-red-50 text-red-700 rounded-lg border border-red-100 font-bold italic">
-                           WARNING: Failure to prove completion will results in permanent loss of {c.stakedPoints} PTS.
-                        </div>
-                     </div>
-                   ))}
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                        <Clock size={12} />
+                        Ends: {new Date(c.deadline?.seconds * 1000).toLocaleDateString()}
+                      </div>
+                      <div className="mt-3 text-[10px] p-2 bg-red-50 text-red-700 rounded-lg border border-red-100 font-bold italic">
+                        WARNING: Failure to prove completion will results in permanent loss of {c.stakedPoints} PTS.
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -547,9 +547,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     <div className="bg-orange-500 h-full w-[80%]" />
                   </div>
                 </div>
-                <Button 
-                   onClick={() => onNavigate?.('BOUNTIES')}
-                   className="w-full h-10 font-black uppercase text-xs tracking-widest gap-2 bg-slate-900 hover:bg-black"
+                <Button
+                  onClick={() => onNavigate?.('BOUNTIES')}
+                  className="w-full h-10 font-black uppercase text-xs tracking-widest gap-2 bg-slate-900 hover:bg-black"
                 >
                   Enter Marketplace
                   <ArrowUpRight size={14} />
@@ -564,14 +564,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-xl rotate-3">
-                       <Crown size={32} />
+                      <Crown size={32} />
                     </div>
                     <div>
                       <h3 className="text-sm text-slate-400 font-bold uppercase tracking-widest leading-none mb-1">Your Status</h3>
                       <p className="text-2xl font-black text-slate-900 tracking-tighter uppercase">{member.tier || 'BRONZE'}</p>
                     </div>
                   </div>
-                  
+
                   <div className="hidden md:block w-px h-12 bg-slate-100"></div>
 
                   <div className="flex-1">
@@ -580,11 +580,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       <span className="text-xs font-black text-jci-blue">{(member.points || 0)} / {MEMBER_TIERS.PLATINUM.minPoints}</span>
                     </div>
                     <div className="w-full h-3 bg-slate-100 rounded-full border border-slate-200/50 p-0.5 overflow-hidden">
-                       <motion.div 
+                      <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min(100, ((member.points || 0) / MEMBER_TIERS.PLATINUM.minPoints) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-jci-blue to-cyan-400 rounded-full shadow-[0_0_10px_rgba(0,151,215,0.4)]" 
-                       />
+                        className="h-full bg-gradient-to-r from-jci-blue to-cyan-400 rounded-full shadow-[0_0_10px_rgba(0,151,215,0.4)]"
+                      />
                     </div>
                   </div>
 
