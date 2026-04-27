@@ -179,7 +179,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         ...(member.membership || {}),
         [yearStr]: {
           year: formValues.membershipYear,
-          dues: MembershipDues.Probation, // 350
+          dues: (member.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
           type: 'Probation',
           amount: 0,
           status: 'pending',
@@ -338,7 +338,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
             <div className="flex items-center gap-3">
               <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Membership Type</label>
               <div className={`flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 ${!isAdmin ? 'opacity-60 grayscale-[0.5]' : ''}`}>
-                {['Full', 'Probation', 'Honorary', 'Visiting', 'Senator'].map(opt => (
+                {['Full', 'Probation', 'Honorary', 'Visiting', 'Senator', 'Associate'].map(opt => (
                   <label key={opt} className={`flex-1 flex ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                     <input
                       type="radio"

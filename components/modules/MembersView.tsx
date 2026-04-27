@@ -2298,7 +2298,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
           ...(selectedGuest?.membership || {}),
           [yearStr]: {
             year: approvalYear,
-            dues: MembershipDues.Probation, // 350
+            dues: (selectedGuest?.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
             type: 'Probation' as any,
             amount: 0,
             status: 'pending',
@@ -2363,7 +2363,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
             ...(guest?.membership || {}),
             [yearStr]: {
               year: approvalYear,
-              dues: MembershipDues.Probation, // 350
+              dues: (guest?.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
               type: 'Probation' as any,
               amount: 0,
               status: 'pending',

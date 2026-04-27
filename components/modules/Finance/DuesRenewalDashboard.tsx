@@ -190,6 +190,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     Honorary: 'bg-purple-100 text-purple-800',
     Senator: 'bg-yellow-100 text-yellow-800',
     Visiting: 'bg-orange-100 text-orange-800',
+    Associate: 'bg-cyan-100 text-cyan-800',
   };
 
   const statusColors: Record<string, string> = {

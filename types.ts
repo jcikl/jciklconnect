@@ -326,6 +326,7 @@ export interface Member {
   // Membership structured history
   membershipType: MembershipType;
   membership?: Record<string, MembershipRecord>; // Key is year as string, e.g., "2026"
+  hasPaidInitiationFee?: boolean;
   introducer?: string;
   senatorCertified?: boolean;
   age?: number;
@@ -809,15 +810,16 @@ export interface TransactionSplit {
 }
 
 // Membership Types and Dues
-export type MembershipType = 'Guest' | 'Probation' | 'Full' | 'Honorary' | 'Senator' | 'Visiting';
+export type MembershipType = 'Guest' | 'Probation' | 'Full' | 'Honorary' | 'Senator' | 'Visiting' | 'Associate';
 
 export const MembershipDues: Record<MembershipType, number> = {
   Guest: 0,
-  Probation: 350,
+  Probation: 300,
   Full: 300,
-  Honorary: 50,
+  Honorary: 300,
   Senator: 0,
   Visiting: 500,
+  Associate: 50,
 };
 
 // Status values for membership records

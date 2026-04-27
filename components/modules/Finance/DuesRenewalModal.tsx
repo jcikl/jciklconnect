@@ -143,11 +143,12 @@ export const DuesRenewalModal: React.FC<DuesRenewalModalProps> = ({
 
   const membershipTypes: Array<{ value: MembershipType | 'all'; label: string }> = [
     { value: 'all', label: 'All Types' },
-    { value: 'Probation', label: 'Probation (RM350)' },
-    { value: 'Full', label: 'Full (RM300)' },
-    { value: 'Honorary', label: 'Honorary (RM50)' },
+    { value: 'Probation', label: 'Probation (RM300)' },
+    { value: 'Full', label: 'Official (RM300)' },
+    { value: 'Honorary', label: 'Honorary (RM300)' },
     { value: 'Senator', label: 'Senator (RM0)' },
     { value: 'Visiting', label: 'Visiting (RM500)' },
+    { value: 'Associate', label: 'Associate (RM50)' },
   ];
 
   return (

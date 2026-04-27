@@ -894,10 +894,25 @@ export class FinanceService {
         };
       }
 
-      await updateDoc(memberRef, {
+      const updates: any = {
         membership: currentMembership,
         updatedAt: Timestamp.now()
-      });
+      };
+
+      // 7. Auto-update hasPaidInitiationFee and role if Guest -> Probation
+      if (status === 'paid' || status === 'over paid') {
+        if (!member.hasPaidInitiationFee) {
+          updates.hasPaidInitiationFee = true;
+        }
+
+        // Rule: Guest -> Probation when payment of 350+ is confirmed
+        if ((member.role === 'GUEST' || !member.role) && totalAmount >= 350) {
+          updates.role = 'PROBATION';
+          updates.membershipType = 'Probation';
+        }
+      }
+
+      await updateDoc(memberRef, updates);
 
       console.log(`Synced membership for member ${memberId} year ${year}. Status: ${status}, Amount: ${totalAmount}`);
     } catch (error) {
@@ -1430,7 +1445,8 @@ export class FinanceService {
       for (const member of allMembers) {
         const membershipType = member.membershipType || 'Full';
         const duesYear = new Date().getFullYear(); // Default to current year or derive from context
-        const duesAmount = MembershipDues[membershipType as keyof typeof MembershipDues];
+        const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
+        const duesAmount = baseDues + (member.hasPaidInitiationFee ? 0 : 50);
 
         // Find member's dues transaction for the year
         const memberTransactions = duesTransactions.filter(t =>
@@ -1513,7 +1529,8 @@ export class FinanceService {
       }
 
       const membershipType = member.membershipType || 'Full';
-      const expectedAmount = MembershipDues[membershipType as keyof typeof MembershipDues];
+      const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
+      const expectedAmount = baseDues + (member.hasPaidInitiationFee ? 0 : 50);
 
       // Verify payment amount matches membership type dues
       if (Math.abs(paymentAmount - expectedAmount) > 0.01) {
