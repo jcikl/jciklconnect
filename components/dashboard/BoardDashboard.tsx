@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search, Bell, LogOut, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search, Bell, LogOut, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3 } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
 import { Select, Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
@@ -21,8 +21,10 @@ import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
+type MemberWithDues = Member & { duesStatus: string; duesYear: number; duesPaidDate?: string };
+
 interface BoardDashboardProps {
-  onNavigate?: (view: any) => void;
+  onNavigate?: (view: any, memberId?: string | null) => void;
   onOpenNotifications: () => void;
   onOpenSearch: () => void;
   searchQuery: string;
@@ -52,7 +54,22 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
 
   const { notifications } = useCommunication();
   const unreadNotifications = notifications.filter(n => !n.read);
-  const { members, loading: membersLoading } = useMembers();
+  const { members: rawMembers, loading: membersLoading } = useMembers();
+  const members = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return rawMembers.map(m => {
+      const record = m.membership?.[currentYear];
+      const isPaid = record?.status === 'paid' || record?.status === 'over paid';
+      const isOverdue = record?.status === 'overdue';
+
+      return {
+        ...m,
+        duesStatus: isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending',
+        duesYear: record?.year || currentYear,
+        duesPaidDate: record?.paymentDate
+      } as MemberWithDues;
+    });
+  }, [rawMembers]);
   const { events, loading: eventsLoading } = useEvents();
   const { projects, loading: projectsLoading } = useProjects();
   const { leaderboard, pointHistory } = usePoints();
@@ -384,7 +401,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
   }, [events]);
 
   const memberInsightsGroups = useMemo(() => {
-    const groups: Record<number, Member[]> = {};
+    const groups: Record<number, MemberWithDues[]> = {};
     for (let i = 0; i < 12; i++) groups[i] = [];
 
     const filtered = members.filter(m => {
@@ -439,7 +456,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
 
   const renderHeader = () => (
     <div
-      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-4 sm:pb-6 lg:pb-8"
+      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-2 sm:pb-2 lg:pb-2"
     >
       {/* Decorative Background Pattern */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
@@ -450,7 +467,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
       {/* Top Row: Fixed/Docked Area */}
       <div className="sticky top-[0rem] z-20 pb-2">
         <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 sm:space-x-4">
             <div className="relative group">
               <img
                 src={member?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'Board')}&background=ffffff&color=0097D7`}
@@ -459,9 +476,16 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
               />
               <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
             </div>
-            <div className="cursor-pointer group">
-              <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
-                <span>{member?.name}</span>
+            <div className="group">
+              <div className="flex items-center space-x-2">
+                <span className="text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">{member?.name}</span>
+                <button
+                  onClick={() => onNavigate?.('MEMBERS', member?.id)}
+                  className="p-0 h-7 w-7 min-h-0 min-w-0 text-white/60 hover:text-white transition-colors flex items-center justify-center"
+                  title="Edit Profile"
+                >
+                  <Edit3 size={16} />
+                </button>
               </div>
               <p className="font-medium text-sm tracking-wide text-blue-200">{member?.role}</p>
             </div>
@@ -507,7 +531,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
       </div>
 
       {/* Dynamic Animation Area */}
-      <div className="relative">
+      <div className="relative pt-5">
         {/* Greeting: Dissolves into the top row as we scroll */}
         <motion.div
           style={{

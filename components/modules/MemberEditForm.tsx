@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, Tabs } from '../ui/Common';
 import { Member, UserRole, MemberTier, MembershipType, MembershipDues } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
-import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS } from '../../config/constants';
+import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS, INTERNATIONAL_PARTNERSHIP_OPTIONS } from '../../config/constants';
 
 interface MemberEditFormProps {
   member: Member;
@@ -58,7 +58,8 @@ function initFormValues(member: Member) {
     acceptInternationalBusiness: member.acceptInternationalBusiness || '',
     businessCategory: Array.isArray(member.businessCategory) ? member.businessCategory : (member.businessCategory ? [member.businessCategory] : []),
     industry: member.industry || '',
-    interestedIndustries: Array.isArray(member.interestedIndustries) ? member.interestedIndustries.join(', ') : (member.interestedIndustries || ''),
+    interestedIndustries: Array.isArray(member.interestedIndustries) ? member.interestedIndustries : (member.interestedIndustries ? [member.interestedIndustries] : []),
+    internationalPartnershipTypes: Array.isArray(member.internationalPartnershipTypes) ? member.internationalPartnershipTypes : (member.internationalPartnershipTypes ? [member.internationalPartnershipTypes] : []),
 
     // Contact Information
     phone: member.phone || '',
@@ -97,7 +98,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   const handleChange = (field: string, value: string | number | boolean | string[]) => {
     setFormValues(prev => {
       const newValues = { ...prev, [field]: value };
-      
+
       // If role changed to PROBATION, default the year to joinDate year (from original member or form)
       if (field === 'role' && value === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role)) {
         if (member.joinDate) {
@@ -107,7 +108,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         }
         newValues.membershipType = 'Probation';
       }
-      
+
       return newValues;
     });
   };
@@ -119,10 +120,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       .split(',')
       .map(s => s.trim())
       .filter(s => s.length > 0);
-    const interestedIndustriesArr = (formValues.interestedIndustries || '')
-      .split(',')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
+    const interestedIndustriesArr = formValues.interestedIndustries;
 
     const updates: Partial<Member> = {
       name: formValues.name || member.name,
@@ -154,8 +152,9 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       businessCategory: formValues.businessCategory.length > 0 ? formValues.businessCategory : undefined,
       industry: formValues.industry || undefined,
       interestedIndustries: interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,
+      internationalPartnershipTypes: formValues.internationalPartnershipTypes,
 
-      alternatePhone: formValues.alternatePhone || undefined,
+      alternatePhone: formValues.alternatePhone || member.alternatePhone,
       whatsappGroup: formValues.whatsappGroup || undefined,
       address: formValues.address || undefined,
       linkedin: formValues.linkedin || undefined,
@@ -320,8 +319,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               {formValues.role === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role) && (
                 <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
                   <label className="w-40 shrink-0 text-sm font-bold text-amber-600">Initiation Year</label>
-                  <select 
-                    value={formValues.membershipYear} 
+                  <select
+                    value={formValues.membershipYear}
                     onChange={(e) => handleChange('membershipYear', parseInt(e.target.value))}
                     className="flex-1 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
                   >
@@ -341,14 +340,14 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               <div className={`flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 ${!isAdmin ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                 {['Full', 'Probation', 'Honorary', 'Visiting', 'Senator'].map(opt => (
                   <label key={opt} className={`flex-1 flex ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                    <input 
-                      type="radio" 
-                      name="membershipType" 
-                      value={opt} 
-                      checked={formValues.membershipType === opt} 
-                      onChange={(e) => isAdmin && handleChange('membershipType', e.target.value)} 
+                    <input
+                      type="radio"
+                      name="membershipType"
+                      value={opt}
+                      checked={formValues.membershipType === opt}
+                      onChange={(e) => isAdmin && handleChange('membershipType', e.target.value)}
                       disabled={!isAdmin}
-                      className="hidden" 
+                      className="hidden"
                     />
                     <span className={`flex-1 text-center px-2 py-2 text-sm font-medium transition-colors whitespace-nowrap ${formValues.membershipType === opt ? 'bg-jci-blue text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{opt}</span>
                   </label>
@@ -380,42 +379,56 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         )}
 
         {activeTab === 'professional' && (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-            <div className="flex items-center gap-3">
-              <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Company Name</label>
-              <input name="companyName" value={formValues.companyName} onChange={(e) => handleChange('companyName', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+            {/* Left Column - Main Fields */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <label className="w-32 shrink-0 text-sm font-medium text-slate-700">Company Name</label>
+                <input name="companyName" value={formValues.companyName} onChange={(e) => handleChange('companyName', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="w-32 shrink-0 text-sm font-medium text-slate-700">Company Website</label>
+                <input name="companyWebsite" type="text" placeholder="e.g., https://example.com" value={formValues.companyWebsite} onChange={(e) => handleChange('companyWebsite', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="w-32 shrink-0 text-sm font-medium text-slate-700">Industry</label>
+                <select
+                  name="industry"
+                  value={formValues.industry}
+                  onChange={(e) => handleChange('industry', e.target.value)}
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                >
+                  <option value="">Select industry...</option>
+                  {INDUSTRY_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="w-32 shrink-0 text-sm font-medium text-slate-700 text-xs leading-tight">Department & Position</label>
+                <input name="departmentAndPosition" value={formValues.departmentAndPosition} onChange={(e) => handleChange('departmentAndPosition', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Company Website</label>
-              <input name="companyWebsite" type="text" placeholder="e.g., https://example.com" value={formValues.companyWebsite} onChange={(e) => handleChange('companyWebsite', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Industry</label>
-              <input
-                name="industry"
-                list="industry-options"
-                value={formValues.industry}
-                onChange={(e) => handleChange('industry', e.target.value)}
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                placeholder="Select or type industry..."
+
+            {/* Right Column - Description */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-slate-700">Company Description</label>
+              <textarea
+                name="companyDescription"
+                value={formValues.companyDescription}
+                onChange={(e) => handleChange('companyDescription', e.target.value)}
+                className="flex-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-none min-h-[150px]"
+                placeholder="Tell us more about your business..."
               />
-              <datalist id="industry-options">
-                {INDUSTRY_OPTIONS.map(opt => (
-                  <option key={opt} value={opt} />
-                ))}
-              </datalist>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Department & Position</label>
-              <input name="departmentAndPosition" value={formValues.departmentAndPosition} onChange={(e) => handleChange('departmentAndPosition', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
-            </div>
-            <div className="flex items-start gap-3 col-span-2">
-              <label className="w-40 shrink-0 text-sm font-medium text-slate-700 pt-2">Company Description</label>
-              <textarea name="companyDescription" value={formValues.companyDescription} onChange={(e) => handleChange('companyDescription', e.target.value)} rows={4} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y min-h-[80px]" />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Accept International Business</label>
-              <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
+
+            {/* Bottom Row - Full Width */}
+            <div className="col-span-2 flex items-center gap-3 pt-2">
+              <label className="w-32 shrink-0 text-sm font-medium text-slate-700 text-xs leading-tight">Accept International Business</label>
+              <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 bg-white">
                 {['Yes', 'No', 'Willing to Explore'].map(opt => (
                   <label key={opt} className="cursor-pointer flex-1 flex">
                     <input type="radio" name="acceptInternationalBusiness" value={opt} checked={formValues.acceptInternationalBusiness === opt} onChange={(e) => handleChange('acceptInternationalBusiness', e.target.value)} className="hidden" />
@@ -424,6 +437,50 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 ))}
               </div>
             </div>
+
+            {/* Conditional International Partnership Selection */}
+            {(formValues.acceptInternationalBusiness === 'Yes' || formValues.acceptInternationalBusiness === 'Willing to Explore') && (
+              <div className="col-span-2 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 py-4 px-6 bg-blue-50/50 rounded-xl border border-blue-100/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
+                  <h4 className="text-sm font-bold text-slate-800">What kind of global partnerships are you looking for?</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {INTERNATIONAL_PARTNERSHIP_OPTIONS.map(opt => (
+                    <label key={opt.label} className="group relative flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer">
+                      <div className="flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          checked={formValues.internationalPartnershipTypes.includes(opt.label)}
+                          onChange={(e) => {
+                            const newTypes = e.target.checked
+                              ? [...formValues.internationalPartnershipTypes, opt.label]
+                              : formValues.internationalPartnershipTypes.filter(t => t !== opt.label);
+                            handleChange('internationalPartnershipTypes', newTypes);
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className={`text-sm font-bold leading-tight ${formValues.internationalPartnershipTypes.includes(opt.label) ? 'text-blue-700' : 'text-slate-700'}`}>
+                          {opt.label}
+                        </span>
+                        {opt.description && (
+                          <span className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                            {opt.description}
+                          </span>
+                        )}
+                      </div>
+                      {formValues.internationalPartnershipTypes.includes(opt.label) && (
+                        <div className="absolute top-2 right-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        </div>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-3 col-span-2">
               <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Business Category</label>
               <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
@@ -443,9 +500,26 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="w-40 shrink-0 text-sm font-medium text-slate-700">Interested Industries</label>
-              <input name="interestedIndustries" placeholder="e.g., Technology, Finance, Healthcare" value={formValues.interestedIndustries} onChange={(e) => handleChange('interestedIndustries', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+            <div className="flex items-start gap-3 col-span-2">
+              <label className="w-40 shrink-0 text-sm font-medium text-slate-700 pt-2">Interested Industries</label>
+              <div className="flex-1 flex flex-wrap gap-2 p-2 border border-slate-200 rounded-lg bg-white">
+                {INDUSTRY_OPTIONS.map(opt => (
+                  <label key={opt} className="cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formValues.interestedIndustries.includes(opt)}
+                      onChange={(e) => {
+                        const newIndustries = e.target.checked
+                          ? [...formValues.interestedIndustries, opt]
+                          : formValues.interestedIndustries.filter(i => i !== opt);
+                        handleChange('interestedIndustries', newIndustries);
+                      }}
+                      className="hidden"
+                    />
+                    <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border-2 ${formValues.interestedIndustries.includes(opt) ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-slate-700 border-slate-300 hover:border-sky-500 hover:text-sky-500'}`}>{opt}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         )}

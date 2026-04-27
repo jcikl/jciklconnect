@@ -26,8 +26,12 @@ export class BusinessDirectoryService {
     }
 
     try {
-      // Query members who have a company name
-      const q = query(collection(db, COLLECTIONS.MEMBERS), orderBy('companyName', 'asc'));
+      // Query members who have a company name - using where clause for public access rule compatibility
+      const q = query(
+        collection(db, COLLECTIONS.MEMBERS), 
+        where('companyName', '!=', ''),
+        orderBy('companyName', 'asc')
+      );
       const snapshot = await getDocs(q);
 
       const businesses: BusinessProfile[] = [];
@@ -38,6 +42,7 @@ export class BusinessDirectoryService {
           businesses.push({
             id: doc.id,
             memberId: doc.id,
+            ownerName: data.name || 'Unknown',
             companyName: data.companyName,
             industry: data.industry || 'Other',
             description: data.companyDescription || '',
@@ -45,7 +50,10 @@ export class BusinessDirectoryService {
             offer: data.specialOffer || '',
             logo: data.companyLogoUrl || '',
             internationalConnections: data.internationalConnections || [],
-            // Map other fields if necessary
+            businessCategory: Array.isArray(data.businessCategory) ? data.businessCategory.join(', ') : (data.businessCategory || ''),
+            acceptsInternationalBusiness: data.acceptInternationalBusiness || false,
+            globalNetworkEnabled: data.globalNetworkEnabled || false,
+            internationalPartnershipTypes: data.internationalPartnershipTypes || [],
           });
         }
       });
@@ -69,6 +77,7 @@ export class BusinessDirectoryService {
           return {
             id: docSnap.id,
             memberId: docSnap.id,
+            ownerName: data.name || 'Unknown',
             companyName: data.companyName,
             industry: data.industry || 'Other',
             description: data.companyDescription || '',
@@ -76,6 +85,10 @@ export class BusinessDirectoryService {
             offer: data.specialOffer || '',
             logo: data.companyLogoUrl || '',
             internationalConnections: data.internationalConnections || [],
+            businessCategory: Array.isArray(data.businessCategory) ? data.businessCategory.join(', ') : (data.businessCategory || ''),
+            acceptsInternationalBusiness: data.acceptInternationalBusiness || false,
+            globalNetworkEnabled: data.globalNetworkEnabled || false,
+            internationalPartnershipTypes: data.internationalPartnershipTypes || [],
           };
         }
       }
@@ -109,6 +122,7 @@ export class BusinessDirectoryService {
       // Note: This relies on exact string match. Search might be better for partials.
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('companyName', '!=', ''),
         where('industry', '==', industry),
         orderBy('companyName', 'asc')
       );
@@ -122,6 +136,7 @@ export class BusinessDirectoryService {
           businesses.push({
             id: doc.id,
             memberId: doc.id,
+            ownerName: data.name || 'Unknown',
             companyName: data.companyName,
             industry: data.industry || 'Other',
             description: data.companyDescription || '',
@@ -129,6 +144,10 @@ export class BusinessDirectoryService {
             offer: data.specialOffer || '',
             logo: data.companyLogoUrl || '',
             internationalConnections: data.internationalConnections || [],
+            businessCategory: Array.isArray(data.businessCategory) ? data.businessCategory.join(', ') : (data.businessCategory || ''),
+            acceptsInternationalBusiness: data.acceptInternationalBusiness || false,
+            globalNetworkEnabled: data.globalNetworkEnabled || false,
+            internationalPartnershipTypes: data.internationalPartnershipTypes || [],
           });
         }
       });

@@ -69,20 +69,22 @@ service cloud.firestore {
     match /members/{memberId} {
       // 1. Basic Read Access (Get and List)
       // Allow if: own linked record, own email match (for linking), or authorized role
-      allow get, read: if isAuthenticated() && (
+      // OR if it's a public business profile (has companyName)
+      allow get, read: if (isAuthenticated() && (
         request.auth.uid == memberId || 
         (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
         isMember() || 
         canReadOrgMembers()
-      );
+      )) || (resource != null && resource.data.get('companyName', '') != '');
       
       // Allow listing specifically for email search during linking
-      allow list: if isAuthenticated() && (
+      // OR for the public business directory (where companyName filter is used)
+      allow list: if (isAuthenticated() && (
         isMember() || 
         canReadOrgMembers() ||
         (request.query.filters.get('email', []) == [request.auth.token.get('email', '')]) ||
         (request.query.filters.email == [request.auth.token.get('email', '')])
-      );
+      )) || (request.query.filters.get('companyName', null) != null);
 
       // 2. Create/Update/Delete Access
       allow create: if isAuthenticated() && 

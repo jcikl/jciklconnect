@@ -380,6 +380,7 @@ export interface Member {
   interestedIndustries?: string[]; // 感兴趣行业
   specialOffer?: string; // Special offer for members
   companyLogoUrl?: string; // URL for company logo
+  internationalPartnershipTypes?: string[]; // Types of international partnerships sought
   internationalConnections?: InternationalConnection[]; // Global JCI connections
 
   // 3. 联系信息 (Contact Information)
@@ -413,6 +414,7 @@ export interface Member {
 export interface BusinessProfile {
   id: string;
   memberId: string;
+  ownerName: string; // Member name
   companyName: string;
   industry: string;
   businessCategory?: string;
@@ -423,6 +425,7 @@ export interface BusinessProfile {
   internationalConnections?: InternationalConnection[];
   globalNetworkEnabled?: boolean;
   acceptsInternationalBusiness?: 'Yes' | 'No' | 'Willing to Explore' | boolean;
+  internationalPartnershipTypes?: string[];
   jciChapters?: string[]; // JCI chapters this business is connected with
 }
 

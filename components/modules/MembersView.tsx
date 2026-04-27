@@ -226,6 +226,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [loadingStats, setLoadingStats] = useState(false);
   const [lastImportResult, setLastImportResult] = useState<any | null>(null);
   const [addModalHobbies, setAddModalHobbies] = useState<string[]>([]);
+  const [addModalInterestedIndustries, setAddModalInterestedIndustries] = useState<string[]>([]);
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
   const { members, loading, error, createMember, updateMember, deleteMember, batchUpdateMembers, batchDeleteMembers, loadMembers } = useMembers(loIdFilter);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -452,6 +453,12 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     }
   };
 
+  const handleCloseAddModal = () => {
+    setAddModalOpen(false);
+    setAddModalHobbies([]);
+    setAddModalInterestedIndustries([]);
+  };
+
   const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -466,8 +473,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
       const hobbies = addModalHobbies.length > 0 ? addModalHobbies : undefined;
 
-      const interestedIndustriesInput = formData.get('interestedIndustries') as string;
-      const interestedIndustries = interestedIndustriesInput ? interestedIndustriesInput.split(',').map(s => s.trim()).filter(s => s.length > 0) : undefined;
+      const interestedIndustries = addModalInterestedIndustries.length > 0 ? addModalInterestedIndustries : undefined;
 
       const newMember: Omit<Member, 'id'> = {
         name,
@@ -531,7 +537,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
       };
 
       await createMember(newMember);
-      setAddModalOpen(false);
+      handleCloseAddModal();
       showToast('Member registered successfully', 'success');
       e.currentTarget.reset();
     } catch (error) {
@@ -748,13 +754,13 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
       <Modal
         isOpen={isAddModalOpen}
-        onClose={() => setAddModalOpen(false)}
+        onClose={handleCloseAddModal}
         title="Register New Member"
         size="xl"
         drawerOnMobile
         footer={
           <div className="flex gap-3 w-full">
-            <Button variant="outline" className="flex-1" type="button" onClick={() => setAddModalOpen(false)}>Cancel</Button>
+            <Button variant="outline" className="flex-1" type="button" onClick={handleCloseAddModal}>Cancel</Button>
             <Button className="flex-1" type="submit" form="add-member-form">Register Member</Button>
           </div>
         }
@@ -831,22 +837,40 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Professional Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <Input name="companyName" label="Company Name" />
-                  <Input
+                  <Select
                     name="industry"
                     label="Industry"
-                    list="register-industry-options"
-                    placeholder="Select or type..."
+                    options={[
+                      { label: 'Select industry...', value: '' },
+                      ...INDUSTRY_OPTIONS.map(opt => ({ label: opt, value: opt }))
+                    ]}
                   />
-                  <datalist id="register-industry-options">
-                    {INDUSTRY_OPTIONS.map(opt => (
-                      <option key={opt} value={opt} />
-                    ))}
-                  </datalist>
                   <div className="col-span-2">
                     <Input name="skills" label="Skills (comma-separated)" placeholder="Leadership, Networking, Marketing..." />
                   </div>
                   <div className="col-span-2">
-                    <Input name="interestedIndustries" label="Interested Industries (comma-separated)" placeholder="Technology, Finance, Healthcare..." />
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Interested Industries</label>
+                    <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      {INDUSTRY_OPTIONS.map(opt => (
+                        <label key={opt} className="cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={addModalInterestedIndustries.includes(opt)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAddModalInterestedIndustries([...addModalInterestedIndustries, opt]);
+                              } else {
+                                setAddModalInterestedIndustries(addModalInterestedIndustries.filter(i => i !== opt));
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 ${addModalInterestedIndustries.includes(opt) ? 'bg-sky-500 text-white border-sky-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-sky-500/30'}`}>
+                            {opt}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -1798,16 +1822,42 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 </div>
               </div>
 
-              <div className="text-sm">
-                <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
-                    member.businessCategory.map((cat, idx) => (
-                      <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
-                    ))
-                  ) : (
-                    <span className="text-slate-400 italic">None</span>
-                  )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
+                      member.businessCategory.map((cat, idx) => (
+                        <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-slate-400 italic">None</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Interested Industries</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Array.isArray(member.interestedIndustries) && member.interestedIndustries.length > 0 ? (
+                      member.interestedIndustries.map((ind, idx) => (
+                        <Badge key={idx} variant="info" className="text-[10px] bg-indigo-50 text-indigo-600 border-indigo-100">{ind}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-slate-400 italic">None</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">International Partnerships</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Array.isArray(member.internationalPartnershipTypes) && member.internationalPartnershipTypes.length > 0 ? (
+                      member.internationalPartnershipTypes.map((type, idx) => (
+                        <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-slate-400 italic">None</span>
+                    )}
+                  </div>
                 </div>
               </div>
 

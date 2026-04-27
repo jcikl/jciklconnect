@@ -6,7 +6,7 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target
+  ChevronLeft, ChevronRight, Target, Edit3
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -64,7 +64,7 @@ import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 
 // --- View Definitions ---
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER';
 
 // --- Helper Components ---
 
@@ -75,8 +75,8 @@ const GuestHeader = ({
   onLogin,
   onRegister
 }: {
-  currentPage: 'home' | 'events' | 'projects' | 'about' | 'enewsletters';
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => void;
+  currentPage: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory';
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
   onLogin: () => void;
   onRegister: () => void;
 }) => {
@@ -84,18 +84,19 @@ const GuestHeader = ({
   const navigate = useNavigate();
 
   // Determine current page from URL
-  const getCurrentPageFromPath = (): 'home' | 'events' | 'projects' | 'about' | 'enewsletters' => {
+  const getCurrentPageFromPath = (): 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' => {
     const path = location.pathname;
     if (path === '/about') return 'about';
     if (path === '/events') return 'events';
     if (path === '/projects') return 'projects';
     if (path === '/enewsletters') return 'enewsletters';
+    if (path === '/directory') return 'directory';
     return 'home';
   };
 
   const activePage = getCurrentPageFromPath();
 
-  const handleNavigation = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => {
+  const handleNavigation = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => {
     onPageChange(page);
     if (page === 'home') {
       navigate('/');
@@ -146,6 +147,13 @@ const GuestHeader = ({
             className={`no-underline font-medium transition-colors ${activePage === 'enewsletters' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
           >
             E-Newsletters
+          </Link>
+          <Link
+            to="/directory"
+            onClick={() => handleNavigation('directory')}
+            className={`no-underline font-medium transition-colors ${activePage === 'directory' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
+          >
+            Directory
           </Link>
         </nav>
         <div className="flex items-center space-x-4">
@@ -224,7 +232,7 @@ const SidebarItem = ({ icon, label, isActive, onClick, isCollapsed }: { icon: Re
 const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
 }) => (
   <div className="min-h-screen bg-slate-50">
     <a href="#main-content" className="skip-link">Skip to main content</a>
@@ -323,7 +331,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
 }) => {
   const { events, loading } = useEvents({ publicMode: true });
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -510,7 +518,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
 const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
 }) => {
   const { projects, loading } = useProjects();
   const activeProjects = projects.filter(p => p.status === 'Active');
@@ -584,7 +592,7 @@ const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
 const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
 }) => {
   const timelineEvents = [
     { year: '1953', title: 'JCI KL was Initiated', description: 'Initiated by JC Frank Wakerman in 1953 followed up by President JC Wong Peng Tuck.' },
@@ -853,7 +861,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
 const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
 }) => {
   const newsletters = [
     {
@@ -960,6 +968,52 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
 
       </main>
+      <GuestFooter />
+    </div>
+  );
+};
+
+// Guest Business Directory Page
+const GuestDirectoryPage = ({ onLogin, onRegister, onPageChange }: {
+  onLogin: () => void;
+  onRegister: () => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
+}) => {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <GuestHeader currentPage="directory" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
+
+      <main id="main-content">
+        <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Business Directory</h1>
+            <p className="text-xl text-blue-100 max-w-2xl mx-auto">
+              Explore the businesses of our members and connect with the global JCI network.
+            </p>
+          </div>
+        </section>
+
+        <section className="py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <BusinessDirectoryView />
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-16 bg-slate-100">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-4">Want to List Your Business?</h2>
+            <p className="text-slate-600 mb-8">
+              Join JCI Kuala Lumpur and showcase your business to our local and global network.
+            </p>
+            <Button size="lg" onClick={onRegister}>
+              Join JCI KL Today
+            </Button>
+          </div>
+        </section>
+      </main>
+
       <GuestFooter />
     </div>
   );
@@ -1326,6 +1380,7 @@ export const JCIKLApp: React.FC = () => {
       GUEST_PROJECTS: 'Projects',
       GUEST_ABOUT: 'About',
       GUEST_ENEWSLETTERS: 'E-Newsletters',
+      GUEST_DIRECTORY: 'Business Directory',
       DASHBOARD: 'Dashboard',
       MEMBERS: 'Members',
       EVENTS: 'Events',
@@ -1418,13 +1473,15 @@ export const JCIKLApp: React.FC = () => {
         setView('GUEST_PROJECTS');
       } else if (path === '/enewsletters') {
         setView('GUEST_ENEWSLETTERS');
+      } else if (path === '/directory') {
+        setView('GUEST_DIRECTORY');
       } else if (path === '/') {
         setView('GUEST');
       }
     } else {
       // Authenticated pages - redirect if accessing guest pages
       const path = location.pathname;
-      const guestPaths = ['/', '/about', '/events', '/projects', '/enewsletters'];
+      const guestPaths = ['/', '/about', '/events', '/projects', '/enewsletters', '/directory'];
 
       if (guestPaths.includes(path)) {
         // Redirect authenticated users away from guest pages
@@ -1488,7 +1545,7 @@ export const JCIKLApp: React.FC = () => {
   }
 
   // Handle guest page navigation
-  const handleGuestPageChange = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters') => {
+  const handleGuestPageChange = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => {
     setSearchQuery('');
     if (page === 'home') {
       setView('GUEST');
@@ -1505,11 +1562,14 @@ export const JCIKLApp: React.FC = () => {
     } else if (page === 'enewsletters') {
       setView('GUEST_ENEWSLETTERS');
       navigate('/enewsletters');
+    } else if (page === 'directory') {
+      setView('GUEST_DIRECTORY');
+      navigate('/directory');
     }
   };
 
   // Conditional Rendering Helper for Guest Pages
-  if (view === 'GUEST' || view === 'GUEST_EVENTS' || view === 'GUEST_PROJECTS' || view === 'GUEST_ABOUT' || view === 'GUEST_ENEWSLETTERS') {
+  if (view === 'GUEST' || view === 'GUEST_EVENTS' || view === 'GUEST_PROJECTS' || view === 'GUEST_ABOUT' || view === 'GUEST_ENEWSLETTERS' || view === 'GUEST_DIRECTORY') {
     const guestPageProps = {
       onLogin: handleLogin,
       onRegister: openRegistration,
@@ -1524,6 +1584,7 @@ export const JCIKLApp: React.FC = () => {
           <Route path="/projects" element={<GuestProjectsPage {...guestPageProps} />} />
           <Route path="/about" element={<GuestAboutPage {...guestPageProps} />} />
           <Route path="/enewsletters" element={<GuestEnewslettersPage {...guestPageProps} />} />
+          <Route path="/directory" element={<GuestDirectoryPage {...guestPageProps} />} />
           <Route path="/roadmap" element={<div />} />
           <Route path="*" element={<GuestLandingPage {...guestPageProps} />} />
         </Routes>
@@ -1900,21 +1961,26 @@ export const JCIKLApp: React.FC = () => {
                       <img
                         src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
                         alt="Avatar"
-                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-white/30 shadow-lg object-cover"
+                        className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
                       />
                       <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
                     </div>
                     <div>
-                      <p className="text-blue-100 text-lg sm:text-xl font-bold leading-tight">{member.name}</p>
-                      <div className="flex items-center space-x-2 mt-0.5">
-                        <p className="font-medium text-[10px] sm:text-xs tracking-wide text-blue-100/70 uppercase">{member.role}</p>
-                        <div
-                          className="flex items-center space-x-1 px-2 py-0.5 bg-white/20 backdrop-blur-md rounded-full text-[10px] sm:text-xs font-bold cursor-pointer hover:bg-white/30 transition-colors"
-                          onClick={() => setView('GAMIFICATION')}
+                      <div className="flex items-center gap-2">
+                        <p className="text-blue-100 text-lg font-bold">{member.name}</p>
+                        <button
+                          onClick={() => {
+                            setInitialSelectedMemberId(member.id);
+                            setView('MEMBERS');
+                          }}
+                          className="p-0 h-7 w-7 min-h-0 min-w-0 text-white/60 hover:text-white transition-colors flex items-center justify-center"
+                          title="Edit Profile"
                         >
-                          <Award size={12} />
-                          <span>{member?.points || 0} Pts</span>
-                        </div>
+                          <Edit3 size={16} />
+                        </button>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-sm tracking-wide text-blue-200">{member.role}</p>
                       </div>
                     </div>
                   </div>
@@ -1954,7 +2020,7 @@ export const JCIKLApp: React.FC = () => {
           )}
 
           {/* Scrollable Area */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-32 md:pb-8">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-4 px-5 sm:px-8 ">
             <div className="max-w-7xl mx-auto">
               <RoleSimulator />
 

@@ -1817,133 +1817,53 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   ]}
                 />
               </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-1 gap-3 md:gap-2">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Projects</p>
-                  <p className="text-lg font-bold text-slate-900">{filteredProjectAccounts.length}</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Total Balance</p>
-                  <p className="text-lg font-bold text-slate-900">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 col-span-2 md:col-span-1">
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Avg. Balance</p>
-                      <p className="text-sm font-bold text-slate-900">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Unassigned</p>
-                      <p className="text-sm font-bold text-orange-600">{uncategorizedProjectTxCount}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-3 bg-green-50/50 rounded-xl border border-green-100/50">
-                  <p className="text-[10px] text-green-600 uppercase font-bold tracking-wider mb-1">Positive</p>
-                  <p className="text-lg font-bold text-green-700">{filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}</p>
-                </div>
-                <div className="p-3 bg-red-50/50 rounded-xl border border-red-100/50">
-                  <p className="text-[10px] text-red-600 uppercase font-bold tracking-wider mb-1">Negative</p>
-                  <p className="text-lg font-bold text-red-700">{filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}</p>
-                </div>
-              </div>
+              <p className="text-sm text-slate-500 mb-2">
+                Total Projects: <span className="font-medium text-slate-900">{filteredProjectAccounts.length}</span>
+              </p>
+              <p className="text-sm text-slate-500 mb-2">
+                Total Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</span>
+              </p>
+              <p className="text-sm text-slate-500 mb-2">
+                Avg. Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</span>
+              </p>
+              <p className="text-sm text-slate-500 mb-2">
+                Positive Balance: <span className="font-medium text-green-600">{filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}</span>
+              </p>
+              <p className="text-sm text-slate-500 mb-2">
+                Negative Balance: <span className="font-medium text-red-600">{filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}</span>
+              </p>
+              <p className="text-sm text-slate-500 mb-2">
+                Unassigned Transactions: <span className="font-medium text-slate-900">{uncategorizedProjectTxCount}</span>
+              </p>
             </Card>
             <Card title="Project Accounts">
               <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
-                {/* Mobile: horizontal scroll */}
-                <div className="lg:hidden -mx-6 px-4">
-                  <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory no-scrollbar">
-                    {[
-                      ...(uncategorizedProjectTxCount > 0 ? [{
-                        id: 'uncategorized',
-                        projectId: UNASSIGNED_PROJECT_ID,
-                        projectName: 'Unassigned',
-                        currentBalance: 0,
-                        totalIncome: 0,
-                        totalExpenses: 0,
-                      }] : []),
-                      ...filteredProjectAccounts
-                    ].map(acc => {
-                      const isActive = selectedProjectFilter === acc.projectId;
-                      const bankIncome = acc.totalIncome || 0;
-                      const bankExpenses = acc.totalExpenses || 0;
-                      const bankNet = bankIncome - bankExpenses;
-                      const ptData = projectTrackerSummary[acc.projectId] || { income: 0, expenses: 0 };
-                      const ptIncome = ptData.income;
-                      const ptExpenses = ptData.expenses;
-                      const ptNet = ptIncome - ptExpenses;
-                      const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
-
-                      return (
-                        <div
-                          key={acc.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSelectedProjectFilter(isActive ? null : acc.projectId)}
-                          onKeyDown={(e) => e.key === 'Enter' && setSelectedProjectFilter(isActive ? null : acc.projectId)}
-                          className={`flex-shrink-0 w-[260px] snap-start p-3 rounded-xl border cursor-pointer transition-all ${isActive ? 'bg-jci-blue/10 border-jci-blue/30 ring-1 ring-jci-blue/20 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'}`}
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <Briefcase size={16} className={isActive ? 'text-jci-blue' : 'text-slate-500'} />
-                            <span className={`text-sm font-semibold truncate ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>{acc.projectName}</span>
-                            {acc.projectId !== UNASSIGNED_PROJECT_ID && isMatch && (
-                              <CheckCircle size={14} className="text-green-600 flex-shrink-0" />
-                            )}
-                          </div>
-                          {acc.projectId === UNASSIGNED_PROJECT_ID ? (
-                            <div className="text-xs text-slate-500">{uncategorizedProjectTxCount} entries</div>
-                          ) : (
-                            <div className="bg-slate-50/80 rounded-lg p-2 text-[11px]">
-                              <div className="grid grid-cols-3 gap-1 border-b border-slate-200 pb-1 mb-1 font-semibold text-slate-400">
-                                <div></div>
-                                <div className="text-right">PT</div>
-                                <div className="text-right">HT</div>
-                              </div>
-                              <div className="grid grid-cols-3 gap-1 py-0.5">
-                                <div className="text-slate-500">In</div>
-                                <div className="text-right font-mono text-slate-700">{formatCurrency(ptIncome)}</div>
-                                <div className="text-right font-mono text-slate-700">{formatCurrency(bankIncome)}</div>
-                              </div>
-                              <div className="grid grid-cols-3 gap-1 py-0.5">
-                                <div className="text-slate-500">Out</div>
-                                <div className="text-right font-mono text-slate-700">{formatCurrency(ptExpenses)}</div>
-                                <div className="text-right font-mono text-slate-700">{formatCurrency(bankExpenses)}</div>
-                              </div>
-                              <div className="grid grid-cols-3 gap-1 py-0.5 border-t border-slate-200 mt-1 pt-1 font-medium">
-                                <div className="text-slate-900">Net</div>
-                                <div className={`text-right font-mono ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(ptNet)}</div>
-                                <div className={`text-right font-mono ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(bankNet)}</div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Desktop: vertical list */}
-                <div className="hidden lg:block divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100">
                   {[
                     ...(uncategorizedProjectTxCount > 0 ? [{
                       id: 'uncategorized',
                       projectId: UNASSIGNED_PROJECT_ID,
                       projectName: 'Unassigned',
-                      currentBalance: 0,
+                      currentBalance: 0, // Placeholder, actual balance not tracked here
                       totalIncome: 0,
                       totalExpenses: 0,
                     }] : []),
                     ...filteredProjectAccounts
                   ].map(acc => {
                     const isActive = selectedProjectFilter === acc.projectId;
+
+                    // Logic for PT vs Bank comparison
                     const bankIncome = acc.totalIncome || 0;
                     const bankExpenses = acc.totalExpenses || 0;
                     const bankNet = bankIncome - bankExpenses;
+
+                    // PT Values from projectTrackerSummary
                     const ptData = projectTrackerSummary[acc.projectId] || { income: 0, expenses: 0 };
                     const ptIncome = ptData.income;
                     const ptExpenses = ptData.expenses;
                     const ptNet = ptIncome - ptExpenses;
+
+                    // Match logic: Check if values match exactly
                     const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
 
                     return (

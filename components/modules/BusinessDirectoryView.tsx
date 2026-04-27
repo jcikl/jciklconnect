@@ -173,7 +173,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
               <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredBusinesses.map(biz => {
-                    const owner = members.find(m => m.id === biz.memberId);
                     return (
                       <Card key={biz.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
                         {/* Industry‑specific banner (Premium Gradient + Decorative Pattern) */}
@@ -189,16 +188,16 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                           <div className="absolute text-right top-2 right-2 flex flex-col items-end gap-1">
                             <Badge variant="neutral">{biz.industry}</Badge>
 
-                            {/* Business Category Tag - fallback to owner profile */}
-                            {(biz.businessCategory || (owner?.businessCategory && owner.businessCategory.length > 0)) && (
+                            {/* Business Category Tag */}
+                            {biz.businessCategory && (
                               <Badge variant="info" className="text-[10px]">
-                                {biz.businessCategory || owner?.businessCategory?.join(', ')}
+                                {biz.businessCategory}
                               </Badge>
                             )}
 
                             {/* International Business Status - fallback to owner profile */}
                             {(() => {
-                              const status = biz.acceptsInternationalBusiness || owner?.acceptInternationalBusiness;
+                              const status = biz.acceptsInternationalBusiness;
                               if (status === 'Yes' || status === true) {
                                 return <Badge variant="success" className="text-[10px]">Accepts International BIZ</Badge>;
                               }
@@ -210,10 +209,20 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                           </div>
                         </div>
                         <div className="pt-8 px-2 pb-6 flex-1 flex flex-col">
-                          <h3 className="text-lg font-bold text-slate-900">{owner?.name || 'Unknown'}</h3>
-                          <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                          <h3 className="text-lg font-bold text-slate-900">{biz.ownerName}</h3>
+                          <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
                             {biz.companyName}
                           </p>
+                          {biz.description ? (
+                            <p className="text-[11px] text-slate-600 line-clamp-3 mb-4 leading-relaxed">
+                              {biz.description}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-slate-400 italic mb-4 leading-relaxed">
+                              No company description provided yet.
+                            </p>
+                          )}
+
                           <div className="flex gap-2 mt-auto mb-4">
                             {biz.website && (
                               <Button
@@ -237,7 +246,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                               Contact
                             </Button>
                           </div>
-                          <p className="text-sm text-slate-600 mb-4 flex-1 line-clamp-3">{biz.description}</p>
 
                           {biz.offer && (
                             <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
@@ -284,7 +292,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         drawerOnMobile
         size="2xl"
       >
-        <div className={selectedBiz ? "grid md:grid-cols-2 gap-6 pt-2" : "space-y-4 pt-2"}>
+        <div className={selectedBiz ? "grid md:grid-cols-2 gap-6" : "space-y-4"}>
           {/* Left Column: Business Info */}
           {selectedBiz && (
             <div className="space-y-4 border-b md:border-b-0 md:border-r border-slate-100 pb-6 md:pb-0 md:pr-6">
@@ -309,7 +317,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-50">
                   <div>
                     <span className="font-bold text-slate-700 block uppercase text-[10px] tracking-widest mb-1">Owner</span>
-                    <span className="text-slate-600 font-medium">{members.find(m => m.id === selectedBiz.memberId)?.name || 'Unknown'}</span>
+                    <span className="text-slate-600 font-medium">{selectedBiz.ownerName}</span>
                   </div>
                   {selectedBiz.website && (
                     <div>
@@ -322,21 +330,30 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
 
                 {(() => {
-                  const ownerCats = members.find(m => m.id === selectedBiz.memberId)?.businessCategory;
                   const bizCatsStr = selectedBiz.businessCategory;
-                  const showCats = bizCatsStr ? [bizCatsStr] : ownerCats;
 
-                  return (showCats && showCats.length > 0) ? (
+                  return bizCatsStr ? (
                     <div className="pt-3 border-t border-slate-50">
                       <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Categories</span>
                       <div className="flex flex-wrap gap-1.5">
-                        {showCats.map((cat, idx) => (
+                        {bizCatsStr.split(', ').map((cat, idx) => (
                           <Badge key={idx} variant="info" className="bg-blue-50/50 text-blue-600 border border-blue-100">{cat}</Badge>
                         ))}
                       </div>
                     </div>
                   ) : null;
                 })()}
+
+                {selectedBiz.internationalPartnershipTypes && selectedBiz.internationalPartnershipTypes.length > 0 && (
+                  <div className="pt-3 border-t border-slate-50">
+                    <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Seeking Partnerships</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedBiz.internationalPartnershipTypes.map((type, idx) => (
+                        <Badge key={idx} variant="neutral" className="bg-sky-50/50 text-sky-600 border border-sky-100 font-bold">{type}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {selectedBiz.offer && (
                   <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 rounded-xl p-4 shadow-inner">
@@ -429,8 +446,7 @@ interface InternationalNetworkTabProps {
 
 const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ businesses, members, onContact }) => {
   const businessesWithConnections = businesses.filter(business => {
-    const owner = members.find(m => m.id === business.memberId);
-    const acceptStatus = business.acceptsInternationalBusiness || owner?.acceptInternationalBusiness;
+    const acceptStatus = business.acceptsInternationalBusiness;
     const hasConnections = business.internationalConnections && business.internationalConnections.length > 0;
     return hasConnections || acceptStatus === 'Yes' || acceptStatus === 'Willing to Explore' || acceptStatus === true;
   });
@@ -446,8 +462,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ busin
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {businessesWithConnections.map(business => {
-            const owner = members.find(m => m.id === business.memberId);
-            const status = business.acceptsInternationalBusiness || owner?.acceptInternationalBusiness;
+            const status = business.acceptsInternationalBusiness;
             return (
               <Card key={business.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
                 {/* Industry‑specific banner */}
@@ -462,9 +477,9 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ busin
                   <div className="absolute text-right top-2 right-2 flex flex-col items-end gap-1">
                     <Badge variant="neutral">{business.industry}</Badge>
 
-                    {(business.businessCategory || (owner?.businessCategory && owner.businessCategory.length > 0)) && (
+                    {business.businessCategory && (
                       <Badge variant="info" className="text-[10px]">
-                        {business.businessCategory || owner?.businessCategory?.join(', ')}
+                        {business.businessCategory}
                       </Badge>
                     )}
 
@@ -478,10 +493,19 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ busin
 
                 {/* Card Body */}
                 <div className="pt-8 px-2 pb-6 flex-1 flex flex-col">
-                  <h3 className="text-lg font-bold text-slate-900">{owner?.name || 'Unknown'}</h3>
-                  <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                  <h3 className="text-lg font-bold text-slate-900">{business.ownerName}</h3>
+                  <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
                     {business.companyName}
                   </p>
+                  {business.description ? (
+                    <p className="text-[11px] text-slate-600 line-clamp-3 mb-4 leading-relaxed">
+                      {business.description}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic mb-4 leading-relaxed">
+                      No company description provided yet.
+                    </p>
+                  )}
                   <div className="flex gap-2 mb-4">
                     {business.website && (
                       <Button
@@ -530,10 +554,26 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ busin
                         </div>
                       ))
                     ) : (
-                      <div className="h-full flex items-center justify-center p-3 bg-amber-50/50 rounded-lg border border-amber-100 min-h-[100px]">
+                      <div
+                        className="h-full flex items-center justify-center p-4 bg-blue-50/50 rounded-xl border border-blue-100 min-h-[120px] cursor-pointer hover:bg-blue-100/50 transition-colors group/biz"
+                        onClick={() => onContact(business)}
+                      >
                         <div className="text-center">
-                          <Globe size={24} className="text-amber-500 mx-auto mb-2" />
-                          <p className="text-xs text-amber-700 font-medium leading-tight">Looking for international opportunities</p>
+                          <p className="text-xs text-blue-700 font-bold leading-tight mb-3">Looking for international opportunities</p>
+                          {business.internationalPartnershipTypes && business.internationalPartnershipTypes.length > 0 && (
+                            <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                              {business.internationalPartnershipTypes.slice(0, 3).map(type => (
+                                <span key={type} className="px-2 py-1 bg-white text-blue-600 border border-blue-200 rounded-lg text-[9px] font-bold shadow-sm">
+                                  {type}
+                                </span>
+                              ))}
+                              {business.internationalPartnershipTypes.length > 3 && (
+                                <span className="px-2 py-1 bg-blue-600 text-white rounded-lg text-[9px] font-black shadow-sm group-hover/biz:bg-blue-700 transition-colors">
+                                  +{business.internationalPartnershipTypes.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
