@@ -350,34 +350,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         </div>
       )}
 
-      {/* Actions */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Actions</h2>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleCreateRenewals}
-            disabled={creatingRenewals}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
-          >
-            <Plus className={`w-4 h-4 ${creatingRenewals ? 'animate-spin' : ''}`} />
-            {creatingRenewals ? 'Creating...' : 'Create Renewals'}
-          </button>
 
-          <button
-            onClick={handleSendReminders}
-            disabled={sendingReminders}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
-          >
-            <Send className={`w-4 h-4 ${sendingReminders ? 'animate-spin' : ''}`} />
-            {sendingReminders ? 'Sending...' : 'Send Reminders'}
-          </button>
-
-          <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
-        </div>
-      </div>
 
       {/* Renewal Transactions + 会费流水 grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -503,7 +476,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-y-2 pt-3 border-t border-gray-50 text-[11px]">
                       <div className="text-gray-500">Due: <span className="text-gray-900 font-medium">{fmtDate(renewal.dueDate)}</span></div>
                       <div className="text-gray-500 text-right">Reminders: <span className="text-gray-900 font-medium">{renewal.remindersSent || 0}</span></div>
@@ -543,83 +516,83 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 </div>
               ) : (
                 <>
-                {/* Desktop View */}
-                <div className="hidden md:block">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">日期 / 描述</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">会员 / 项目</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">金额 / 操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredByYear
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map((tx) => (
-                          <tr key={tx.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2">
-                              <div className="text-sm text-gray-900 font-medium whitespace-nowrap">{fmtDate(tx.date)}</div>
-                              <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.description}>{tx.description}</div>
-                            </td>
-                            <td className="px-4 py-2">
-                              <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}>
-                                {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
-                              </div>
-                              <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.projectId || '—'}>{tx.projectId || '—'}</div>
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              <div className="flex flex-col items-end gap-1">
-                                <span className="text-sm font-medium text-gray-900">
-                                  {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
-                                </span>
-                                {hasEditPermission && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
-                                    className="text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
-                                  >
-                                    <Edit size={12} /> 编辑
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
+                  {/* Desktop View */}
+                  <div className="hidden md:block">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">日期 / 描述</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">会员 / 项目</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">金额 / 操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredByYear
+                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .map((tx) => (
+                            <tr key={tx.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-2">
+                                <div className="text-sm text-gray-900 font-medium whitespace-nowrap">{fmtDate(tx.date)}</div>
+                                <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.description}>{tx.description}</div>
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}>
+                                  {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.projectId || '—'}>{tx.projectId || '—'}</div>
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
+                                  </span>
+                                  {hasEditPermission && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                      className="py-0 min-h-0 min-w-0 text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
+                                    >
+                                      <Edit size={12} /> 编辑
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-                {/* Mobile View */}
-                <div className="md:hidden space-y-3 p-4">
-                  {filteredByYear
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                    .map((tx) => (
-                      <div key={tx.id} className="bg-slate-50 border border-slate-100 rounded-lg p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-[10px] text-gray-400 font-medium">{fmtDate(tx.date)}</span>
-                          <span className={`text-xs font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
-                          </span>
-                        </div>
-                        <div className="text-xs font-bold text-gray-800 mb-1 truncate">{tx.description}</div>
-                        <div className="flex justify-between items-center mt-2">
-                          <div className="text-[10px] text-gray-500 truncate max-w-[150px]">
-                            {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
+                  {/* Mobile View */}
+                  <div className="md:hidden space-y-3 p-4">
+                    {filteredByYear
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((tx) => (
+                        <div key={tx.id} className="bg-slate-50 border border-slate-100 rounded-lg p-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-[10px] text-gray-400 font-medium">{fmtDate(tx.date)}</span>
+                            <span className={`text-xs font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                              {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
+                            </span>
                           </div>
-                          {hasEditPermission && (
-                            <button
-                              type="button"
-                              onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
-                              className="text-blue-600 text-[10px] font-bold"
-                            >
-                              Edit
-                            </button>
-                          )}
+                          <div className="text-xs font-bold text-gray-800 mb-1 truncate">{tx.description}</div>
+                          <div className="flex justify-between items-center mt-2">
+                            <div className="text-[10px] text-gray-500 truncate max-w-[150px]">
+                              {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
+                            </div>
+                            {hasEditPermission && (
+                              <button
+                                type="button"
+                                onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                className="text-blue-600 text-[10px] font-bold"
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                </div>
+                      ))}
+                  </div>
                 </>
               );
             })()}

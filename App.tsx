@@ -6,7 +6,7 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target, Edit3
+  ChevronLeft, ChevronRight, Target, Edit3, CreditCard
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -60,11 +60,12 @@ import { BoardDashboard } from './components/dashboard/BoardDashboard';
 import { DashboardHome } from './components/dashboard/DashboardHome';
 import { DeveloperInterface } from './components/modules/DeveloperInterface';
 import { BountyMarketplaceView } from './components/modules/BountyMarketplaceView';
+import { ToyyibView } from './components/modules/ToyyibView';
 import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 
 // --- View Definitions ---
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB';
 
 // --- Helper Components ---
 
@@ -1398,6 +1399,7 @@ export const JCIKLApp: React.FC = () => {
       SURVEYS: 'Surveys',
       BENEFITS: 'Member Benefits',
       DATA_IMPORT_EXPORT: 'Data Import/Export',
+      TOYYIB: 'ToyyibPay Test',
       ADVERTISEMENTS: 'Advertisements',
       AI_INSIGHTS: 'AI Insights',
       TEMPLATES: 'Templates',
@@ -1635,6 +1637,7 @@ export const JCIKLApp: React.FC = () => {
       case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
       case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
+      case 'TOYYIB': return <ToyyibView />;
       default:
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
@@ -1877,6 +1880,13 @@ export const JCIKLApp: React.FC = () => {
                         label="Data Import/Export"
                         isActive={view === 'DATA_IMPORT_EXPORT'}
                         onClick={() => { handleViewChange('DATA_IMPORT_EXPORT'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<CreditCard size={18} />}
+                        label="ToyyibPay"
+                        isActive={view === 'TOYYIB'}
+                        onClick={() => { handleViewChange('TOYYIB'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                     </>

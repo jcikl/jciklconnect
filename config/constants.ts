@@ -75,6 +75,16 @@ export const COLLECTIONS = {
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */
 export const REFERENCE_NUMBER_PREFIX = 'PR';
 
+export const TOYYIB_CONFIG = {
+  ENDPOINT: 'https://toyyibpay.com/index.php/api',
+  SANDBOX_ENDPOINT: 'https://dev.toyyibpay.com/index.php/api',
+  IS_SANDBOX: true,
+  USER_SECRET_KEY: 'tl5be74e-pazq-kti6-xci2-bh6npgb4gcjv', // To be filled in via environment or dashboard
+  CATEGORY_CODE: '6x9mw99z',    // To be filled in via environment or dashboard
+  RETURN_URL_SUFFIX: '/payment-return',
+  CALLBACK_URL_SUFFIX: '/api/webhooks/toyyibpay'
+};
+
 export const POINT_CATEGORIES = {
   EVENT_ATTENDANCE: 'event_attendance',
   PROJECT_TASK: 'project_task',
@@ -418,7 +428,7 @@ export const CONTRACT_STATUS = {
 
 export const OPPORTUNITY_URGENCY = {
   SCARCE: 'Scarce',     // < 3 slots
-  LIMIT_REACHED: 'Full', 
+  LIMIT_REACHED: 'Full',
   ENDING_SOON: 'Ending', // < 24h
 } as const;
 

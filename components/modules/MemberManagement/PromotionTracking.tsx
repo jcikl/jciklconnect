@@ -243,7 +243,10 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   {member.name.split(' ').map((n: string) => n[0]).join('')}
                 </div>
                 <div>
-                  <div className="font-medium text-slate-900">{member.name}</div>
+                  {member.fullName && (
+                    <div className="font-medium text-slate-900">{member.fullName}</div>
+                  )}
+                  <div className={member.fullName ? "text-sm text-slate-600" : "font-medium text-slate-900"}>{member.name}</div>
                   <div className="text-xs text-slate-500">Joined: {member.joinDate}</div>
                 </div>
               </div>
