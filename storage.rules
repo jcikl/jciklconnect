@@ -120,7 +120,16 @@ service firebase.storage {
     }
     
     // Advertisement images
-    match /advertisements/{adId}/{fileName} {
+    match /advertisements/{fileName} {
+      allow read: if true;
+      allow write: if isBoard() && 
+                      isValidImageFile() && 
+                      isValidFileSize(5); // 5MB limit
+      allow delete: if isBoard();
+    }
+    
+    // Member benefits banners
+    match /benefits/{fileName} {
       allow read: if isAuthenticated();
       allow write: if isBoard() && 
                       isValidImageFile() && 

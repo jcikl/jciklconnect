@@ -12,6 +12,8 @@ import {
   MemberTier
 } from '../types';
 import { MembersService } from './membersService';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 export class PromotionService {
   private static readonly PROBATION_DUES = 350; // RM350
@@ -68,14 +70,14 @@ export class PromotionService {
         id: 'event_participation',
         type: 'event_participation',
         name: 'Event Participation',
-        description: 'Participate in at least one event',
+        description: 'Participate in at least two events',
         isCompleted: false
       },
       {
         id: 'jci_inspire',
         type: 'jci_inspire_completion',
-        name: 'JCIM Inspire Course',
-        description: 'Complete the JCIM Inspire course',
+        name: 'Course Completion',
+        description: 'Complete the JCIM Inspire course OR JCI KL New Members’ Orientation',
         isCompleted: false
       }
     ];
@@ -383,11 +385,15 @@ export class PromotionService {
     const member = await this.getMemberById(memberId);
     const value = member?.promotionProgress?.eventParticipation;
     if (value && value.trim()) {
-      return {
-        completedAt: new Date(),
-        details: { eventName: value },
-        evidence: [] as string[]
-      };
+      // Check for at least 2 events separated by comma, semicolon, or newline
+      const events = value.split(/[,\n;]+/).filter(e => e.trim().length > 0);
+      if (events.length >= 2) {
+        return {
+          completedAt: new Date(),
+          details: { eventNames: events },
+          evidence: [] as string[]
+        };
+      }
     }
     return null;
   }

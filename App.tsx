@@ -6,7 +6,7 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target, Edit3, CreditCard
+  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -58,6 +58,7 @@ import { ReportsView } from './components/modules/ReportsView';
 import { RoleSimulator } from './components/dev/RoleSimulator';
 import { BoardDashboard } from './components/dashboard/BoardDashboard';
 import { DashboardHome } from './components/dashboard/DashboardHome';
+import { CanvaView } from './components/modules/CanvaView';
 import { DeveloperInterface } from './components/modules/DeveloperInterface';
 import { BountyMarketplaceView } from './components/modules/BountyMarketplaceView';
 import { ToyyibView } from './components/modules/ToyyibView';
@@ -65,7 +66,7 @@ import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 
 // --- View Definitions ---
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA';
 
 // --- Helper Components ---
 
@@ -1400,7 +1401,7 @@ export const JCIKLApp: React.FC = () => {
       BENEFITS: 'Member Benefits',
       DATA_IMPORT_EXPORT: 'Data Import/Export',
       TOYYIB: 'ToyyibPay Test',
-      ADVERTISEMENTS: 'Advertisements',
+      ADVERTISEMENTS: 'Partnership & Promotions',
       AI_INSIGHTS: 'AI Insights',
       TEMPLATES: 'Templates',
       ACTIVITY_PLANS: 'Activity Plans',
@@ -1528,6 +1529,13 @@ export const JCIKLApp: React.FC = () => {
     if (newView === 'DIRECTORY' && selectedId) setInitialSelectedBusinessId(selectedId);
   };
 
+  const handleEditProfile = () => {
+    if (member) {
+      setInitialSelectedMemberId(member.id);
+      setView('MEMBERS');
+    }
+  };
+
   const openRegistration = () => setRegisterModalOpen(true);
   const closeRegistration = () => setRegisterModalOpen(false);
   const openLogin = () => setLoginModalOpen(true);
@@ -1619,25 +1627,26 @@ export const JCIKLApp: React.FC = () => {
       case 'ACTIVITIES': return <ActivityPlansView searchQuery={searchQuery} />;
       case 'PROJECTS': return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
       case 'EVENTS': return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
-      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
-      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
-      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
+      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />;
-      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
       case 'COMMUNICATION': return <CommunicationView searchQuery={searchQuery} />;
       case 'CLUBS': return <HobbyClubsView searchQuery={searchQuery} />;
       case 'SURVEYS': return <SurveysView searchQuery={searchQuery} />;
       case 'BENEFITS': return <MemberBenefitsView searchQuery={searchQuery} />;
-      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
-      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
-      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
-      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
+      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
+      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
+      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
+      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
       case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
-      case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
+      case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
       case 'TOYYIB': return <ToyyibView />;
+      case 'CANVA': return <CanvaView />;
       default:
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
@@ -1656,6 +1665,7 @@ export const JCIKLApp: React.FC = () => {
           onOpenNotifications={() => setNotificationDrawerOpen(true)}
           onOpenSearch={() => setSearchDrawerOpen(true)}
           onNavigate={handleViewChange}
+          onEditProfile={handleEditProfile}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           scrollRef={scrollRef}
@@ -1837,7 +1847,7 @@ export const JCIKLApp: React.FC = () => {
                     <>
                       <SidebarItem
                         icon={<Megaphone size={18} />}
-                        label="Advertisements"
+                        label="Partnerships & Promotions"
                         isActive={view === 'ADVERTISEMENTS'}
                         onClick={() => { handleViewChange('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
@@ -1889,6 +1899,13 @@ export const JCIKLApp: React.FC = () => {
                         onClick={() => { handleViewChange('TOYYIB'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
+                      <SidebarItem
+                        icon={<ImageIcon size={18} />}
+                        label="Canva"
+                        isActive={view === 'CANVA'}
+                        onClick={() => { handleViewChange('CANVA'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
                     </>
                   )}
                   {!(isMember || isGuest) && (
@@ -1929,31 +1946,13 @@ export const JCIKLApp: React.FC = () => {
                 </div>
               )}
             </nav>
-
-            <div className="pt-4 mt-auto border-t border-slate-100 px-2 space-y-1 pb-4">
-              <SidebarItem
-                icon={<BookOpen size={18} />}
-                label="Help / Process Guide"
-                isActive={false}
-                onClick={() => { setIsHelpModalOpen(true); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
-              <button
-                onClick={handleLogout}
-                className={`flex items-center text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 text-sm font-medium ${isSidebarCollapsed ? 'w-full justify-center px-0 py-3' : 'w-full space-x-3 px-4 py-3'}`}
-                title={isSidebarCollapsed ? "Sign Out" : undefined}
-              >
-                <LogOut size={18} />
-                {!isSidebarCollapsed && <span>Sign Out</span>}
-              </button>
-            </div>
           </div>
         </aside>
 
         {/* Main Content */}
         <main id="main-content" className="flex-1 flex flex-col min-w-0 h-full overflow-hidden" tabIndex={-1} role="main">
           <h1 className="sr-only">
-            {view === 'DASHBOARD' ? 'Dashboard' : view === 'BOUNTIES' ? 'Bounty Marketplace' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Advertisements' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
+            {view === 'DASHBOARD' ? 'Dashboard' : view === 'BOUNTIES' ? 'Bounty Marketplace' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 

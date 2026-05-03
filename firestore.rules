@@ -404,8 +404,11 @@ service cloud.firestore {
     
     // Advertisements collection
     match /advertisements/{adId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isBoard();
+      allow read: if true;
+      allow create, delete: if isBoard();
+      allow update: if isBoard() || 
+        (request.resource.data.diff(resource.data).affectedKeys()
+         .hasOnly(['impressions', 'clicks', 'updatedAt']));
     }
     
     // Promotion Packages collection

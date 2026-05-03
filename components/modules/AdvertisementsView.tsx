@@ -9,6 +9,9 @@ import { Advertisement } from '../../services/advertisementService';
 import { formatDate, toDate } from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/formatUtils';
 import { Timestamp } from 'firebase/firestore';
+import { storage } from '../../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import imageCompression from 'browser-image-compression';
 
 // AdImage component extracted outside to avoid React Hooks rule violation
 interface AdImageProps {
@@ -42,6 +45,19 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const { advertisements, packages, loading, error, createAdvertisement, updateAdvertisement, deleteAdvertisement } = useAdvertisements();
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
+  const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
+  const [formImage, setFormImage] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  React.useEffect(() => {
+    if (selectedAd) {
+      setSelectedPlacements(Array.isArray(selectedAd.placement) ? selectedAd.placement : [selectedAd.placement]);
+      setFormImage(null);
+    } else {
+      setSelectedPlacements([]);
+      setFormImage(null);
+    }
+  }, [selectedAd, isModalOpen]);
 
   const filteredAds = useMemo(() => {
     const term = (searchQuery || '').toLowerCase();
@@ -50,7 +66,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       (ad.title ?? '').toLowerCase().includes(term) ||
       (ad.description ?? '').toLowerCase().includes(term) ||
       (ad.type ?? '').toLowerCase().includes(term) ||
-      (ad.placement ?? '').toLowerCase().includes(term) ||
+      (Array.isArray(ad.placement) ? ad.placement.join(' ') : (ad.placement ?? '')).toLowerCase().includes(term) ||
       (ad.status ?? '').toLowerCase().includes(term) ||
       (ad.targetAudience ?? '').toLowerCase().includes(term)
     );
@@ -59,22 +75,62 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'> = {
-      title: formData.get('title') as string,
-      description: formData.get('description') as string,
-      type: formData.get('type') as any,
-      placement: formData.get('placement') as any,
-      targetAudience: formData.get('targetAudience') as any || 'All Members',
-      imageUrl: formData.get('imageUrl') as string,
-      linkUrl: formData.get('linkUrl') as string || undefined,
-      startDate: formData.get('startDate') as string,
-      endDate: formData.get('endDate') as string || undefined,
-      status: (formData.get('status') as any) || 'Active',
-      priority: parseInt(formData.get('priority') as string) || 0,
-      budget: formData.get('budget') ? parseFloat(formData.get('budget') as string) : undefined,
-    };
-
+    
+    setIsUploading(true);
     try {
+      let imageUrl = selectedAd?.imageUrl || '';
+
+      if (formImage) {
+        let fileToUpload = formImage;
+        try {
+          const options = {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+          };
+          const compressedFile = await imageCompression(formImage, options);
+          fileToUpload = new File([compressedFile], formImage.name, {
+            type: compressedFile.type,
+            lastModified: Date.now(),
+          });
+        } catch (error) {
+          console.error('Image compression failed, using original file:', error);
+        }
+
+        const fileRef = ref(storage, `advertisements/${Date.now()}_${fileToUpload.name}`);
+        const snapshot = await uploadBytes(fileRef, fileToUpload);
+        imageUrl = await getDownloadURL(snapshot.ref);
+      } else if (!imageUrl && formData.get('imageUrl')) {
+        imageUrl = formData.get('imageUrl') as string;
+      }
+
+      if (!imageUrl) {
+        showToast('Please provide an image.', 'error');
+        setIsUploading(false);
+        return;
+      }
+
+      if (selectedPlacements.length === 0) {
+        showToast('Please select at least one placement.', 'error');
+        setIsUploading(false);
+        return;
+      }
+
+      const adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'> = {
+        title: formData.get('title') as string,
+        description: formData.get('description') as string,
+        type: formData.get('type') as any,
+        placement: selectedPlacements as any,
+        targetAudience: formData.get('targetAudience') as any || 'All Members',
+        imageUrl: imageUrl,
+        linkUrl: formData.get('linkUrl') as string || undefined,
+        startDate: formData.get('startDate') as string,
+        endDate: formData.get('endDate') as string || undefined,
+        status: (formData.get('status') as any) || 'Active',
+        priority: parseInt(formData.get('priority') as string) || 0,
+        budget: formData.get('budget') ? parseFloat(formData.get('budget') as string) : undefined,
+      };
+
       if (selectedAd) {
         await updateAdvertisement(selectedAd.id!, adData);
       } else {
@@ -82,9 +138,12 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       }
       setIsModalOpen(false);
       setSelectedAd(null);
+      setFormImage(null);
       e.currentTarget.reset();
     } catch (err) {
       // Error handled by hook
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -141,8 +200,8 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Advertisements & Promotions</h2>
-          <p className="text-slate-500">Manage promotional content and advertising campaigns.</p>
+          <h2 className="text-2xl font-bold text-slate-900">Partnership & Promotions</h2>
+          <p className="text-slate-500">Manage promotional content and partnership campaigns.</p>
         </div>
         {(isBoard || isAdmin) && (
           <Button onClick={() => {
@@ -158,14 +217,14 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       <Card noPadding>
         <div className="px-4 md:px-6 pt-4">
           <Tabs
-            tabs={['Advertisements', 'Promotion Packages', 'Analytics']}
+            tabs={['Partnerships', 'Promotion Packages', 'Analytics']}
             activeTab={
-              activeTab === 'ads' ? 'Advertisements' :
+              activeTab === 'ads' ? 'Partnerships' :
                 activeTab === 'packages' ? 'Promotion Packages' :
                   'Analytics'
             }
             onTabChange={(tab) => {
-              if (tab === 'Advertisements') setActiveTab('ads');
+              if (tab === 'Partnerships') setActiveTab('ads');
               else if (tab === 'Promotion Packages') setActiveTab('packages');
               else setActiveTab('analytics');
             }}
@@ -196,7 +255,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                           <Megaphone size={12} />
                           <span className="capitalize">{ad.type}</span>
                           <span>•</span>
-                          <span className="capitalize">{ad.placement}</span>
+                          <span className="capitalize">{Array.isArray(ad.placement) ? ad.placement.join(', ') : ad.placement}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar size={12} />
@@ -316,14 +375,14 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         </div>
       </Card>
 
-      {/* Create/Edit Advertisement Modal */}
+      {/* Create/Edit Partnership Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
           setSelectedAd(null);
         }}
-        title={selectedAd ? 'Edit Advertisement' : 'Create Advertisement'}
+        title={selectedAd ? 'Edit Partnership' : 'Create Partnership'}
         size="lg"
         drawerOnMobile
       >
@@ -339,13 +398,13 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           <Textarea
             name="description"
             label="Description"
-            placeholder="Advertisement description..."
+            placeholder="Partnership description..."
             defaultValue={selectedAd?.description}
             rows={3}
             required
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
               name="type"
               label="Type"
@@ -359,20 +418,27 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
               ]}
               required
             />
-            <Select
-              name="placement"
-              label="Placement"
-              defaultValue={selectedAd?.placement}
-              options={[
-                { label: 'Homepage', value: 'Homepage' },
-                { label: 'Events Page', value: 'Events Page' },
-                { label: 'Newsletter Header', value: 'Newsletter Header' },
-                { label: 'Newsletter Footer', value: 'Newsletter Footer' },
-                { label: 'Sidebar', value: 'Sidebar' },
-                { label: 'Popup', value: 'Popup' },
-              ]}
-              required
-            />
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">Placements</label>
+              <div className="flex flex-wrap gap-2">
+                {['Homepage', 'Events Page', 'Newsletter Header', 'Newsletter Footer', 'Sidebar', 'Popup'].map(place => (
+                  <label key={place} className="flex items-center gap-2 text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      name="placement"
+                      value={place}
+                      defaultChecked={selectedPlacements.includes(place)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedPlacements(prev => [...prev, place]);
+                        else setSelectedPlacements(prev => prev.filter(p => p !== place));
+                      }}
+                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
+                    />
+                    {place}
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
 
           <Select
@@ -387,13 +453,47 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
             ]}
           />
 
-          <Input
-            name="imageUrl"
-            label="Image URL"
-            placeholder="https://example.com/image.jpg"
-            defaultValue={selectedAd?.imageUrl}
-            required
-          />
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-700">Ad Image <span className="text-red-500">*</span></label>
+            <div className="flex items-center gap-4">
+              <div className="w-32 h-20 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative">
+                {(formImage || selectedAd?.imageUrl) ? (
+                  <img
+                    src={formImage ? URL.createObjectURL(formImage) : selectedAd?.imageUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                    <ImageIcon size={24} />
+                    <span className="text-[10px] mt-1">Image</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setFormImage(file);
+                  }}
+                  className="hidden"
+                  id="ad-image-upload"
+                />
+                <label
+                  htmlFor="ad-image-upload"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-jci-blue bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  <ImageIcon size={16} />
+                  {formImage ? 'Change Image' : selectedAd?.imageUrl ? 'Change Image' : 'Upload Image'}
+                </label>
+                <p className="text-xs text-slate-500 mt-2">Max 1MB.</p>
+              </div>
+            </div>
+            {/* Hidden input for fallback/editing logic if needed */}
+            <input type="hidden" name="imageUrl" value={selectedAd?.imageUrl || ''} />
+          </div>
 
           <Input
             name="linkUrl"
@@ -451,8 +551,8 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           />
 
           <div className="flex gap-3 pt-4">
-            <Button className="flex-1" type="submit">
-              {selectedAd ? 'Update Advertisement' : 'Create Advertisement'}
+            <Button className="flex-1" type="submit" disabled={isUploading}>
+              {isUploading ? 'Uploading...' : (selectedAd ? 'Update Partnership' : 'Create Partnership')}
             </Button>
             <Button
               variant="ghost"

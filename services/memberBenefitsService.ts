@@ -40,6 +40,7 @@ export interface MemberBenefit {
   status: 'Active' | 'Inactive' | 'Expired';
   provider?: string; // Business/partner providing the benefit
   termsAndConditions?: string;
+  bannerUrl?: string; // 5:3 ratio landscape banner
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;
 }
@@ -222,6 +223,9 @@ export class MemberBenefitsService {
       if (benefitData.discountAmount !== undefined) {
         newBenefit.discountAmount = benefitData.discountAmount;
       }
+      if (benefitData.bannerUrl !== undefined) {
+        newBenefit.bannerUrl = benefitData.bannerUrl;
+      }
 
       const cleanBenefit = removeUndefined(newBenefit);
       const docRef = await addDoc(collection(db, COLLECTIONS.MEMBER_BENEFITS || 'memberBenefits'), cleanBenefit);
@@ -252,6 +256,7 @@ export class MemberBenefitsService {
       if (updates.eligibilityCriteria !== undefined) updateData.eligibilityCriteria = updates.eligibilityCriteria;
       if (updates.discountPercentage !== undefined) updateData.discountPercentage = updates.discountPercentage;
       if (updates.discountAmount !== undefined) updateData.discountAmount = updates.discountAmount;
+      if (updates.bannerUrl !== undefined) updateData.bannerUrl = updates.bannerUrl;
 
       if (updates.validFrom) {
         updateData.validFrom = Timestamp.fromDate(toDate(updates.validFrom));

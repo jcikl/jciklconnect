@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Gift, Plus, Edit, Trash2, Users, TrendingUp, Calendar, Tag, CheckCircle, History, Eye } from 'lucide-react';
+import { Gift, Plus, Edit, Trash2, Users, TrendingUp, Calendar, Tag, CheckCircle, History, Eye, Image as ImageIcon, X } from 'lucide-react';
 import { Button, Card, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
@@ -9,6 +9,9 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useMembers } from '../../hooks/useMembers';
 import { MemberBenefit } from '../../services/memberBenefitsService';
 import { formatDate, toDate } from '../../utils/dateUtils';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../config/firebase';
+import imageCompression from 'browser-image-compression';
 
 export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,6 +19,8 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const [claimedBenefitIds, setClaimedBenefitIds] = useState<Set<string>>(new Set());
   const [selectedBenefitForUsage, setSelectedBenefitForUsage] = useState<MemberBenefit | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+  const [formBanner, setFormBanner] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const { benefits, loading, error, createBenefit, updateBenefit, deleteBenefit, recordUsage, getUsageHistory } = useMemberBenefits();
   const { member } = useAuth();
   const { isBoard, isAdmin } = usePermissions();
@@ -43,27 +48,54 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
     if (!member) return;
 
     const formData = new FormData(e.currentTarget);
-    const benefitData: Omit<MemberBenefit, 'id' | 'createdAt' | 'updatedAt' | 'currentUsage'> = {
-      name: formData.get('name') as string,
-      description: formData.get('description') as string,
-      type: formData.get('type') as any,
-      category: formData.get('category') as any,
-      discountPercentage: formData.get('discountPercentage') ? parseFloat(formData.get('discountPercentage') as string) : undefined,
-      discountAmount: formData.get('discountAmount') ? parseFloat(formData.get('discountAmount') as string) : undefined,
-      eligibilityCriteria: {
-        tier: formData.get('eligibleTiers') ? (formData.get('eligibleTiers') as string).split(',').filter(Boolean) : undefined,
-        role: formData.get('eligibleRoles') ? (formData.get('eligibleRoles') as string).split(',').filter(Boolean) : undefined,
-        points: formData.get('minPoints') ? parseInt(formData.get('minPoints') as string) : undefined,
-      },
-      validFrom: formData.get('validFrom') as string,
-      validUntil: formData.get('validUntil') as string || undefined,
-      usageLimit: formData.get('usageLimit') ? parseInt(formData.get('usageLimit') as string) : undefined,
-      status: (formData.get('status') as any) || 'Active',
-      provider: formData.get('provider') as string || undefined,
-      termsAndConditions: formData.get('terms') as string || undefined,
-    };
 
+    setIsUploading(true);
     try {
+      let bannerUrl = selectedBenefit?.bannerUrl;
+
+      if (formBanner) {
+        let fileToUpload = formBanner;
+        try {
+          const options = {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+          };
+          const compressedFile = await imageCompression(formBanner, options);
+          fileToUpload = new File([compressedFile], formBanner.name, {
+            type: compressedFile.type,
+            lastModified: Date.now(),
+          });
+        } catch (error) {
+          console.error('Image compression failed, using original file:', error);
+        }
+
+        const fileRef = ref(storage, `benefits/${Date.now()}_${fileToUpload.name}`);
+        const snapshot = await uploadBytes(fileRef, fileToUpload);
+        bannerUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      const benefitData: Omit<MemberBenefit, 'id' | 'createdAt' | 'updatedAt' | 'currentUsage'> = {
+        name: formData.get('name') as string,
+        description: formData.get('description') as string,
+        type: formData.get('type') as any,
+        category: formData.get('category') as any,
+        discountPercentage: formData.get('discountPercentage') ? parseFloat(formData.get('discountPercentage') as string) : undefined,
+        discountAmount: formData.get('discountAmount') ? parseFloat(formData.get('discountAmount') as string) : undefined,
+        eligibilityCriteria: {
+          tier: formData.get('eligibleTiers') ? (formData.get('eligibleTiers') as string).split(',').filter(Boolean) : undefined,
+          role: formData.get('eligibleRoles') ? (formData.get('eligibleRoles') as string).split(',').filter(Boolean) : undefined,
+          points: formData.get('minPoints') ? parseInt(formData.get('minPoints') as string) : undefined,
+        },
+        validFrom: formData.get('validFrom') as string,
+        validUntil: formData.get('validUntil') as string || undefined,
+        usageLimit: formData.get('usageLimit') ? parseInt(formData.get('usageLimit') as string) : undefined,
+        status: (formData.get('status') as any) || 'Active',
+        provider: formData.get('provider') as string || undefined,
+        termsAndConditions: formData.get('terms') as string || undefined,
+        bannerUrl,
+      };
+
       if (selectedBenefit) {
         await updateBenefit(selectedBenefit.id!, benefitData);
       } else {
@@ -71,19 +103,12 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       }
       setIsModalOpen(false);
       setSelectedBenefit(null);
+      setFormBanner(null);
       e.currentTarget.reset();
     } catch (err) {
-      // Error handled by hook
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'Discount': return '💰';
-      case 'Exclusive Access': return '🎫';
-      case 'Free Service': return '🎁';
-      case 'Priority': return '⭐';
-      default: return '🎯';
+      showToast('Failed to save benefit', 'error');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -131,12 +156,16 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
               {displayBenefits.map(benefit => (
                 <Card key={benefit.id} className="hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="text-3xl">{getTypeIcon(benefit.type)}</div>
                     <Badge variant={benefit.status === 'Active' ? 'success' : 'neutral'}>
                       {benefit.status}
                     </Badge>
                   </div>
                   <h3 className="font-bold text-lg text-slate-900 mb-2">{benefit.name}</h3>
+                  {benefit.bannerUrl && (
+                    <div className="mb-3 w-full h-48 overflow-hidden rounded-lg">
+                      <img src={benefit.bannerUrl} alt={benefit.name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
                   <p className="text-sm text-slate-600 mb-4">{benefit.description}</p>
 
                   <div className="space-y-2 mb-4">
@@ -230,6 +259,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         onClose={() => {
           setIsModalOpen(false);
           setSelectedBenefit(null);
+          setFormBanner(null);
         }}
         title={selectedBenefit ? 'Edit Benefit' : 'Create New Benefit'}
         size="lg"
@@ -243,6 +273,52 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
             defaultValue={selectedBenefit?.name}
             required
           />
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-700">Banner Image (5:3 Ratio Landscape)</label>
+            <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    setFormBanner(e.target.files[0]);
+                  }
+                }}
+                className="hidden"
+                id="banner-upload"
+              />
+              <label htmlFor="banner-upload" className="flex flex-col items-center cursor-pointer">
+                <ImageIcon size={24} className="text-slate-400 mb-2" />
+                <span className="text-sm font-medium text-slate-600">Click to upload banner image</span>
+                <span className="text-xs text-slate-400 mt-1">Recommended: 1200x720px (5:3)</span>
+              </label>
+
+              {(formBanner || selectedBenefit?.bannerUrl) && (
+                <div className="mt-4 flex items-center justify-between bg-white p-2 rounded border border-slate-100">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <ImageIcon size={16} className="text-blue-500" />
+                    <span className="text-xs text-slate-700 truncate">
+                      {formBanner ? formBanner.name : 'Current Banner'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormBanner(null);
+                      if (selectedBenefit) {
+                        // Optional: Clear selectedBenefit bannerUrl if they remove it
+                        // selectedBenefit.bannerUrl = undefined;
+                      }
+                    }}
+                    className="text-slate-400 hover:text-red-500 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           <Textarea
             name="description"
@@ -374,15 +450,17 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           />
 
           <div className="flex gap-3 pt-4">
-            <Button className="flex-1" type="submit">
-              {selectedBenefit ? 'Update Benefit' : 'Create Benefit'}
+            <Button className="flex-1" type="submit" disabled={isUploading}>
+              {isUploading ? 'Uploading...' : selectedBenefit ? 'Update Benefit' : 'Create Benefit'}
             </Button>
             <Button
               variant="ghost"
               type="button"
+              disabled={isUploading}
               onClick={() => {
                 setIsModalOpen(false);
                 setSelectedBenefit(null);
+                setFormBanner(null);
               }}
             >
               Cancel

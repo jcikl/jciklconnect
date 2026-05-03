@@ -22,7 +22,7 @@ export interface Advertisement {
   title: string;
   description: string;
   type: 'Banner' | 'Newsletter' | 'Event Sponsorship' | 'Social Media' | 'Website';
-  placement: 'Homepage' | 'Events Page' | 'Newsletter Header' | 'Newsletter Footer' | 'Sidebar' | 'Popup';
+  placement: ('Homepage' | 'Events Page' | 'Newsletter Header' | 'Newsletter Footer' | 'Sidebar' | 'Popup')[];
   targetAudience?: 'All Members' | 'Specific Tier' | 'Specific Role' | 'Custom';
   targetCriteria?: {
     tiers?: string[];
@@ -73,7 +73,7 @@ export class AdvertisementService {
           title: 'Tech Solutions Inc.',
           description: 'Premium IT services for JCI members',
           type: 'Banner',
-          placement: 'Homepage',
+          placement: ['Homepage'],
           targetAudience: 'All Members',
           imageUrl: 'https://via.placeholder.com/728x90',
           linkUrl: 'https://example.com',
@@ -91,9 +91,9 @@ export class AdvertisementService {
 
     try {
       const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'), orderBy('priority', 'desc'), orderBy('createdAt', 'desc'))
+        query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'))
       );
-      return snapshot.docs.map(doc => ({
+      const ads = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
@@ -101,6 +101,16 @@ export class AdvertisementService {
         createdAt: doc.data().createdAt?.toDate() || new Date(),
         updatedAt: doc.data().updatedAt?.toDate() || new Date(),
       })) as Advertisement[];
+      
+      // Sort in memory to avoid requiring a composite index
+      return ads.sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return (b.priority || 0) - (a.priority || 0);
+        }
+        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date();
+        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date();
+        return bDate.getTime() - aDate.getTime();
+      });
     } catch (error) {
       console.error('Error fetching advertisements:', error);
       throw error;
@@ -108,13 +118,14 @@ export class AdvertisementService {
   }
 
   // Get active advertisements for placement
-  static async getActiveAdvertisements(placement: Advertisement['placement']): Promise<Advertisement[]> {
+  static async getActiveAdvertisements(placement: string): Promise<Advertisement[]> {
     try {
       const now = new Date();
       const allAds = await this.getAllAdvertisements();
 
       return allAds.filter(ad => {
-        if (ad.placement !== placement) return false;
+        const placements = Array.isArray(ad.placement) ? ad.placement : [ad.placement];
+        if (!placements.includes(placement as any)) return false;
         if (ad.status !== 'Active') return false;
 
         const startDate = toDate(ad.startDate);

@@ -4,7 +4,7 @@ import {
   Calendar, Briefcase, Bell, Award, Sparkles, AlertTriangle, CheckCircle,
   TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
   CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift, ChevronDown, Search, LogOut,
-  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown
+  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, Save, RefreshCw, Edit3
 } from 'lucide-react';
 import { Card, StatCard, StatCardsContainer, Badge, Button, useToast } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
@@ -22,10 +22,18 @@ import { ActivityRecommendationService } from '../../services/activityRecommenda
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { MEMBER_TIERS, MEMBER_PRIVILEGES, BOUNTY_STATUS } from '../../config/constants';
 import { ContractService, CommitmentContract } from '../../services/contractService';
+import { PromotionService } from '../../services/promotionService';
+import { MembersService } from '../../services/membersService';
+import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 import type { Event } from '../../types';
 import { UserRole } from '../../types';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { EventDetailModal } from '../modules/EventsView';
 import { useState, useEffect } from 'react';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/pagination';
 
 /**
  * Competitive UI Helper Component: Elite Leaderboard
@@ -85,6 +93,7 @@ interface DashboardHomeProps {
   onOpenNotifications: () => void;
   onOpenSearch?: () => void;
   onNavigate?: (view: string) => void;
+  onEditProfile?: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
@@ -95,6 +104,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   onOpenNotifications,
   onOpenSearch,
   onNavigate,
+  onEditProfile,
   searchQuery,
   onSearchChange,
   scrollRef
@@ -118,7 +128,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const { showToast } = useToast();
   const { member, signOut } = useAuth();
   const { isBoard, isAdmin, isDeveloper, hasPermission, isOrganizationFinance, isActivityFinance, isOrganizationSecretary } = usePermissions();
-  const { events, loading: eventsLoading } = useEvents();
+  const { events, loading: eventsLoading, registerForEvent, markAttendance } = useEvents();
   const { projects, loading: projectsLoading } = useProjects();
   const { members, loading: membersLoading } = useMembers();
   const { nudges, dismissNudge } = useBehavioralNudging();
@@ -134,6 +144,29 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [eventTab, setEventTab] = useState<'upcoming' | 'past'>('upcoming');
   const [contracts, setContracts] = useState<CommitmentContract[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
+
+  // Promotion Progress state (for Probation members)
+  const [promotionProgress, setPromotionProgress] = useState<any>(null);
+  const [promoEditValues, setPromoEditValues] = useState<Record<string, string>>({});
+  const [promoSavingField, setPromoSavingField] = useState<string | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [showPromoModal, setShowPromoModal] = useState(false);
+  const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
+
+  const PROMO_FIELD_MAP: Record<string, 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted'> = {
+    'bod_meeting_attendance': 'bodMeetingAttended',
+    'event_organizing_committee': 'eventOrganizerParticipation',
+    'event_participation': 'eventParticipation',
+    'jci_inspire_completion': 'jciInspireCompleted'
+  };
+
+  const PROMO_PLACEHOLDER: Record<string, string> = {
+    'bod_meeting_attendance': 'e.g. 2026-03-15 BOD Meeting #3',
+    'event_organizing_committee': 'e.g. Charity Fundraiser 2026 - Logistics',
+    'event_participation': 'e.g. Event A, Event B (min 2 events, separated by commas)',
+    'jci_inspire_completion': 'e.g. JCIM Inspire 2026 OR NMO 2026'
+  };
 
   const handleRestrictedAction = (viewType: string) => {
     if (member?.role === UserRole.GUEST) {
@@ -142,6 +175,26 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       onNavigate?.(viewType);
     }
   };
+
+  // Load Homepage Advertisements
+  useEffect(() => {
+    const loadAds = async () => {
+      try {
+        const ads = await AdvertisementService.getActiveAdvertisements('Homepage');
+        setHomepageAds(ads);
+      } catch (err) {
+        console.error('Failed to load homepage ads', err);
+      }
+    };
+    loadAds();
+  }, []);
+
+  // Initial impression for the first ad
+  useEffect(() => {
+    if (homepageAds.length > 0 && homepageAds[0]?.id) {
+      AdvertisementService.recordImpression(homepageAds[0].id!);
+    }
+  }, [homepageAds.length]);
 
   // Load active commitments (Phase 3)
   useEffect(() => {
@@ -156,6 +209,49 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     };
     fetchContracts();
   }, [member]);
+
+  // Load Promotion Progress for Probation members
+  useEffect(() => {
+    if (!member || member.membershipType !== 'Probation') return;
+    const loadPromotion = async () => {
+      setPromoLoading(true);
+      try {
+        const progress = await PromotionService.getPromotionProgress(member.id);
+        setPromotionProgress(progress);
+        // Load existing edit values from member record
+        const memberData = await MembersService.getMemberById(member.id);
+        const pp = memberData?.promotionProgress || {};
+        setPromoEditValues({
+          'bod_meeting_attendance': pp.bodMeetingAttended || '',
+          'event_organizing_committee': pp.eventOrganizerParticipation || '',
+          'event_participation': pp.eventParticipation || '',
+          'jci_inspire_completion': pp.jciInspireCompleted || ''
+        });
+      } catch (err) {
+        console.error('Failed to load promotion progress:', err);
+      } finally {
+        setPromoLoading(false);
+      }
+    };
+    loadPromotion();
+  }, [member]);
+
+  const handleSavePromotionField = async (reqType: string) => {
+    if (!member) return;
+    const field = PROMO_FIELD_MAP[reqType];
+    if (!field) return;
+    setPromoSavingField(reqType);
+    try {
+      await PromotionService.savePromotionProgressField(member.id, field, promoEditValues[reqType] || '');
+      const progress = await PromotionService.getPromotionProgress(member.id);
+      setPromotionProgress(progress);
+      showToast('Progress saved! BOD will review your submission.', 'success');
+    } catch (err) {
+      showToast('Failed to save progress', 'error');
+    } finally {
+      setPromoSavingField(null);
+    }
+  };
 
   // Load member's event registrations (for guest dashboard: Activity Timeline + Upcoming Registered)
   useEffect(() => {
@@ -239,7 +335,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const renderHeader = () => (
     <div
-      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-2 sm:pb-2 lg:pb-2"
+      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-5 sm:px-8 text-white shadow-2xl relative -mt-4 -mx-5 sm:-mx-8 pb-4"
     >
       {/* Decorative Background Pattern */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
@@ -259,9 +355,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               />
               <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
             </div>
-            <div className="cursor-pointer group">
-              <div className="flex items-center space-x-1 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
+            <div className="cursor-pointer group" onClick={onEditProfile}>
+              <div className="flex items-center gap-1.5 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
                 <span>{member.name}</span>
+                <Edit3 size={14} className="text-white/50 group-hover:text-white transition-colors" />
               </div>
               <p className="font-medium text-sm tracking-wide text-blue-200">{member.role}</p>
             </div>
@@ -325,6 +422,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             <div
               className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
               onClick={() => {
+                if (topRecommendation.type === 'event') {
+                  const event = events.find(e => e.id === topRecommendation.itemId);
+                  if (event) {
+                    setSelectedEventForDetail(event);
+                    return;
+                  }
+                }
                 if (topRecommendation.actionUrl) {
                   const view = topRecommendation.actionUrl.replace('/', '').toUpperCase();
                   onNavigate?.(view);
@@ -362,6 +466,57 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   return (
     <div className="space-y-6">
       {renderHeader()}
+
+      {/* Homepage Advertisements Banner (Swiper) */}
+      {homepageAds.length > 0 && (
+        <div className="w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+          <Swiper
+            modules={[Autoplay, Pagination]}
+            spaceBetween={16}
+            slidesPerView={1.15}
+            breakpoints={{
+              640: { slidesPerView: 3.15 },
+              1024: { slidesPerView: 4.15 },
+            }}
+            autoplay={{ delay: 5000, disableOnInteraction: false }}
+            pagination={{ clickable: true, dynamicBullets: true }}
+            loop={homepageAds.length > 5}
+            className="w-full"
+            onSlideChange={(swiper) => {
+              if (homepageAds.length > 0) {
+                const currentAd = homepageAds[swiper.realIndex];
+                if (currentAd?.id) {
+                  AdvertisementService.recordImpression(currentAd.id);
+                }
+              }
+            }}
+          >
+            {homepageAds.map((ad, idx) => (
+              <SwiperSlide key={ad.id || idx}>
+                <div
+                  className="h-36 sm:h-40 w-full rounded-2xl overflow-hidden relative shadow-md cursor-pointer group transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+                  onClick={() => {
+                    if (ad.id) AdvertisementService.recordClick(ad.id);
+                    if (ad.linkUrl) window.open(ad.linkUrl, '_blank');
+                  }}
+                >
+                  <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
+                  {/* Overlay Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                  {/* Ad Tag */}
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-xs font-bold px-2 py-1 rounded-md text-slate-800 shadow-sm z-10">
+                    Partnership
+                  </div>
+                  {/* Content */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+                    <h3 className="text-white font-bold text-sm sm:text-base line-clamp-1">{ad.title}</h3>
+                  </div>
+                </div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </div>
+      )}
 
       {/* Horizontal Shortcuts Grid */}
       <div className="grid grid-cols-6 sm:grid-cols-6 gap-y-6 gap-x-4">
@@ -403,6 +558,44 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         </div>
       </div>
 
+      {/* Promotion Progress Card (Probation Members Only) — Minimalist */}
+      {member.membershipType === 'Probation' && (
+        <div
+          className="flex items-center gap-4 p-4 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-white cursor-pointer hover:shadow-md transition-all group"
+          onClick={() => setShowPromoModal(true)}
+        >
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md flex-shrink-0">
+            <TrendingUp size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <h3 className="font-bold text-sm text-slate-900">Promotion Progress</h3>
+              <span className="text-xs font-bold text-amber-700">
+                {promoLoading ? '...' : `${promotionProgress?.requirements?.filter((r: any) => r.isCompleted).length || 0}/4 completed`}
+              </span>
+            </div>
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${promotionProgress?.overallProgress || 0}%` }}
+                transition={{ duration: 1, ease: 'easeOut' }}
+                className={`h-full rounded-full ${promotionProgress?.isEligibleForPromotion
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+                  : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                  }`}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="flex-shrink-0 text-xs h-8 px-4 bg-amber-500 hover:bg-amber-600 border-none text-white font-bold"
+            onClick={(e) => { e.stopPropagation(); setShowPromoModal(true); }}
+          >
+            Update
+          </Button>
+        </div>
+      )}
+
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card noPadding>
@@ -442,7 +635,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     const isRecommended = recommendedEvents.some(re => re.id === event.id);
                     const isRegistered = myRegistrationEventIds.includes(event.id!);
                     return (
-                      <div key={event.id} className="flex items-center space-x-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors" onClick={() => onNavigate?.('EVENTS')}>
+                      <div key={event.id} className="flex items-center space-x-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors" onClick={() => setSelectedEventForDetail(event)}>
                         <div className={`w-12 h-12 ${eventTab === 'upcoming' ? 'bg-blue-50 text-jci-blue' : 'bg-slate-100 text-slate-500'} rounded-lg flex flex-col items-center justify-center flex-shrink-0 shadow-sm border border-slate-100`}>
                           <span className="text-[10px] font-bold uppercase">{new Date(event.date).toLocaleString('default', { month: 'short' })}</span>
                           <span className="text-lg font-bold leading-none">{new Date(event.date).getDate()}</span>
@@ -459,7 +652,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                             <Badge variant="success" className="px-2 py-0.5 text-[10px]">Registered</Badge>
                           ) : (
                             eventTab === 'upcoming' && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 px-2" onClick={(e) => { e.stopPropagation(); onNavigate?.('EVENTS'); }}>
+                              <Button size="sm" variant="outline" className="text-xs h-7 px-2" onClick={(e) => { e.stopPropagation(); setSelectedEventForDetail(event); }}>
                                 Register
                               </Button>
                             )
@@ -600,34 +793,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <MemberGrowthChart members={members} />
               )}
 
-              <Card title="Priority Actions (Automated)" className="border-l-4 border-l-amber-500">
-                {unreadNotifications.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <CheckCircle size={32} className="mx-auto mb-2 text-green-500" />
-                    <p className="text-sm">All caught up! No pending actions.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {unreadNotifications.slice(0, 5).map(note => (
-                      <div key={note.id} className="flex items-start justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                        <div className="flex items-start space-x-3 flex-1">
-                          {note.type === 'info' ? <Sparkles size={18} className="text-purple-500 mt-1" /> : <AlertTriangle size={18} className="text-amber-500 mt-1" />}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-sm text-slate-900">{note.title}</h4>
-                            <p className="text-sm text-slate-600">{note.message}</p>
-                          </div>
-                        </div>
-                        <Button size="sm" variant="outline" className="text-xs h-8 flex-shrink-0" onClick={() => onOpenNotifications()}>View</Button>
-                      </div>
-                    ))}
-                    {unreadNotifications.length > 5 && (
-                      <Button variant="ghost" className="w-full text-sm" onClick={onOpenNotifications}>
-                        View All {unreadNotifications.length} Notifications
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </Card>
+
             </div>
 
             <div className="space-y-6">
@@ -666,6 +832,138 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Promotion Progress Modal / Bottom Drawer */}
+      {showPromoModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center md:justify-center" onClick={() => setShowPromoModal(false)}>
+          <div className="bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[85vh] md:max-h-[90vh] flex flex-col md:mx-4 animate-slide-up md:animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            {/* Drag Handle (mobile only) */}
+            <div className="flex justify-center pt-3 pb-1 md:hidden">
+              <div className="w-10 h-1 rounded-full bg-slate-300"></div>
+            </div>
+            {/* Header */}
+            <div className="px-5 pt-2 pb-4 md:p-5 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md">
+                  <TrendingUp size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">Update Promotion Progress</h3>
+                  <p className="text-xs text-slate-500">Fill in and save each requirement</p>
+                </div>
+              </div>
+              <button onClick={() => setShowPromoModal(false)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Progress Summary */}
+              {promotionProgress && (
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-slate-700">
+                    {promotionProgress.requirements?.filter((r: any) => r.isCompleted).length || 0} of 4 completed
+                  </span>
+                  <span className="text-sm font-bold text-amber-600">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
+                </div>
+              )}
+              {promotionProgress && (
+                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-4">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${promotionProgress.isEligibleForPromotion
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+                      : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                      }`}
+                    style={{ width: `${promotionProgress.overallProgress || 0}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Requirements */}
+              {promoLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <RefreshCw className="animate-spin text-amber-500" size={24} />
+                </div>
+              ) : promotionProgress?.requirements ? (
+                promotionProgress.requirements.map((req: any) => (
+                  <div
+                    key={req.id}
+                    className={`p-4 rounded-xl border-2 transition-all ${req.isCompleted
+                      ? 'border-green-200 bg-green-50/60'
+                      : 'border-slate-200 bg-white'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`${req.isCompleted ? 'text-green-500' : 'text-slate-300'}`}>
+                          {req.isCompleted ? <CheckCircle size={18} /> : <Clock size={18} />}
+                        </div>
+                        <span className="font-semibold text-sm text-slate-900">{req.name}</span>
+                      </div>
+                      {req.isCompleted && (
+                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3 pl-6">{req.description}</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
+                        placeholder={PROMO_PLACEHOLDER[req.type] || 'Enter details...'}
+                        value={promoEditValues[req.type] || ''}
+                        onChange={(e) => setPromoEditValues(prev => ({ ...prev, [req.type]: e.target.value }))}
+                      />
+                      <button
+                        className={`rounded-lg border transition-all ${promoEditValues[req.type]?.trim()
+                          ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-400 border-slate-200'
+                          }`}
+                        onClick={() => handleSavePromotionField(req.type)}
+                        disabled={promoSavingField === req.type}
+                        title="Save"
+                      >
+                        {promoSavingField === req.type ? (
+                          <RefreshCw size={14} className="animate-spin" />
+                        ) : (
+                          <Save size={14} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-sm">
+                  <AlertTriangle size={24} className="mx-auto mb-2" />
+                  Unable to load promotion requirements.
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
+              <p className="text-[11px] text-slate-500 text-center">
+                Your submissions will be reviewed and approved by the <strong>Board of Directors</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Event Detail Modal */}
+      {selectedEventForDetail && (
+        <EventDetailModal
+          event={events.find(e => e.id === selectedEventForDetail.id) || selectedEventForDetail}
+          onClose={() => setSelectedEventForDetail(null)}
+          onRegister={() => {
+            if (member) registerForEvent(selectedEventForDetail.id!, member.id);
+          }}
+          onCheckIn={() => {
+            if (member) markAttendance(selectedEventForDetail.id!, member.id);
+          }}
+          member={member}
+          members={members}
+        />
       )}
     </div>
   );

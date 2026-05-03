@@ -20,6 +20,11 @@ import { useCommunication } from '../../hooks/useCommunication';
 import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/pagination';
+import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 
 type MemberWithDues = Member & { duesStatus: string; duesYear: number; duesPaidDate?: string };
 
@@ -109,6 +114,11 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
     projectPredictions: [],
   });
   const [loadingAI, setLoadingAI] = useState(false);
+  const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
+
+  useEffect(() => {
+    AdvertisementService.getActiveAdvertisements('Homepage').then(setHomepageAds).catch(console.error);
+  }, []);
 
   const handleGenerateReport = async (reportName: string) => {
     try {
@@ -569,6 +579,58 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
   return (
     <div className="space-y-6 pb-24">
       {renderHeader()}
+
+      {/* Homepage Advertisements Banner (Swiper) */}
+      {homepageAds.length > 0 && (
+        <div className="w-full -mx-4 px-4 sm:mx-0 sm:px-0 mt-6">
+          <Swiper
+            modules={[Autoplay, Pagination]}
+            spaceBetween={16}
+            slidesPerView={1.15}
+            breakpoints={{
+              640: { slidesPerView: 3.15 },
+              1024: { slidesPerView: 4.15 },
+            }}
+            autoplay={{ delay: 5000, disableOnInteraction: false }}
+            pagination={{ clickable: true, dynamicBullets: true }}
+            loop={homepageAds.length > 5}
+            className="w-full"
+            onSlideChange={(swiper) => {
+              if (homepageAds.length > 0) {
+                const activeIndex = swiper.realIndex;
+                const ad = homepageAds[activeIndex];
+                if (ad && ad.id) {
+                  AdvertisementService.recordImpression(ad.id);
+                }
+              }
+            }}
+          >
+            {homepageAds.map((ad, idx) => (
+              <SwiperSlide key={ad.id || idx}>
+                <div
+                  className="h-36 sm:h-40 w-full rounded-2xl overflow-hidden relative shadow-md cursor-pointer group transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+                  onClick={() => {
+                    if (ad.id) AdvertisementService.recordClick(ad.id);
+                    if (ad.linkUrl) window.open(ad.linkUrl, '_blank');
+                  }}
+                >
+                  <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
+                  {/* Overlay Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                  {/* Ad Tag */}
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-xs font-bold px-2 py-1 rounded-md text-slate-800 shadow-sm z-10">
+                    Partnership
+                  </div>
+                  {/* Content */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+                    <h3 className="text-white font-bold text-sm sm:text-base line-clamp-1">{ad.title}</h3>
+                  </div>
+                </div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        </div>
+      )}
 
       {/* Horizontal Circular Shortcuts (5x2) */}
       <div className="grid grid-cols-5 gap-y-6">

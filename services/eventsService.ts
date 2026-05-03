@@ -51,6 +51,8 @@ export class EventsService {
       status: data.status ?? 'Upcoming',
       predictedDemand: data.predictedDemand ?? undefined,
       location: data.location ?? '',
+      price: data.price ?? undefined,
+      imageUrl: data.imageUrl ?? undefined,
       organizerId: data.organizerId ?? undefined,
       registeredMembers: data.registeredMembers as string[] ?? [],
       committee: data.committee as any[] ?? undefined,

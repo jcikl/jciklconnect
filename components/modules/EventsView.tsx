@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff } from 'lucide-react';
+import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info } from 'lucide-react';
 import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useEvents } from '../../hooks/useEvents';
@@ -189,7 +189,7 @@ const EventRow: React.FC<{
           </div>
           <div className="flex items-center gap-1 min-w-0">
             <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-            <span className="truncate">{event.location}</span>
+            <span className="truncate">{event.location || 'TBA'}</span>
           </div>
           <div className="flex items-center gap-1">
             <Users size={12} className="text-slate-400" />
@@ -216,7 +216,7 @@ const EventRow: React.FC<{
 }
 
 // Event Detail Modal with Budget Management
-interface EventDetailModalProps {
+export interface EventDetailModalProps {
   event: Event;
   onClose: () => void;
   onRegister: () => void;
@@ -225,7 +225,7 @@ interface EventDetailModalProps {
   members: Member[];
 }
 
-const EventDetailModal: React.FC<EventDetailModalProps> = ({
+export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   event,
   onClose,
   onRegister,
@@ -239,6 +239,7 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [updatingRegId, setUpdatingRegId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
@@ -317,124 +318,266 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
     }
   };
 
+  const date = new Date(event.date);
+  const isRegistered = member && event.registeredMembers?.includes(member.id);
+  const attendancePercent = event.maxAttendees ? Math.round(((event.attendees || 0) / event.maxAttendees) * 100) : 0;
+
   return (
     <>
-      <Modal isOpen={true} onClose={onClose} title={event.title} size="lg" drawerOnMobile>
-        <Tabs
-          tabs={availableTabs}
-          activeTab={
-            activeTab === 'details' ? 'Event Details' :
-              activeTab === 'participants' ? '参与名单' : 'Feedback'
+      <Modal
+        isOpen={true}
+        onClose={onClose}
+        title={null}
+        size="lg"
+        drawerOnMobile
+        mobileHeight={isExpanded ? "h-screen" : "h-[80vh] md:h-auto"}
+        scrollInBody={true}
+        onScroll={(e) => {
+          const scrollTop = e.currentTarget.scrollTop;
+          if (scrollTop > 10 && !isExpanded) {
+            setIsExpanded(true);
+          } else if (scrollTop <= 0 && isExpanded) {
+            setIsExpanded(false);
           }
-          onTabChange={(tab) => {
-            if (tab === 'Event Details') setActiveTab('details');
-            else if (tab === '参与名单') setActiveTab('participants');
-            else setActiveTab('feedback');
-          }}
-        />
-
-        <div className="mt-6">
-          {activeTab === 'details' && (
-            <div className="space-y-4">
-              <div>
-                {event.description && (
-                  <p className="text-sm text-slate-500 mb-2">{event.description}</p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="neutral">{event.type}</Badge>
-                  <Badge variant={
-                    event.status === 'Upcoming' ? 'success' :
-                      event.status === 'Completed' ? 'info' :
-                        'neutral'
-                  }>
-                    {event.status}
-                  </Badge>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Clock size={16} className="text-slate-400" />
-                  <span>{new Date(event.date).toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-slate-400" />
-                  <span>{event.location}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-slate-400" />
-                  <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
-                </div>
-              </div>
-              {member && event.status === 'Upcoming' && (
-                <div className="pt-4 flex gap-3 border-t">
-                  <Button
-                    className="flex-1"
-                    variant={event.registeredMembers?.includes(member.id) ? "success" : "primary"}
-                    disabled={event.registeredMembers?.includes(member.id)}
-                    onClick={onRegister}
-                  >
-                    {event.registeredMembers?.includes(member.id) ? 'Registered' : 'Register'}
-                  </Button>
-                </div>
-              )}
+        }}
+        className="premium-event-modal"
+        footerClassName="flex-none p-6 bg-white border-t border-slate-50 rounded-t-[40px] shadow-[0_-20px_50px_-12px_rgba(0,0,0,0.15)] z-30 pb-safe"
+        footer={activeTab === 'details' ? (
+          <div className="flex items-center justify-between gap-4 w-full">
+            <div className="flex flex-col">
+              <span className="text-2xl font-black text-slate-900 leading-none">
+                {event.price ? `RM ${event.price}` : 'FREE'}
+              </span>
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">per person</span>
             </div>
-          )}
-
-          {activeTab === 'participants' && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-500">报名/缴费/签到名单与状态一致可查（Story 8.1）</p>
-              {loadingParticipants ? (
-                <p className="text-slate-500">加载中…</p>
-              ) : participations.length === 0 ? (
-                <p className="text-slate-500">暂无报名记录</p>
+            <Button
+              className={`flex-1 max-w-[220px] h-14 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${isRegistered
+                ? 'bg-green-500 text-white hover:bg-green-600 shadow-green-100'
+                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+                }`}
+              disabled={isRegistered || event.status === 'Completed' || event.status === 'Cancelled'}
+              onClick={onRegister}
+            >
+              {event.status === 'Completed' ? (
+                <span>Event Ended</span>
+              ) : event.status === 'Cancelled' ? (
+                <span>Cancelled</span>
+              ) : isRegistered ? (
+                <>
+                  <CheckCircle size={20} className="stroke-[3]" />
+                  <span>Registered</span>
+                </>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead>
-                      <tr>
-                        <th className="py-2 pr-2">会员</th>
-                        <th className="py-2 pr-2">状态</th>
-                        <th className="py-2 pr-2">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {participations.map((r) => {
-                        const mem = members.find((m) => m.id === r.memberId);
-                        const statusLabel = r.status === 'registered' ? '报名' : r.status === 'paid' ? '已缴费' : '已签到';
-                        return (
-                          <tr key={r.id}>
-                            <td className="py-2 pr-2">{mem?.name ?? r.memberId}</td>
-                            <td className="py-2 pr-2">
-                              <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'}>{statusLabel}</Badge>
-                            </td>
-                            <td className="py-2 pr-2 flex gap-1">
-                              {r.status === 'registered' && (
-                                <Button size="sm" variant="outline" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(r)}>标记已缴费</Button>
-                              )}
-                              {(r.status === 'registered' || r.status === 'paid') && (
-                                <Button size="sm" variant="outline" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(r)}>标记已签到</Button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <CheckCircle size={20} className="stroke-[3]" />
+                  <span>Register Now</span>
+                </>
               )}
-            </div>
-          )}
-
-          {activeTab === 'feedback' && (
-            <EventFeedbackTab
-              event={event}
-              feedback={eventFeedback}
-              loading={loadingFeedback}
-              onRefresh={loadEventFeedback}
-              onSubmitFeedback={() => setIsFeedbackModalOpen(true)}
+            </Button>
+          </div>
+        ) : null}
+      >
+        <div className="-m-4 md:-m-6 relative">
+          {/* Hero Image Section */}
+          <div
+            className="relative h-64 md:h-80 w-full overflow-hidden cursor-pointer"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            <img
+              src={event.imageUrl || "https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?auto=format&fit=crop&q=80"}
+              alt={event.title}
+              className="w-full h-full object-cover"
             />
-          )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+
+            {/* Top Bar Controls */}
+            <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
+              <button
+                onClick={onClose}
+                className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <button
+                className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all"
+              >
+                <Share2 size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Content Body - Overlapping Card Style */}
+          <div className="relative bg-white rounded-t-[32px] -mt-10 px-6 pt-8 pb-10 min-h-[400px]">
+            {/* Header Info */}
+            <div>
+              <Badge variant="jci" className="bg-blue-50 text-jci-blue border-none px-3 py-1 text-[11px] font-bold">
+                {event.type || 'Event'}
+              </Badge>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">
+                {event.title}
+              </h2>
+            </div>
+
+            {/* Tabs for Committee/Feedback */}
+            {availableTabs.length > 1 && (
+              <div>
+                <Tabs
+                  tabs={availableTabs}
+                  activeTab={
+                    activeTab === 'details' ? 'Event Details' :
+                      activeTab === 'participants' ? '参与名单' : 'Feedback'
+                  }
+                  onTabChange={(tab) => {
+                    if (tab === 'Event Details') setActiveTab('details');
+                    else if (tab === '参与名单') setActiveTab('participants');
+                    else setActiveTab('feedback');
+                  }}
+                  className="border-none"
+                />
+              </div>
+            )}
+
+            {activeTab === 'details' && (
+              <div className="space-y-3 animate-fade-in">
+                {/* Details Card */}
+                <div className="bg-white border border-slate-100 rounded-[24px] shadow-sm overflow-hidden">
+                  <div className="divide-y divide-slate-50">
+                    {/* Date & Time */}
+                    <div className="flex items-center gap-4 px-4 py-2">
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue">
+                        <Calendar size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
+                        <p className="text-sm font-bold text-slate-800">
+                          {date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} • {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Location */}
+                    <div className="flex items-center gap-4 px-4 py-2">
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue">
+                        <MapPin size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Location</p>
+                        <p className="text-sm font-bold text-slate-800 truncate">{event.location || 'TBA (To Be Announced)'}</p>
+                      </div>
+                    </div>
+
+                    {/* Price (Details card version) */}
+                    <div className="flex items-center gap-4 px-4 py-2">
+                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue">
+                        <Tag size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Price</p>
+                        <p className="text-sm font-bold text-slate-800">
+                          {event.price ? `RM ${event.price}` : 'FREE'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* About Section */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <Info size={18} className="text-jci-blue" />
+                    About
+                  </h3>
+                  <div className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+                    {event.description || "No description provided for this event. Join us to find out more!"}
+                  </div>
+                </div>
+
+                {/* Attendance Section */}
+                <div className="bg-slate-50 rounded-3xl p-5 border border-slate-100">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight">Attendance</h3>
+                    <span className="text-sm font-black text-jci-blue">
+                      {event.attendees || 0}/{event.maxAttendees || '∞'}
+                    </span>
+                  </div>
+                  <div className="w-full h-3 bg-white rounded-full overflow-hidden border border-slate-200 p-0.5 mb-2">
+                    <div
+                      style={{ width: `${Math.min(100, attendancePercent)}%` }}
+                      className="h-full bg-jci-blue rounded-full shadow-[0_0_10px_rgba(0,151,215,0.2)]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {attendancePercent}% of spots filled • by JCI Kuala Lumpur
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'participants' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 mb-4">
+                  <p className="text-xs text-blue-700 font-medium flex items-center gap-2">
+                    <Users size={14} />
+                    Committee Access: Track registrations and payments.
+                  </p>
+                </div>
+                {loadingParticipants ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="animate-spin text-jci-blue" size={24} />
+                  </div>
+                ) : participations.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400">
+                    <Users size={48} className="mx-auto mb-3 opacity-20" />
+                    <p className="text-sm">No registrations yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {participations.map((r) => {
+                      const mem = members.find((m) => m.id === r.memberId);
+                      return (
+                        <div key={r.id} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                              <Users size={18} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">{mem?.name ?? 'Unknown Member'}</p>
+                              <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'} className="text-[10px] mt-1">
+                                {r.status === 'registered' ? 'Registered' : r.status === 'paid' ? 'Paid' : 'Checked In'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            {r.status === 'registered' && (
+                              <Button size="sm" variant="outline" className="text-[10px] h-8" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(r)}>Mark Paid</Button>
+                            )}
+                            {(r.status === 'registered' || r.status === 'paid') && (
+                              <Button size="sm" variant="outline" className="text-[10px] h-8" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(r)}>Check In</Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'feedback' && (
+              <div className="animate-fade-in">
+                <EventFeedbackTab
+                  event={event}
+                  feedback={eventFeedback}
+                  loading={loadingFeedback}
+                  onRefresh={loadEventFeedback}
+                  onSubmitFeedback={() => setIsFeedbackModalOpen(true)}
+                />
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Floating Action Footer (Integrated into Modal Footer) */}
       </Modal>
 
       {isFeedbackModalOpen && (
@@ -451,7 +594,7 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
 };
 
 // Event Budget Tab Component
-interface EventBudgetTabProps {
+export interface EventBudgetTabProps {
   event: Event;
   budget: EventBudget | null;
   loading: boolean;
@@ -459,7 +602,7 @@ interface EventBudgetTabProps {
   onEdit: () => void;
 }
 
-const EventBudgetTab: React.FC<EventBudgetTabProps> = ({
+export const EventBudgetTab: React.FC<EventBudgetTabProps> = ({
   event,
   budget,
   loading,
@@ -666,7 +809,7 @@ const EventBudgetEditModal: React.FC<EventBudgetEditModalProps> = ({
 };
 
 // Event Feedback Tab Component
-interface EventFeedbackTabProps {
+export interface EventFeedbackTabProps {
   event: Event;
   feedback: EventFeedbackSummary | null;
   loading: boolean;
@@ -674,7 +817,7 @@ interface EventFeedbackTabProps {
   onSubmitFeedback: () => void;
 }
 
-const EventFeedbackTab: React.FC<EventFeedbackTabProps> = ({
+export const EventFeedbackTab: React.FC<EventFeedbackTabProps> = ({
   event,
   feedback,
   loading,
@@ -800,12 +943,12 @@ const EventFeedbackTab: React.FC<EventFeedbackTabProps> = ({
 };
 
 // Event Feedback Modal Component
-interface EventFeedbackModalProps {
+export interface EventFeedbackModalProps {
   event: Event;
   onClose: () => void;
 }
 
-const EventFeedbackModal: React.FC<EventFeedbackModalProps> = ({ event, onClose }) => {
+export const EventFeedbackModal: React.FC<EventFeedbackModalProps> = ({ event, onClose }) => {
   const { member } = useAuth();
   const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);

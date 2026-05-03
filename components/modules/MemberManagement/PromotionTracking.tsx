@@ -23,8 +23,8 @@ const REQUIREMENT_FIELD_MAP: Record<string, 'bodMeetingAttended' | 'eventOrganiz
 const REQUIREMENT_PLACEHOLDER: Record<string, string> = {
   'bod_meeting_attendance': 'e.g. 2026-03-15 BOD Meeting #3',
   'event_organizing_committee': 'e.g. Charity Fundraiser 2026 - Logistics',
-  'event_participation': 'e.g. Leadership Training Workshop',
-  'jci_inspire_completion': 'e.g. JCIM Inspire 2026 - Completed'
+  'event_participation': 'e.g. Event A, Event B (Min 2 events)',
+  'jci_inspire_completion': 'e.g. JCIM Inspire OR NMO'
 };
 
 export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {

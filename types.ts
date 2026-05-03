@@ -540,6 +540,8 @@ export interface Event {
   status: 'Upcoming' | 'Completed' | 'Cancelled';
   predictedDemand?: 'Low' | 'Medium' | 'High'; // AI Feature
   location: string;
+  price?: number; // Optional price for paid events
+  imageUrl?: string; // Optional hero image URL
   /** 活动负责人/筹委会员 ID（选会员带出，Story 3.2） */
   organizerId?: string | null;
   /** List of registered member IDs (for UI checking) */

@@ -278,7 +278,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
         onScroll={handleScroll}
         className="overflow-x-auto no-scrollbar scroll-smooth"
       >
-        <nav className="-mb-px flex space-x-8 px-2" aria-label="Tabs">
+        <nav className="-mb-1px flex space-x-8 px-2 mb-2" aria-label="Tabs">
           {tabs.map((tab) => {
             const id = typeof tab === 'string' ? tab : tab.id;
             const label = typeof tab === 'string' ? tab : tab.label;
@@ -352,6 +352,14 @@ interface ModalProps {
   footer?: React.ReactNode;
   /** Optional header content */
   header?: React.ReactNode;
+  /** Custom class name for the modal container */
+  className?: string;
+  /** Custom class name for the footer wrapper */
+  footerClassName?: string;
+  /** Initial height on mobile for drawer/bottomSheet */
+  mobileHeight?: string;
+  /** Scroll event handler */
+  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -366,6 +374,10 @@ export const Modal: React.FC<ModalProps> = ({
   variant = 'default',
   footer,
   header,
+  className,
+  footerClassName,
+  mobileHeight,
+  onScroll,
 }) => {
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -412,49 +424,57 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         className={`
-          bg-white shadow-2xl w-full overflow-hidden flex flex-col max-h-screen md:max-h-[90vh] md:rounded-xl
+          bg-white shadow-2xl w-full overflow-hidden flex flex-col md:rounded-xl transition-all duration-300 ease-in-out
           ${(bottomSheet || drawerOnMobile)
             ? (bottomSheet
-              ? 'fixed bottom-0 rounded-t-2xl md:bottom-4 md:rounded-2xl animate-slide-up ' + sizeClasses[size]
-              : 'fixed bottom-0 rounded-t-2xl md:relative md:rounded-xl animate-slide-up ' + sizeClasses[size])
-            : 'rounded-xl max-w-[95vw] animate-scale-in ' + sizeClasses[size]}
+              ? `fixed bottom-0 rounded-t-[32px] md:bottom-4 md:rounded-2xl animate-slide-up ${mobileHeight || 'max-h-[90vh]'} ${sizeClasses[size]}`
+              : `fixed bottom-0 rounded-t-[32px] md:relative md:rounded-xl animate-slide-up ${mobileHeight || 'max-h-[90vh]'} ${sizeClasses[size]}`)
+            : `rounded-xl max-w-[95vw] max-h-[90vh] animate-scale-in ${sizeClasses[size]}`}
+          ${className || ''}
         `}
         style={!drawerOnMobile ? { maxWidth: size === 'sm' ? '448px' : size === 'md' ? '512px' : undefined } : {}}
       >
-        <div className={`
-          flex justify-between items-center sticky top-0 z-10 
-          ${variant === 'jci'
-            ? 'flex-none bg-gradient-to-r from-jci-blue via-sky-600 to-blue-700 px-6 py-5 text-white shadow-md'
-            : 'p-4 border-b border-slate-100 bg-slate-50'}
-        `}>
-          {(bottomSheet || drawerOnMobile) && (
-            <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-slate-300 rounded-full md:hidden" />
-          )}
-          <div id="modal-title" className={variant === 'jci' ? 'flex-1' : 'font-bold text-slate-800'}>
-            {typeof title === 'string' ? (
-              <h3 className={variant === 'jci' ? 'text-xl font-bold uppercase tracking-tight' : ''}>{title}</h3>
-            ) : (
-              title
-            )}
+        {(bottomSheet || drawerOnMobile) && (
+          <div className="absolute top-0 left-0 right-0 h-10 flex items-center justify-center z-50 pointer-events-none md:hidden">
+            <div className="w-12 h-1.5 bg-black/10 rounded-full" />
           </div>
-          <button
-            onClick={onClose}
-            className={`
-              rounded transition-all duration-200 button-press
-              ${variant === 'jci'
-                ? 'text-white/80 hover:text-white hover:bg-white/20'
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'}
-            `}
-            aria-label="Close"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div className={`p-4 md:p-6 flex-1 min-h-0 flex flex-col ${scrollInBody ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        )}
+        {title !== null && (
+          <div className={`
+            flex justify-between items-center sticky top-0 z-10 
+            ${variant === 'jci'
+              ? 'flex-none bg-gradient-to-r from-jci-blue via-sky-600 to-blue-700 px-6 py-5 text-white shadow-md'
+              : 'p-4 border-b border-slate-100 bg-slate-50'}
+          `}>
+            <div id="modal-title" className={variant === 'jci' ? 'flex-1' : 'font-bold text-slate-800'}>
+              {typeof title === 'string' ? (
+                <h3 className={variant === 'jci' ? 'text-xl font-bold uppercase tracking-tight' : ''}>{title}</h3>
+              ) : (
+                title
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className={`
+                rounded transition-all duration-200 button-press
+                ${variant === 'jci'
+                  ? 'text-white/80 hover:text-white hover:bg-white/20'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'}
+              `}
+              aria-label="Close"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+        )}
+        <div
+          className={`p-4 md:p-6 flex-1 min-h-0 flex flex-col ${scrollInBody ? 'overflow-y-auto' : 'overflow-hidden'}`}
+          onScroll={onScroll}
+        >
           {children}
         </div>
         {footer && (
-          <div className="flex-none p-4 border-t border-slate-100 bg-slate-50/50 backdrop-blur-sm">
+          <div className={footerClassName || "flex-none p-4 border-t border-slate-100 bg-slate-50/50 backdrop-blur-sm"}>
             {footer}
           </div>
         )}
