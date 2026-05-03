@@ -125,51 +125,57 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-          <div className="sm:mx-auto sm:w-full sm:max-w-md">
-            <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-              <div className="text-center">
-                <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-                <h2 className="text-lg font-medium text-gray-900 mb-2">
-                  出现了一些问题
-                </h2>
-                <p className="text-sm text-gray-600 mb-6">
-                  应用程序遇到了意外错误。我们已经记录了这个问题，正在努力修复。
-                </p>
+        <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center p-6">
+          <div className="w-full max-w-md bg-white rounded-[40px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden">
+            <div className="p-8 sm:p-10 text-center">
+              {/* Error Illustration / Icon */}
+              <div className="w-20 h-20 bg-red-50 rounded-[24px] flex items-center justify-center mx-auto mb-8 shadow-sm border border-red-100/50">
+                <AlertTriangle className="h-10 w-10 text-red-500" />
+              </div>
 
-                {this.state.errorId && (
-                  <div className="bg-gray-100 rounded-md p-3 mb-6">
-                    <p className="text-xs text-gray-500">
-                      错误ID: <code className="font-mono">{this.state.errorId}</code>
-                    </p>
-                  </div>
-                )}
+              <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">
+                抱歉，出现了一些问题
+              </h2>
+              <p className="text-slate-500 text-sm leading-relaxed mb-8">
+                应用程序遇到了意外错误。这可能是暂时的系统波动，我们已经记录了此问题并正在努力修复。
+              </p>
 
-                <div className="space-y-3">
-                  <button
-                    onClick={this.handleRetry}
-                    className="w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    重试
-                  </button>
+              {this.state.errorId && (
+                <div className="bg-slate-50 rounded-2xl p-4 mb-8 border border-slate-100 flex items-center justify-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    错误编号: <span className="text-slate-800 font-mono">{this.state.errorId}</span>
+                  </p>
+                </div>
+              )}
 
+              <div className="space-y-4">
+                <button
+                  onClick={this.handleRetry}
+                  className="w-full h-14 bg-jci-blue text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-[0_12px_24px_-8px_rgba(0,151,215,0.4)] hover:bg-blue-600 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  立即重试
+                </button>
+
+                <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={this.handleReload}
-                    className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="h-12 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                   >
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                    <RefreshCw className="w-4 h-4" />
                     刷新页面
                   </button>
 
                   <button
                     onClick={this.handleGoHome}
-                    className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="h-12 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                   >
-                    <Home className="w-4 h-4 mr-2" />
+                    <Home className="w-4 h-4" />
                     返回首页
                   </button>
                 </div>
+              </div>
 
                 {(this.props.showDetails || process.env.NODE_ENV === 'development') && (
                   <details className="mt-6 text-left">
@@ -214,8 +220,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             </div>
           </div>
-        </div>
-      );
+        );
     }
 
     return this.props.children;
