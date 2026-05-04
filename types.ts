@@ -427,6 +427,7 @@ export interface BusinessProfile {
   globalNetworkEnabled?: boolean;
   acceptsInternationalBusiness?: 'Yes' | 'No' | 'Willing to Explore' | boolean;
   internationalPartnershipTypes?: string[];
+  interestedIndustries?: string[]; // Industries this business is interested in partnering with
   jciChapters?: string[]; // JCI chapters this business is connected with
 }
 

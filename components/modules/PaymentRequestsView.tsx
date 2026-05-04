@@ -690,9 +690,25 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           <p className="text-slate-500">Submit claims and manage reimbursement requests</p>
         </div>
         {member && (
-          <Button onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}>
-            <Plus size={18} className="mr-1" /> New Payment Request
-          </Button>
+          <>
+            {/* Desktop Button */}
+            <div className="hidden sm:block">
+              <Button onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}>
+                <Plus size={18} className="mr-1" /> New Payment Request
+              </Button>
+            </div>
+
+            {/* Mobile Floating Action Button (FAB) */}
+            <div className="sm:hidden fixed bottom-24 right-6 z-40">
+              <button
+                onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}
+                className="w-14 h-14 rounded-full bg-jci-blue text-white shadow-[0_8px_30px_rgb(0,151,215,0.4)] flex items-center justify-center hover:scale-110 active:scale-90 transition-all duration-200 border-none outline-none"
+                aria-label="New Payment Request"
+              >
+                <Plus size={28} />
+              </button>
+            </div>
+          </>
         )}
       </div>
 
@@ -899,18 +915,16 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                 <button
                   type="button"
                   onClick={() => { setFormCategory('administrative'); setFormActivityId(''); }}
-                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${
-                    formCategory === 'administrative' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${formCategory === 'administrative' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   Administrative
                 </button>
                 <button
                   type="button"
                   onClick={() => { setFormCategory('projects_activities'); setFormActivityId(''); }}
-                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${
-                    formCategory === 'projects_activities' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${formCategory === 'projects_activities' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   Projects & Activities
                 </button>

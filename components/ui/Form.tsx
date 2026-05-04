@@ -115,8 +115,8 @@ export const Select: React.FC<SelectProps> = ({ label, options, error, helperTex
     if (buttonRef.current && isOpen) {
       const rect = buttonRef.current.getBoundingClientRect();
       setDropdownPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
+        top: rect.bottom,
+        left: rect.left,
         width: rect.width
       });
     }
@@ -199,7 +199,7 @@ export const Select: React.FC<SelectProps> = ({ label, options, error, helperTex
       {isOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[9999] mt-1 rounded-lg border border-slate-200 bg-white shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[40] mt-1 rounded-lg border border-slate-200 bg-white shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
           style={{
             top: dropdownPosition.top,
             left: dropdownPosition.left,

@@ -46,7 +46,7 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
   return (
     <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-jci-navy border-none shadow-[0_20px_50px_rgba(8,112,184,0.7)] text-white">
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-xl font-black uppercase tracking-tighter italic leading-none mb-1">Elite Leaderboard</h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Global Ranking • Top 3 Members</p>
@@ -56,37 +56,37 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
           {/* Left Side: Member List */}
-          <div className="space-y-4">
+          <div className="grid grid-cols-3 md:grid-cols-1 gap-3 md:gap-4 ">
             {top3.map((m, idx) => (
               <div
                 key={m.id}
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all group cursor-pointer ${m.id === selectedMemberId ? 'bg-white/20 border-white/40 shadow-lg scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                className={`flex flex-col md:flex-row items-center md:justify-between p-3 md:p-4 rounded-2xl border transition-all group cursor-pointer ${m.id === selectedMemberId ? 'bg-white/20 border-white/40 shadow-lg scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                 onClick={() => setSelectedMemberId(m.id)}
               >
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <span className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${idx === 0 ? 'bg-amber-400 text-amber-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : 'bg-orange-400 text-orange-900'}`}>
+                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3 text-center md:text-left">
+                  <div className="relative mb-2 md:mb-0">
+                    <span className={`absolute -top-1 -left-1 md:-top-2 md:-left-2 w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-[9px] md:text-[10px] font-black shadow-lg ${idx === 0 ? 'bg-amber-400 text-amber-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : 'bg-orange-400 text-orange-900'}`}>
                       {idx + 1}
                     </span>
-                    <img src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}`} className="w-12 h-12 rounded-full border-2 border-white/20" alt="" />
+                    <img src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}`} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
                   </div>
-                  <div>
-                    <p className={`font-black tracking-tight ${m.id === currentUser?.id ? 'text-amber-400' : 'text-white'}`}>{m.name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{m.tier || 'MEMBER'}</p>
+                  <div className="min-w-0">
+                    <p className={`font-black tracking-tight text-xs md:text-base truncate max-w-[60px] md:max-w-none ${m.id === currentUser?.id ? 'text-amber-400' : 'text-white'}`}>{m.name}</p>
+                    <p className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest hidden md:block">{m.tier || 'MEMBER'}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-black tracking-tighter leading-none">{(m.points || 0).toLocaleString()}</p>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Points</p>
+                <div className="text-center md:text-right mt-1 md:mt-0">
+                  <p className="text-sm md:text-lg font-black tracking-tighter leading-none">{(m.points || 0).toLocaleString()}</p>
+                  <p className="text-[8px] md:text-[9px] text-slate-400 font-bold uppercase tracking-widest">Points</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Right Side: Radar Chart */}
-          <div className="relative bg-white/5 rounded-[32px] p-6 border border-white/10 h-full flex flex-col items-center justify-center min-h-[280px]">
+          <div className="relative bg-white/5 rounded-[32px] p-4 border border-white/10 h-full flex flex-col items-center justify-center min-h-[280px]">
             <div className="absolute top-4 left-6">
               <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 italic">Points Source</h4>
               <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Skill Analysis</p>
@@ -482,12 +482,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {renderHeader()}
 
       {/* Homepage Advertisements Banner (Swiper) */}
       {homepageAds.length > 0 && (
-        <div className="w-full -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="w-full">
           <Swiper
             modules={[Autoplay, Pagination]}
             spaceBetween={16}
@@ -615,7 +615,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       )}
 
       {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4">
         <Card noPadding>
           <div className="px-6 pt-4">
             <div className="flex items-center justify-between">

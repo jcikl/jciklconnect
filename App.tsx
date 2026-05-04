@@ -6,13 +6,12 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon
+  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
-import { MemberGrowthChart, PointsDistributionChart } from './components/dashboard/Analytics';
 import { UserRole, Notification, Event } from './types';
 import { EventCalendarView } from './components/modules/EventCalendarView';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -84,6 +83,7 @@ const GuestHeader = ({
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Determine current page from URL
   const getCurrentPageFromPath = (): 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' => {
@@ -100,6 +100,7 @@ const GuestHeader = ({
 
   const handleNavigation = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => {
     onPageChange(page);
+    setIsMobileMenuOpen(false);
     if (page === 'home') {
       navigate('/');
     } else {
@@ -107,9 +108,19 @@ const GuestHeader = ({
     }
   };
 
+  const navItems: { page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory'; label: string; icon: React.ReactNode }[] = [
+    { page: 'home', label: 'Home', icon: <LayoutDashboard size={18} /> },
+    { page: 'events', label: 'Events', icon: <Calendar size={18} /> },
+    { page: 'projects', label: 'Projects', icon: <FolderKanban size={18} /> },
+    { page: 'about', label: 'About', icon: <Users size={18} /> },
+    { page: 'enewsletters', label: 'E-Newsletters', icon: <FileText size={18} /> },
+    { page: 'directory', label: 'Directory', icon: <Briefcase size={18} /> },
+  ];
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between">
+        {/* Logo */}
         <Link
           to="/"
           onClick={() => handleNavigation('home')}
@@ -118,49 +129,67 @@ const GuestHeader = ({
           <img
             src="/JCI Kuala Lumpur-transparent.png"
             alt="JCI Kuala Lumpur Logo"
-            className="h-10 w-auto object-contain"
+            className="h-8 md:h-10 w-auto object-contain"
           />
         </Link>
+
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex space-x-8">
-          <Link
-            to="/events"
-            onClick={() => handleNavigation('events')}
-            className={`no-underline font-medium transition-colors ${activePage === 'events' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
-          >
-            Events
-          </Link>
-          <Link
-            to="/projects"
-            onClick={() => handleNavigation('projects')}
-            className={`no-underline font-medium transition-colors ${activePage === 'projects' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
-          >
-            Projects
-          </Link>
-          <Link
-            to="/about"
-            onClick={() => handleNavigation('about')}
-            className={`no-underline font-medium transition-colors ${activePage === 'about' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
-          >
-            About
-          </Link>
-          <Link
-            to="/enewsletters"
-            onClick={() => handleNavigation('enewsletters')}
-            className={`no-underline font-medium transition-colors ${activePage === 'enewsletters' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
-          >
-            E-Newsletters
-          </Link>
-          <Link
-            to="/directory"
-            onClick={() => handleNavigation('directory')}
-            className={`no-underline font-medium transition-colors ${activePage === 'directory' ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
-          >
-            Directory
-          </Link>
+          {navItems.map(item => (
+            <Link
+              key={item.page}
+              to={item.page === 'home' ? '/' : `/${item.page}`}
+              onClick={() => handleNavigation(item.page)}
+              className={`no-underline font-medium transition-colors ${activePage === item.page ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
-        <div className="flex items-center space-x-4">
-          <Button onClick={onLogin}>Log In</Button>
+
+        {/* Right side: Login + Mobile Menu Toggle */}
+        <div className="flex items-center gap-3">
+          <Button onClick={onLogin} size="sm" className="hidden sm:inline-flex">Log In</Button>
+          <button
+            className="md:hidden w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
+      </div>
+
+      {/* Mobile Navigation Panel */}
+      <div
+        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+      >
+        <nav className="bg-white border-t border-slate-100 px-4 py-3 space-y-1">
+          {navItems.map(item => (
+            <button
+              key={item.page}
+              onClick={() => handleNavigation(item.page)}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left font-medium text-sm transition-all ${activePage === item.page
+                ? 'bg-blue-50 text-jci-blue'
+                : 'text-slate-600 hover:bg-slate-50 active:bg-slate-100'
+                }`}
+            >
+              <span className={`flex-shrink-0 ${activePage === item.page ? 'text-jci-blue' : 'text-slate-400'}`}>
+                {item.icon}
+              </span>
+              {item.label}
+              {activePage === item.page && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-jci-blue"></div>
+              )}
+            </button>
+          ))}
+          <div className="pt-3 pb-2 px-4 border-t border-slate-100 mt-2">
+            <Button onClick={() => { onLogin(); setIsMobileMenuOpen(false); }} className="w-full">
+              Log In
+            </Button>
+          </div>
+        </nav>
       </div>
     </header>
   );
@@ -368,7 +397,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Upcoming Events</h1>
-            <p className="text-xl text-blue-100 max-w-2xl mx-auto">
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               Join us for exciting events, trainings, and networking opportunities.
             </p>
           </div>
@@ -386,10 +415,11 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                 Login to Register
               </Button>
             </div>
-            <div className="bg-white border p-4 border-slate-200 rounded-xl shadow-sm">
+            <div className="mt-8">
               <EventCalendarView
                 events={allPublishedEvents}
                 readonly={true}
+                upcomingOnly={true}
                 onEventClick={(event) => {
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
@@ -398,7 +428,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                     setSelectedEvent(event);
                     setIsRegistrationModalOpen(true);
                   } else {
-                    showToast('Registration is not available for past events.', 'info');
+                    showToast('This event has already passed', 'info');
                   }
                 }}
               />
@@ -423,91 +453,219 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
               notes: '',
             });
           }}
-          title={`Register for ${selectedEvent.title}`}
+          title={null}
           size="lg"
-        >
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                const { EventsService } = await import('./services/eventsService');
-                await EventsService.registerGuestForEvent(selectedEvent.id, guestRegistrationData);
-                showToast('Registration submitted successfully! We will contact you soon.', 'success');
-                setIsRegistrationModalOpen(false);
-                setSelectedEvent(null);
-                setGuestRegistrationData({
-                  name: '',
-                  email: '',
-                  phone: '',
-                  organization: '',
-                  notes: '',
-                });
-              } catch (err) {
-                const errorMessage = err instanceof Error ? err.message : 'Failed to register for event';
-                showToast(errorMessage, 'error');
-              }
-            }}
-            className="space-y-4"
-          >
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>Event Details:</strong>
-              </p>
-              <p className="text-sm text-blue-700 mt-1">
-                Date: {new Date(selectedEvent.date).toLocaleString()}
-              </p>
-              <p className="text-sm text-blue-700">
-                Location: {selectedEvent.location}
-              </p>
-            </div>
-            <Forms.Input
-              label="Full Name *"
-              value={guestRegistrationData.name}
-              onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, name: e.target.value })}
-              required
-            />
-            <Forms.Input
-              label="Email *"
-              type="email"
-              value={guestRegistrationData.email}
-              onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, email: e.target.value })}
-              required
-            />
-            <Forms.Input
-              label="Phone Number *"
-              type="tel"
-              value={guestRegistrationData.phone}
-              onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, phone: e.target.value })}
-              required
-            />
-            <Forms.Input
-              label="Organization"
-              value={guestRegistrationData.organization}
-              onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, organization: e.target.value })}
-            />
-            <Forms.Textarea
-              label="Additional Notes"
-              value={guestRegistrationData.notes}
-              onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, notes: e.target.value })}
-              rows={3}
-              placeholder="Any special requirements or questions..."
-            />
-            <div className="pt-4 flex gap-3 border-t">
-              <Button type="submit" className="flex-1">
-                Submit Registration
-              </Button>
+          bottomSheet={true}
+          drawerOnMobile
+          mobileHeight="h-[90vh]"
+          scrollInBody={true}
+          className="premium-registration-modal"
+          footerClassName="flex-none p-6 bg-white border-t border-slate-50 rounded-t-[40px] shadow-[0_-20px_50px_-12px_rgba(0,0,0,0.15)] z-30 pb-safe"
+          footer={(
+            <div className="flex items-center justify-between gap-4 w-full">
+              <div className="flex flex-col">
+                <span className="text-2xl font-black text-slate-900 leading-none">
+                  {selectedEvent.price ? `RM ${selectedEvent.price}` : 'FREE'}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">per person</span>
+              </div>
               <Button
-                variant="ghost"
-                type="button"
-                onClick={() => {
-                  setIsRegistrationModalOpen(false);
-                  setSelectedEvent(null);
-                }}
+                form="guest-registration-form"
+                type="submit"
+                className="flex-1 max-w-[240px] h-14 bg-blue-600 text-white hover:bg-blue-700 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
               >
-                Cancel
+                <CheckCircle size={20} className="stroke-[3]" />
+                <span>Confirm Registration</span>
               </Button>
             </div>
-          </form>
+          )}
+        >
+          <div className="-m-4 md:-m-6 relative">
+            {/* Hero Image Section */}
+            <div className="relative h-48 md:h-64 w-full overflow-hidden">
+              <img
+                src={selectedEvent.imageUrl || "https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?auto=format&fit=crop&q=80"}
+                alt={selectedEvent.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+
+              {/* Top Controls */}
+              <div className="absolute top-4 left-4">
+                <button
+                  onClick={() => setIsRegistrationModalOpen(false)}
+                  className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Body - Overlapping Card Style */}
+            <div className="relative bg-white rounded-t-[32px] -mt-10 px-6 pt-8 pb-10">
+              <div className="mb-6">
+                <Badge variant="jci" className="bg-blue-50 text-jci-blue border-none px-3 py-1 text-[11px] font-bold mb-2">
+                  {selectedEvent.type || 'Event Registration'}
+                </Badge>
+                <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">
+                  {selectedEvent.title}
+                </h2>
+              </div>
+
+              {/* Event Info Grid - Replicating EventDetailModal Style */}
+              <div className="bg-white border border-slate-100 rounded-[24px] shadow-sm overflow-hidden mb-8">
+                <div className="divide-y divide-slate-50">
+                  <div className="flex items-center gap-4 px-4 py-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue flex-shrink-0">
+                      <Calendar size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
+                      <p className="text-sm font-bold text-slate-800">
+                        {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} • {selectedEvent.time || 'TBA'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 px-4 py-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue flex-shrink-0">
+                      <MapPin size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Location</p>
+                      <p className="text-sm font-bold text-slate-800 truncate">{selectedEvent.location || 'TBA (To Be Announced)'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 px-4 py-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue flex-shrink-0">
+                      <Tag size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Price</p>
+                      <p className="text-sm font-bold text-slate-800">
+                        {selectedEvent.price ? `RM ${selectedEvent.price}` : 'FREE'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Registration Form */}
+              <form
+                id="guest-registration-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const { EventsService } = await import('./services/eventsService');
+                    await EventsService.registerGuestForEvent(selectedEvent.id, guestRegistrationData);
+                    showToast('Registration submitted successfully! We will contact you soon.', 'success');
+                    setIsRegistrationModalOpen(false);
+                    setSelectedEvent(null);
+                    setGuestRegistrationData({
+                      name: '',
+                      email: '',
+                      phone: '',
+                      organization: '',
+                      notes: '',
+                    });
+                  } catch (err) {
+                    const errorMessage = err instanceof Error ? err.message : 'Failed to register for event';
+                    showToast(errorMessage, 'error');
+                  }
+                }}
+                className="space-y-6"
+              >
+                <div className="space-y-5">
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 mb-2">
+                    <div className="w-1 h-4 bg-jci-blue rounded-full"></div>
+                    Your Particulars
+                  </h3>
+
+                  {/* Full Name */}
+                  <div className="flex flex-row items-center gap-3 sm:gap-6 group">
+                    <label className="w-28 sm:w-32 flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400 group-focus-within:text-jci-blue transition-colors leading-tight">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex-1">
+                      <Forms.Input
+                        placeholder="e.g. John Doe"
+                        value={guestRegistrationData.name}
+                        onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, name: e.target.value })}
+                        required
+                        className="!mb-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="flex flex-row items-center gap-3 sm:gap-6 group">
+                    <label className="w-28 sm:w-32 flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400 group-focus-within:text-jci-blue transition-colors leading-tight">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex-1">
+                      <Forms.Input
+                        type="email"
+                        placeholder="john@example.com"
+                        value={guestRegistrationData.email}
+                        onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, email: e.target.value })}
+                        required
+                        className="!mb-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Phone Number */}
+                  <div className="flex flex-row items-center gap-3 sm:gap-6 group">
+                    <label className="w-28 sm:w-32 flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400 group-focus-within:text-jci-blue transition-colors leading-tight">
+                      Contact Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex-1">
+                      <Forms.Input
+                        type="tel"
+                        placeholder="+60 12-345 6789"
+                        value={guestRegistrationData.phone}
+                        onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, phone: e.target.value })}
+                        required
+                        className="!mb-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Organization */}
+                  <div className="flex flex-row items-center gap-3 sm:gap-6 group">
+                    <label className="w-28 sm:w-32 flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400 group-focus-within:text-jci-blue transition-colors leading-tight">
+                      Organization
+                    </label>
+                    <div className="flex-1">
+                      <Forms.Input
+                        placeholder="Company or University"
+                        value={guestRegistrationData.organization}
+                        onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, organization: e.target.value })}
+                        className="!mb-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Additional Notes */}
+                  <div className="flex flex-col sm:flex-row items-start gap-2 sm:gap-6 group">
+                    <label className="sm:w-32 flex-shrink-0 pt-3 text-[10px] font-black uppercase tracking-widest text-slate-400 group-focus-within:text-jci-blue transition-colors leading-tight">
+                      Remarks
+                    </label>
+                    <div className="flex-1 w-full">
+                      <Forms.Textarea
+                        placeholder="Any special requirements or dietary needs?"
+                        value={guestRegistrationData.notes}
+                        onChange={(e) => setGuestRegistrationData({ ...guestRegistrationData, notes: e.target.value })}
+                        rows={2}
+                        className="!mb-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
         </Modal>
       )}
 
@@ -534,7 +692,7 @@ const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Projects</h1>
-            <p className="text-xl text-blue-100 max-w-2xl mx-auto">
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               Discover the impactful projects we're working on to create positive change in our community.
             </p>
           </div>
@@ -620,7 +778,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">About JCI Kuala Lumpur</h1>
-            <p className="text-xl text-blue-100 max-w-2xl mx-auto">
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               Empowering young active citizens to create positive change.
             </p>
           </div>
@@ -659,7 +817,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
             <div className="space-y-8">
               {/* JCI Creed - Full Width on Top */}
               <Card className="bg-white">
-                <div className="p-8">
+                <div>
                   <h3 className="text-2xl font-bold text-slate-900 mb-6">JCI Creed</h3>
                   <ul className="space-y-4 text-slate-600">
                     <li className="flex items-start">
@@ -693,7 +851,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
               {/* JCI Mission and Vision - Side by Side Below */}
               <div className="grid md:grid-cols-2 gap-8">
                 <Card className="bg-white">
-                  <div className="p-8">
+                  <div>
                     <h3 className="text-2xl font-bold text-slate-900 mb-6">JCI Mission</h3>
                     <p className="text-lg text-slate-600 leading-relaxed">
                       To provide development opportunities that empower young people to create positive change.
@@ -702,7 +860,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 </Card>
 
                 <Card className="bg-white">
-                  <div className="p-8">
+                  <div>
                     <h3 className="text-2xl font-bold text-slate-900 mb-6">JCI Vision</h3>
                     <p className="text-lg text-slate-600 leading-relaxed">
                       To be the leading global network of young active citizens.
@@ -928,7 +1086,7 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">E-Newsletters</h1>
-            <p className="text-xl text-blue-100 max-w-2xl mx-auto">
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               Stay updated with our latest news, events, and achievements.
             </p>
           </div>
@@ -990,7 +1148,7 @@ const GuestDirectoryPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Business Directory</h1>
-            <p className="text-xl text-blue-100 max-w-2xl mx-auto">
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               Explore the businesses of our members and connect with the global JCI network.
             </p>
           </div>
@@ -1958,7 +2116,7 @@ export const JCIKLApp: React.FC = () => {
 
           {/* Global Persistent Header - Always visible, not affected by scrolling */}
           {view !== 'DASHBOARD' && member && (
-            <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-4 pb-4 px-5 sm:px-8 text-white shadow-2xl relative overflow-hidden">
+            <div className="z-[50] bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-4 pb-4 px-5 sm:px-8 text-white shadow-2xl relative overflow-hidden">
               {/* Decorative Background Pattern */}
               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, MapPin, Users, Clock, Download, Link as LinkIcon, Share2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, MapPin, Users, Clock, Link as LinkIcon, Share2 } from 'lucide-react';
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { Event } from '../../types';
 import { formatDate, formatTime } from '../../utils/dateUtils';
@@ -12,6 +12,7 @@ interface EventCalendarViewProps {
   onDateClick?: (date: Date) => void;
   onEventUpdate?: (eventId: string, updates: Partial<Event>) => Promise<void>;
   readonly?: boolean;
+  upcomingOnly?: boolean;
 }
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -21,7 +22,8 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
   onEventClick,
   onDateClick,
   onEventUpdate,
-  readonly = false
+  readonly = false,
+  upcomingOnly = false
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
@@ -96,24 +98,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
     return date.getMonth() === currentDate.getMonth();
   };
 
-  // Export events to iCal format using ICalService
-  const exportToICal = (eventsToExport: Event[]) => {
-    try {
-      // Convert Event objects to CalendarEvent objects
-      const calendarEvents = ICalService.convertEventsToCalendarEvents(eventsToExport);
 
-      // Generate filename with current date
-      const filename = `jci-kl-events-${new Date().toISOString().split('T')[0]}.ics`;
-
-      // Download the iCal file
-      ICalService.downloadICalFile(calendarEvents, filename, 'JCI Kuala Lumpur Events');
-
-      showToast(`Exported ${eventsToExport.length} events to iCal format`, 'success');
-    } catch (error) {
-      console.error('Error exporting to iCal:', error);
-      showToast('Failed to export events to iCal format', 'error');
-    }
-  };
 
   // Generate iCal subscription URL
   const generateICalSubscriptionUrl = (): string => {
@@ -220,14 +205,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
           >
             Day
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportToICal(events)}
-          >
-            <Download size={16} className="mr-2" />
-            Export iCal
-          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -242,68 +220,51 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Left Column: Events List */}
         <div className="w-full lg:w-1/3">
-          <Card noPadding>
-            <div className="px-4 md:px-6 pt-4">
-              <Tabs
-                tabs={['Upcoming', 'Completed']}
-                activeTab={activeListTab}
-                onTabChange={setActiveListTab}
-              />
-            </div>
-            <div className="p-4 md:p-6 space-y-4 max-h-[800px] overflow-y-auto">
-              {events
-                .filter(e => {
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  const eventDate = new Date(e.date);
-                  if (activeListTab === 'Upcoming') {
+          {upcomingOnly ? (
+            <div className="w-full">
+              <div className="p-0 md:p-0 space-y-4 max-h-[800px] overflow-y-auto">
+                {events
+                  .filter(e => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const eventDate = new Date(e.date);
                     return eventDate >= today;
-                  } else {
-                    return eventDate < today;
-                  }
-                })
-                .sort((a, b) => {
-                  if (activeListTab === 'Upcoming') {
-                    return new Date(a.date).getTime() - new Date(b.date).getTime();
-                  } else {
-                    return new Date(b.date).getTime() - new Date(a.date).getTime();
-                  }
-                })
-                .slice(0, 10)
-                .map(event => (
-                  <div
-                    key={event.id}
-                    className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 hover:border-jci-blue hover:shadow-md transition-all cursor-pointer bg-white"
-                    onClick={() => onEventClick?.(event)}
-                  >
-                    <div className="flex-shrink-0 w-16 h-16 bg-blue-50 text-jci-blue rounded-xl flex flex-col items-center justify-center border border-blue-100">
-                      <span className="text-xs font-bold uppercase tracking-wider">
-                        {new Date(event.date).toLocaleString('default', { month: 'short' })}
-                      </span>
-                      <span className="text-2xl font-bold leading-none">
-                        {new Date(event.date).getDate()}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-bold text-slate-900">{event.title}</h4>
-                        <Badge variant="neutral">{event.type}</Badge>
+                  })
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .slice(0, 10)
+                  .map(event => (
+                    <div
+                      key={event.id}
+                      className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 hover:border-jci-blue hover:shadow-md transition-all cursor-pointer bg-white"
+                      onClick={() => onEventClick?.(event)}
+                    >
+                      <div className="flex-shrink-0 w-16 h-16 bg-blue-50 text-jci-blue rounded-xl flex flex-col items-center justify-center border border-blue-100">
+                        <span className="text-xs font-bold uppercase tracking-wider">
+                          {new Date(event.date).toLocaleString('default', { month: 'short' })}
+                        </span>
+                        <span className="text-2xl font-bold leading-none">
+                          {new Date(event.date).getDate()}
+                        </span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-3">
-                        <div className="flex items-center gap-1">
-                          <Clock size={14} />
-                          <span>{formatTime(new Date(event.date))}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-bold text-slate-900">{event.title}</h4>
+                          <Badge variant="neutral">{event.type}</Badge>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin size={14} />
-                          <span className="truncate">{event.location}</span>
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-3">
+                          <div className="flex items-center gap-1">
+                            <Clock size={14} />
+                            <span>{formatTime(new Date(event.date))}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MapPin size={14} />
+                            <span className="truncate">{event.location}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users size={14} />
+                            <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Users size={14} />
-                          <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
-                        </div>
-                      </div>
-                      {activeListTab === 'Upcoming' ? (
                         <Button
                           size="sm"
                           className="w-full"
@@ -314,39 +275,129 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                         >
                           Register Now
                         </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEventClick?.(event);
-                          }}
-                        >
-                          View Details
-                        </Button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              {events.filter(e => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const eventDate = new Date(e.date);
-                if (activeListTab === 'Upcoming') {
+                  ))}
+                {events.filter(e => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const eventDate = new Date(e.date);
                   return eventDate >= today;
-                } else {
-                  return eventDate < today;
-                }
-              }).length === 0 && (
+                }).length === 0 && (
+                    <div className="text-center py-8 text-slate-500">
+                      <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />
+                      <p>No upcoming events</p>
+                    </div>
+                  )}
+              </div>
+            </div>
+          ) : (
+            <Card noPadding>
+              <div className="px-4 md:px-6 pt-4">
+                <Tabs
+                  tabs={['Upcoming', 'Completed']}
+                  activeTab={activeListTab}
+                  onTabChange={setActiveListTab}
+                />
+              </div>
+              <div className="p-4 md:p-6 space-y-4 max-h-[800px] overflow-y-auto">
+                {events
+                  .filter(e => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const eventDate = new Date(e.date);
+                    if (activeListTab === 'Upcoming') {
+                      return eventDate >= today;
+                    } else {
+                      return eventDate < today;
+                    }
+                  })
+                  .sort((a, b) => {
+                    if (activeListTab === 'Upcoming') {
+                      return new Date(a.date).getTime() - new Date(b.date).getTime();
+                    } else {
+                      return new Date(b.date).getTime() - new Date(a.date).getTime();
+                    }
+                  })
+                  .slice(0, 10)
+                  .map(event => (
+                    <div
+                      key={event.id}
+                      className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 hover:border-jci-blue hover:shadow-md transition-all cursor-pointer bg-white"
+                      onClick={() => onEventClick?.(event)}
+                    >
+                      <div className="flex-shrink-0 w-16 h-16 bg-blue-50 text-jci-blue rounded-xl flex flex-col items-center justify-center border border-blue-100">
+                        <span className="text-xs font-bold uppercase tracking-wider">
+                          {new Date(event.date).toLocaleString('default', { month: 'short' })}
+                        </span>
+                        <span className="text-2xl font-bold leading-none">
+                          {new Date(event.date).getDate()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-bold text-slate-900">{event.title}</h4>
+                          <Badge variant="neutral">{event.type}</Badge>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-3">
+                          <div className="flex items-center gap-1">
+                            <Clock size={14} />
+                            <span>{formatTime(new Date(event.date))}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MapPin size={14} />
+                            <span className="truncate">{event.location}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users size={14} />
+                            <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
+                          </div>
+                        </div>
+                        {activeListTab === 'Upcoming' ? (
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEventClick?.(event);
+                            }}
+                          >
+                            Register Now
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEventClick?.(event);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                {events.filter(e => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const eventDate = new Date(e.date);
+                  if (activeListTab === 'Upcoming') {
+                    return eventDate >= today;
+                  } else {
+                    return eventDate < today;
+                  }
+                }).length === 0 && (
                   <div className="text-center py-8 text-slate-500">
                     <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />
                     <p>No {activeListTab.toLowerCase()} events</p>
                   </div>
                 )}
-            </div>
-          </Card>
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Calendar Grid */}
@@ -401,9 +452,9 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                                 e.stopPropagation();
                                 onEventClick?.(event);
                               }}
-                              title={`${formatTime(new Date(event.date))} ${event.title}${!readonly ? ' - Drag to move' : ''}`}
+                              title={`${event.title}${!readonly ? ' - Drag to move' : ''}`}
                             >
-                              {formatTime(new Date(event.date))} {event.title}
+                              {event.title}
                             </div>
                           ))}
                           {dayEvents.length > 2 && (
@@ -459,10 +510,9 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                                   e.stopPropagation();
                                   onEventClick?.(event);
                                 }}
-                                title={`${formatTime(new Date(event.date))} ${event.title}${!readonly ? ' - Drag to move' : ''}`}
+                                title={`${event.title}${!readonly ? ' - Drag to move' : ''}`}
                               >
                                 <div className="font-semibold truncate">{event.title}</div>
-                                <div className="text-slate-600">{formatTime(new Date(event.date))}</div>
                               </div>
                             ))}
                             {dayEvents.length === 0 && (
@@ -522,9 +572,6 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                                 title={`${event.title}${!readonly ? ' - Drag to move to different time' : ''}`}
                               >
                                 <div className="font-semibold text-slate-900">{event.title}</div>
-                                <div className="text-sm text-slate-600 mt-1">
-                                  {formatTime(new Date(event.date))} • {event.location}
-                                </div>
                               </div>
                             ))}
                           </div>
@@ -586,19 +633,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
               </ul>
             </div>
 
-            <div className="pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  exportToICal(events);
-                  setShowICalModal(false);
-                }}
-                className="w-full"
-              >
-                <Download size={16} className="mr-2" />
-                Or Download iCal File Instead
-              </Button>
-            </div>
+
           </div>
         </div>
       </Modal>

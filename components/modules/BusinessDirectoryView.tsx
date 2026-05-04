@@ -6,7 +6,7 @@ import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { useMembers } from '../../hooks/useMembers';
 import { BusinessProfile } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { Input, Textarea } from '../ui/Form';
+import { Input, Textarea, Select } from '../ui/Form';
 
 
 // Map each industry to a unique premium gradient and background image for the banner (referencing premium dashboard header patterns)
@@ -38,6 +38,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
   const [activeTab, setActiveTab] = useState<'directory' | 'international'>('directory');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('All');
+  const [selectedInterestedIndustry, setSelectedInterestedIndustry] = useState<string>('All');
   const [isInquiryModalOpen, setInquiryModalOpen] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
     name: '',
@@ -46,6 +47,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     requirements: ''
   });
   const [inquiryErrors, setInquiryErrors] = useState<Record<string, string>>({});
+  const [filterInternational, setFilterInternational] = useState(false);
 
   const { businesses, loading, error } = useBusinessDirectory();
   const { members } = useMembers(); // Used to find owner name
@@ -75,10 +77,31 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     return ['All', ...Array.from(industries).sort()];
   }, [businesses]);
 
+  const uniqueInterestedIndustries = useMemo(() => {
+    const industries = new Set<string>();
+    businesses.forEach(b => {
+      if (b.interestedIndustries) {
+        b.interestedIndustries.forEach(ind => industries.add(ind));
+      }
+    });
+    return ['All', ...Array.from(industries).sort()];
+  }, [businesses]);
+
   const filteredBusinesses = useMemo(() => {
     let filtered = businesses;
     if (selectedIndustry !== 'All') {
       filtered = filtered.filter(biz => biz.industry === selectedIndustry);
+    }
+    if (selectedInterestedIndustry !== 'All') {
+      filtered = filtered.filter(biz => 
+        biz.interestedIndustries && biz.interestedIndustries.includes(selectedInterestedIndustry)
+      );
+    }
+    if (filterInternational) {
+      filtered = filtered.filter(biz => {
+        const val = String(biz.acceptsInternationalBusiness || '').toLowerCase();
+        return val === 'yes' || val === 'true' || val === 'willing to explore';
+      });
     }
     const term = (searchQuery || searchTerm).toLowerCase();
     if (!term) return filtered;
@@ -89,7 +112,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       (biz.description ?? '').toLowerCase().includes(term) ||
       (biz.businessCategory ?? '').toLowerCase().includes(term)
     );
-  }, [businesses, searchTerm, searchQuery, selectedIndustry]);
+  }, [businesses, searchTerm, searchQuery, selectedIndustry, selectedInterestedIndustry, filterInternational]);
 
   const handleContact = () => {
     // Auto-fill form from current user info
@@ -128,7 +151,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Member Business Directory</h2>
@@ -136,45 +159,90 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         </div>
       </div>
 
-      {/* Education/Instruction Card */}
-      <Card noPadding>
-        <div className="px-4 md:px-6 pt-4 pb-2">
-          <Tabs
-            tabs={['Business Directory', 'International Network']}
-            activeTab={activeTab === 'directory' ? 'Business Directory' : 'International Network'}
-            onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
-          />
-        </div>
+      <div>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2">
+          <div className="flex-shrink-0">
+            <Tabs
+              tabs={['Business Directory', 'International Network']}
+              activeTab={activeTab === 'directory' ? 'Business Directory' : 'International Network'}
+              onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
+              className="border-none"
+            />
+          </div>
 
-        {/* Global Category Filter for both Tabs */}
-        <div className="px-4 md:px-6 py-3 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-1 -mx-1">
-            {uniqueIndustries.map(ind => {
-              const isActive = selectedIndustry === ind;
-              return (
-                <button
-                  key={ind}
-                  onClick={() => setSelectedIndustry(ind)}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full whitespace-nowrap transition-all duration-200 flex-shrink-0 ${isActive
-                    ? 'bg-jci-blue text-white font-medium shadow-md shadow-jci-blue/20'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-jci-blue hover:border-blue-200 font-medium shadow-sm'
-                    }`}
-                >
-                  <span className="text-sm">{ind}</span>
-                </button>
-              );
-            })}
+          {/* Global Category Filters */}
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto lg:px-0">
+            {/* Own Industry */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex-shrink-0 text-slate-400 hidden lg:block" title="Business Industry">
+                <Building2 size={16} />
+              </div>
+              <div className="w-full sm:w-60 lg:w-52">
+                <Select
+                  value={selectedIndustry}
+                  onChange={(e) => setSelectedIndustry(e.target.value)}
+                  options={uniqueIndustries.map(ind => {
+                    const count = ind === 'All' 
+                      ? businesses.length 
+                      : businesses.filter(b => b.industry === ind).length;
+                    return { 
+                      value: ind, 
+                      label: `${count.toString().padStart(2, '0')} | ${ind === 'All' ? 'Industry: All' : ind}` 
+                    };
+                  })}
+                  className="bg-white border-slate-200 shadow-sm font-mono-numbers h-9 py-0 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Interested Industry */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex-shrink-0 text-slate-400 hidden lg:block" title="Looking for Industry">
+                <Search size={16} />
+              </div>
+              <div className="w-full sm:w-60 lg:w-52">
+                <Select
+                  value={selectedInterestedIndustry}
+                  onChange={(e) => setSelectedInterestedIndustry(e.target.value)}
+                  options={uniqueInterestedIndustries.map(ind => {
+                    const count = ind === 'All' 
+                      ? businesses.length 
+                      : businesses.filter(b => b.interestedIndustries && b.interestedIndustries.includes(ind)).length;
+                    return { 
+                      value: ind, 
+                      label: `${count.toString().padStart(2, '0')} | ${ind === 'All' ? 'Interested: All' : ind}` 
+                    };
+                  })}
+                  className="bg-white border-slate-200 shadow-sm font-mono-numbers h-9 py-0 text-xs"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => setFilterInternational(!filterInternational)}
+              className={`flex items-center gap-2 px-3 h-9 rounded-lg border transition-all duration-200 whitespace-nowrap flex-shrink-0 ${filterInternational
+                ? 'bg-sky-500 text-white border-sky-600 shadow-md shadow-sky-500/20'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-sky-50 hover:text-sky-600 hover:border-sky-200 shadow-sm'
+                }`}
+              title="Filter by International Business readiness"
+            >
+              <Globe size={14} className={filterInternational ? 'animate-pulse' : ''} />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">International Biz</span>
+              {filterInternational && (
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse ml-0.5 hidden sm:block" />
+              )}
+            </button>
           </div>
         </div>
 
-        <div className="p-4 md:p-6 bg-slate-50/30">
+        <div className="bg-transparent">
           {activeTab === 'directory' ? (
-            <div className="space-y-6">
+            <div className="space-y-3">
               <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredBusinesses.map(biz => {
                     return (
-                      <Card key={biz.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
+                      <Card key={biz.id} noPadding className="overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full bg-white border border-slate-100">
                         {/* Industry‑specific banner (Premium Gradient + Decorative Pattern) */}
                         <div className={`h-24 bg-gradient-to-br ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.from ?? 'from-slate-100'} ${INDUSTRY_BANNER_MAP[biz.industry ?? 'Other']?.to ?? 'to-slate-200'} relative`}>
 
@@ -208,7 +276,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                             })()}
                           </div>
                         </div>
-                        <div className="pt-8 px-2 pb-6 flex-1 flex flex-col">
+                        <div className="pt-8 px-2 flex-1 flex flex-col">
                           <h3 className="text-lg font-bold text-slate-900">{biz.ownerName}</h3>
                           <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
                             {biz.companyName}
@@ -280,7 +348,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
             />
           )}
         </div>
-      </Card>
+      </div>
 
 
 
@@ -302,9 +370,22 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   alt={selectedBiz.companyName}
                   className="w-16 h-16 rounded-lg object-cover border border-slate-200 shadow-sm"
                 />
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 leading-tight">{selectedBiz.companyName}</h3>
-                  <Badge variant="neutral" className="mt-2">{selectedBiz.industry}</Badge>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-slate-900 leading-tight">{selectedBiz.ownerName}</h3>
+                  <p className="text-sm text-slate-500 font-medium truncate">{selectedBiz.companyName}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{selectedBiz.industry}</Badge>
+                    {selectedBiz.website && (
+                      <a
+                        href={selectedBiz.website.startsWith('http') ? selectedBiz.website : `https://${selectedBiz.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-jci-blue hover:text-sky-600 hover:underline flex items-center gap-1 font-black uppercase tracking-widest transition-colors"
+                      >
+                        <Globe size={10} /> Visit Site
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -314,51 +395,56 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   <p className="text-slate-600 leading-relaxed min-h-[60px]">{selectedBiz.description || 'No description provided.'}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-50">
-                  <div>
-                    <span className="font-bold text-slate-700 block uppercase text-[10px] tracking-widest mb-1">Owner</span>
-                    <span className="text-slate-600 font-medium">{selectedBiz.ownerName}</span>
+                {/* Categories */}
+                <div className="pt-3 border-t border-slate-50">
+                  <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Categories</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedBiz.businessCategory ? (
+                      selectedBiz.businessCategory.split(', ').map((cat, idx) => (
+                        <Badge key={idx} variant="info" className="bg-blue-50/50 text-blue-600 border border-blue-100">{cat}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">No specific categories listed</span>
+                    )}
                   </div>
-                  {selectedBiz.website && (
-                    <div>
-                      <span className="font-bold text-slate-700 block uppercase text-[10px] tracking-widest mb-1">Website</span>
-                      <a href={selectedBiz.website.startsWith('http') ? selectedBiz.website : `https://${selectedBiz.website}`} target="_blank" rel="noopener noreferrer" className="text-jci-blue hover:text-sky-600 hover:underline break-all font-medium transition-colors">
-                        Visit Site
-                      </a>
-                    </div>
-                  )}
                 </div>
 
-                {(() => {
-                  const bizCatsStr = selectedBiz.businessCategory;
-
-                  return bizCatsStr ? (
-                    <div className="pt-3 border-t border-slate-50">
-                      <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Categories</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {bizCatsStr.split(', ').map((cat, idx) => (
-                          <Badge key={idx} variant="info" className="bg-blue-50/50 text-blue-600 border border-blue-100">{cat}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null;
-                })()}
-
-                {selectedBiz.internationalPartnershipTypes && selectedBiz.internationalPartnershipTypes.length > 0 && (
-                  <div className="pt-3 border-t border-slate-50">
-                    <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Seeking Partnerships</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedBiz.internationalPartnershipTypes.map((type, idx) => (
+                {/* Seeking Partnerships */}
+                <div className="pt-3 border-t border-slate-50">
+                  <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Seeking Partnerships</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedBiz.internationalPartnershipTypes && selectedBiz.internationalPartnershipTypes.length > 0 ? (
+                      selectedBiz.internationalPartnershipTypes.map((type, idx) => (
                         <Badge key={idx} variant="neutral" className="bg-sky-50/50 text-sky-600 border border-sky-100 font-bold">{type}</Badge>
-                      ))}
-                    </div>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">Open to all partnership opportunities</span>
+                    )}
                   </div>
-                )}
+                </div>
+
+                {/* Interested Industries */}
+                <div className="pt-3 border-t border-slate-50">
+                  <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Interested Industries</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(() => {
+                      const owner = members.find(m => m.id === selectedBiz.memberId);
+                      const industries = owner?.interestedIndustries;
+                      return (Array.isArray(industries) && industries.length > 0) ? (
+                        industries.map((ind: string, idx: number) => (
+                          <Badge key={idx} variant="neutral" className="bg-purple-50/50 text-purple-600 border border-purple-100 font-bold">{ind}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">Exploring various industries and connections</span>
+                      );
+                    })()}
+                  </div>
+                </div>
 
                 {selectedBiz.offer && (
                   <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 rounded-xl p-4 shadow-inner">
                     <span className="text-[10px] font-black text-blue-800 uppercase tracking-widest flex items-center gap-1.5 mb-2">
-                      <Gift size={14} className="text-blue-500" /> JCI Member Deal
+                      JCI Member Deal
                     </span>
                     <p className="text-slate-700 font-medium leading-relaxed">{selectedBiz.offer}</p>
                   </div>
@@ -368,65 +454,80 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
           )}
 
           {/* Right Column: Inquiry Form */}
-          <div className="space-y-4">
-            {selectedBiz ? (
-              <div className="mb-4 mt-2">
-                <h4 className="font-black text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
-                  <Send size={18} className="text-jci-blue" /> Submit Inquiry
-                </h4>
-                <p className="text-xs text-slate-500 mt-3 font-medium">
+          <div className="flex flex-col h-full">
+            <div className="flex-1 space-y-4">
+              {selectedBiz ? (
+                <div className="mb-4 mt-2">
+                  <h4 className="font-black text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <Send size={18} className="text-jci-blue" /> Submit Inquiry
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-3 font-medium">
+                    Please fill in your details and requirements. The business owner will contact you shortly.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 mb-4">
                   Please fill in your details and requirements. The business owner will contact you shortly.
                 </p>
+              )}
+
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <label className="w-20 sm:w-28 pt-2.5 text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Name <span className="text-red-500">*</span></label>
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Your full name"
+                      value={inquiryForm.name}
+                      error={inquiryErrors.name}
+                      onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <label className="w-20 sm:w-28 pt-2.5 text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Company</label>
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Your company name (optional)"
+                      value={inquiryForm.company}
+                      onChange={(e) => setInquiryForm({ ...inquiryForm, company: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <label className="w-20 sm:w-28 pt-2.5 text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Phone <span className="text-red-500">*</span></label>
+                  <div className="flex-1">
+                    <Input
+                      placeholder="E.g. +60123456789"
+                      value={inquiryForm.phone}
+                      error={inquiryErrors.phone}
+                      onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Requirements <span className="text-red-500">*</span></label>
+                  <Textarea
+                    placeholder="What products or services are you looking for?"
+                    value={inquiryForm.requirements}
+                    error={inquiryErrors.requirements}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, requirements: e.target.value })}
+                  />
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-slate-500 mb-4">
-                Please fill in your details and requirements. The business owner will contact you shortly.
-              </p>
-            )}
+            </div>
 
-            <Input
-              label="Name"
-              placeholder="Your full name"
-              required
-              value={inquiryForm.name}
-              error={inquiryErrors.name}
-              onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
-            />
-
-            <Input
-              label="Company"
-              placeholder="Your company name (optional)"
-              value={inquiryForm.company}
-              onChange={(e) => setInquiryForm({ ...inquiryForm, company: e.target.value })}
-            />
-
-            <Input
-              label="Phone Number"
-              placeholder="E.g. +60123456789"
-              required
-              value={inquiryForm.phone}
-              error={inquiryErrors.phone}
-              onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
-            />
-
-            <Textarea
-              label="Requirements"
-              placeholder="What products or services are you looking for?"
-              required
-              value={inquiryForm.requirements}
-              error={inquiryErrors.requirements}
-              onChange={(e) => setInquiryForm({ ...inquiryForm, requirements: e.target.value })}
-            />
-
-            <div className="flex gap-3 pt-4">
+            <div className="sticky bottom-0 bg-white pt-4 pb-2 border-t border-slate-100 mt-6 z-10 flex gap-3">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 font-bold"
                 onClick={() => setInquiryModalOpen(false)}
               >
                 Cancel
               </Button>
-              <Button className="flex-1" onClick={handleSendInquiry}>
+              <Button className="flex-1 font-bold shadow-lg shadow-jci-blue/20" onClick={handleSendInquiry}>
                 <Send size={16} className="mr-2" /> Send Inquiry
               </Button>
             </div>
@@ -452,7 +553,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ busin
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {businessesWithConnections.length === 0 ? (
         <div className="text-center py-16 bg-white border border-slate-100 shadow-sm rounded-xl">
           <Network size={48} className="mx-auto mb-4 text-slate-300" />

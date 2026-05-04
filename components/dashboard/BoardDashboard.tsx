@@ -583,7 +583,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
 
       {/* Homepage Advertisements Banner (Swiper) */}
       {homepageAds.length > 0 && (
-        <div className="w-full mt-6">
+        <div className="w-full">
           <Swiper
             modules={[Autoplay, Pagination]}
             spaceBetween={16}
