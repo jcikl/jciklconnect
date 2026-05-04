@@ -93,7 +93,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       filtered = filtered.filter(biz => biz.industry === selectedIndustry);
     }
     if (selectedInterestedIndustry !== 'All') {
-      filtered = filtered.filter(biz => 
+      filtered = filtered.filter(biz =>
         biz.interestedIndustries && biz.interestedIndustries.includes(selectedInterestedIndustry)
       );
     }
@@ -161,13 +161,27 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
       <div>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2">
-          <div className="flex-shrink-0">
-            <Tabs
-              tabs={['Business Directory', 'International Network']}
-              activeTab={activeTab === 'directory' ? 'Business Directory' : 'International Network'}
-              onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
-              className="border-none"
-            />
+          <div className="flex items-center justify-between w-full lg:w-auto gap-4">
+            <div className="flex-shrink-0">
+              <Tabs
+                tabs={['Business Directory', 'International Network']}
+                activeTab={activeTab === 'directory' ? 'Business Directory' : 'International Network'}
+                onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
+                className="border-none"
+              />
+            </div>
+
+            {/* Mobile International Biz Toggle */}
+            <button
+              onClick={() => setFilterInternational(!filterInternational)}
+              className={`lg:hidden flex items-center h-9 rounded-lg border transition-all duration-200 whitespace-nowrap flex-shrink-0 ${filterInternational
+                ? 'bg-sky-500 text-white border-sky-600 shadow-md shadow-sky-500/20'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-sky-50 hover:text-sky-600 hover:border-sky-200 shadow-sm'
+                }`}
+              title="Filter by International Business readiness"
+            >
+              <Globe size={14} className={filterInternational ? 'animate-pulse' : ''} />
+            </button>
           </div>
 
           {/* Global Category Filters */}
@@ -182,12 +196,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   value={selectedIndustry}
                   onChange={(e) => setSelectedIndustry(e.target.value)}
                   options={uniqueIndustries.map(ind => {
-                    const count = ind === 'All' 
-                      ? businesses.length 
+                    const count = ind === 'All'
+                      ? businesses.length
                       : businesses.filter(b => b.industry === ind).length;
-                    return { 
-                      value: ind, 
-                      label: `${count.toString().padStart(2, '0')} | ${ind === 'All' ? 'Industry: All' : ind}` 
+                    return {
+                      value: ind,
+                      label: `${count.toString().padStart(2, '0')} | ${ind === 'All' ? 'Industry: All' : ind}`
                     };
                   })}
                   className="bg-white border-slate-200 shadow-sm font-mono-numbers h-9 py-0 text-xs"
@@ -205,12 +219,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   value={selectedInterestedIndustry}
                   onChange={(e) => setSelectedInterestedIndustry(e.target.value)}
                   options={uniqueInterestedIndustries.map(ind => {
-                    const count = ind === 'All' 
-                      ? businesses.length 
+                    const count = ind === 'All'
+                      ? businesses.length
                       : businesses.filter(b => b.interestedIndustries && b.interestedIndustries.includes(ind)).length;
-                    return { 
-                      value: ind, 
-                      label: `${count.toString().padStart(2, '0')} | ${ind === 'All' ? 'Interested: All' : ind}` 
+                    return {
+                      value: ind,
+                      label: `${count.toString().padStart(2, '0')} | ${ind === 'All' ? 'Interested: All' : ind}`
                     };
                   })}
                   className="bg-white border-slate-200 shadow-sm font-mono-numbers h-9 py-0 text-xs"
@@ -220,7 +234,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
             <button
               onClick={() => setFilterInternational(!filterInternational)}
-              className={`flex items-center gap-2 px-3 h-9 rounded-lg border transition-all duration-200 whitespace-nowrap flex-shrink-0 ${filterInternational
+              className={`hidden lg:flex items-center gap-2 px-3 h-9 rounded-lg border transition-all duration-200 whitespace-nowrap flex-shrink-0 ${filterInternational
                 ? 'bg-sky-500 text-white border-sky-600 shadow-md shadow-sky-500/20'
                 : 'bg-white text-slate-600 border-slate-200 hover:bg-sky-50 hover:text-sky-600 hover:border-sky-200 shadow-sm'
                 }`}
