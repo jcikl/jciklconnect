@@ -2152,10 +2152,10 @@ export const JCIKLApp: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="flex items-center">
                     <button
                       onClick={() => setSearchDrawerOpen(true)}
-                      className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+                      className="p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
                       title="Search"
                     >
                       <Search size={20} className="group-hover:scale-110 transition-transform" />
@@ -2163,11 +2163,11 @@ export const JCIKLApp: React.FC = () => {
 
                     <button
                       onClick={() => setNotificationDrawerOpen(true)}
-                      className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+                      className="relative p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
                     >
                       <Bell size={20} className="group-hover:rotate-12 transition-transform" />
                       {unreadNotifications.length > 0 && (
-                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
+                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] flex items-center justify-center">
                           {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
                         </span>
                       )}
@@ -2175,7 +2175,7 @@ export const JCIKLApp: React.FC = () => {
 
                     <button
                       onClick={handleLogout}
-                      className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+                      className="p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
                       title="Sign Out"
                     >
                       <LogOut size={20} className="group-hover:scale-110 transition-transform" />
