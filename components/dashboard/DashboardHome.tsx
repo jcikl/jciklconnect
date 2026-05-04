@@ -16,7 +16,7 @@ import { usePoints } from '../../hooks/usePoints';
 import { useMembers } from '../../hooks/useMembers';
 import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
 import { NudgeBanner } from '../ui/NudgeBanner';
-import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
+import { MemberGrowthChart, PointsDistributionChart, PointsSourceRadarChart } from './Analytics';
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
 import { ActivityRecommendationService } from '../../services/activityRecommendationService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
@@ -41,46 +41,63 @@ import 'swiper/css/pagination';
  */
 const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ members, currentUser }) => {
   const top3 = members.slice(0, 3);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(top3[0]?.id || null);
+
   return (
     <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-jci-navy border-none shadow-[0_20px_50px_rgba(8,112,184,0.7)] text-white">
-      <div className="absolute top-0 right-0 p-4 opacity-10">
-        <Trophy size={80} />
-      </div>
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-black uppercase tracking-tighter italic">Elite Leaderboard</h3>
-          <Badge className="bg-amber-500 text-white border-none animate-pulse">Top League</Badge>
-        </div>
-        <div className="space-y-4">
-          {top3.map((m, idx) => (
-            <div key={m.id} className={`flex items-center justify-between p-3 rounded-2xl border ${m.id === currentUser?.id ? 'bg-white/20 border-white/40' : 'bg-white/5 border-white/10'} hover:bg-white/10 transition-all group cursor-pointer`}>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <span className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${idx === 0 ? 'bg-amber-400 text-amber-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : 'bg-orange-400 text-orange-900'}`}>
-                    {idx + 1}
-                  </span>
-                  <img src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}`} className="w-10 h-10 rounded-full border-2 border-white/20" alt="" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold truncate max-w-[120px]">{m.name}</p>
-                  <p className="text-[10px] text-blue-200 uppercase font-black tracking-widest">{m.tier || 'BRONZE'}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-black text-amber-400">{(m.points || 0).toLocaleString()}</p>
-                <p className="text-[10px] text-blue-200">Total Points</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-blue-200 uppercase font-bold">Your Rank</span>
-            <span className="text-xl font-black italic">#{members.findIndex(m => m.id === currentUser?.id) + 1 || '?'}</span>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h3 className="text-xl font-black uppercase tracking-tighter italic leading-none mb-1">Elite Leaderboard</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Global Ranking • Top 3 Members</p>
           </div>
-          <div className="flex items-center gap-2 text-amber-400 hover:gap-3 transition-all cursor-pointer">
-            <span className="text-xs font-bold uppercase">Climb Up</span>
-            <ArrowUpRight size={16} />
+          <Badge className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-white border-none animate-pulse shadow-[0_0_20px_rgba(245,158,11,0.5)] font-black italic tracking-tighter">
+            Top League
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          {/* Left Side: Member List */}
+          <div className="space-y-4">
+            {top3.map((m, idx) => (
+              <div
+                key={m.id}
+                className={`flex items-center justify-between p-4 rounded-2xl border transition-all group cursor-pointer ${m.id === selectedMemberId ? 'bg-white/20 border-white/40 shadow-lg scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                onClick={() => setSelectedMemberId(m.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <span className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${idx === 0 ? 'bg-amber-400 text-amber-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : 'bg-orange-400 text-orange-900'}`}>
+                      {idx + 1}
+                    </span>
+                    <img src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}`} className="w-12 h-12 rounded-full border-2 border-white/20" alt="" />
+                  </div>
+                  <div>
+                    <p className={`font-black tracking-tight ${m.id === currentUser?.id ? 'text-amber-400' : 'text-white'}`}>{m.name}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{m.tier || 'MEMBER'}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black tracking-tighter leading-none">{(m.points || 0).toLocaleString()}</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Points</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Right Side: Radar Chart */}
+          <div className="relative bg-white/5 rounded-[32px] p-6 border border-white/10 h-full flex flex-col items-center justify-center min-h-[280px]">
+            <div className="absolute top-4 left-6">
+              <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 italic">Points Source</h4>
+              <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Skill Analysis</p>
+            </div>
+
+            <PointsSourceRadarChart memberId={selectedMemberId || undefined} className="mt-4" />
+
+            <div className="absolute bottom-4 right-6 text-right">
+              <p className="text-[10px] font-black text-amber-400 italic uppercase">Competitive Mode</p>
+              <p className="text-[8px] text-slate-500 uppercase font-bold">Data Realtime</p>
+            </div>
           </div>
         </div>
       </div>
@@ -364,10 +381,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1">
             <button
               onClick={onOpenSearch}
-              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              className="p-0 text-white/70 hover:text-white transition-all group"
               title="Search"
             >
               <Search size={20} className="group-hover:scale-110 transition-transform" />
@@ -375,11 +392,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
             <button
               onClick={onOpenNotifications}
-              className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              className="relative p-0 text-white/70 hover:text-white transition-all group"
+              title="Notifications"
             >
               <Bell size={20} className="group-hover:rotate-12 transition-transform" />
               {unreadNotifications.length > 0 && (
-                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
+                <span className="absolute top-0 right-0 min-w-[16px] h-[16px] bg-red-500 rounded-full text-[9px] flex items-center justify-center font-black">
                   {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
                 </span>
               )}
@@ -394,7 +412,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   showToast('Failed to logout', 'error');
                 }
               }}
-              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+              className="p-0 text-white/70 hover:text-red-400 transition-all group"
               title="Sign Out"
             >
               <LogOut size={20} className="group-hover:scale-110 transition-transform" />
@@ -600,25 +618,17 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       <div className="grid lg:grid-cols-3 gap-6">
         <Card noPadding>
           <div className="px-6 pt-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between">
               <h3 className="font-bold text-slate-900">Events</h3>
-              <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
-                <button
-                  onClick={() => setEventTab('upcoming')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${eventTab === 'upcoming' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Upcoming
-                </button>
-                <button
-                  onClick={() => setEventTab('past')}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${eventTab === 'past' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Past
-                </button>
-              </div>
+              <button
+                onClick={() => onNavigate?.('EVENTS')}
+                className="text-xs font-black text-jci-blue uppercase tracking-widest hover:opacity-70 transition-opacity"
+              >
+                View All
+              </button>
             </div>
           </div>
-          <div className="p-6">
+          <div className="px-6 pb-6">
             {eventsLoading ? (
               <div className="text-center py-8 text-slate-400 text-sm">Loading events...</div>
             ) : (eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length === 0 ? (
@@ -676,8 +686,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
         {member.role !== UserRole.GUEST && (
           <>
-            {/* LEADERBOARD (Wolf Heart) */}
-            <EliteLeaderboard members={leaderboard} currentUser={member} />
+            {/* LEADERBOARD (Wolf Heart) - Spanning 2 columns */}
+            <div className="lg:col-span-2">
+              <EliteLeaderboard members={leaderboard} currentUser={member} />
+            </div>
 
             {/* OPPORTUNITY DROPS (FOMO) */}
             <Card className="bg-slate-50 border-2 border-dashed border-slate-200 hover:border-jci-blue hover:bg-white transition-all group overflow-hidden">
@@ -750,62 +762,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </div>
             </Card>
 
-            <div className="lg:col-span-2 space-y-6">
-              {/* STATUS & PRIVILEGES (Status Seeking) */}
-              <Card className="bg-white border-2 border-jci-blue/20 relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-32 h-32 bg-jci-blue/5 rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-xl rotate-3">
-                      <Crown size={32} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm text-slate-400 font-bold uppercase tracking-widest leading-none mb-1">Your Status</h3>
-                      <p className="text-2xl font-black text-slate-900 tracking-tighter uppercase">{member.tier || 'BRONZE'}</p>
-                    </div>
-                  </div>
-
-                  <div className="hidden md:block w-px h-12 bg-slate-100"></div>
-
-                  <div className="flex-1">
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Privilege Unlock: PLATINUM</span>
-                      <span className="text-xs font-black text-jci-blue">{(member.points || 0)} / {MEMBER_TIERS.PLATINUM.minPoints}</span>
-                    </div>
-                    <div className="w-full h-3 bg-slate-100 rounded-full border border-slate-200/50 p-0.5 overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, ((member.points || 0) / MEMBER_TIERS.PLATINUM.minPoints) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-jci-blue to-cyan-400 rounded-full shadow-[0_0_10px_rgba(0,151,215,0.4)]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {MEMBER_PRIVILEGES[member.tier || 'BRONZE'].map((priv, i) => (
-                      <Badge key={i} className="bg-blue-50 text-jci-blue border-blue-100 font-black italic text-[10px] py-1">{priv}</Badge>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-
-              {(isBoard || isAdmin || isDeveloper) && (
-                <MemberGrowthChart members={members} />
-              )}
 
 
-            </div>
-
-            <div className="space-y-6">
-              <div className="relative" style={{ minHeight: 320, minWidth: 0 }}>
-                <div className="absolute top-4 right-6 z-10 flex flex-col items-end">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Points</span>
-                  <span className="text-2xl font-bold text-jci-blue leading-none">{(member.points || 0).toLocaleString()}</span>
-                  {rankPercentile > 0 && <span className="text-[10px] text-slate-400 mt-1">Top {rankPercentile}%</span>}
-                </div>
-                <PointsDistributionChart pointHistory={pointHistory} />
-              </div>
-            </div>
+            {/* Engagement Points Source removed per user request */}
           </>
         )}
       </div>

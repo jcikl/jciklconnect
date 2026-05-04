@@ -1,5 +1,9 @@
 import React, { useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  BarChart, Bar, Cell, 
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar 
+} from 'recharts';
 import { Card } from '../ui/Common';
 import { Member } from '../../types';
 import { PointTransaction } from '../../services/pointsService';
@@ -111,5 +115,53 @@ export const PointsDistributionChart: React.FC<PointsDistributionChartProps> = (
         </ResponsiveContainer>
       </div>
     </Card>
+  );
+};
+
+interface PointsSourceRadarChartProps {
+  memberId?: string;
+  className?: string;
+}
+
+export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ memberId, className }) => {
+  // Mock data for the radar chart
+  const data = useMemo(() => {
+    // Generate slightly different data based on memberId for visual variety
+    const seed = memberId ? memberId.length : 10;
+    const rawData = [
+      { subject: 'Leadership', A: 60 + (seed % 40), fullMark: 150 },
+      { subject: 'Events', A: 70 + ((seed * 2) % 60), fullMark: 150 },
+      { subject: 'Recruitment', A: 40 + ((seed * 3) % 80), fullMark: 150 },
+      { subject: 'Sponsorship', A: 30 + ((seed * 4) % 100), fullMark: 150 },
+      { subject: 'Training', A: 50 + ((seed * 5) % 70), fullMark: 150 },
+    ];
+    
+    // Append score to subject name for direct display on the axis
+    return rawData.map(item => ({
+      ...item,
+      displaySubject: `${item.subject}: ${item.A}`
+    }));
+  }, [memberId]);
+
+  return (
+    <div className={`w-full h-full min-h-[220px] ${className}`}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
+          <PolarGrid stroke="#ffffff20" />
+          <PolarAngleAxis 
+            dataKey="displaySubject" 
+            tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 'bold' }} 
+          />
+          <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
+          <Radar
+            name="Points"
+            dataKey="A"
+            stroke="#F59E0B"
+            fill="#F59E0B"
+            fillOpacity={0.5}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
   );
 };

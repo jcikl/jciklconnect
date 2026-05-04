@@ -168,8 +168,31 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     <div className="space-y-6">
       {/* Statistics Overview */}
       {statistics && (
-        <div className="grid md:grid-cols-4 gap-4">
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Mobile: Combined Card (Single Row) */}
+          <Card className="md:hidden">
+            <div className="grid grid-cols-4 divide-x divide-slate-100 -m-4">
+              <div className="py-4 px-1 text-center">
+                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Probation</div>
+                <div className="text-sm font-bold text-slate-900">{statistics.totalProbationMembers}</div>
+              </div>
+              <div className="py-4 px-1 text-center">
+                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Eligible</div>
+                <div className="text-sm font-bold text-green-600">{statistics.eligibleForPromotion}</div>
+              </div>
+              <div className="py-4 px-1 text-center">
+                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Promoted</div>
+                <div className="text-sm font-bold text-purple-600">{statistics.promotedThisYear}</div>
+              </div>
+              <div className="py-4 px-1 text-center">
+                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Avg Time</div>
+                <div className="text-sm font-bold text-amber-600">{statistics.averageTimeToPromotion}d</div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Desktop: Separate Cards */}
+          <Card className="hidden md:block">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-slate-500 mb-1">Probation Members</div>
@@ -179,7 +202,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             </div>
           </Card>
 
-          <Card>
+          <Card className="hidden md:block">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-slate-500 mb-1">Eligible for Promotion</div>
@@ -189,7 +212,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             </div>
           </Card>
 
-          <Card>
+          <Card className="hidden md:block">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-slate-500 mb-1">Promoted This Year</div>
@@ -199,7 +222,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             </div>
           </Card>
 
-          <Card>
+          <Card className="hidden md:block">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-slate-500 mb-1">Avg. Time to Promotion</div>

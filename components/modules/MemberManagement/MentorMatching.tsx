@@ -184,13 +184,9 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Intelligent Mentor Matching</h1>
-          <p className="text-gray-600 mt-1">AI-powered mentor-mentee pairing system</p>
-        </div>
         {onClose && (
           <button
             onClick={onClose}
@@ -203,7 +199,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
 
       {/* Stats Cards */}
       {mentorshipStats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">

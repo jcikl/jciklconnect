@@ -105,11 +105,11 @@ export const BountyMarketplaceView: React.FC = () => {
 
       {/* Hunter Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-jci-blue text-white border-none shadow-lg">
+        <Card className="!bg-jci-blue text-white !border-none shadow-lg">
           <p className="text-[10px] font-black uppercase opacity-60">Active Bounties</p>
           <p className="text-3xl font-black">{bounties.length}</p>
         </Card>
-        <Card className="bg-slate-900 text-white border-none shadow-lg">
+        <Card className="!bg-slate-900 text-white !border-none shadow-lg">
           <p className="text-[10px] font-black uppercase opacity-60">Avg. Payout</p>
           <p className="text-3xl font-black">
             {bounties.length > 0 ? Math.round(bounties.reduce((a, b) => a + b.rewardPoints, 0) / bounties.length) : 0}

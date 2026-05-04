@@ -75,21 +75,25 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         bannerUrl = await getDownloadURL(snapshot.ref);
       }
 
+      const getNumber = (val: FormDataEntryValue | null) => {
+        const parsed = parseFloat(val as string);
+        return isNaN(parsed) ? undefined : parsed;
+      };
+
       const benefitData: Omit<MemberBenefit, 'id' | 'createdAt' | 'updatedAt' | 'currentUsage'> = {
         name: formData.get('name') as string,
         description: formData.get('description') as string,
         type: formData.get('type') as any,
         category: formData.get('category') as any,
-        discountPercentage: formData.get('discountPercentage') ? parseFloat(formData.get('discountPercentage') as string) : undefined,
-        discountAmount: formData.get('discountAmount') ? parseFloat(formData.get('discountAmount') as string) : undefined,
+
         eligibilityCriteria: {
-          tier: formData.get('eligibleTiers') ? (formData.get('eligibleTiers') as string).split(',').filter(Boolean) : undefined,
-          role: formData.get('eligibleRoles') ? (formData.get('eligibleRoles') as string).split(',').filter(Boolean) : undefined,
-          points: formData.get('minPoints') ? parseInt(formData.get('minPoints') as string) : undefined,
+          tier: formData.get('eligibleTiers') ? (formData.get('eligibleTiers') as string).split(',').map(s => s.trim()).filter(Boolean) : undefined,
+          role: formData.get('eligibleRoles') ? (formData.get('eligibleRoles') as string).split(',').map(s => s.trim()).filter(Boolean) : undefined,
+          points: getNumber(formData.get('minPoints')),
         },
         validFrom: formData.get('validFrom') as string,
         validUntil: formData.get('validUntil') as string || undefined,
-        usageLimit: formData.get('usageLimit') ? parseInt(formData.get('usageLimit') as string) : undefined,
+        usageLimit: getNumber(formData.get('usageLimit')),
         status: (formData.get('status') as any) || 'Active',
         provider: formData.get('provider') as string || undefined,
         termsAndConditions: formData.get('terms') as string || undefined,
@@ -105,7 +109,9 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       setSelectedBenefit(null);
       setFormBanner(null);
       e.currentTarget.reset();
+      showToast(selectedBenefit ? 'Benefit updated successfully' : 'Benefit created successfully', 'success');
     } catch (err) {
+      console.error('Benefit save error:', err);
       showToast('Failed to save benefit', 'error');
     } finally {
       setIsUploading(false);
@@ -149,109 +155,88 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         )}
       </div>
 
-      <Card noPadding>
-        <div className="p-4">
-          <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits available">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayBenefits.map(benefit => (
-                <Card key={benefit.id} className="hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <Badge variant={benefit.status === 'Active' ? 'success' : 'neutral'}>
-                      {benefit.status}
-                    </Badge>
-                  </div>
-                  <h3 className="font-bold text-lg text-slate-900 mb-2">{benefit.name}</h3>
-                  {benefit.bannerUrl && (
-                    <div className="mb-3 w-full h-48 overflow-hidden rounded-lg">
-                      <img src={benefit.bannerUrl} alt={benefit.name} className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                  <p className="text-sm text-slate-600 mb-4">{benefit.description}</p>
+      <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits available">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {displayBenefits.map(benefit => (
+            <Card key={benefit.id} className="hover:shadow-md transition-shadow">
+              <h3 className="font-bold text-lg text-slate-900 mb-2">{benefit.name}</h3>
+              {benefit.bannerUrl && (
+                <div className="mb-3 w-full h-48 overflow-hidden rounded-lg">
+                  <img src={benefit.bannerUrl} alt={benefit.name} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <p className="text-sm text-slate-600 mb-4">{benefit.description}</p>
 
-                  <div className="space-y-2 mb-4">
-                    {benefit.discountPercentage && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Tag size={14} className="text-green-600" />
-                        <span className="font-semibold text-green-600">{benefit.discountPercentage}% Off</span>
-                      </div>
-                    )}
-                    {benefit.discountAmount && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Tag size={14} className="text-green-600" />
-                        <span className="font-semibold text-green-600">RM {benefit.discountAmount} Off</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <Users size={12} />
-                      <span>{benefit.currentUsage || 0} uses</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <Calendar size={12} />
-                      <span>Valid until {benefit.validUntil ? formatDate(toDate(benefit.validUntil).toISOString()) : 'Ongoing'}</span>
-                    </div>
-                  </div>
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Users size={12} />
+                  <span>{benefit.currentUsage || 0} uses</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Calendar size={12} />
+                  <span>Valid until {benefit.validUntil ? formatDate(toDate(benefit.validUntil).toISOString()) : 'Ongoing'}</span>
+                </div>
+              </div>
 
-                  <div className="flex gap-2 pt-4 border-t">
-                    {(isBoard || isAdmin) && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedBenefit(benefit);
-                            setIsModalOpen(true);
-                          }}
-                        >
-                          <Edit size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to delete this benefit?')) {
-                              await deleteBenefit(benefit.id!);
-                            }
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </>
-                    )}
-                    {member && (
-                      <Button
-                        size="sm"
-                        className="flex-1"
-                        variant={claimedBenefitIds.has(benefit.id!) ? 'outline' : 'primary'}
-                        disabled={claimedBenefitIds.has(benefit.id!)}
-                        onClick={async () => {
-                          if (!member) {
-                            showToast('Please login to claim benefits', 'error');
-                            return;
-                          }
+              <div className="flex gap-2 pt-4 border-t">
+                {(isBoard || isAdmin) && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedBenefit(benefit);
+                        setIsModalOpen(true);
+                      }}
+                    >
+                      <Edit size={14} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to delete this benefit?')) {
+                          await deleteBenefit(benefit.id!);
+                        }
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </>
+                )}
+                {member && (
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    variant={claimedBenefitIds.has(benefit.id!) ? 'outline' : 'primary'}
+                    disabled={claimedBenefitIds.has(benefit.id!)}
+                    onClick={async () => {
+                      if (!member) {
+                        showToast('Please login to claim benefits', 'error');
+                        return;
+                      }
 
-                          try {
-                            await recordUsage(member.id, benefit.id!, `Claimed ${benefit.name}`);
-                            showToast('Benefit claimed! Details will be sent via email.', 'success');
+                      try {
+                        await recordUsage(member.id, benefit.id!, `Claimed ${benefit.name}`);
+                        showToast('Benefit claimed! Details will be sent via email.', 'success');
 
-                            await loadClaimedBenefits();
-                          } catch (err) {
-                            // Error handled by hook
-                          }
-                        }}
-                      >
-                        <CheckCircle size={14} className="mr-2" />
-                        {claimedBenefitIds.has(benefit.id!) ? 'Claimed' : 'Claim Benefit'}
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </LoadingState>
-
+                        await loadClaimedBenefits();
+                      } catch (err) {
+                        // Error handled by hook
+                      }
+                    }}
+                  >
+                    <CheckCircle size={14} className="mr-2" />
+                    {claimedBenefitIds.has(benefit.id!) ? 'Claimed' : 'Claim Benefit'}
+                  </Button>
+                )}
+              </div>
+            </Card>
+          ))}
         </div>
-      </Card>
+      </LoadingState>
+
 
       {/* Create/Edit Benefit Modal */}
       <Modal
@@ -264,8 +249,27 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         title={selectedBenefit ? 'Edit Benefit' : 'Create New Benefit'}
         size="lg"
         drawerOnMobile
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button className="flex-1" type="submit" form="benefit-form" disabled={isUploading}>
+              {isUploading ? 'Uploading...' : selectedBenefit ? 'Update Benefit' : 'Create Benefit'}
+            </Button>
+            <Button
+              variant="ghost"
+              type="button"
+              disabled={isUploading}
+              onClick={() => {
+                setIsModalOpen(false);
+                setSelectedBenefit(null);
+                setFormBanner(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form id="benefit-form" onSubmit={handleSubmit} className="space-y-4">
           <Input
             name="name"
             label="Benefit Name"
@@ -276,7 +280,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-slate-700">Banner Image (5:3 Ratio Landscape)</label>
-            <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            <div className="bg-slate-50 rounded-xl border border-dashed border-slate-200">
               <input
                 type="file"
                 accept="image/*"
@@ -288,30 +292,39 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                 className="hidden"
                 id="banner-upload"
               />
-              <label htmlFor="banner-upload" className="flex flex-col items-center cursor-pointer">
-                <ImageIcon size={24} className="text-slate-400 mb-2" />
-                <span className="text-sm font-medium text-slate-600">Click to upload banner image</span>
-                <span className="text-xs text-slate-400 mt-1">Recommended: 1200x720px (5:3)</span>
-              </label>
+              {!(formBanner || selectedBenefit?.bannerUrl) && (
+                <label htmlFor="banner-upload" className="flex flex-col items-center cursor-pointer">
+                  <ImageIcon size={24} className="text-slate-400 mb-2" />
+                  <span className="text-sm font-medium text-slate-600">Click to upload banner image</span>
+                  <span className="text-xs text-slate-400 mt-1">Recommended: 1200x720px (5:3)</span>
+                </label>
+              )}
 
               {(formBanner || selectedBenefit?.bannerUrl) && (
-                <div className="mt-4 flex items-center justify-between bg-white p-2 rounded border border-slate-100">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <ImageIcon size={16} className="text-blue-500" />
-                    <span className="text-xs text-slate-700 truncate">
-                      {formBanner ? formBanner.name : 'Current Banner'}
-                    </span>
-                  </div>
+                <div className="mt-4 relative group">
+                  <label htmlFor="banner-upload" className="cursor-pointer block">
+                    <div className="aspect-[5/3] w-full rounded-xl overflow-hidden border border-slate-200 shadow-inner bg-slate-100">
+                      <img
+                        src={formBanner ? URL.createObjectURL(formBanner) : selectedBenefit?.bannerUrl}
+                        alt="Banner Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <p className="text-white text-[10px] font-black uppercase tracking-widest">Click to change</p>
+                      </div>
+                    </div>
+                  </label>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       setFormBanner(null);
                       if (selectedBenefit) {
-                        // Optional: Clear selectedBenefit bannerUrl if they remove it
-                        // selectedBenefit.bannerUrl = undefined;
+                        // Handle removal of existing banner if needed
                       }
                     }}
-                    className="text-slate-400 hover:text-red-500 transition-colors"
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors z-10"
                   >
                     <X size={14} />
                   </button>
@@ -355,24 +368,6 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                 { label: 'General', value: 'General' },
               ]}
               required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              name="discountPercentage"
-              label="Discount Percentage (%)"
-              type="number"
-              min="0"
-              max="100"
-              defaultValue={selectedBenefit?.discountPercentage?.toString()}
-            />
-            <Input
-              name="discountAmount"
-              label="Discount Amount (RM)"
-              type="number"
-              min="0"
-              defaultValue={selectedBenefit?.discountAmount?.toString()}
             />
           </div>
 
@@ -448,24 +443,6 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
               { label: 'Expired', value: 'Expired' },
             ]}
           />
-
-          <div className="flex gap-3 pt-4">
-            <Button className="flex-1" type="submit" disabled={isUploading}>
-              {isUploading ? 'Uploading...' : selectedBenefit ? 'Update Benefit' : 'Create Benefit'}
-            </Button>
-            <Button
-              variant="ghost"
-              type="button"
-              disabled={isUploading}
-              onClick={() => {
-                setIsModalOpen(false);
-                setSelectedBenefit(null);
-                setFormBanner(null);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
         </form>
       </Modal>
 

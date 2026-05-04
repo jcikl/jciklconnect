@@ -24,8 +24,7 @@ export interface MemberBenefit {
   description: string;
   type: 'Discount' | 'Exclusive Access' | 'Free Service' | 'Priority' | 'Other';
   category: 'Event' | 'Training' | 'Business' | 'Social' | 'General';
-  discountPercentage?: number;
-  discountAmount?: number;
+
   eligibilityCriteria: {
     tier?: string[];
     role?: string[];
@@ -64,7 +63,6 @@ export class MemberBenefitsService {
           description: 'Exclusive discount on all JCI events',
           type: 'Discount',
           category: 'Event',
-          discountPercentage: 20,
           eligibilityCriteria: {
             tier: ['Silver', 'Gold', 'Platinum'],
           },
@@ -212,19 +210,18 @@ export class MemberBenefitsService {
         currentUsage: 0,
         validFrom: Timestamp.fromDate(toDate(benefitData.validFrom)),
         validUntil: benefitData.validUntil ? Timestamp.fromDate(toDate(benefitData.validUntil)) : null,
+        usageLimit: benefitData.usageLimit || null,
+        provider: benefitData.provider || null,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
 
-      // Only include discount fields if they are defined
-      if (benefitData.discountPercentage !== undefined) {
-        newBenefit.discountPercentage = benefitData.discountPercentage;
-      }
-      if (benefitData.discountAmount !== undefined) {
-        newBenefit.discountAmount = benefitData.discountAmount;
-      }
+
       if (benefitData.bannerUrl !== undefined) {
         newBenefit.bannerUrl = benefitData.bannerUrl;
+      }
+      if (benefitData.termsAndConditions !== undefined) {
+        newBenefit.termsAndConditions = benefitData.termsAndConditions;
       }
 
       const cleanBenefit = removeUndefined(newBenefit);
@@ -254,9 +251,11 @@ export class MemberBenefitsService {
       if (updates.type !== undefined) updateData.type = updates.type;
       if (updates.category !== undefined) updateData.category = updates.category;
       if (updates.eligibilityCriteria !== undefined) updateData.eligibilityCriteria = updates.eligibilityCriteria;
-      if (updates.discountPercentage !== undefined) updateData.discountPercentage = updates.discountPercentage;
-      if (updates.discountAmount !== undefined) updateData.discountAmount = updates.discountAmount;
+
       if (updates.bannerUrl !== undefined) updateData.bannerUrl = updates.bannerUrl;
+      if (updates.termsAndConditions !== undefined) updateData.termsAndConditions = updates.termsAndConditions;
+      if (updates.usageLimit !== undefined) updateData.usageLimit = updates.usageLimit;
+      if (updates.provider !== undefined) updateData.provider = updates.provider;
 
       if (updates.validFrom) {
         updateData.validFrom = Timestamp.fromDate(toDate(updates.validFrom));

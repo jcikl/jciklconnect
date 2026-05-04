@@ -466,7 +466,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
 
   const renderHeader = () => (
     <div
-      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-4 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-2 sm:pb-2 lg:pb-2"
+      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-5 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-2 sm:pb-2 lg:pb-2"
     >
       {/* Decorative Background Pattern */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
@@ -501,10 +501,10 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1">
             <button
               onClick={onOpenSearch}
-              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              className="p-0 text-white/70 hover:text-white transition-all group"
               title="Search"
             >
               <Search size={20} className="group-hover:scale-110 transition-transform" />
@@ -512,11 +512,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
 
             <button
               onClick={onOpenNotifications}
-              className="relative p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all shadow-xl group"
+              className="relative p-0 text-white/70 hover:text-white transition-all group"
+              title="Notifications"
             >
               <Bell size={20} className="group-hover:rotate-12 transition-transform" />
               {unreadNotifications.length > 0 && (
-                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-jci-navy text-[10px] flex items-center justify-center font-black">
+                <span className="absolute top-0 right-0 min-w-[16px] h-[16px] bg-red-500 rounded-full text-[9px] flex items-center justify-center font-black">
                   {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
                 </span>
               )}
@@ -531,7 +532,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                   showToast('Failed to logout', 'error');
                 }
               }}
-              className="p-3 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-red-500/20 hover:border-red-500/50 transition-all shadow-xl group"
+              className="p-0 text-white/70 hover:text-red-400 transition-all group"
               title="Sign Out"
             >
               <LogOut size={20} className="group-hover:scale-110 transition-transform" />
@@ -577,12 +578,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
   );
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-2 pb-24">
       {renderHeader()}
 
       {/* Homepage Advertisements Banner (Swiper) */}
       {homepageAds.length > 0 && (
-        <div className="w-full -mx-4 px-4 sm:mx-0 sm:px-0 mt-6">
+        <div className="w-full mt-6">
           <Swiper
             modules={[Autoplay, Pagination]}
             spaceBetween={16}
@@ -716,539 +717,613 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
         {activeTab === 'overview' && (
           <>
             {/* Member Metrics Row */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="min-w-0">
-                <StatCard
-                  title="Total Members"
-                  value={metrics.totalMembers.toString()}
-                  icon={<Users size={20} />}
-                  subtext={`${metrics.newMembersThisMonth} new this month`}
-                  trend={metrics.newMembersThisMonth > 0 ? metrics.newMembersThisMonth : undefined}
+            <Card noPadding className="mb-2 overflow-hidden">
+              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
+                {/* Total Members */}
+                <div
+                  className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative"
                   onClick={() => onNavigate?.('MEMBERS')}
-                />
-              </div>
-              <div className="min-w-0">
-                <StatCard
-                  title="Active Members"
-                  value={metrics.activeMembers.toString()}
-                  icon={<CheckCircle size={20} />}
-                  subtext={`${Math.round((metrics.activeMembers / Math.max(metrics.totalMembers, 1)) * 100)}% engagement`}
-                  onClick={() => onNavigate?.('MEMBERS')}
-                />
-              </div>
-            </div>
+                >
+                  <div className="absolute top-4 right-4 p-2 bg-blue-50 text-jci-blue rounded-lg group-hover:bg-jci-blue group-hover:text-white transition-colors">
+                    <Users size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Members</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.totalMembers}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">{metrics.newMembersThisMonth} new this month</span>
+                  </div>
+                </div>
 
-            {/* Activity Metrics Row */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="min-w-0">
-                <StatCard
-                  title="Upcoming Events"
-                  value={metrics.upcomingEvents.toString()}
-                  icon={<Calendar size={20} />}
-                  subtext="Scheduled activities"
+                {/* Active Members */}
+                <div
+                  className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative"
+                  onClick={() => onNavigate?.('MEMBERS')}
+                >
+                  <div className="absolute top-4 right-4 p-2 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors">
+                    <CheckCircle size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Members</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.activeMembers}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">{Math.round((metrics.activeMembers / Math.max(metrics.totalMembers, 1)) * 100)}% engagement</span>
+                  </div>
+                </div>
+
+                {/* Upcoming Events */}
+                <div
+                  className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative"
                   onClick={() => onNavigate?.('EVENTS')}
-                />
-              </div>
-              <div className="min-w-0">
-                <StatCard
-                  title="Active Projects"
-                  value={metrics.activeProjects.toString()}
-                  icon={<Briefcase size={20} />}
-                  subtext={`${metrics.completedProjects} completed`}
+                >
+                  <div className="absolute top-4 right-4 p-2 bg-purple-50 text-purple-600 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                    <Calendar size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Upcoming Events</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.upcomingEvents}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">Scheduled activities</span>
+                  </div>
+                </div>
+
+                {/* Active Projects */}
+                <div
+                  className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative"
                   onClick={() => onNavigate?.('PROJECTS')}
-                />
+                >
+                  <div className="absolute top-4 right-4 p-2 bg-amber-50 text-amber-600 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                    <Briefcase size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Projects</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.activeProjects}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">{metrics.completedProjects} completed</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            </Card>
 
             {/* Financial Overview */}
             {loadingFinance ? (
-              <Card noPadding className="p-4" title="Financial Overview">
+              <Card noPadding noHeaderPadding className="mb-4" title={<div className="px-4 py-3">Financial Overview</div>}>
                 <div className="text-center py-8 text-slate-400 text-sm">Loading financial data...</div>
               </Card>
             ) : financialSummary ? (
               <Card
                 noPadding
-                className="p-4 mb-4"
-                title="Financial Overview"
+                noHeaderPadding
+                className="mb-2 overflow-hidden"
+                title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Financial Overview</div>}
                 action={
-                  <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
-                    <Eye size={18} />
-                  </Button>
+                  <div className="px-4">
+                    <Button variant="ghost" size="sm" onClick={() => onNavigate?.('FINANCE')}>
+                      <Eye size={18} />
+                    </Button>
+                  </div>
                 }
               >
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="min-w-0 bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
-                    <div className="flex items-center justify-between mb-1 md:mb-2">
-                      <span className="text-xs md:text-sm font-medium text-green-700 truncate">Total Income</span>
-                      <DollarSign size={18} className="text-green-600 flex-shrink-0 md:w-5 md:h-5" />
+                <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                  {/* Total Income */}
+                  <div className="p-4 group relative">
+                    <div className="absolute top-4 right-4 p-2 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors">
+                      <DollarSign size={16} />
                     </div>
-                    <p className="text-lg md:text-2xl font-bold text-green-900 truncate">
-                      {formatCurrency(financialSummary.totalIncome || 0)}
-                    </p>
-                  </div>
-                  <div className="min-w-0 bg-red-50 p-3 md:p-4 rounded-lg border border-red-200">
-                    <div className="flex items-center justify-between mb-1 md:mb-2">
-                      <span className="text-xs md:text-sm font-medium text-red-700 truncate">Total Expenses</span>
-                      <DollarSign size={18} className="text-red-600 flex-shrink-0 md:w-5 md:h-5" />
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Income</span>
+                      <span className="text-2xl font-black text-green-600 leading-tight">
+                        {formatCurrency(financialSummary.totalIncome || 0)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium mt-1">Year to date</span>
                     </div>
-                    <p className="text-lg md:text-2xl font-bold text-red-900 truncate">
-                      {formatCurrency(financialSummary.totalExpenses || 0)}
-                    </p>
                   </div>
-                </div>
-                <div className="min-w-0 bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-between mb-1 md:mb-2">
-                    <span className="text-xs md:text-sm font-medium text-blue-700 truncate">Net Balance</span>
-                    <TrendingUp size={18} className="text-blue-600 flex-shrink-0 md:w-5 md:h-5" />
+
+                  {/* Total Expenses */}
+                  <div className="p-4 group relative">
+                    <div className="absolute top-4 right-4 p-2 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-colors">
+                      <DollarSign size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Expenses</span>
+                      <span className="text-2xl font-black text-red-600 leading-tight">
+                        {formatCurrency(financialSummary.totalExpenses || 0)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium mt-1">Administrative & Projects</span>
+                    </div>
                   </div>
-                  <p className="text-lg md:text-2xl font-bold text-blue-900 truncate">
-                    {formatCurrency((financialSummary.totalIncome || 0) - (financialSummary.totalExpenses || 0))}
-                  </p>
+
+                  {/* Net Balance */}
+                  <div className="p-4 group relative">
+                    <div className="absolute top-4 right-4 p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <TrendingUp size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Balance</span>
+                      <span className="text-2xl font-black text-blue-900 leading-tight">
+                        {formatCurrency((financialSummary.totalIncome || 0) - (financialSummary.totalExpenses || 0))}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium mt-1">Current treasury</span>
+                    </div>
+                  </div>
                 </div>
               </Card>
             ) : null}
 
             {/* Main Content Grid */}
-            <div className="grid lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 space-y-6">
+            <div className="grid lg:grid-cols-3 gap-2">
+              <div className="lg:col-span-2 space-y-2">
                 {/* Member Engagement */}
-                <Card noPadding className="p-4" title="Member Engagement Metrics" >
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">Average Points per Member</p>
-                          <p className="text-2xl font-bold text-slate-900 mt-1">{metrics.averagePoints}</p>
-                        </div>
-                        <Award size={32} className="text-jci-blue" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle size={18} className="text-amber-600" />
-                            <span className="text-sm font-medium text-amber-700">High Risk Members</span>
+                <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Member Engagement & Celebrations</div>}>
+                  <div className="p-4">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {/* Left Side: Engagement Metrics */}
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-3">
+                          {/* Average Points */}
+                          <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 relative group transition-all hover:shadow-md">
+                            <div className="absolute top-4 right-4 p-2 bg-white text-jci-blue rounded-lg shadow-sm group-hover:bg-jci-blue group-hover:text-white transition-colors">
+                              <Award size={18} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Avg Points / Member</span>
+                              <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.averagePoints}</span>
+                              <span className="text-[10px] text-slate-500 font-medium mt-1">Overall performance</span>
+                            </div>
                           </div>
-                          <p className="text-2xl font-bold text-amber-900">{metrics.highRiskMembers}</p>
-                          <p className="text-xs text-amber-600 mt-1">Requires attention</p>
-                        </div>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <CheckCircle size={18} className="text-green-600" />
-                            <span className="text-sm font-medium text-green-700">Engagement Rate</span>
-                          </div>
-                          <p className="text-2xl font-bold text-green-900">
-                            {metrics.totalMembers > 0 ? Math.round((metrics.activeMembers / metrics.totalMembers) * 100) : 0}%
-                          </p>
-                          <p className="text-xs text-green-600 mt-1">Active participation</p>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                          <Cake size={16} className="text-pink-500" />
-                          Today's Birthdays
-                        </h4>
-                        <Badge variant="info" className="text-[10px]">
-                          {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </Badge>
-                      </div>
-
-                      {birthdaysToday.length > 0 ? (
-                        <div className="space-y-3 max-h-[160px] overflow-y-auto pr-2">
-                          {birthdaysToday.map(member => (
-                            <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg bg-pink-50/50 border border-pink-100 group hover:bg-pink-50 transition-colors">
-                              <div className="w-10 h-10 rounded-full bg-white border-2 border-pink-200 flex items-center justify-center text-pink-500 font-bold overflow-hidden">
-                                {member.avatar ? (
-                                  <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  member.name.charAt(0)
-                                )}
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* High Risk */}
+                            <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 relative group transition-all hover:shadow-md">
+                              <div className="absolute top-3 right-3 p-1.5 bg-white text-amber-600 rounded-lg shadow-sm group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                                <AlertTriangle size={14} />
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{member.name}</p>
-                                <div className="flex items-center gap-2">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">High Risk</span>
+                                <span className="text-xl font-black text-amber-900 leading-tight">{metrics.highRiskMembers}</span>
+                                <span className="text-[9px] text-amber-600 font-medium mt-1">Needs attention</span>
+                              </div>
+                            </div>
+
+                            {/* Engagement Rate */}
+                            <div className="p-4 bg-green-50 rounded-xl border border-green-100 relative group transition-all hover:shadow-md">
+                              <div className="absolute top-3 right-3 p-1.5 bg-white text-green-600 rounded-lg shadow-sm group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                <TrendingUp size={14} />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Engagement</span>
+                                <span className="text-xl font-black text-green-900 leading-tight">
+                                  {metrics.totalMembers > 0 ? Math.round((metrics.activeMembers / metrics.totalMembers) * 100) : 0}%
+                                </span>
+                                <span className="text-[9px] text-green-600 font-medium mt-1">Active rate</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Side: Birthdays */}
+                      <div className="flex flex-col">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <Cake size={14} className="text-pink-500" />
+                            Today's Birthdays
+                          </h4>
+                          <Badge variant="info" className="text-[10px] px-2 py-0">
+                            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </Badge>
+                        </div>
+
+                        {birthdaysToday.length > 0 ? (
+                          <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 scrollbar-thin">
+                            {birthdaysToday.map(member => (
+                              <div key={member.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-100 group hover:border-pink-200 hover:shadow-sm transition-all">
+                                <div className="w-10 h-10 rounded-full bg-slate-50 border-2 border-white shadow-sm flex items-center justify-center text-slate-400 font-bold overflow-hidden">
+                                  {member.avatar ? (
+                                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500">
+                                      {member.name.charAt(0)}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-slate-900 truncate group-hover:text-pink-600 transition-colors">{member.name}</p>
                                   <span className="text-[10px] text-pink-600 font-semibold flex items-center gap-1">
                                     <Gift size={10} /> Happy Birthday!
                                   </span>
                                 </div>
+                                <div className="group-hover:animate-bounce">
+                                  <Cake size={16} className="text-pink-400" />
+                                </div>
                               </div>
-                              <div className="animate-bounce">
-                                <Cake size={16} className="text-pink-400" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-2">
-                            <Cake size={20} className="text-slate-300" />
+                            ))}
                           </div>
-                          <p className="text-xs text-slate-400 font-medium text-center px-4">No member birthdays recorded for today</p>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="flex-1 flex flex-col items-center justify-center py-8 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                            <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center mb-3">
+                              <Cake size={24} className="text-slate-300" />
+                            </div>
+                            <p className="text-xs text-slate-400 font-medium text-center px-6 leading-relaxed">No member birthdays recorded for today</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </Card>
 
                 {/* Project Status */}
-                <Card noPadding className="p-4" title="Project Status Overview">
-                  <div className="space-y-4">
-                    {projects.slice(0, 5).map(project => (
-                      <div key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-slate-900">{project.name ?? project.title ?? 'Project'}</h4>
-                          <p className="text-sm text-slate-500">{project.status} • {project.completion ?? 0}% Complete</p>
+                <Card noPadding noHeaderPadding className="mb-6" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Project Status Overview</div>}>
+                  <div className="p-4">
+                    <div className="space-y-4">
+                      {projects.slice(0, 5).map(project => (
+                        <div key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-slate-900">{project.name ?? project.title ?? 'Project'}</h4>
+                            <p className="text-sm text-slate-500">{project.status} • {project.completion ?? 0}% Complete</p>
+                          </div>
+                          <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
+                            {project.status}
+                          </Badge>
                         </div>
-                        <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
-                          {project.status}
-                        </Badge>
-                      </div>
-                    ))}
-                    {projects.length === 0 && (
-                      <div className="text-center py-8 text-slate-400 text-sm">No projects found</div>
-                    )}
+                      ))}
+                      {projects.length === 0 && (
+                        <div className="text-center py-8 text-slate-400 text-sm">No projects found</div>
+                      )}
+                    </div>
                   </div>
                 </Card>
 
                 {/* Additional Metrics Grid */}
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-2">
                   {/* Inventory Status */}
                   <Card
-                    noPadding className="p-4"
-                    title="Inventory Status"
+                    noPadding noHeaderPadding
+                    title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Inventory Status</div>}
                     action={
-                      <Button variant="ghost" size="sm" onClick={() => onNavigate?.('INVENTORY')}>
-                        <Eye size={18} />
-                      </Button>
+                      <div className="px-4">
+                        <Button variant="ghost" size="sm" onClick={() => onNavigate?.('INVENTORY')}>
+                          <Eye size={18} />
+                        </Button>
+                      </div>
                     }
                   >
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Package size={20} className="text-jci-blue" />
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">Total Items</p>
-                            <p className="text-2xl font-bold text-slate-900">{metrics.totalInventoryItems}</p>
+                    <div className="p-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Package size={20} className="text-jci-blue" />
+                            <div>
+                              <p className="text-sm font-medium text-slate-700">Total Items</p>
+                              <p className="text-2xl font-bold text-slate-900">{metrics.totalInventoryItems}</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-xs text-green-700 mb-1">Available</p>
-                          <p className="text-lg font-bold text-green-900">{metrics.availableItems}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                            <p className="text-xs text-green-700 mb-1">Available</p>
+                            <p className="text-lg font-bold text-green-900">{metrics.availableItems}</p>
+                          </div>
+                          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <p className="text-xs text-amber-700 mb-1">Checked Out</p>
+                            <p className="text-lg font-bold text-amber-900">{metrics.checkedOutItems}</p>
+                          </div>
                         </div>
-                        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                          <p className="text-xs text-amber-700 mb-1">Checked Out</p>
-                          <p className="text-lg font-bold text-amber-900">{metrics.checkedOutItems}</p>
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-xs text-blue-700 mb-1">Total Value</p>
+                          <p className="text-lg font-bold text-blue-900">{formatCurrency(metrics.totalInventoryValue)}</p>
                         </div>
-                      </div>
-                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-xs text-blue-700 mb-1">Total Value</p>
-                        <p className="text-lg font-bold text-blue-900">{formatCurrency(metrics.totalInventoryValue)}</p>
                       </div>
                     </div>
                   </Card>
 
                   {/* Bank Accounts */}
-                  <Card noPadding className="p-4" title="Bank Accounts">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <CreditCard size={20} className="text-jci-blue" />
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">Total Balance</p>
-                            <p className="text-2xl font-bold text-slate-900">{formatCurrency(metrics.totalBankBalance)}</p>
+                  <Card noPadding noHeaderPadding
+                    title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Bank Accounts</div>}>
+                    <div className="p-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <CreditCard size={20} className="text-jci-blue" />
+                            <div>
+                              <p className="text-sm font-medium text-slate-700">Total Balance</p>
+                              <p className="text-2xl font-bold text-slate-900">{formatCurrency(metrics.totalBankBalance)}</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        {bankAccounts.map(account => (
-                          <div key={account.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                            <div>
-                              <p className="text-sm font-medium text-slate-900">{account.name}</p>
-                              <p className="text-xs text-slate-500">{account.accountNumber}</p>
+                        <div className="space-y-2">
+                          {bankAccounts.map(account => (
+                            <div key={account.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-slate-900">{account.name}</p>
+                                <p className="text-xs text-slate-500">{account.accountNumber}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className={`text-sm font-bold ${(account.balance || 0) < (account.minimumBalance || 0) ? 'text-red-600' : 'text-green-600'}`}>
+                                  {formatCurrency(account.balance || 0)}
+                                </p>
+                                {(account.balance || 0) < (account.minimumBalance || 0) && (
+                                  <Badge variant="error" className="text-xs mt-1">Low Balance</Badge>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className={`text-sm font-bold ${(account.balance || 0) < (account.minimumBalance || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                                {formatCurrency(account.balance || 0)}
+                          ))}
+                          {bankAccounts.length === 0 && (
+                            <div className="text-center py-4 text-slate-400 text-sm">No bank accounts</div>
+                          )}
+                          {metrics.lowBalanceAccounts > 0 && (
+                            <div className="p-2 bg-red-50 rounded-lg border border-red-200">
+                              <p className="text-xs text-red-700">
+                                <AlertTriangle size={14} className="inline mr-1" />
+                                {metrics.lowBalanceAccounts} account(s) below minimum balance
                               </p>
-                              {(account.balance || 0) < (account.minimumBalance || 0) && (
-                                <Badge variant="error" className="text-xs mt-1">Low Balance</Badge>
-                              )}
                             </div>
-                          </div>
-                        ))}
-                        {bankAccounts.length === 0 && (
-                          <div className="text-center py-4 text-slate-400 text-sm">No bank accounts</div>
-                        )}
-                        {metrics.lowBalanceAccounts > 0 && (
-                          <div className="p-2 bg-red-50 rounded-lg border border-red-200">
-                            <p className="text-xs text-red-700">
-                              <AlertTriangle size={14} className="inline mr-1" />
-                              {metrics.lowBalanceAccounts} account(s) below minimum balance
-                            </p>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Card>
 
                   {/* Hobby Clubs Activity */}
-                  <Card noPadding className="p-4" title="Hobby Clubs Activity">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Heart size={20} className="text-jci-blue" />
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">Total Clubs</p>
-                            <p className="text-2xl font-bold text-slate-900">{metrics.totalClubs}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-xs text-green-700 mb-1">Active Clubs</p>
-                          <p className="text-lg font-bold text-green-900">{metrics.activeClubs}</p>
-                        </div>
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-xs text-blue-700 mb-1">Total Members</p>
-                          <p className="text-lg font-bold text-blue-900">{metrics.totalClubMembers}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {hobbyClubs.slice(0, 3).map(club => (
-                          <div key={club.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                  <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Hobby Clubs Activity</div>}>
+                    <div className="p-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Heart size={20} className="text-jci-blue" />
                             <div>
-                              <p className="text-sm font-medium text-slate-900">{club.name}</p>
-                              <p className="text-xs text-slate-500">{club.category}</p>
+                              <p className="text-sm font-medium text-slate-700">Total Clubs</p>
+                              <p className="text-2xl font-bold text-slate-900">{metrics.totalClubs}</p>
                             </div>
-                            <Badge variant="neutral">{club.membersCount || 0} members</Badge>
                           </div>
-                        ))}
-                        {hobbyClubs.length === 0 && (
-                          <div className="text-center py-4 text-slate-400 text-sm">No clubs</div>
-                        )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                            <p className="text-xs text-green-700 mb-1">Active Clubs</p>
+                            <p className="text-lg font-bold text-green-900">{metrics.activeClubs}</p>
+                          </div>
+                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <p className="text-xs text-blue-700 mb-1">Total Members</p>
+                            <p className="text-lg font-bold text-blue-900">{metrics.totalClubMembers}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {hobbyClubs.slice(0, 3).map(club => (
+                            <div key={club.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-slate-900">{club.name}</p>
+                                <p className="text-xs text-slate-500">{club.category}</p>
+                              </div>
+                              <Badge variant="neutral">{club.membersCount || 0} members</Badge>
+                            </div>
+                          ))}
+                          {hobbyClubs.length === 0 && (
+                            <div className="text-center py-4 text-slate-400 text-sm">No clubs</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Card>
 
                   {/* Business Directory Engagement */}
-                  <Card noPadding className="p-4" title="Business Directory">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Building2 size={20} className="text-jci-blue" />
-                          <div>
-                            <p className="text-sm font-medium text-slate-700">Total Businesses</p>
-                            <p className="text-2xl font-bold text-slate-900">{metrics.totalBusinesses}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-xs text-green-700 mb-1">Verified</p>
-                          <p className="text-lg font-bold text-green-900">{metrics.verifiedBusinesses}</p>
-                        </div>
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-xs text-blue-700 mb-1">Pending</p>
-                          <p className="text-lg font-bold text-blue-900">{metrics.totalBusinesses - metrics.verifiedBusinesses}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {businesses.slice(0, 3).map(business => (
-                          <div key={business.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                  <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Business Directory</div>}>
+                    <div className="p-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Building2 size={20} className="text-jci-blue" />
                             <div>
-                              <p className="text-sm font-medium text-slate-900">{business.companyName}</p>
-                              <p className="text-xs text-slate-500">{business.industry}</p>
+                              <p className="text-sm font-medium text-slate-700">Total Businesses</p>
+                              <p className="text-2xl font-bold text-slate-900">{metrics.totalBusinesses}</p>
                             </div>
-                            {business.globalNetworkEnabled ? (
-                              <Badge variant="success">Verified</Badge>
-                            ) : (
-                              <Badge variant="warning">Pending</Badge>
-                            )}
                           </div>
-                        ))}
-                        {businesses.length === 0 && (
-                          <div className="text-center py-4 text-slate-400 text-sm">No businesses</div>
-                        )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                            <p className="text-xs text-green-700 mb-1">Verified</p>
+                            <p className="text-lg font-bold text-green-900">{metrics.verifiedBusinesses}</p>
+                          </div>
+                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <p className="text-xs text-blue-700 mb-1">Pending</p>
+                            <p className="text-lg font-bold text-blue-900">{metrics.totalBusinesses - metrics.verifiedBusinesses}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {businesses.slice(0, 3).map(business => (
+                            <div key={business.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-slate-900">{business.companyName}</p>
+                                <p className="text-xs text-slate-500">{business.industry}</p>
+                              </div>
+                              {business.globalNetworkEnabled ? (
+                                <Badge variant="success">Verified</Badge>
+                              ) : (
+                                <Badge variant="warning">Pending</Badge>
+                              )}
+                            </div>
+                          ))}
+                          {businesses.length === 0 && (
+                            <div className="text-center py-4 text-slate-400 text-sm">No businesses</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Card>
                 </div>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-2">
                 {/* Quick Actions */}
-                <Card noPadding className="p-4" title="Quick Actions">
-                  <div className="space-y-2">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => {
-                        setSelectedReportType('financial');
-                        setIsReportModalOpen(true);
-                      }}
-                    >
-                      <FileText size={16} className="mr-2" />
-                      Generate Financial Report
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => onNavigate?.('MEMBERS')}
-                    >
-                      <Users size={16} className="mr-2" />
-                      Member Analytics
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => onNavigate?.('INVENTORY')}
-                    >
-                      <Package size={16} className="mr-2" />
-                      Inventory Management
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => onNavigate?.('FINANCE')}
-                    >
-                      <DollarSign size={16} className="mr-2" />
-                      Financial Management
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => onNavigate?.('CLUBS')}
-                    >
-                      <Heart size={16} className="mr-2" />
-                      Hobby Clubs
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => onNavigate?.('DIRECTORY')}
-                    >
-                      <Building2 size={16} className="mr-2" />
-                      Business Directory
-                    </Button>
+                <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Quick Actions</div>}>
+                  <div className="p-4">
+                    <div className="space-y-2">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          setSelectedReportType('financial');
+                          setIsReportModalOpen(true);
+                        }}
+                      >
+                        <FileText size={16} className="mr-2" />
+                        Generate Financial Report
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => onNavigate?.('MEMBERS')}
+                      >
+                        <Users size={16} className="mr-2" />
+                        Member Analytics
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => onNavigate?.('INVENTORY')}
+                      >
+                        <Package size={16} className="mr-2" />
+                        Inventory Management
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => onNavigate?.('FINANCE')}
+                      >
+                        <DollarSign size={16} className="mr-2" />
+                        Financial Management
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => onNavigate?.('CLUBS')}
+                      >
+                        <Heart size={16} className="mr-2" />
+                        Hobby Clubs
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => onNavigate?.('DIRECTORY')}
+                      >
+                        <Building2 size={16} className="mr-2" />
+                        Business Directory
+                      </Button>
+                    </div>
                   </div>
                 </Card>
 
                 {/* AI Insights & Predictions */}
-                <Card noPadding className="p-4 border-l-4 border-l-purple-500" title="AI Insights & Predictions">
-                  <div className="space-y-4">
-                    {loadingAI ? (
-                      <div className="text-center py-4 text-slate-400 text-sm">Loading AI insights...</div>
-                    ) : (
-                      <>
-                        {aiInsights.churnRisk.length > 0 && (
-                          <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <AlertCircle size={16} className="text-red-600" />
-                              <span className="text-sm font-semibold text-red-900">High Churn Risk</span>
-                            </div>
-                            <p className="text-xs text-red-700">
-                              {aiInsights.churnRisk.length} member(s) at high risk of leaving.
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-xs h-auto p-0 ml-1 text-red-700 hover:text-red-900"
-                                onClick={() => onNavigate?.('AI_INSIGHTS')}
-                              >
-                                View Details →
-                              </Button>
-                            </p>
-                          </div>
-                        )}
-
-                        {aiInsights.topRecommendations.length > 0 && (
-                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Lightbulb size={16} className="text-blue-600" />
-                              <span className="text-sm font-semibold text-blue-900">Top Recommendations</span>
-                            </div>
-                            <div className="space-y-2">
-                              {aiInsights.topRecommendations.slice(0, 2).map((rec: any, idx: number) => (
-                                <div key={idx} className="text-xs text-blue-700">
-                                  • {rec.itemName} ({rec.matchScore}% match)
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {aiInsights.eventPredictions.length > 0 && (
-                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <TrendingUp size={16} className="text-green-600" />
-                              <span className="text-sm font-semibold text-green-900">Event Predictions</span>
-                            </div>
-                            <p className="text-xs text-green-700">
-                              {aiInsights.eventPredictions.length} upcoming event(s) analyzed for demand
-                            </p>
-                          </div>
-                        )}
-
-                        {aiInsights.projectPredictions.length > 0 && (
-                          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Sparkles size={16} className="text-amber-600" />
-                              <span className="text-sm font-semibold text-amber-900">Project Forecasts</span>
-                            </div>
-                            <p className="text-xs text-amber-700">
-                              {aiInsights.projectPredictions.length} active project(s) with success predictions
-                            </p>
-                          </div>
-                        )}
-
-                        {(aiInsights.churnRisk.length === 0 &&
-                          aiInsights.topRecommendations.length === 0 &&
-                          aiInsights.eventPredictions.length === 0 &&
-                          aiInsights.projectPredictions.length === 0) && (
-                            <div className="text-center py-4 text-slate-400 text-sm">
-                              No AI insights available yet
+                <Card noPadding noHeaderPadding className="mb-6 border-l-4 border-l-purple-500" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">AI Insights & Predictions</div>}>
+                  <div className="p-4">
+                    <div className="space-y-4">
+                      {loadingAI ? (
+                        <div className="text-center py-4 text-slate-400 text-sm">Loading AI insights...</div>
+                      ) : (
+                        <>
+                          {aiInsights.churnRisk.length > 0 && (
+                            <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <AlertCircle size={16} className="text-red-600" />
+                                <span className="text-sm font-semibold text-red-900">High Churn Risk</span>
+                              </div>
+                              <p className="text-xs text-red-700">
+                                {aiInsights.churnRisk.length} member(s) at high risk of leaving.
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs h-auto p-0 ml-1 text-red-700 hover:text-red-900"
+                                  onClick={() => onNavigate?.('AI_INSIGHTS')}
+                                >
+                                  View Details →
+                                </Button>
+                              </p>
                             </div>
                           )}
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => onNavigate?.('AI_INSIGHTS')}
-                        >
-                          <Sparkles size={14} className="mr-2" />
-                          View Full AI Insights
-                        </Button>
-                      </>
-                    )}
+                          {aiInsights.topRecommendations.length > 0 && (
+                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Lightbulb size={16} className="text-blue-600" />
+                                <span className="text-sm font-semibold text-blue-900">Top Recommendations</span>
+                              </div>
+                              <div className="space-y-2">
+                                {aiInsights.topRecommendations.slice(0, 2).map((rec: any, idx: number) => (
+                                  <div key={idx} className="text-xs text-blue-700">
+                                    • {rec.itemName} ({rec.matchScore}% match)
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {aiInsights.eventPredictions.length > 0 && (
+                            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <TrendingUp size={16} className="text-green-600" />
+                                <span className="text-sm font-semibold text-green-900">Event Predictions</span>
+                              </div>
+                              <p className="text-xs text-green-700">
+                                {aiInsights.eventPredictions.length} upcoming event(s) analyzed for demand
+                              </p>
+                            </div>
+                          )}
+
+                          {aiInsights.projectPredictions.length > 0 && (
+                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Sparkles size={16} className="text-amber-600" />
+                                <span className="text-sm font-semibold text-amber-900">Project Forecasts</span>
+                              </div>
+                              <p className="text-xs text-amber-700">
+                                {aiInsights.projectPredictions.length} active project(s) with success predictions
+                              </p>
+                            </div>
+                          )}
+
+                          {(aiInsights.churnRisk.length === 0 &&
+                            aiInsights.topRecommendations.length === 0 &&
+                            aiInsights.eventPredictions.length === 0 &&
+                            aiInsights.projectPredictions.length === 0) && (
+                              <div className="text-center py-4 text-slate-400 text-sm">
+                                No AI insights available yet
+                              </div>
+                            )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => onNavigate?.('AI_INSIGHTS')}
+                          >
+                            <Sparkles size={14} className="mr-2" />
+                            View Full AI Insights
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </Card>
 
                 {/* Top Performers */}
-                <Card noPadding className="p-4" title="Top Performers">
-                  <div className="space-y-3">
-                    {leaderboard.slice(0, 5).map((member, index) => (
-                      <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                          index === 1 ? 'bg-slate-100 text-slate-600' :
-                            index === 2 ? 'bg-amber-100 text-amber-700' :
-                              'bg-slate-100 text-slate-500'
-                          }`}>
-                          {index + 1}
+                <Card noPadding noHeaderPadding className="mb-6" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Top Performers</div>}>
+                  <div className="p-4">
+                    <div className="space-y-3">
+                      {leaderboard.slice(0, 5).map((member, index) => (
+                        <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                            index === 1 ? 'bg-slate-100 text-slate-600' :
+                              index === 2 ? 'bg-amber-100 text-amber-700' :
+                                'bg-slate-100 text-slate-500'
+                            }`}>
+                            {index + 1}
+                          </div>
+                          <img src={member.avatar || undefined} alt={member.name} className="w-8 h-8 rounded-full" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
+                            <p className="text-xs text-slate-500">{member.points} points</p>
+                          </div>
                         </div>
-                        <img src={member.avatar || undefined} alt={member.name} className="w-8 h-8 rounded-full" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
-                          <p className="text-xs text-slate-500">{member.points} points</p>
-                        </div>
-                      </div>
-                    ))}
-                    {leaderboard.length === 0 && (
-                      <div className="text-center py-4 text-slate-400 text-sm">No data available</div>
-                    )}
+                      ))}
+                      {leaderboard.length === 0 && (
+                        <div className="text-center py-4 text-slate-400 text-sm">No data available</div>
+                      )}
+                    </div>
                   </div>
                 </Card>
               </div>
@@ -1257,7 +1332,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
         )}
 
         {activeTab === 'analytics' && (
-          <div className="space-y-6">
+          <div className="space-y-2">
             <div className="grid lg:grid-cols-2 gap-4">
               <MemberGrowthChart members={members} />
               <PointsDistributionChart pointHistory={pointHistory} />
@@ -1317,8 +1392,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
         )}
 
         {activeTab === 'reports' && (
-          <div className="space-y-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-2">
               <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('financial'); setIsReportModalOpen(true); }}>
                 <div className="text-center">
                   <DollarSign className="mx-auto mb-3 text-jci-blue" size={32} />
@@ -1353,8 +1428,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
             </div>
 
             <Card title="Quick Report Generation">
-              <div className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="grid md:grid-cols-2 gap-2">
                   <Button
                     variant="outline"
                     className="justify-start"

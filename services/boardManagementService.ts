@@ -276,11 +276,13 @@ export class BoardManagementService {
   static getRolePermissions(position: string): string[] {
     const permissionMap: Record<string, string[]> = {
       'President': ['admin', 'board', 'finance', 'events', 'projects', 'members'],
-      'Vice President': ['board', 'events', 'projects', 'members'],
+      'General Legal Council': ['board', 'members'],
       'Secretary': ['board', 'events', 'members'],
       'Treasurer': ['board', 'finance'],
+      'Vice President': ['board', 'events', 'projects', 'members'],
       'Director': ['board', 'projects'],
       'Committee Chair': ['board', 'events'],
+
     };
 
     return permissionMap[position] || ['board'];
@@ -291,6 +293,7 @@ export class BoardManagementService {
     return [
       'President',
       'Immediate Past President',
+      'General Legal Council',
       'Secretary',
       'Honorary Treasurer',
       'Executive Vice President',

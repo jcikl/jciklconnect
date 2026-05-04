@@ -152,7 +152,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
     const namePart = m.name;
     const fullNamePart = m.fullName || '';
     const idPart = m.idNumber ? `(${m.idNumber})` : '';
-    
+
     if (fullNamePart || idPart) {
       return `${fullNamePart} ${idPart} - ${namePart}`.trim();
     }
@@ -178,56 +178,56 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Historical Board of Directors</h2>
-          <p className="text-slate-500 mt-1">Management of "One Year to Lead" leadership terms</p>
-        </div>
+    <div className="space-y-2">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         {canManage && (
-          <Button variant="outline" className="flex items-center gap-2" onClick={() => handleOpenManage(String(new Date().getFullYear() + 1))}>
+          <Button
+            variant="outline"
+            className="w-full md:w-auto flex items-center justify-center gap-2"
+            onClick={() => handleOpenManage(String(new Date().getFullYear() + 1))}
+          >
             <Plus size={16} /> Setup Next Year
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
         {terms.map((term) => (
           <div
             key={term.year}
             onClick={() => handleOpenManage(term.year)}
-            className="group relative bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-xl hover:border-jci-blue transition-all cursor-pointer overflow-hidden"
+            className="group relative bg-white rounded-2xl border border-slate-200 p-4 hover:shadow-xl hover:border-jci-blue transition-all cursor-pointer overflow-hidden"
           >
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Award size={100} className="text-jci-blue" />
+              <Award size={80} className="text-jci-blue" />
             </div>
 
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-jci-blue/10 rounded-xl flex items-center justify-center text-jci-blue">
-                  <Calendar size={24} />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="flex-shrink-0">
+                <h3 className="text-2xl font-black text-slate-900 leading-none">{term.year}</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Term</p>
+              </div>
+
+              <div className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">President</p>
+                  <p className="text-sm font-bold text-slate-800 truncate">{term.presidentName}</p>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">{term.year}</h3>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Leadership Term</p>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Board</p>
+                  <div className="flex items-center gap-1 justify-end">
+                    <span className="text-sm font-black text-jci-blue">{term.totalMembers}</span>
+                    <Users size={10} className="text-jci-blue/60" />
+                  </div>
                 </div>
               </div>
-              <ChevronRight className="text-slate-300 group-hover:text-jci-blue transition-colors" />
+
+              <ChevronRight className="text-slate-300 group-hover:text-jci-blue transition-colors shrink-0" size={18} />
             </div>
 
             <div className="space-y-4 relative z-10">
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">President</p>
-                <p className="text-sm font-bold text-slate-800">{term.presidentName}</p>
-              </div>
 
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <Users size={14} className="text-slate-400" />
-                  <span className="text-xs font-medium text-slate-600">Board Members</span>
-                </div>
-                <Badge variant="neutral">{term.totalMembers}</Badge>
-              </div>
+
             </div>
           </div>
         ))}
@@ -250,7 +250,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           </div>
         }
       >
-        <div className="space-y-6">
+        <div className="space-y-2">
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
             <Shield className="text-blue-500 shrink-0 mt-1" size={20} />
             <p className="text-sm text-blue-700">
@@ -259,79 +259,79 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           </div>
 
           {positions.map(position => (
-              <div key={position} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 border border-slate-100">
-                      <Award size={20} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900">{position}</h4>
-                      <p className="text-xs text-slate-500">Assignment for {selectedTerm}</p>
-                    </div>
+            <div key={position} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 border border-slate-100">
+                    <Award size={20} />
                   </div>
-
-                  <div className="w-full sm:w-80">
-                    <MemberSelector
-                      label=""
-                      members={sortedMembers.filter(m => !allAssignedIds.has(m.id) || m.id === (assignments[position]?.memberId || ''))}
-                      getOptionLabel={getMemberLabel}
-                      value={assignments[position]?.memberId || ''}
-                      onChange={(id) => handleAssignmentChange(position, id)}
-                      selfOption={false}
-                      showLookupFields={false}
-                      placeholder="Search member..."
-                      disabled={!canManage}
-                    />
+                  <div>
+                    <h4 className="font-bold text-slate-900">{position}</h4>
+                    <p className="text-xs text-slate-500">Assignment for {selectedTerm}</p>
                   </div>
                 </div>
 
-                {assignments[position]?.memberId && (
-                  <div className="pt-4 border-t border-slate-50 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Commission Directors</h5>
-                      {canManage && (
-                        <div className="w-80">
-                          <MemberSelector
-                            label=""
-                            members={sortedMembers.filter(m => !allAssignedIds.has(m.id))}
-                            getOptionLabel={getMemberLabel}
-                            value=""
-                            onChange={(id) => handleAddCommissionDirector(position, id)}
-                            selfOption={false}
-                            showLookupFields={false}
-                            placeholder="+ Add Director"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {assignments[position].commissionDirectorIds.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic">No commission directors assigned</p>
-                      ) : (
-                        assignments[position].commissionDirectorIds.map(id => {
-                          const m = members.find(mem => mem.id === id);
-                          return (
-                            <div key={id} className="flex items-center gap-2 bg-slate-50 pl-4 pr-1 py-1 rounded-full border border-slate-200">
-                              <span className="text-xs font-medium text-slate-700">{m?.name || 'Unknown'}</span>
-                              {canManage && (
-                                <button
-                                  onClick={() => handleRemoveCommissionDirector(position, id)}
-                                  className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
+                <div className="w-full sm:w-80">
+                  <MemberSelector
+                    label=""
+                    members={sortedMembers.filter(m => !allAssignedIds.has(m.id) || m.id === (assignments[position]?.memberId || ''))}
+                    getOptionLabel={getMemberLabel}
+                    value={assignments[position]?.memberId || ''}
+                    onChange={(id) => handleAssignmentChange(position, id)}
+                    selfOption={false}
+                    showLookupFields={false}
+                    placeholder="Search member..."
+                    disabled={!canManage}
+                  />
+                </div>
               </div>
-            ))}
+
+              {assignments[position]?.memberId && (
+                <div className="pt-4 border-t border-slate-50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Commission Directors</h5>
+                    {canManage && (
+                      <div className="w-80">
+                        <MemberSelector
+                          label=""
+                          members={sortedMembers.filter(m => !allAssignedIds.has(m.id))}
+                          getOptionLabel={getMemberLabel}
+                          value=""
+                          onChange={(id) => handleAddCommissionDirector(position, id)}
+                          selfOption={false}
+                          showLookupFields={false}
+                          placeholder="+ Add Director"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {assignments[position].commissionDirectorIds.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No commission directors assigned</p>
+                    ) : (
+                      assignments[position].commissionDirectorIds.map(id => {
+                        const m = members.find(mem => mem.id === id);
+                        return (
+                          <div key={id} className="flex items-center gap-2 bg-slate-50 pl-4 pr-1 py-1 rounded-full border border-slate-200">
+                            <span className="text-xs font-medium text-slate-700">{m?.name || 'Unknown'}</span>
+                            {canManage && (
+                              <button
+                                onClick={() => handleRemoveCommissionDirector(position, id)}
+                                className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </Modal>
     </div>

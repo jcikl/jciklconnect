@@ -17,6 +17,7 @@ interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> 
   title?: React.ReactNode;
   action?: React.ReactNode;
   noPadding?: boolean;
+  noHeaderPadding?: boolean;
 }
 
 interface BadgeProps {
@@ -137,11 +138,11 @@ export const Button: React.FC<ButtonProps> = ({
 };
 
 // Fix: Destructure ...props and spread them onto the underlying div element.
-export const Card: React.FC<CardProps> = ({ children, className = '', title, action, noPadding = false, ...props }) => {
+export const Card: React.FC<CardProps> = ({ children, className = '', title, action, noPadding = false, noHeaderPadding = false, ...props }) => {
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${props.onClick ? 'cursor-pointer hover:shadow-md transition-all active:scale-[0.98]' : ''} ${className}`} {...props}>
       {(title || action) && (
-        <div className="px-4 py-4 border-b border-slate-100 justify-between items-center bg-slate-50/50">
+        <div className={`border-b border-slate-100 flex justify-between items-center bg-slate-50/50 ${noHeaderPadding ? '' : 'px-4 py-4'}`}>
           {title && <h3 className="font-semibold text-slate-800 text-base">{title}</h3>}
           {action && <div className="flex items-center gap-2">{action}</div>}
         </div>
@@ -278,7 +279,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
         onScroll={handleScroll}
         className="overflow-x-auto no-scrollbar scroll-smooth"
       >
-        <nav className="-mb-1px flex space-x-8 px-2 mb-2" aria-label="Tabs">
+        <nav className="-mb-1px flex space-x-8 px-2" aria-label="Tabs">
           {tabs.map((tab) => {
             const id = typeof tab === 'string' ? tab : tab.id;
             const label = typeof tab === 'string' ? tab : tab.label;

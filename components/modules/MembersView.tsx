@@ -252,9 +252,9 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [batchSetValue, setBatchSetValue] = useState<any>('');
 
   const { member: currentMember } = useAuth();
-  const { isAdmin, isBoard, isOrganizationSecretary } = usePermissions();
+  const { isAdmin, isBoard, isOrganizationSecretary, isDeveloper } = usePermissions();
   const { showToast } = useToast();
-  const canManageMembers = isAdmin || isBoard || isOrganizationSecretary;
+  const canManageMembers = isAdmin || isBoard || isOrganizationSecretary || isDeveloper;
 
   const selectedMember = members.find(m => m.id === selectedMemberId);
 
@@ -518,7 +518,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
         // Contact
         alternatePhone: formData.get('alternatePhone') as string || undefined,
-        whatsappGroup: formData.get('whatsappGroup') as string || undefined,
+        whatsappGroup: false, // Managed by API
         address: formData.get('address') as string || undefined,
         linkedin: formData.get('linkedin') as string || undefined,
         facebook: formData.get('facebook') as string || undefined,
@@ -548,7 +548,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   // Self-view or Guest view: only show profile detail
   if (!canManageMembers && currentMember) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pb-40 md:pb-0">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Profile</h2>
         </div>
@@ -558,7 +558,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-40 md:pb-0">
       {!selectedMember ? (
         <>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -581,8 +581,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             </div>
           </div>
 
-          <Card noPadding>
-            <div className="px-4 md:px-6 pt-4">
+          <div className="space-y-2">
+            <div>
               <Tabs
                 tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking']}
                 activeTab={
@@ -602,7 +602,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 }}
               />
             </div>
-            <div className="p-4">
+            <div>
               {activeTab === 'directory' && (
                 <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
                   <MemberTable
@@ -651,7 +651,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 <PromotionTracking searchQuery={searchQuery} />
               )}
             </div>
-          </Card>
+          </div>
         </>
       ) : (
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} />
@@ -669,6 +669,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             setBatchActionType('set');
             setIsBatchActionModalOpen(true);
           }}
+          isDeveloper={isDeveloper}
         />
       )}
 
@@ -1048,24 +1049,56 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
 
   const tierData = Object.entries(statistics.membersByTier).map(([tier, count]) => ({ name: tier, value: count }));
   const roleData = Object.entries(statistics.membersByRole).map(([role, count]) => ({ name: role, value: count }));
-  const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5'];
+  const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5', '#A5B4FC', '#F472B6'];
+
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Mobile: Combined Card for all 4 stats (Single Row) */}
+        <Card className="md:hidden">
+          <div className="grid grid-cols-4 divide-x divide-slate-100 -m-4">
+            <div className="py-4 px-1 text-center">
+              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Total</div>
+              <div className="text-sm font-bold text-slate-900">{statistics.totalMembers}</div>
+            </div>
+            <div className="py-4 px-1 text-center">
+              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Active</div>
+              <div className="text-sm font-bold text-green-600">{statistics.activeMembers}</div>
+            </div>
+            <div className="py-4 px-1 text-center">
+              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">New</div>
+              <div className="text-sm font-bold text-blue-600">{statistics.newMembersThisMonth}</div>
+            </div>
+            <div className="py-4 px-1 text-center">
+              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Avg Pts</div>
+              <div className="text-sm font-bold text-amber-600">{statistics.averagePoints}</div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Desktop: Separate Cards */}
+        <Card className="hidden md:block">
           <div className="text-sm text-slate-500 mb-1">Total Members</div>
           <div className="text-2xl font-bold text-slate-900">{statistics.totalMembers}</div>
         </Card>
-        <Card>
+        <Card className="hidden md:block">
           <div className="text-sm text-slate-500 mb-1">Active Members</div>
           <div className="text-2xl font-bold text-green-600">{statistics.activeMembers}</div>
         </Card>
-        <Card>
+        <Card className="hidden md:block">
           <div className="text-sm text-slate-500 mb-1">New This Month</div>
           <div className="text-2xl font-bold text-blue-600">{statistics.newMembersThisMonth}</div>
         </Card>
-        <Card>
+        <Card className="hidden md:block">
           <div className="text-sm text-slate-500 mb-1">Average Points</div>
           <div className="text-2xl font-bold text-amber-600">{statistics.averagePoints}</div>
         </Card>
@@ -1073,15 +1106,15 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card title="Members by Tier">
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
             <PieChart>
               <Pie
                 data={tierData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
+                labelLine={!isMobile}
+                label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={isMobile ? 70 : 80}
                 fill="#8884d8"
                 dataKey="value"
               >
@@ -1090,36 +1123,51 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
                 ))}
               </Pie>
               <Tooltip />
+              {isMobile && <Legend verticalAlign="bottom" height={36} />}
             </PieChart>
           </ResponsiveContainer>
         </Card>
 
         <Card title="Members by Role">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={roleData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" stroke="#64748b" />
-              <YAxis stroke="#64748b" />
+          <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
+            <PieChart>
+              <Pie
+                data={roleData}
+                cx="50%"
+                cy="50%"
+                labelLine={!isMobile}
+                label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={isMobile ? 70 : 80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {roleData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
+                ))}
+              </Pie>
               <Tooltip />
-              <Bar dataKey="value" fill="#0097D7" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              {isMobile && <Legend verticalAlign="bottom" height={36} />}
+            </PieChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
-      <Card title="Engagement Metrics">
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">{statistics.engagementMetrics.highlyEngaged}</div>
-            <div className="text-sm text-slate-600 mt-1">Highly Engaged (&gt;80%)</div>
+      <Card title="Member Engagement Overview">
+        <div className="grid grid-cols-3 divide-x divide-slate-100 -m-4 border-t border-slate-50 bg-slate-50/30">
+          <div className="p-2 text-center">
+            <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Highly</div>
+            <div className="text-2xl font-black text-green-600">{statistics.engagementMetrics.highlyEngaged}</div>
+            <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">&gt;80% Engagement</p>
           </div>
-          <div className="text-center p-4 bg-amber-50 rounded-lg">
-            <div className="text-2xl font-bold text-amber-600">{statistics.engagementMetrics.moderatelyEngaged}</div>
-            <div className="text-sm text-slate-600 mt-1">Moderately Engaged (50-80%)</div>
+          <div className="p-2 text-center">
+            <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Moderate</div>
+            <div className="text-2xl font-black text-amber-500">{statistics.engagementMetrics.moderatelyEngaged}</div>
+            <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">50-80% Engagement</p>
           </div>
-          <div className="text-center p-4 bg-red-50 rounded-lg">
-            <div className="text-2xl font-bold text-red-600">{statistics.engagementMetrics.lowEngaged}</div>
-            <div className="text-sm text-slate-600 mt-1">Low Engaged (&lt;50%)</div>
+          <div className="p-2 text-center">
+            <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Low</div>
+            <div className="text-2xl font-black text-red-500">{statistics.engagementMetrics.lowEngaged}</div>
+            <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">&lt;50% Engagement</p>
           </div>
         </div>
       </Card>
@@ -1132,8 +1180,9 @@ const BatchActionBar: React.FC<{
   selectedCount: number,
   onClear: () => void,
   onBatchDelete: () => void,
-  onBatchSet: () => void
-}> = ({ selectedCount, onClear, onBatchDelete, onBatchSet }) => {
+  onBatchSet: () => void,
+  isDeveloper: boolean
+}> = ({ selectedCount, onClear, onBatchDelete, onBatchSet, isDeveloper }) => {
   return (
     <div className="fixed bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[40] animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="bg-slate-900 text-white px-2 md:px-6 py-3 md:py-4 rounded-[40px] md:rounded-2xl shadow-2xl flex items-center justify-around md:justify-start gap-0 md:gap-6 border border-white/10 backdrop-blur-md h-20 md:h-auto">
@@ -1154,15 +1203,17 @@ const BatchActionBar: React.FC<{
           <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Batch Set</span>
         </button>
 
-        <button
-          onClick={onBatchDelete}
-          className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"
-        >
-          <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
-            <Trash2 size={20} className="md:w-4 md:h-4" />
-          </div>
-          <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Delete</span>
-        </button>
+        {isDeveloper && (
+          <button
+            onClick={onBatchDelete}
+            className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"
+          >
+            <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+              <Trash2 size={20} className="md:w-4 md:h-4" />
+            </div>
+            <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Delete</span>
+          </button>
+        )}
 
         <button
           onClick={onClear}
@@ -1501,7 +1552,26 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               {(canEditMembers || isSelfView) && (
                 <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)} className="flex-1 md:flex-none h-10 px-6 font-bold">Edit Profile</Button>
               )}
-              {(isAdmin || (isDeveloper && effectiveRole === UserRole.ADMIN)) && !isSelfView && (
+              {(isAdmin || isDeveloper) && !isSelfView && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`flex-1 md:flex-none h-10 px-6 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
+                  onClick={async () => {
+                    const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
+                    try {
+                      await updateMember(member.id, { role: newRole });
+                      showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
+                      window.location.reload();
+                    } catch (err) {
+                      showToast('Failed to update member status', 'error');
+                    }
+                  }}
+                >
+                  {member.role === UserRole.INACTIVE ? 'Activate Member' : 'Set Inactive'}
+                </Button>
+              )}
+              {isDeveloper && !isSelfView && (
                 <Button variant="outline" size="sm" className="flex-1 md:flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
               )}
             </div>
@@ -1523,12 +1593,12 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
           <div className="p-6 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
             <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">Dues Status ({new Date().getFullYear()})</p>
-            <Badge 
+            <Badge
               variant={
-                (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' || 
-                 member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' : 
-                member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
-              } 
+                (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
+                  member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
+                  member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+              }
               className="px-4 font-black capitalize"
             >
               {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
@@ -1771,11 +1841,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <div className="grid grid-cols-1 gap-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
-                  <Badge 
+                  <Badge
                     variant={
-                      (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' || 
-                       member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' : 
-                      member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+                      (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
+                        member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
+                        member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
                     }
                     className="capitalize"
                   >
@@ -2027,6 +2097,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           onClose={() => setShowEditModal(false)}
           title={isSelfView ? `Edit Your Profile` : `Edit Member Profile: ${member.name}`}
           size="xl"
+          bottomSheet
           scrollInBody={false}
         >
           <MemberEditForm
@@ -2209,7 +2280,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showProbationTasksModal, setShowProbationTasksModal] = useState(false);
   const [selectedProbationMember, setSelectedProbationMember] = useState<Member | null>(null);
-  
+
   const getInitiationYear = (dateStr?: string | null) => {
     if (!dateStr) return new Date().getFullYear();
     const date = new Date(dateStr);
@@ -2219,7 +2290,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
   };
 
   const [approvalYear, setApprovalYear] = useState(getInitiationYear(new Date().toISOString()));
-  
+
   // Batch approval states
   const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
   const [showBatchApprovalModal, setShowBatchApprovalModal] = useState(false);
@@ -2287,7 +2358,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
       ];
 
       const yearStr = String(approvalYear);
-      
+
       await updateMember(guestId, {
         role: UserRole.PROBATION,
         membershipType: 'Probation' as any,
@@ -2374,7 +2445,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
       });
 
       await Promise.all(updates.map(update => updateMember(update.id, update)));
-      
+
       showToast(`Successfully approved ${selectedGuestIds.size} guests`, 'success');
       setShowBatchApprovalModal(false);
       setSelectedGuestIds(new Set());
@@ -2603,8 +2674,8 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
 
             <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <label className="block text-sm font-bold text-amber-700 mb-1">Set Initiation Year:</label>
-              <select 
-                value={approvalYear} 
+              <select
+                value={approvalYear}
                 onChange={(e) => setApprovalYear(parseInt(e.target.value))}
                 className="w-full rounded-lg border-2 border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900 focus:border-amber-500"
               >
@@ -2657,8 +2728,8 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
 
             <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <label className="block text-sm font-bold text-amber-700 mb-1">Set Initiation Year for All:</label>
-              <select 
-                value={approvalYear} 
+              <select
+                value={approvalYear}
                 onChange={(e) => setApprovalYear(parseInt(e.target.value))}
                 className="w-full rounded-lg border-2 border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900 focus:border-amber-500"
               >

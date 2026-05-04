@@ -387,7 +387,7 @@ export interface Member {
   // 3. 联系信息 (Contact Information)
   // 3.1 个人联系方式
   alternatePhone?: string; // 备用电话
-  whatsappGroup?: string; // WhatsApp群组
+  whatsappGroup?: boolean; // WhatsApp群组状态 (True: Joined, False: Not Joined)
   address?: string; // 地址
   // 3.2 社交媒体
   linkedin?: string; // LinkedIn

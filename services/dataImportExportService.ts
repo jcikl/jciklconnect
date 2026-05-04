@@ -424,7 +424,7 @@ export class DataImportExportService {
           }
 
           // Special handling for boolean fields
-          if (normalizedHeader === 'senatorCertified' && typeof value === 'string') {
+          if ((normalizedHeader === 'senatorCertified' || normalizedHeader === 'whatsappGroup') && typeof value === 'string') {
             value = value.toLowerCase() === 'true' || value.toLowerCase() === 'yes';
           }
 
