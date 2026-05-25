@@ -3,6 +3,8 @@ import { X, Plus, Trash2, Lightbulb, Edit, Check } from 'lucide-react';
 import { Transaction, TransactionSplit } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
 import { projectFinancialService } from '../../../services/projectFinancialService';
+import { MembershipConfigService, resolveMembershipPurpose, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
+import { MembershipType, MembershipRuleConfig } from '../../../types';
 import * as Forms from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
 import { Modal, Button } from '../../ui/Common';
@@ -59,6 +61,26 @@ export function TransactionSplitModal({
   const [splitYearFilters, setSplitYearFilters] = useState<Record<number, string>>({});
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<SplitItem | null>(null);
+  const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+
+  useEffect(() => {
+    const fetchRules = async () => {
+      const rules = await MembershipConfigService.getRules();
+      setMembershipRules(rules);
+    };
+    fetchRules();
+  }, []);
+
+  useEffect(() => {
+    if (editForm && editForm.category === 'Membership') {
+      const year = editForm.year || new Date().getFullYear();
+      const amount = editForm.amount || 0;
+      const resolvedPurpose = resolveMembershipPurpose(amount, year, membershipRules || DEFAULT_MEMBERSHIP_RULES);
+      if (editForm.purpose !== resolvedPurpose) {
+        setEditForm(prev => prev ? { ...prev, purpose: resolvedPurpose } : null);
+      }
+    }
+  }, [editForm?.category, editForm?.amount, editForm?.year, membershipRules]);
 
   const getSplitYearFilter = (index: number) => {
     return splitYearFilters[index] ?? '';
@@ -271,7 +293,7 @@ export function TransactionSplitModal({
         year: year,
         projectId: '',
         memberId: '',
-        purpose: `${year} Full membership`,
+        purpose: resolveMembershipPurpose(350, year, membershipRules || DEFAULT_MEMBERSHIP_RULES),
         paymentRequestId: '',
         amount: 350,
         description: `${year} Membership Fee`,

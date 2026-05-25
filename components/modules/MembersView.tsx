@@ -16,10 +16,11 @@ import { LoadingState } from '../ui/Loading';
 import { useMembers } from '../../hooks/useMembers';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
-import { UserRole, Member, MemberTier, ProbationTask, MembershipDues } from '../../types';
+import { UserRole, Member, MemberTier, ProbationTask, MembershipDues, BoardMember } from '../../types';
 import { MembersService } from '../../services/membersService';
 import { MEMBER_SELF_EDITABLE_FIELDS } from '../../config/constants';
 import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
+import { MembershipConfigService } from '../../services/membershipConfigService';
 import { INDUSTRY_OPTIONS } from '../../config/constants';
 import { HobbyClubsService } from '../../services/hobbyClubsService';
 import { HobbyClub } from '../../types';
@@ -468,6 +469,46 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     const email = formData.get('email') as string;
 
     try {
+      const formNationality = formData.get('nationality') as string || 'Malaysia';
+      const formDateOfBirth = formData.get('dateOfBirth') as string || undefined;
+      const formMembershipType = (formData.get('membershipType') as any) || undefined;
+      const formSenatorshipId = formData.get('senatorshipId') as string || undefined;
+
+      if (formMembershipType) {
+        const rules = await MembershipConfigService.getRules();
+        const rule = rules[formMembershipType as keyof typeof rules];
+        if (rule) {
+          if (rule.nationalityLimit === 'Malaysian' && formNationality !== 'Malaysia') {
+            showToast(`Nationality mismatch: ${formMembershipType} requires Malaysian`, 'error');
+            return;
+          }
+          if (rule.nationalityLimit === 'Non-Malaysian' && formNationality === 'Malaysia') {
+            showToast(`Nationality mismatch: ${formMembershipType} requires Non-Malaysian`, 'error');
+            return;
+          }
+          if (rule.requiresSenatorship && !formSenatorshipId?.trim()) {
+            showToast(`Senatorship ID is required for ${formMembershipType}`, 'error');
+            return;
+          }
+          if (formDateOfBirth) {
+            const birthYear = new Date(formDateOfBirth).getFullYear();
+            const currentYear = new Date().getFullYear();
+            let age = currentYear - birthYear;
+            if (rule.ageLimit.min && age < rule.ageLimit.min) {
+              showToast(`Age limit not met: ${formMembershipType} requires min age ${rule.ageLimit.min}`, 'error');
+              return;
+            }
+            if (rule.ageLimit.max && age > rule.ageLimit.max) {
+              showToast(`Age limit exceeded: ${formMembershipType} requires max age ${rule.ageLimit.max}`, 'error');
+              return;
+            }
+          } else if (rule.ageLimit.min || rule.ageLimit.max) {
+            showToast(`Date of Birth is required to validate age for ${formMembershipType}`, 'error');
+            return;
+          }
+        }
+      }
+
       const skillsInput = formData.get('skills') as string;
       const skills = skillsInput ? skillsInput.split(',').map(s => s.trim()).filter(s => s.length > 0) : [];
 
@@ -503,8 +544,9 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         bio: formData.get('bio') as string || undefined,
 
         // Membership
-        membershipType: (formData.get('membershipType') as any) || undefined,
+        membershipType: formMembershipType,
         senatorCertified: formData.get('senatorCertified') === 'on',
+        senatorshipId: formSenatorshipId,
 
         // Professional
         companyName: formData.get('companyName') as string || undefined,
@@ -729,7 +771,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                     <Input value={batchSetValue} onChange={(e) => setBatchSetValue(e.target.value)} placeholder="Enter introducer name" />
                   ) : batchSetField === 'role' ? (
                     <Select
-                      options={Object.values(UserRole).map(r => ({ label: r, value: r }))}
+                      options={[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => ({ label: r, value: r }))}
                       value={batchSetValue}
                       onChange={(e) => setBatchSetValue(e.target.value)}
                     />
@@ -828,9 +870,14 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               <section>
                 <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Internal Profile</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <Select name="role" label="System Role" defaultValue={UserRole.MEMBER} options={Object.values(UserRole).map(r => ({ label: r, value: r }))} />
-                  <Select name="membershipType" label="Membership Type" options={['Full', 'Probation', 'Honorary', 'Visiting', 'Senator'].map(t => ({ label: t, value: t }))} />
+                  <Select name="role" label="System Role" defaultValue={UserRole.MEMBER} options={[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => ({ label: r, value: r }))} />
+                  <Select name="membershipType" label="Membership Type" options={['Full', 'Probation', 'Honorary', 'Visiting', 'Senator', 'Associate'].map(t => ({ label: t, value: t }))} />
                   <Input name="introducer" label="Introducer Name" placeholder="Who brought them in?" />
+                  <div className="flex items-center gap-2 mt-6">
+                    <input type="checkbox" id="add-senatorCertified" name="senatorCertified" className="w-4 h-4" />
+                    <label htmlFor="add-senatorCertified" className="text-sm">Senator Certified</label>
+                  </div>
+                  <Input name="senatorshipId" label="Senatorship ID" placeholder="e.g. 12345" />
                 </div>
               </section>
 
@@ -1039,6 +1086,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
 // Member Statistics View Component
 const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; loading: boolean }> = ({ statistics, loading }) => {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   if (loading) {
     return <div className="text-center py-8 text-slate-400">Loading statistics...</div>;
   }
@@ -1050,15 +1106,6 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
   const tierData = Object.entries(statistics.membersByTier).map(([tier, count]) => ({ name: tier, value: count }));
   const roleData = Object.entries(statistics.membersByRole).map(([role, count]) => ({ name: role, value: count }));
   const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5', '#A5B4FC', '#F472B6'];
-
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -1411,6 +1458,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [memberClubs, setMemberClubs] = useState<HobbyClub[]>([]);
   const [loadingClubs, setLoadingClubs] = useState(false);
   const [editFormTab, setEditFormTab] = useState<'basic' | 'professional' | 'contact' | 'apparel'>('basic');
+  const [boardPositions, setBoardPositions] = useState<BoardMember[]>([]);
 
   const mentor = members.find(m => m.id === member.mentorId);
   const mentees = members.filter(m => member.menteeIds?.includes(m.id));
@@ -1432,6 +1480,19 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       }
     };
     loadMemberClubs();
+  }, [member.id]);
+
+  // Load board positions for this member directly from boardMembers collection
+  useEffect(() => {
+    const loadBoardPositions = async () => {
+      try {
+        const positions = await BoardManagementService.getMemberBoardPositions(member.id);
+        setBoardPositions(positions);
+      } catch (err) {
+        console.error('Failed to load board positions:', err);
+      }
+    };
+    loadBoardPositions();
   }, [member.id]);
 
   const handleFindMentors = async () => {
@@ -2037,6 +2098,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
           <Card title="JCI Career Path">
             <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+              {/* Join milestone */}
               <div className="relative">
                 <div className="absolute -left-8 bg-green-100 text-green-600 p-1 rounded-full border-4 border-white">
                   <UserPlus size={14} />
@@ -2045,16 +2107,91 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
               </div>
 
-              {Array.isArray(member.careerHistory) && member.careerHistory.map((milestone, idx) => (
-                <div key={idx} className="relative">
-                  <div className="absolute -left-8 bg-blue-100 text-jci-blue p-1 rounded-full border-4 border-white">
-                    <Briefcase size={14} />
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono mb-1 block">{milestone.year}</span>
-                  <h4 className="text-sm font-bold text-slate-900">{milestone.role}</h4>
-                  <p className="text-sm text-slate-600">{milestone.description}</p>
-                </div>
-              ))}
+              {/* Merged & sorted: careerHistory + boardPositions from Firestore */}
+              {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                // Date-based status helper
+                const getBodStatus = (bp: BoardMember): 'former' | 'current' | 'elected' => {
+                  const start = bp.startDate ? new Date(bp.startDate) : null;
+                  const end = bp.endDate ? new Date(bp.endDate) : null;
+                  if (end && today > end) return 'former';
+                  if (start && today < start) return 'elected';
+                  return 'current';
+                };
+
+                type TimelineItem = {
+                  sortKey: string; type: 'career' | 'board';
+                  year: string; title: string; subtitle?: string;
+                  bodStatus?: 'former' | 'current' | 'elected';
+                };
+                const items: TimelineItem[] = [];
+
+                // Career history from member profile
+                if (Array.isArray(member.careerHistory)) {
+                  member.careerHistory.forEach(m => {
+                    items.push({ sortKey: String(m.year), type: 'career', year: String(m.year), title: m.role, subtitle: m.description });
+                  });
+                }
+
+                // Board positions from Firestore boardMembers collection
+                boardPositions.forEach(bp => {
+                  items.push({
+                    sortKey: bp.term,
+                    type: 'board',
+                    year: bp.term,
+                    title: bp.position,
+                    subtitle: `Board of Directors – ${bp.term}`,
+                    bodStatus: getBodStatus(bp),
+                  });
+                });
+
+                // Sort chronologically
+                items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+                return items.map((item, idx) => {
+                  if (item.type === 'board') {
+                    const statusConfig = {
+                      current:  { dot: 'bg-amber-100 text-amber-600',  badge: 'bg-amber-100 text-amber-700',  label: '现任', icon: 'text-amber-500' },
+                      elected:  { dot: 'bg-blue-100 text-blue-600',    badge: 'bg-blue-100 text-blue-700',    label: 'Elected', icon: 'text-blue-500' },
+                      former:   { dot: 'bg-slate-100 text-slate-500',  badge: 'bg-slate-100 text-slate-600',  label: '历届', icon: 'text-slate-400' },
+                    };
+                    const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
+                    return (
+                      <div key={`board-${idx}`} className="relative">
+                        <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
+                          <Award size={14} />
+                        </div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs text-slate-400 font-mono">{item.year}</span>
+                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Shield size={10} className={cfg.icon} />
+                          <p className={`text-xs font-medium ${cfg.icon}`}>Board of Directors</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={`career-${idx}`} className="relative">
+                      <div className="absolute -left-8 bg-blue-100 text-jci-blue p-1 rounded-full border-4 border-white">
+                        <Briefcase size={14} />
+                      </div>
+                      <span className="text-xs text-slate-400 font-mono mb-1 block">{item.year}</span>
+                      <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                      {item.subtitle && <p className="text-sm text-slate-600">{item.subtitle}</p>}
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* Empty state */}
+              {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && (
+                <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
+              )}
             </div>
           </Card>
 
@@ -2370,7 +2507,6 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
           [yearStr]: {
             year: approvalYear,
             dues: (selectedGuest?.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
-            type: 'Probation' as any,
             amount: 0,
             status: 'pending',
             transactionId: []
@@ -2435,7 +2571,6 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
             [yearStr]: {
               year: approvalYear,
               dues: (guest?.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
-              type: 'Probation' as any,
               amount: 0,
               status: 'pending',
               transactionId: []

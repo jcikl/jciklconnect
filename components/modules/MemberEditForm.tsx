@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Tabs } from '../ui/Common';
-import { Member, UserRole, MemberTier, MembershipType, MembershipDues } from '../../types';
+import { Button, Tabs, useToast } from '../ui/Common';
+import { Member, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS, INTERNATIONAL_PARTNERSHIP_OPTIONS } from '../../config/constants';
+import { MembershipConfigService } from '../../services/membershipConfigService';
 
 interface MemberEditFormProps {
   member: Member;
@@ -47,6 +48,7 @@ function initFormValues(member: Member) {
     tier: member.tier,
     membershipType: member.membershipType || '',
     senatorCertified: member.senatorCertified || false,
+    senatorshipId: member.senatorshipId || '',
     attendanceRate: member.attendanceRate ?? 0,
     churnRisk: member.churnRisk,
 
@@ -88,9 +90,15 @@ function initFormValues(member: Member) {
 
 export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit, onCancel, selfEditableOnly = false }) => {
   const { isAdmin, isDeveloper } = usePermissions();
+  const { showToast } = useToast();
   const canEditMembership = isAdmin || isDeveloper;
   const [activeTab, setActiveTab] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'membership'>(selfEditableOnly ? 'contact' : 'basic');
   const [formValues, setFormValues] = useState(() => initFormValues(member));
+  const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+
+  useEffect(() => {
+    MembershipConfigService.getRules().then(setMembershipRules).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setFormValues(initFormValues(member));
@@ -123,6 +131,46 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       .filter(s => s.length > 0);
     const interestedIndustriesArr = formValues.interestedIndustries;
 
+    const targetType = (formValues.membershipType as Member['membershipType']) || member.membershipType;
+    if (membershipRules && targetType && membershipRules[targetType] && canEditMembership) {
+      const rule = membershipRules[targetType];
+      
+      // Nationality Check
+      if (rule.nationalityLimit === 'Malaysian' && formValues.nationality !== 'Malaysia') {
+         showToast(`Nationality mismatch: ${targetType} requires Malaysian`, 'error');
+         return;
+      }
+      if (rule.nationalityLimit === 'Non-Malaysian' && formValues.nationality === 'Malaysia') {
+         showToast(`Nationality mismatch: ${targetType} requires Non-Malaysian`, 'error');
+         return;
+      }
+      
+      // Senatorship Check
+      if (rule.requiresSenatorship && !formValues.senatorshipId?.trim()) {
+         showToast(`Senatorship ID is required for ${targetType}`, 'error');
+         return;
+      }
+      
+      // Age Check
+      if (formValues.dateOfBirth) {
+         const birthYear = new Date(formValues.dateOfBirth).getFullYear();
+         const currentYear = new Date().getFullYear();
+         let age = currentYear - birthYear;
+         
+         if (rule.ageLimit.min && age < rule.ageLimit.min) {
+            showToast(`Age limit not met: ${targetType} requires min age ${rule.ageLimit.min} (Current Age: ${age})`, 'error');
+            return;
+         }
+         if (rule.ageLimit.max && age > rule.ageLimit.max) {
+            showToast(`Age limit exceeded: ${targetType} requires max age ${rule.ageLimit.max} (Current Age: ${age})`, 'error');
+            return;
+         }
+      } else if (rule.ageLimit.min || rule.ageLimit.max) {
+         showToast(`Date of Birth is required to validate age for ${targetType}`, 'error');
+         return;
+      }
+    }
+
     const updates: Partial<Member> = {
       name: formValues.name || member.name,
       email: formValues.email || member.email,
@@ -135,6 +183,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       churnRisk: formValues.churnRisk || member.churnRisk,
       membershipType: (formValues.membershipType as Member['membershipType']) || member.membershipType,
       senatorCertified: formValues.senatorCertified,
+      senatorshipId: formValues.senatorshipId || undefined,
 
       fullName: formValues.fullName || undefined,
       idNumber: formValues.idNumber || undefined,
@@ -180,7 +229,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         [yearStr]: {
           year: formValues.membershipYear,
           dues: (member.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
-          type: 'Probation',
           amount: 0,
           status: 'pending',
           transactionId: []
@@ -311,7 +359,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   disabled={!canEditMembership}
                   className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 >
-                  {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
+                  {[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div className="flex flex-row items-center gap-3">
@@ -408,6 +456,17 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                       className={`w-5 h-5 rounded border-gray-300 text-jci-blue focus:ring-jci-blue ${!canEditMembership ? 'cursor-not-allowed' : ''}`}
                     />
                     <label htmlFor="senatorCertified" className={`text-sm font-bold md:font-medium text-blue-900 ${canEditMembership ? 'cursor-pointer' : 'cursor-not-allowed'}`}>Senator Certified</label>
+                  </div>
+                  <div className="flex-1 flex flex-row items-center gap-3">
+                    <label className="w-28 shrink-0 text-sm font-semibold text-slate-700">Senatorship ID</label>
+                    <input
+                      name="senatorshipId"
+                      value={formValues.senatorshipId}
+                      onChange={(e) => handleChange('senatorshipId', e.target.value)}
+                      disabled={!canEditMembership}
+                      placeholder="e.g. 12345"
+                      className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : 'bg-white'}`}
+                    />
                   </div>
                 </div>
               )}

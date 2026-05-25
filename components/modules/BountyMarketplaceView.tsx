@@ -1,43 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Plus, Search, Filter, Shield, Coins, Zap, Clock, Users, ArrowUpRight,
-  CheckCircle, Flame, Target, MessageSquare, AlertTriangle, ChevronRight,
-  TrendingUp, Award, Briefcase, Globe
+  Plus, Shield, Coins, Zap, Target, MessageSquare, AlertTriangle, 
+  CheckCircle, ShieldCheck
 } from 'lucide-react';
 import {
-  Card, Button, Badge, useToast, Modal
+  Card, Button, Badge, useToast, Modal, Tabs
 } from '../ui/Common';
 import { Input, Textarea, Select } from '../ui/Form';
 import { BountyService, Bounty } from '../../services/bountyService';
 import { useAuth } from '../../hooks/useAuth';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { formatDateToDDMMMYYYY } from '../../utils/dateUtils';
-import { BOUNTY_STATUS } from '../../config/constants';
+import { LoadingState } from '../ui/Loading';
 
 export const BountyMarketplaceView: React.FC = () => {
   const { member } = useAuth();
   const { showToast } = useToast();
   const [bounties, setBounties] = useState<Bounty[]>([]);
+  const [myQuests, setMyQuests] = useState<Bounty[]>([]);
+  const [myPosts, setMyPosts] = useState<Bounty[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [actioning, setActioning] = useState(false);
+  const [activeTab, setActiveTab] = useState<'marketplace' | 'quests' | 'posts'>('marketplace');
   const [filter, setFilter] = useState<'All' | 'BUSINESS' | 'COMMUNITY' | 'INDIVIDUAL'>('All');
+  
+  // Modals
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedBounty, setSelectedBounty] = useState<Bounty | null>(null);
 
-  // Load Bounties
-  const loadBounties = async () => {
+  const loadData = useCallback(async () => {
+    if (!member) return;
     setLoading(true);
     try {
-      const data = await BountyService.getOpenBounties();
-      setBounties(data);
+      const [openData, questData, postData] = await Promise.all([
+        BountyService.getOpenBounties(),
+        BountyService.getUserClaimedBounties(member.id),
+        BountyService.getUserPostedBounties(member.id)
+      ]);
+      setBounties(openData);
+      setMyQuests(questData);
+      setMyPosts(postData);
     } catch (err) {
-      showToast('Failed to load marketplace', 'error');
+      showToast('Failed to sync competition floor', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [member, showToast]);
 
   useEffect(() => {
-    loadBounties();
-  }, []);
+    loadData();
+  }, [loadData]);
 
   const handlePostBounty = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -47,10 +61,11 @@ export const BountyMarketplaceView: React.FC = () => {
     const rewardPoints = parseInt(formData.get('rewardPoints') as string);
 
     if (member.points < rewardPoints) {
-      showToast('Insufficient points to post this bounty', 'error');
+      showToast('Insufficient points to lock in escrow', 'error');
       return;
     }
 
+    setActioning(true);
     try {
       const bountyData: any = {
         title: formData.get('title') as string,
@@ -62,22 +77,91 @@ export const BountyMarketplaceView: React.FC = () => {
       };
 
       await BountyService.postBounty(member.id, member.name, bountyData);
-      showToast('Bounty posted! Points locked in escrow.', 'success');
+      showToast('Bounty committed to floor. Points escrowed.', 'success');
       setIsPostModalOpen(false);
-      loadBounties();
+      loadData();
     } catch (err) {
       showToast('Failed to post bounty', 'error');
+    } finally {
+      setActioning(false);
     }
   };
 
   const handleClaim = async (bountyId: string) => {
     if (!member) return;
+    setActioning(true);
     try {
       await BountyService.claimBounty(bountyId, member.id, member.name);
-      showToast('Bounty claimed! Get to work, hunter.', 'success');
-      loadBounties();
+      showToast('Bounty claimed. Happy hunting!', 'success');
+      loadData();
     } catch (err: any) {
       showToast(err.message || 'Claim failed', 'error');
+    } finally {
+      setActioning(false);
+    }
+  };
+
+  const handleSubmitProof = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedBounty) return;
+
+    const formData = new FormData(e.currentTarget);
+    const proofText = formData.get('proofText') as string;
+
+    setActioning(true);
+    try {
+      await BountyService.submitBountyProof(selectedBounty.id!, proofText, []);
+      showToast('Proof submitted for review.', 'success');
+      setIsSubmitModalOpen(false);
+      loadData();
+    } catch (err) {
+      showToast('Failed to submit proof', 'error');
+    } finally {
+      setActioning(false);
+    }
+  };
+
+  const handleApprove = async (bountyId: string) => {
+    if (!member) return;
+    setActioning(true);
+    try {
+      await BountyService.finalizeBounty(bountyId);
+      showToast('Bounty approved. Points released!', 'success');
+      setIsReviewModalOpen(false);
+      loadData();
+    } catch (err) {
+      showToast('Failed to release escrow', 'error');
+    } finally {
+      setActioning(false);
+    }
+  };
+
+  const handleReject = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedBounty) return;
+
+    const formData = new FormData(e.currentTarget);
+    const reason = formData.get('reason') as string;
+
+    setActioning(true);
+    try {
+      await BountyService.rejectBountySubmission(selectedBounty.id!, reason);
+      showToast('Submission rejected.', 'warning');
+      setIsReviewModalOpen(false);
+      loadData();
+    } catch (err) {
+      showToast('Failed to reject', 'error');
+    } finally {
+      setActioning(false);
+    }
+  };
+
+  const getUrgencyColor = (urgency: string) => {
+    switch (urgency) {
+      case 'Critical': return 'bg-red-500';
+      case 'High': return 'bg-orange-500';
+      case 'Medium': return 'bg-blue-500';
+      default: return 'bg-slate-400';
     }
   };
 
@@ -103,122 +187,92 @@ export const BountyMarketplaceView: React.FC = () => {
         </Button>
       </div>
 
-      {/* Hunter Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="!bg-jci-blue text-white !border-none shadow-lg">
-          <p className="text-[10px] font-black uppercase opacity-60">Active Bounties</p>
-          <p className="text-3xl font-black">{bounties.length}</p>
-        </Card>
-        <Card className="!bg-slate-900 text-white !border-none shadow-lg">
-          <p className="text-[10px] font-black uppercase opacity-60">Avg. Payout</p>
-          <p className="text-3xl font-black">
-            {bounties.length > 0 ? Math.round(bounties.reduce((a, b) => a + b.rewardPoints, 0) / bounties.length) : 0}
-          </p>
-        </Card>
-        <Card className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_#0f172a]">
-          <p className="text-[10px] font-black uppercase text-slate-400">Your Success</p>
-          <p className="text-3xl font-black text-slate-900">0%</p>
-        </Card>
-        <Card className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_#0f172a]">
-          <p className="text-[10px] font-black uppercase text-slate-400">Total Profits</p>
-          <p className="text-3xl font-black text-emerald-600">0</p>
-        </Card>
-      </div>
-
-      {/* Filter Tabs */}
+      {/* Tabs */}
       <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
-        {['All', 'BUSINESS', 'COMMUNITY', 'INDIVIDUAL'].map((f) => (
+        {[
+          { id: 'marketplace', label: 'Bounty Floor' },
+          { id: 'quests', label: 'My Quests' },
+          { id: 'posts', label: 'My Posts' }
+        ].map((t) => (
           <button
-            key={f}
-            onClick={() => setFilter(f as any)}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${filter === f ? 'bg-white shadow-md text-jci-blue' : 'text-slate-500 hover:bg-white/50'}`}
+            key={t.id}
+            onClick={() => setActiveTab(t.id as any)}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all ${activeTab === t.id ? 'bg-white shadow-md text-jci-blue' : 'text-slate-500 hover:bg-white/50'}`}
           >
-            {f}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* Bounties Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
-        {loading ? (
-          <div className="col-span-full py-20 text-center space-y-4">
-            <Zap className="mx-auto text-jci-blue animate-pulse" size={48} />
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Syncing Competition Floor...</p>
-          </div>
-        ) : filteredBounties.length === 0 ? (
-          <div className="col-span-full py-20 text-center bg-slate-50 rounded-[40px] border-4 border-dashed border-slate-200">
-            <Target className="mx-auto text-slate-300 mb-4" size={64} />
-            <h3 className="text-xl font-black text-slate-900 uppercase">No active bounties</h3>
-            <p className="text-slate-500">Wait for a drop or post your own resource demand.</p>
-          </div>
-        ) : (
-          filteredBounties.map(bounty => (
-            <motion.div
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              key={bounty.id}
-            >
-              <Card className={`relative min-h-[220px] bg-white border-2 hover:border-jci-blue hover:shadow-2xl transition-all cursor-pointer group flex flex-col p-6 rounded-[32px] ${bounty.urgency === 'Critical' ? 'border-red-500' : 'border-slate-200'}`}>
-                {/* Category & Points Badge */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex gap-2">
-                    <Badge className="bg-slate-100 text-slate-500 border-none font-black text-[10px] py-1 px-3">
-                      {bounty.category}
-                    </Badge>
-                    {bounty.urgency === 'Critical' && (
-                      <Badge className="bg-red-500 text-white border-none animate-pulse font-black text-[10px] py-1 px-3">
-                        URGENT
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-2xl font-black text-jci-blue italic tracking-tighter">
-                    {bounty.rewardPoints.toLocaleString()}
-                    <Coins size={20} className="text-amber-500" />
-                  </div>
-                </div>
+      {/* Main Content Area */}
+      {loading ? (
+        <LoadingState loading={true}><div>Syncing Competition Floor...</div></LoadingState>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {activeTab === 'marketplace' && (
+            filteredBounties.length === 0 ? (
+              <div className="col-span-full py-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                <Target className="mx-auto text-slate-300 mb-4" size={48} />
+                <p className="text-slate-500 font-bold uppercase tracking-tighter">No resource demands currently on the floor.</p>
+              </div>
+            ) : (
+              filteredBounties.map((bounty) => (
+                <BountyCard 
+                  key={bounty.id} 
+                  bounty={bounty} 
+                  isOwner={member?.id === bounty.posterId}
+                  onClaim={() => handleClaim(bounty.id!)}
+                  getUrgencyColor={getUrgencyColor}
+                />
+              ))
+            )
+          )}
 
-                {/* Title & Description */}
-                <div className="flex-1">
-                  <h3 className="text-xl font-black text-slate-900 mb-2 leading-tight group-hover:text-jci-blue transition-colors">{bounty.title}</h3>
-                  <p className="text-sm text-slate-500 line-clamp-3 mb-4 font-medium leading-relaxed">
-                    {bounty.description}
-                  </p>
-                </div>
+          {activeTab === 'quests' && (
+            myQuests.length === 0 ? (
+              <div className="col-span-full py-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                <Zap className="mx-auto text-slate-300 mb-4" size={48} />
+                <p className="text-slate-500 font-bold uppercase tracking-tighter">You haven't claimed any bounties yet.</p>
+              </div>
+            ) : (
+              myQuests.map((bounty) => (
+                <BountyCard 
+                  key={bounty.id} 
+                  bounty={bounty} 
+                  isQuest={true}
+                  onAction={() => {
+                    setSelectedBounty(bounty);
+                    setIsSubmitModalOpen(true);
+                  }}
+                  getUrgencyColor={getUrgencyColor}
+                />
+              ))
+            )
+          )}
 
-                {/* Footer Metadata */}
-                <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(bounty.posterName)}&background=f1f5f9&color=64748b`}
-                      className="w-8 h-8 rounded-full border border-white shadow-sm"
-                      alt=""
-                    />
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-slate-400">Posted by</p>
-                      <p className="text-xs font-bold text-slate-700">{bounty.posterName}</p>
-                    </div>
-                  </div>
-
-                  {member?.id === bounty.posterId ? (
-                    <Badge variant="neutral" className="opacity-50">YOUR BOUNTY</Badge>
-                  ) : (
-                    <Button
-                      onClick={() => handleClaim(bounty.id!)}
-                      className="rounded-full px-6 font-black uppercase text-xs tracking-widest bg-jci-navy hover:bg-jci-blue"
-                    >
-                      Hunt Now
-                    </Button>
-                  )}
-                </div>
-
-                {/* Decorative Overlays */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:bg-jci-blue/5 transition-colors -z-10"></div>
-              </Card>
-            </motion.div>
-          ))
-        )}
-      </div>
+          {activeTab === 'posts' && (
+            myPosts.length === 0 ? (
+              <div className="col-span-full py-20 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                <ShieldCheck className="mx-auto text-slate-300 mb-4" size={48} />
+                <p className="text-slate-500 font-bold uppercase tracking-tighter">You haven't posted any demands yet.</p>
+              </div>
+            ) : (
+              myPosts.map((bounty) => (
+                <BountyCard 
+                  key={bounty.id} 
+                  bounty={bounty} 
+                  isPosted={true}
+                  onAction={() => {
+                    setSelectedBounty(bounty);
+                    setIsReviewModalOpen(true);
+                  }}
+                  getUrgencyColor={getUrgencyColor}
+                />
+              ))
+            )
+          )}
+        </div>
+      )}
 
       {/* Post Bounty Modal */}
       <Modal
@@ -231,51 +285,169 @@ export const BountyMarketplaceView: React.FC = () => {
           <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex gap-3">
             <Shield className="text-amber-600 shrink-0" size={24} />
             <p className="text-xs font-bold text-amber-700">
-              Posting a bounty will lock the reward points in escrow immediately. Points will only be released once you approve the hunter's submission.
+              Posting a bounty will lock points in escrow. Points are released only upon approval.
             </p>
           </div>
 
           <div className="space-y-4">
-            <Input name="title" label="What do you need?" placeholder="e.g. Regional HQ Referral for Logistics Tech" required />
-            <Textarea name="description" label="Detailed Demand (Deliverables)" placeholder="Specify exactly what you need to receive to release the points." rows={4} required />
+            <Input name="title" label="Title" placeholder="e.g. Regional HQ Referral" required />
+            <Textarea name="description" label="Requirements" placeholder="Describe deliverables..." rows={4} required />
 
             <div className="grid grid-cols-2 gap-4">
-              <Select
-                name="category"
-                label="Category"
-                options={[
-                  { label: 'Business', value: 'BUSINESS' },
-                  { label: 'Community', value: 'COMMUNITY' },
-                  { label: 'Individual', value: 'INDIVIDUAL' },
-                  { label: 'International', value: 'INTERNATIONAL' }
-                ]}
-              />
-              <Select
-                name="urgency"
-                label="Urgency"
-                options={[
-                  { label: 'Low', value: 'Low' },
-                  { label: 'Medium', value: 'Medium' },
-                  { label: 'High', value: 'High' },
-                  { label: 'Critical (High Impact)', value: 'Critical' }
-                ]}
-              />
+              <Select name="category" label="Category" options={[
+                { label: 'Business', value: 'BUSINESS' },
+                { label: 'Community', value: 'COMMUNITY' },
+                { label: 'Individual', value: 'INDIVIDUAL' }
+              ]} />
+              <Select name="urgency" label="Urgency" options={[
+                { label: 'Low', value: 'Low' },
+                { label: 'Medium', value: 'Medium' },
+                { label: 'High', value: 'High' },
+                { label: 'Critical', value: 'Critical' }
+              ]} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Input name="rewardPoints" label="Reward Points" type="number" defaultValue="500" required />
-              <Input name="tags" label="Tags (comma separated)" placeholder="referral, tech, region" />
+              <Input name="rewardPoints" label="Points" type="number" defaultValue="500" required />
+              <Input name="tags" label="Tags" placeholder="referral, tech" />
             </div>
 
             <div className="pt-4 flex justify-end gap-3">
               <Button variant="outline" type="button" onClick={() => setIsPostModalOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-slate-900 px-8 font-black uppercase italic">
+              <Button type="submit" isLoading={actioning} className="bg-slate-900 px-8 font-black uppercase italic">
                 Commit & Post
               </Button>
             </div>
           </div>
         </form>
       </Modal>
+
+      {/* Submit Proof Modal */}
+      <Modal
+        isOpen={isSubmitModalOpen}
+        onClose={() => setIsSubmitModalOpen(false)}
+        title="Submit Bounty Proof"
+        size="lg"
+      >
+        {selectedBounty && (
+          <form onSubmit={handleSubmitProof} className="space-y-6">
+            <Textarea 
+              name="proofText" 
+              label="Evidence / Deliverables" 
+              placeholder="Detail how you fulfilled the demand..." 
+              rows={6} 
+              required 
+            />
+            <div className="pt-4 flex justify-end gap-3">
+              <Button variant="outline" type="button" onClick={() => setIsSubmitModalOpen(false)}>Cancel</Button>
+              <Button type="submit" isLoading={actioning} className="bg-jci-blue px-8 font-black uppercase italic">
+                Submit for Review
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Review Modal */}
+      <Modal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        title="Review Submission"
+        size="lg"
+      >
+        {selectedBounty && (
+          <div className="space-y-6">
+            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap">
+              {selectedBounty.claimantProofText || "No proof provided."}
+            </div>
+
+            {selectedBounty.status === 'Submitted' && (
+              <div className="pt-6 flex flex-col gap-4">
+                <Button 
+                  variant="success" 
+                  className="w-full font-black uppercase italic py-4"
+                  onClick={() => handleApprove(selectedBounty.id!)}
+                  isLoading={actioning}
+                >
+                  Release Points
+                </Button>
+                
+                <form onSubmit={handleReject} className="pt-4 border-t border-slate-100 flex gap-2">
+                  <Input name="reason" placeholder="Rejection reason..." required className="flex-1" />
+                  <Button variant="outline" type="submit" isLoading={actioning} className="text-red-500">
+                    Reject
+                  </Button>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
+  );
+};
+
+// Helper Components
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const variant = 
+    status === 'Open' ? 'jci' : 
+    status === 'Claimed' ? 'warning' : 
+    status === 'Submitted' ? 'info' : 
+    status === 'Completed' ? 'success' : 'neutral';
+  
+  return <Badge variant={variant} className="rounded-full px-3 uppercase text-[10px] font-black italic">{status}</Badge>;
+};
+
+const BountyCard: React.FC<{ 
+  bounty: Bounty; 
+  isOwner?: boolean; 
+  isQuest?: boolean; 
+  isPosted?: boolean;
+  onClaim?: () => void;
+  onAction?: () => void;
+  getUrgencyColor: (urgency: string) => string;
+}> = ({ bounty, isOwner, isQuest, isPosted, onClaim, onAction, getUrgencyColor }) => {
+  const status = bounty.status;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <Card noPadding className="relative h-full border-none shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-jci-blue/10 transition-all rounded-[2.5rem] overflow-hidden group bg-white">
+        <div className={`absolute top-0 left-0 w-2 h-full ${getUrgencyColor(bounty.urgency)}`}></div>
+        <div className="p-8 space-y-6">
+          <div className="flex justify-between items-start">
+            <Badge variant="jci" className="rounded-full px-4 py-1 font-black italic">{bounty.category}</Badge>
+            <div className="text-right">
+              <div className="text-2xl font-black text-slate-900 leading-none">{bounty.rewardPoints}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PTS</div>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-xl font-black text-slate-900 uppercase italic flex-1 truncate">{bounty.title}</h3>
+              <StatusBadge status={status} />
+            </div>
+            <p className="text-sm text-slate-500 line-clamp-3 font-medium">{bounty.description}</p>
+          </div>
+          <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">
+              {isQuest ? `Posted by: ${bounty.posterName}` : (isPosted ? `Claimed by: ${bounty.claimantName || 'Pending'}` : bounty.posterName)}
+            </div>
+            {status === 'Open' && !isOwner && (
+              <Button onClick={onClaim} size="sm" className="rounded-full px-6 bg-jci-navy">Hunt</Button>
+            )}
+            {isQuest && status === 'Claimed' && (
+              <Button onClick={onAction} size="sm" className="rounded-full px-6 bg-orange-500">Submit</Button>
+            )}
+            {isPosted && status === 'Submitted' && (
+              <Button onClick={onAction} size="sm" className="rounded-full px-6 bg-slate-900">Review</Button>
+            )}
+          </div>
+        </div>
+      </Card>
+    </motion.div>
   );
 };

@@ -4,6 +4,8 @@ import { Mail, Lock, AlertCircle } from 'lucide-react';
 import { Modal, Button, useToast } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
+import { fetchSignInMethodsForEmail } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -38,7 +40,40 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       setEmail('');
       setPassword('');
     } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to login. Please check your credentials.';
+      let errorMessage = err?.message || 'Failed to login. Please check your credentials.';
+      
+      const isCredentialError = 
+        errorMessage.includes('auth/invalid-credential') || 
+        errorMessage.includes('auth/wrong-password') ||
+        errorMessage.includes('auth/user-not-found');
+
+      if (isCredentialError) {
+        try {
+          const methods = await fetchSignInMethodsForEmail(auth, email);
+          if (methods.includes('google.com')) {
+            await resetPassword(email);
+            errorMessage = '检测到您曾使用 Google 登入。我们已发送密码重置邮件到您的邮箱，请检查。';
+          } else if (methods.length > 0) {
+            errorMessage = '密码错误，请重试。';
+          } else {
+            errorMessage = '电邮未注册';
+          }
+        } catch (methodErr) {
+          // 如果 Firebase 开启了“电邮枚举保护”，fetchSignInMethodsForEmail 会抛出错误。
+          // 此时我们退而求其次，检查我们的数据库中是否存在该会员。
+          try {
+            const { MembersService } = await import('../../services/membersService');
+            const member = await MembersService.getMemberByEmail(email);
+            if (member) {
+              errorMessage = '电邮或密码错误。若您曾使用 Google 登入，请直接点击下方的 Google 登入，或重置密码。';
+            } else {
+              errorMessage = '电邮未注册';
+            }
+          } catch (e) {
+            errorMessage = '电邮未注册';
+          }
+        }
+      }
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
@@ -55,7 +90,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       showToast('Login successful!', 'success');
       onClose();
     } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to login with Google.';
+      let errorMessage = err?.message || 'Failed to login with Google.';
+      if (errorMessage.includes('auth/invalid-credential')) {
+        errorMessage = '电邮未注册';
+      }
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {

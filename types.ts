@@ -6,6 +6,7 @@ export enum UserRole {
   MEMBER = 'MEMBER',
   BOARD = 'BOARD',
   ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN',
   /** 组织秘书：主档维护与宣导 */
   ORGANIZATION_SECRETARY = 'ORGANIZATION_SECRETARY',
   /** 组织财政长：组织级财务与对账 */
@@ -329,6 +330,7 @@ export interface Member {
   hasPaidInitiationFee?: boolean;
   introducer?: string;
   senatorCertified?: boolean;
+  senatorshipId?: string; // Senatorship ID for Senators
   age?: number;
   // New fields for Deep Profiling
   bio?: string;
@@ -828,13 +830,25 @@ export const MembershipDues: Record<MembershipType, number> = {
 // Status values for membership records
 export type MembershipStatus = 'pending' | 'paid' | 'overdue' | 'partial' | 'over paid';
 
+// Configurable Rules for Membership Types
+export interface MembershipRuleConfig {
+  type: MembershipType;
+  duesAmount: number;
+  nationalityLimit: 'Malaysian' | 'Non-Malaysian' | 'None';
+  ageLimit: {
+    min?: number;
+    max?: number;
+  };
+  requiresSenatorship: boolean;
+}
+
 export interface MembershipRecord {
   year: number;
   dues: number; // Target fee for this year
-  type: MembershipType; // Type at the time of payment
   amount: number; // Cumulative total paid for this year
   paymentDate?: string; // Latest payment date
   transactionId: string[]; // List of transaction IDs
+  purpose?: string; // Latest transaction description
   status: MembershipStatus;
 }
 

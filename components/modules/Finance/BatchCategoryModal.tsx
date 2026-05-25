@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, CheckSquare, Layers } from 'lucide-react';
-import { Transaction, TransactionSplit } from '../../../types';
+import { Transaction, TransactionSplit, MembershipType, MembershipRuleConfig } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
+import { MembershipConfigService, resolveMembershipPurpose, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
 import * as Forms from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
 import { Modal, Button } from '../../ui/Common';
@@ -72,6 +73,15 @@ export function BatchCategoryModal({
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+
+    useEffect(() => {
+        const fetchRules = async () => {
+            const rules = await MembershipConfigService.getRules();
+            setMembershipRules(rules);
+        };
+        fetchRules();
+    }, []);
 
     // Reset form when modal opens
     useEffect(() => {
@@ -140,15 +150,18 @@ export function BatchCategoryModal({
         if (category === 'Membership' && memberId) {
             const member = members.find(m => m.id === memberId);
             const membershipType = member?.membershipType || 'Full';
+            const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
+            const duesAmount = rules[membershipType as MembershipType]?.duesAmount ?? 300;
             const y = year || currentYear;
-            setPurpose(`${y} ${membershipType} membership`);
+            const resolvedPurpose = resolveMembershipPurpose(duesAmount, y, rules);
+            setPurpose(resolvedPurpose);
             setEnablePurpose(true);
         } else if (category !== 'Membership' && enablePurpose) {
             // Clear purpose if category changes from Membership and purpose was auto-enabled
             setPurpose('');
             setEnablePurpose(false);
         }
-    }, [category, memberId, year, members, currentYear, enablePurpose]);
+    }, [category, memberId, year, members, currentYear, enablePurpose, membershipRules]);
 
     // Clear projectId if it becomes incompatible with the current year filter
     useEffect(() => {

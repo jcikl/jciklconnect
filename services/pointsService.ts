@@ -1291,5 +1291,91 @@ export class PointsService {
   static async deleteStandard(id: string): Promise<void> {
     return this.bulkDeleteStandards([id]);
   }
+
+  /**
+   * Fetch LO Star progress for a given LO and year
+   */
+  static async getLOStarProgress(loId: string, year: number): Promise<LOStarProgress> {
+    if (isDevMode()) {
+      return {
+        loId,
+        year,
+        categories: {
+          efficient: { current: 45, total: 100, stars: 0 },
+          network: { current: 120, total: 250, stars: 0 },
+          experience: { current: 80, total: 250, stars: 0 },
+          outreach: { current: 30, total: 200, stars: 0 },
+          impact: { current: 15, total: 150, stars: 0 }
+        },
+        details: {},
+        totalPoints: 290,
+        starsUnlocked: 0,
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
+    try {
+      // 1. Get active program for the year
+      const programs = await this.getIncentivePrograms();
+      const program = programs.find(p => p.year === year && p.isActive) || programs[0];
+      if (!program) throw new Error('No active incentive program found');
+
+      // 2. Get all approved submissions for the LO
+      const q = query(
+        collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+        where('loId', '==', loId),
+        where('status', '==', 'APPROVED')
+      );
+      const snapshot = await getDocs(q);
+      const submissions = snapshot.docs.map(doc => doc.data() as IncentiveSubmission);
+
+      // 3. Get all standards to map standardId -> category
+      const standards = await this.getStandards(program.id);
+      const standardMap = new Map(standards.map(s => [s.id, s]));
+
+      // 4. Aggregate scores
+      const categoryScores: Record<string, number> = {};
+      Object.keys(program.categories).forEach(cat => categoryScores[cat] = 0);
+
+      submissions.forEach(sub => {
+        const std = standardMap.get(sub.standardId);
+        if (std && categoryScores[std.category] !== undefined) {
+          categoryScores[std.category] += (sub.scoreAwarded || 0);
+        }
+      });
+
+      // 5. Build progress object
+      const categories: Record<string, { current: number; total: number; stars: number }> = {};
+      let starsUnlocked = 0;
+      let totalPoints = 0;
+
+      Object.entries(program.categories).forEach(([id, cat]) => {
+        const current = categoryScores[id] || 0;
+        const total = cat.minScore;
+        const earnedStar = current >= total;
+        if (earnedStar) starsUnlocked++;
+        totalPoints += current;
+
+        categories[id] = {
+          current,
+          total,
+          stars: earnedStar ? 1 : 0
+        };
+      });
+
+      return {
+        loId,
+        year,
+        categories,
+        details: {},
+        totalPoints,
+        starsUnlocked,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error fetching LO star progress:', error);
+      throw error;
+    }
+  }
 }
 

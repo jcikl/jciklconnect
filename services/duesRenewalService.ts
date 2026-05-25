@@ -367,6 +367,7 @@ export class DuesRenewalService {
         Honorary: 'Honorary Member (特友会员)',
         Senator: 'Senator (参议员)',
         Visiting: 'Visiting Member (访问会员)',
+        Associate: 'Associate Member (赞助会员)',
       };
 
       const message = renewal.membershipType === 'Senator'
@@ -452,6 +453,7 @@ export class DuesRenewalService {
         Honorary: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Senator: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Visiting: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
+        Associate: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
       };
 
       const yearMembers = MOCK_MEMBERS.filter((m: any) => m.joinDate && new Date(m.joinDate).getFullYear() <= year);
@@ -506,6 +508,7 @@ export class DuesRenewalService {
         Honorary: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Senator: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
         Visiting: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
+        Associate: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
       };
 
       // Fetch members who joined in or before this year
@@ -520,10 +523,10 @@ export class DuesRenewalService {
         const membershipYearData = m.membership?.[String(year)];
         if (membershipYearData) {
           return {
-            membershipType: membershipYearData.type,
+            membershipType: m.membershipType || 'Probation',
             amount: membershipYearData.amount,
             status: membershipYearData.status,
-            dues: MembershipDues[membershipYearData.type] || 0
+            dues: MembershipDues[m.membershipType || 'Probation'] || 0
           };
         }
 

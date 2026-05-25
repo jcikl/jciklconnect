@@ -6,6 +6,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   Timestamp,
@@ -323,16 +324,11 @@ export class BoardManagementService {
       const boardMembersRef = collection(db, 'boardMembers');
       const existing = await this.getBoardMembersByYear(year);
 
-      // Deactivate existing board members for this term
+      // Delete ALL existing records for this term (reconfiguration replaces them fully).
+      // Using deleteDoc ensures superseded / erroneous assignments never surface in Career Path.
       for (const bm of existing) {
-        if (bm.isActive) {
-          const boardMemberRef = doc(db, 'boardMembers', bm.id);
-          await updateDoc(boardMemberRef, {
-            isActive: false,
-            endDate: new Date().toISOString().slice(0, 10),
-            updatedAt: new Date().toISOString(),
-          });
-        }
+        const boardMemberRef = doc(db, 'boardMembers', bm.id);
+        await deleteDoc(boardMemberRef);
       }
 
       const now = new Date().toISOString();
@@ -502,6 +498,27 @@ export class BoardManagementService {
     } catch (error) {
       console.error('Error getting board composition:', error);
       throw error;
+    }
+  }
+
+  // Get all board positions for a specific member (queries boardMembers collection directly)
+  static async getMemberBoardPositions(memberId: string): Promise<BoardMember[]> {
+    if (isDevMode()) {
+      return [];
+    }
+
+    try {
+      const boardMembersRef = collection(db, 'boardMembers');
+      const q = query(boardMembersRef, where('memberId', '==', memberId));
+      const snapshot = await getDocs(q);
+
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as BoardMember[];
+    } catch (error) {
+      console.error('Error getting board positions for member:', error);
+      return [];
     }
   }
 

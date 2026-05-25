@@ -32,13 +32,14 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageSettings: false,
     canApproveClaims: false,
   },
+  // PROBATION is deprecated as a permission tier - maps to MEMBER
   [UserRole.PROBATION]: {
     canViewMembers: true,
     canEditMembers: false,
     canViewFinance: false,
     canEditFinance: false,
     canManageProjects: false,
-    canManageEvents: true, // Can register for events
+    canManageEvents: true,
     canManageInventory: false,
     canManageAutomation: false,
     canViewReports: false,
@@ -51,25 +52,26 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canViewFinance: false,
     canEditFinance: false,
     canManageProjects: false,
-    canManageEvents: false,
+    canManageEvents: true,
     canManageInventory: false,
     canManageAutomation: false,
     canViewReports: false,
     canManageSettings: false,
     canApproveClaims: false,
   },
+  // BOARD is deprecated as a static role - Board access is granted dynamically via currentBoardYear
   [UserRole.BOARD]: {
     canViewMembers: true,
-    canEditMembers: true,
-    canViewFinance: true,
-    canEditFinance: true,
-    canManageProjects: true,
+    canEditMembers: false,
+    canViewFinance: false,
+    canEditFinance: false,
+    canManageProjects: false,
     canManageEvents: true,
-    canManageInventory: true,
-    canManageAutomation: true,
-    canViewReports: true,
-    canManageSettings: true,
-    canApproveClaims: true,
+    canManageInventory: false,
+    canManageAutomation: false,
+    canViewReports: false,
+    canManageSettings: false,
+    canApproveClaims: false,
   },
   [UserRole.ADMIN]: {
     canViewMembers: true,
@@ -84,13 +86,27 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageSettings: true,
     canApproveClaims: true,
   },
-  [UserRole.ORGANIZATION_SECRETARY]: {
+  [UserRole.SUPER_ADMIN]: {
     canViewMembers: true,
     canEditMembers: true,
+    canViewFinance: true,
+    canEditFinance: true,
+    canManageProjects: true,
+    canManageEvents: true,
+    canManageInventory: true,
+    canManageAutomation: true,
+    canViewReports: true,
+    canManageSettings: true,
+    canApproveClaims: true,
+  },
+  // Deprecated special roles - all map to MEMBER level (actual fine-grained access via Dynamic Assignment)
+  [UserRole.ORGANIZATION_SECRETARY]: {
+    canViewMembers: true,
+    canEditMembers: false,
     canViewFinance: false,
     canEditFinance: false,
     canManageProjects: false,
-    canManageEvents: false,
+    canManageEvents: true,
     canManageInventory: false,
     canManageAutomation: false,
     canViewReports: false,
@@ -100,23 +116,36 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
   [UserRole.ORGANIZATION_FINANCE]: {
     canViewMembers: true,
     canEditMembers: false,
-    canViewFinance: true,
-    canEditFinance: true,
+    canViewFinance: false,
+    canEditFinance: false,
     canManageProjects: false,
-    canManageEvents: false,
+    canManageEvents: true,
     canManageInventory: false,
     canManageAutomation: false,
-    canViewReports: true,
+    canViewReports: false,
     canManageSettings: false,
     canApproveClaims: false,
   },
   [UserRole.ACTIVITY_FINANCE]: {
     canViewMembers: true,
     canEditMembers: false,
-    canViewFinance: true,
-    canEditFinance: true,
+    canViewFinance: false,
+    canEditFinance: false,
     canManageProjects: false,
     canManageEvents: true,
+    canManageInventory: false,
+    canManageAutomation: false,
+    canViewReports: false,
+    canManageSettings: false,
+    canApproveClaims: false,
+  },
+  [UserRole.INACTIVE]: {
+    canViewMembers: false,
+    canEditMembers: false,
+    canViewFinance: false,
+    canEditFinance: false,
+    canManageProjects: false,
+    canManageEvents: false,
     canManageInventory: false,
     canManageAutomation: false,
     canViewReports: false,
@@ -158,7 +187,31 @@ export const usePermissions = () => {
     if (!member) {
       return ROLE_PERMISSIONS[UserRole.GUEST];
     }
-    return ROLE_PERMISSIONS[member.role] || ROLE_PERMISSIONS[UserRole.MEMBER];
+    
+    let basePermissions = ROLE_PERMISSIONS[member.role] || ROLE_PERMISSIONS[UserRole.MEMBER];
+    
+    // SECONDARY ACCESS PERMISSION: If they are a current board member, grant Board permissions automatically.
+    const currentYear = new Date().getFullYear();
+    const isCurrentBoardMember = member.currentBoardYear === currentYear || member.boardHistory?.some(b => b.year === currentYear);
+    
+    if (isCurrentBoardMember && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN) {
+      basePermissions = {
+        ...basePermissions,
+        canViewMembers: true,
+        canEditMembers: true,
+        canViewFinance: true,
+        canEditFinance: true,
+        canManageProjects: true,
+        canManageEvents: true,
+        canManageInventory: true,
+        canManageAutomation: true,
+        canViewReports: true,
+        canManageSettings: true,
+        canApproveClaims: true,
+      };
+    }
+    
+    return basePermissions;
   }, [member, devMode, simulatedRole]);
 
   const hasPermission = (permission: keyof Permission): boolean => {
@@ -200,19 +253,22 @@ export const usePermissions = () => {
   // Determine effective role (simulated role in dev mode, or actual member role)
   const effectiveRole = devMode && simulatedRole ? simulatedRole : (member?.role || UserRole.GUEST);
 
+  const currentYear = new Date().getFullYear();
+  const isCurrentBoardMember = member?.currentBoardYear === currentYear || member?.boardHistory?.some(b => b.year === currentYear);
+
   return {
     permissions,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
     isGuest: effectiveRole === UserRole.GUEST,
-    isProbationMember: effectiveRole === UserRole.PROBATION,
-    isMember: effectiveRole === UserRole.MEMBER,
-    isBoard: effectiveRole === UserRole.BOARD,
-    isAdmin: effectiveRole === UserRole.ADMIN,
-    isOrganizationSecretary: effectiveRole === UserRole.ORGANIZATION_SECRETARY,
-    isOrganizationFinance: effectiveRole === UserRole.ORGANIZATION_FINANCE,
-    isActivityFinance: effectiveRole === UserRole.ACTIVITY_FINANCE,
+    isProbationMember: effectiveRole === UserRole.PROBATION, // Kept for backward compat with MembersView probation flow
+    isMember: effectiveRole === UserRole.MEMBER || effectiveRole === UserRole.PROBATION || isCurrentBoardMember,
+    isBoard: isCurrentBoardMember || false,
+    isAdmin: effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN,
+    isOrganizationSecretary: false, // Deprecated - use dynamic assignment
+    isOrganizationFinance: false, // Deprecated - use dynamic assignment
+    isActivityFinance: false, // Deprecated - use dynamic assignment
     isDeveloper: devMode,
     effectiveRole, // Return the effective role being used
   };

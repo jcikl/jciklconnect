@@ -21,6 +21,8 @@ import { isDevMode } from '../utils/devMode';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
 import { removeUndefined } from '../utils/dataUtils';
+import { MembershipConfigService, resolveMembershipPurpose } from './membershipConfigService';
+
 
 export class FinanceService {
   // Get all transactions
@@ -107,8 +109,16 @@ export class FinanceService {
     }
 
     try {
+      let purpose = transactionData.purpose;
+      if (transactionData.category === 'Membership') {
+        const year = transactionData.projectId ? parseInt(transactionData.projectId, 10) : new Date(transactionData.date).getFullYear();
+        const rules = await MembershipConfigService.getRules();
+        purpose = resolveMembershipPurpose(transactionData.amount, isNaN(year) ? new Date().getFullYear() : year, rules);
+      }
+
       const newTransaction = {
         ...transactionData,
+        purpose,
         date: Timestamp.fromDate(new Date(transactionData.date)),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
@@ -886,10 +896,10 @@ export class FinanceService {
         currentMembership[yearStr] = {
           year: yearNum,
           dues: duesAmount,
-          type: currentMembership[yearStr]?.type || (type as MembershipType),
           amount: totalAmount,
           status: status,
           transactionId: transactionIds,
+          purpose: latestTx ? latestTx.description : undefined,
           paymentDate: latestTx ? latestTx.date : null
         };
       }
@@ -1139,6 +1149,7 @@ export class FinanceService {
       const { MembersService } = await import('./membersService');
       const { CommunicationService } = await import('./communicationService');
       const { MembershipDues } = await import('../types');
+      const rules = await MembershipConfigService.getRules();
 
       // Get all members who paid dues in the previous year (renewal members)
       const previousYearTransactions = await this.getTransactionsByCategory('Membership');
@@ -1212,15 +1223,17 @@ export class FinanceService {
           }
 
           // Get dues amount for membership type
-          const duesAmount = MembershipDues[membershipType];
+          const duesAmount = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType];
 
           // Create renewal transaction
           const renewalDate = new Date(year, 0, 1);
+          const purpose = resolveMembershipPurpose(duesAmount, year, rules);
           await this.createTransaction({
             type: 'Income',
             category: 'Membership',
             amount: duesAmount,
             description: `${year} Membership Dues - ${membershipType.charAt(0).toUpperCase() + membershipType.slice(1)} Member`,
+            purpose,
             memberId: memberId,
             status: 'Pending',
             date: renewalDate.toISOString(),

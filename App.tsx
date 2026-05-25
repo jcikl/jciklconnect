@@ -6,7 +6,7 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag
+  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -61,11 +61,14 @@ import { CanvaView } from './components/modules/CanvaView';
 import { DeveloperInterface } from './components/modules/DeveloperInterface';
 import { BountyMarketplaceView } from './components/modules/BountyMarketplaceView';
 import { ToyyibView } from './components/modules/ToyyibView';
+import { WhapiConfigView } from './components/modules/WhapiConfigView';
+import { MembershipConfigView } from './components/modules/MembershipConfigView';
+import { AccessConfigView } from './components/modules/AccessConfigView';
 import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 
 // --- View Definitions ---
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG';
 
 // --- Helper Components ---
 
@@ -1566,6 +1569,7 @@ export const JCIKLApp: React.FC = () => {
       REPORTS: 'Reports',
       DEVELOPER: 'Developer Interface',
       BOUNTIES: 'Bounty Marketplace',
+      WHAPI_CONFIG: 'Whapi Configuration',
     };
     const pageTitle = titles[view] ?? 'JCI LO Management';
     document.title = `${pageTitle} | JCI Kuala Lumpur`;
@@ -1805,6 +1809,9 @@ export const JCIKLApp: React.FC = () => {
       case 'DEVELOPER': return <DeveloperInterface />;
       case 'TOYYIB': return <ToyyibView />;
       case 'CANVA': return <CanvaView />;
+      case 'WHAPI_CONFIG': return <WhapiConfigView />;
+      case 'MEMBERSHIP_CONFIG': return <MembershipConfigView />;
+      case 'ACCESS_CONFIG': return <AccessConfigView />;
       default:
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
@@ -2055,6 +2062,27 @@ export const JCIKLApp: React.FC = () => {
                         label="ToyyibPay"
                         isActive={view === 'TOYYIB'}
                         onClick={() => { handleViewChange('TOYYIB'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<MessageSquare size={18} />}
+                        label="Whapi API"
+                        isActive={view === 'WHAPI_CONFIG'}
+                        onClick={() => { handleViewChange('WHAPI_CONFIG'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<Users size={18} />}
+                        label="Membership Config"
+                        isActive={view === 'MEMBERSHIP_CONFIG'}
+                        onClick={() => { handleViewChange('MEMBERSHIP_CONFIG'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<Shield size={18} />}
+                        label="Access Config"
+                        isActive={view === 'ACCESS_CONFIG'}
+                        onClick={() => { handleViewChange('ACCESS_CONFIG'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem

@@ -1,13 +1,13 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
   Timestamp,
   serverTimestamp
 } from 'firebase/firestore';
@@ -30,6 +30,8 @@ export interface Bounty {
   tags?: string[];
   claimantId?: string;
   claimantName?: string;
+  claimantProofText?: string;
+  rejectionReason?: string;
   escrowId?: string;
   createdAt: any;
   updatedAt: any;
@@ -84,8 +86,8 @@ export class BountyService {
    * Post a new bounty (Locks points immediately)
    */
   static async postBounty(
-    memberId: string, 
-    memberName: string, 
+    memberId: string,
+    memberName: string,
     data: Omit<Bounty, 'posterId' | 'posterName' | 'status' | 'createdAt' | 'updatedAt' | 'escrowId'>
   ): Promise<string> {
     if (isDevMode()) {
@@ -172,7 +174,7 @@ export class BountyService {
 
     const bountyRef = doc(db, COLLECTIONS.BOUNTIES, bountyId);
     const bountyDoc = await getDoc(bountyRef);
-    
+
     if (!bountyDoc.exists()) throw new Error('Bounty not found');
     if (bountyDoc.data().status !== 'Open') throw new Error('Bounty is no longer available');
     if (bountyDoc.data().posterId === claimantId) throw new Error('Cannot claim your own bounty');
@@ -181,6 +183,88 @@ export class BountyService {
       status: 'Claimed',
       claimantId,
       claimantName,
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  /**
+   * Get bounties claimed by a specific user
+   */
+  static async getUserClaimedBounties(userId: string): Promise<Bounty[]> {
+    if (isDevMode()) {
+      return [...this.mockBounties].filter(b => b.claimantId === userId);
+    }
+    const q = query(
+      collection(db, COLLECTIONS.BOUNTIES),
+      where('claimantId', '==', userId),
+      orderBy('updatedAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Bounty));
+  }
+
+  /**
+   * Get bounties posted by a specific user
+   */
+  static async getUserPostedBounties(userId: string): Promise<Bounty[]> {
+    if (isDevMode()) {
+      return [...this.mockBounties].filter(b => b.posterId === userId);
+    }
+    const q = query(
+      collection(db, COLLECTIONS.BOUNTIES),
+      where('posterId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Bounty));
+  }
+
+  /**
+   * Submit proof for a claimed bounty
+   */
+  static async submitBountyProof(bountyId: string, proofText: string, proofFiles: string[]): Promise<void> {
+    if (isDevMode()) {
+      const index = this.mockBounties.findIndex(b => b.id === bountyId);
+      if (index !== -1) {
+        this.mockBounties[index] = {
+          ...this.mockBounties[index],
+          status: 'Submitted',
+          claimantProofText: proofText,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return;
+    }
+
+    const bountyRef = doc(db, COLLECTIONS.BOUNTIES, bountyId);
+    await updateDoc(bountyRef, {
+      status: 'Submitted',
+      claimantProofText: proofText,
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  /**
+   * Reject a bounty submission
+   */
+  static async rejectBountySubmission(bountyId: string, reason: string): Promise<void> {
+    if (isDevMode()) {
+      const index = this.mockBounties.findIndex(b => b.id === bountyId);
+      if (index !== -1) {
+        this.mockBounties[index] = {
+          ...this.mockBounties[index],
+          status: 'Claimed',
+          rejectionReason: reason,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return;
+    }
+
+    const bountyRef = doc(db, COLLECTIONS.BOUNTIES, bountyId);
+    await updateDoc(bountyRef, {
+      status: 'Claimed',
+      rejectionReason: reason,
       updatedAt: serverTimestamp()
     });
   }

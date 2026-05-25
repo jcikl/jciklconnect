@@ -12,7 +12,6 @@ export const RoleSimulator: React.FC = () => {
   const roles = [
     { value: null, label: 'Developer', icon: Shield, color: 'bg-purple-100 text-purple-700' },
     { value: UserRole.ADMIN, label: 'Admin', icon: Crown, color: 'bg-red-100 text-red-700' },
-    { value: UserRole.BOARD, label: 'Board', icon: Shield, color: 'bg-blue-100 text-blue-700' },
     { value: UserRole.MEMBER, label: 'Member', icon: UserCheck, color: 'bg-green-100 text-green-700' },
     { value: UserRole.GUEST, label: 'Guest', icon: User, color: 'bg-gray-100 text-gray-700' },
   ];

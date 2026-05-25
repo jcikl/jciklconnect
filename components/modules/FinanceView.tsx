@@ -22,6 +22,7 @@ import { projectFinancialService } from '../../services/projectFinancialService'
 import { ProjectsService } from '../../services/projectsService';
 import { useHelpModal } from '../../contexts/HelpModalContext';
 import { MembersService } from '../../services/membersService';
+import { MembershipConfigService, resolveMembershipPurpose } from '../../services/membershipConfigService';
 import { getAdministrativeProjectIds, addAdministrativeProjectId } from '../../utils/administrativeProjectsStorage';
 import { InventoryService } from '../../services/inventoryService';
 import { ADMINISTRATIVE_PURPOSES } from '../../config/constants';
@@ -812,10 +813,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       if (category === 'Membership') {
         memberId = (formData.get('memberId') as string)?.trim() || undefined;
         const year = parseInt((formData.get('year') as string) || String(new Date().getFullYear()), 10);
-        const m = members.find(x => x.id === memberId);
-        const membershipType = m?.membershipType ?? 'Full';
         projectId = `${year} membership`;
-        purpose = `${year} ${membershipType} membership`;
+        const amount = parseFloat(formData.get('amount') as string) || 0;
+        const rules = await MembershipConfigService.getRules();
+        purpose = resolveMembershipPurpose(amount, year, rules);
       } else {
         projectId = (formData.get('projectId') as string)?.trim() || undefined;
         purpose = (formData.get('purpose') as string)?.trim() || undefined;
@@ -1101,10 +1102,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     if (category === 'Membership') {
       memberIdVal = formData.has('memberId') ? (formData.get('memberId') as string)?.trim() || undefined : editingTransaction.memberId;
       const year = editingMembershipYear;
-      const m = members.find(x => x.id === memberIdVal);
-      const membershipType = m?.membershipType ?? 'Full';
       projectIdVal = `${year} membership`;
-      purposeVal = `${year} ${membershipType} membership`;
+      const rules = await MembershipConfigService.getRules();
+      purposeVal = resolveMembershipPurpose(amount, year, rules);
     } else if (category === 'Administrative') {
       projectIdVal = formData.has('projectId') ? (formData.get('projectId') as string)?.trim() || undefined : editingTransaction.projectId;
       const year = editingAdministrativeYear;

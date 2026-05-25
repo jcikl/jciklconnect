@@ -1,7 +1,8 @@
 import React from 'react';
 import { Input, Select, Checkbox } from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
-import { Transaction, InventoryItem } from '../../../types';
+import { Transaction, InventoryItem, MembershipType, MembershipRuleConfig } from '../../../types';
+import { MembershipConfigService, resolveMembershipPurpose, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
 import { Package } from 'lucide-react';
 
 type Mode = 'create' | 'edit';
@@ -93,6 +94,15 @@ export const TransactionForm: React.FC<Props> = ({
   const [selectedInvId, setSelectedInvId] = React.useState(getVal('inventoryLinkId') || '');
   const [selectedVar, setSelectedVar] = React.useState(getVal('inventoryVariant') || '');
   const [invQty, setInvQty] = React.useState(getVal('inventoryQuantity') || 1);
+  const [membershipRules, setMembershipRules] = React.useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+
+  React.useEffect(() => {
+    const fetchRules = async () => {
+      const rules = await MembershipConfigService.getRules();
+      setMembershipRules(rules);
+    };
+    fetchRules();
+  }, []);
 
   const selectedItem = React.useMemo(() =>
     inventoryItems.find(item => item.id === selectedInvId),
@@ -103,6 +113,48 @@ export const TransactionForm: React.FC<Props> = ({
     if (!selectedItem || !selectedItem.variants) return [];
     return selectedItem.variants.map(v => ({ label: `${v.size} (Stock: ${v.quantity})`, value: v.size }));
   }, [selectedItem]);
+
+  // Effect to auto-fill purpose for Membership category
+  React.useEffect(() => {
+    const category = isEdit ? editingTransaction?.category : recordFormCategory;
+    if (category !== 'Membership' || !membershipRules) return;
+
+    const year = isEdit ? (editingMembershipYear || new Date().getFullYear()) : (recordFormYear || new Date().getFullYear());
+    
+    const getAmountVal = () => {
+      if (isEdit) return editingTransaction?.amount || 0;
+      const el = document.getElementsByName('amount')[0] as HTMLInputElement;
+      return el ? parseFloat(el.value) || 0 : 0;
+    };
+
+    const updatePurpose = () => {
+      const amount = getAmountVal();
+      const newPurpose = resolveMembershipPurpose(amount, year, membershipRules);
+
+      if (isEdit) {
+        if (editingTransaction?.purpose !== newPurpose) {
+          handleEditChange('purpose', newPurpose);
+        }
+      } else {
+        const purposeField = document.getElementsByName('purpose')[0] as HTMLInputElement;
+        if (purposeField && purposeField.value !== newPurpose) {
+          purposeField.value = newPurpose;
+        }
+      }
+    };
+
+    // Run once initially
+    updatePurpose();
+
+    // Listen for changes on amount element if in create mode
+    if (!isEdit) {
+      const amountEl = document.getElementsByName('amount')[0];
+      if (amountEl) {
+        amountEl.addEventListener('input', updatePurpose);
+        return () => amountEl.removeEventListener('input', updatePurpose);
+      }
+    }
+  }, [isEdit, editingTransaction?.category, editingTransaction?.amount, recordFormCategory, recordFormYear, editingMembershipYear, membershipRules]);
 
   // Effect to auto-fill purpose
   React.useEffect(() => {
@@ -313,11 +365,15 @@ export const TransactionForm: React.FC<Props> = ({
             {isEdit ? (
               editingTransaction?.category === 'Administrative' ? (
                 <Select name="purpose" label="Purpose" value={editingAdministrativePurposeBase} onChange={(e) => setEditingAdministrativePurposeBase?.(e.target.value)} options={[{ label: 'Select...', value: '' }, ...adminPurposes.map(p => ({ label: p, value: p }))]} />
+              ) : editingTransaction?.category === 'Membership' ? (
+                <Input name="purpose" label="Purpose" value={editingTransaction?.purpose ?? ''} readOnly disabled className="bg-slate-50 text-slate-500 font-medium" />
               ) : (
                 <Input name="purpose" label="Purpose" defaultValue={editingTransaction?.purpose ?? ''} onChange={(e: any) => setEditingTransaction?.({ ...editingTransaction!, purpose: e.target.value })} />
               )
             ) : recordFormCategory === 'Administrative' ? (
               <Select name="purpose" label="Purpose" options={[{ label: 'Select...', value: '' }, ...adminPurposes.map(p => ({ label: p, value: p }))]} />
+            ) : recordFormCategory === 'Membership' ? (
+              <Input name="purpose" label="Purpose (Derived)" readOnly disabled className="bg-slate-50 text-slate-500 font-medium" placeholder="Auto-generated based on Config" />
             ) : (
               <Input name="purpose" label="Purpose" placeholder="e.g. AGM venue deposit" />
             )}

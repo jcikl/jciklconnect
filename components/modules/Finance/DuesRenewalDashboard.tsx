@@ -14,16 +14,47 @@ import {
   Edit
 } from 'lucide-react';
 import { DuesRenewalService } from '../../../services/duesRenewalService';
+import { FinanceService } from '../../../services/financeService';
 import {
   MembershipType,
   MembershipDues,
   DuesRenewalTransaction,
   DuesRenewalSummary,
   MembershipRecord,
-  MembershipStatus
+  MembershipStatus,
+  MembershipRuleConfig
 } from '../../../types';
+import { MembershipConfigService, resolveMembershipPurpose, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
 import type { Transaction } from '../../../types';
 // Re-scan trigger
+
+/** Fuzzy-match a transaction to a member via description / referenceNumber */
+const findMatchingMember = (
+  tx: Transaction,
+  membersList: Array<{ id: string; name: string; fullName?: string }>
+) => {
+  // If already linked by memberId, return exact match
+  if (tx.memberId) {
+    return membersList.find(m => m.id === tx.memberId) || null;
+  }
+
+  // Normalize: lowercase + strip all non-alphanumeric chars
+  const norm = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const cleanDesc = norm(tx.description);
+  const cleanRef = norm(tx.referenceNumber);
+  if (!cleanDesc && !cleanRef) return null;
+
+  for (const member of membersList) {
+    const candidates = [norm(member.name), norm(member.fullName)];
+    for (const c of candidates) {
+      if (c && c.length >= 3 && (cleanDesc.includes(c) || cleanRef.includes(c))) {
+        return member;
+      }
+    }
+  }
+  return null;
+};
 
 interface DuesRenewalDashboardProps {
   year?: number;
@@ -72,6 +103,58 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   const [filterStatus, setFilterStatus] = useState<MembershipStatus | 'all'>('all');
   const [creatingRenewals, setCreatingRenewals] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [autoMatching, setAutoMatching] = useState(false);
+
+  /** One-click: fuzzy-match all unlinked membership transactions and persist memberId to Firestore */
+  const handleAutoMatchMembers = async () => {
+    setAutoMatching(true);
+    try {
+      // Filter to current year
+      const filteredByYear = membershipTransactions.filter((tx) => {
+        const yearFromProjectId = tx.projectId?.match(/^(\d+)\s+membership$/)?.[1];
+        const txYear = yearFromProjectId ? parseInt(yearFromProjectId, 10) : new Date(tx.date).getFullYear();
+        return txYear === selectedYear;
+      });
+
+      const unlinked = filteredByYear.filter(tx => !tx.memberId);
+      let matched = 0;
+      let skipped = 0;
+
+      for (const tx of unlinked) {
+        const member = findMatchingMember(tx, members);
+        if (member) {
+          await FinanceService.updateTransaction(tx.id, { 
+            memberId: member.id,
+            projectId: `${selectedYear} membership`,
+            category: 'Membership'
+          });
+          matched++;
+        } else {
+          skipped++;
+        }
+      }
+
+      alert(`自动匹配完成！\n✅ 成功关联: ${matched} 笔\n⏭️ 未匹配: ${skipped} 笔\n📌 已关联: ${filteredByYear.length - unlinked.length} 笔（跳过）`);
+
+      // Reload page data to reflect changes
+      window.location.reload();
+    } catch (err: any) {
+      alert(`自动匹配失败: ${err.message}`);
+    } finally {
+      setAutoMatching(false);
+    }
+  };
+  const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+  const [calculationMode, setCalculationMode] = useState<'calendar' | 'payment_date'>('calendar');
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const config = await MembershipConfigService.getConfig();
+      setMembershipRules(config.rules);
+      setCalculationMode(config.calculationMode);
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     loadDashboardData();
@@ -127,8 +210,34 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   };
 
   const displayRenewals = React.useMemo(() => {
-    // Only show people who joined in or before the selected year
-    const yearMembers = members.filter(m => m.joinDate && new Date(m.joinDate).getFullYear() <= selectedYear);
+    const getEffectiveJoinYear = (m: any): number => {
+      if (calculationMode === 'payment_date') {
+        const memberTxs = membershipTransactions.filter(
+          tx => tx.memberId === m.id && tx.category === 'Membership'
+        );
+        if (memberTxs.length > 0) {
+          const sorted = [...memberTxs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          return new Date(sorted[0].date).getFullYear();
+        }
+      }
+
+      if (!m.joinDate) return selectedYear;
+      const date = new Date(m.joinDate);
+      const calendarYear = date.getFullYear();
+      const month = date.getMonth(); // 0-indexed: 9 = Oct
+      const day = date.getDate();
+      if (month > 9 || (month === 9 && day >= 1)) {
+        return calendarYear + 1;
+      }
+      return calendarYear;
+    };
+
+    // Only show people whose effective join year is in or before the selected year
+    const yearMembers = members.filter(m => {
+      if (!m.joinDate && calculationMode === 'calendar') return false;
+      const effYear = getEffectiveJoinYear(m);
+      return effYear <= selectedYear;
+    });
 
     const existingMap = new Map<string, DuesRenewalTransaction>();
     renewals.forEach(r => existingMap.set(r.memberId, r));
@@ -136,52 +245,112 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     const merged = yearMembers.map(m => {
       // Check for structured membership record in member object first
       const membershipData = m.membership?.[String(selectedYear)];
+      const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
+
+      const joinYear = getEffectiveJoinYear(m);
+      const isFirstYear = joinYear === selectedYear;
+
+      const getTargetDues = (mType: MembershipType) => {
+        const baseDues = rules[mType]?.duesAmount ?? MembershipDues[mType] ?? 0;
+        if ((mType === 'Probation' || mType === 'Full') && isFirstYear) {
+          return baseDues + 50; // Probation first-year exception: base (300) + registration fee (50) = 350
+        }
+        return baseDues;
+      };
+
+      const resolveTypeFromDues = (amt: number, currentType: MembershipType) => {
+        if (amt === 0) return currentType;
+        const matched = Object.entries(rules).find(([_, ruleConfig]) => ruleConfig.duesAmount === amt);
+        if (matched) return matched[0] as MembershipType;
+        if (amt === (rules.Probation?.duesAmount ?? 300) + 50) return 'Probation';
+        return currentType;
+      };
 
       if (membershipData) {
+        const rawType = m.membershipType || 'Probation';
+        const duesVal = membershipData.dues || getTargetDues(rawType);
+        const resolvedType = resolveTypeFromDues(duesVal, rawType);
         return {
           id: `summary-${m.id}-${selectedYear}`,
           memberId: m.id,
-          membershipType: membershipData.type,
+          membershipType: resolvedType,
           duesYear: selectedYear,
-          amount: membershipData.amount,
+          amount: membershipData.amount, // Keep actual paid amount
+          targetDues: duesVal, // Configured dues amount
           status: membershipData.status,
           dueDate: new Date(selectedYear, 2, 31).toISOString(),
-          isRenewal: true,
-        } as DuesRenewalTransaction;
+          isRenewal: !isFirstYear,
+        } as DuesRenewalTransaction & { targetDues: number };
       }
 
       // Fallback to duesRenewals collection if no summary found
       const existing = existingMap.get(m.id);
-      if (existing) return existing;
+      if (existing) {
+        const duesVal = existing.amount > 0 ? existing.amount : getTargetDues(existing.membershipType);
+        const resolvedType = resolveTypeFromDues(duesVal, existing.membershipType);
+        return {
+          ...existing,
+          membershipType: resolvedType,
+          targetDues: duesVal,
+          isRenewal: !isFirstYear,
+        } as DuesRenewalTransaction & { targetDues: number };
+      }
 
       const type = (m.membershipType && MembershipDues[m.membershipType])
         ? m.membershipType
         : 'Probation';
 
+      const duesVal = getTargetDues(type);
+      const resolvedType = resolveTypeFromDues(duesVal, type);
+
       return {
         id: `virtual-${m.id}`,
         memberId: m.id,
-        membershipType: type,
+        membershipType: resolvedType,
         duesYear: selectedYear,
         amount: 0,
+        targetDues: duesVal,
         status: 'pending',
         dueDate: new Date(selectedYear, 2, 31).toISOString(),
-        isRenewal: false,
-      } as DuesRenewalTransaction;
+        isRenewal: !isFirstYear,
+      } as DuesRenewalTransaction & { targetDues: number };
     });
 
-    return merged.filter(renewal => {
-      if (filterType !== 'all' && renewal.membershipType !== filterType) return false;
-      if (filterStatus === 'all') return true;
+    const statusWeight = (status: string) => {
+      const s = status?.toLowerCase() || '';
+      if (s === 'paid' || s === 'over paid') return 1;
+      if (s === 'overdue' || s === 'partial') return 2;
+      if (s === 'pending') return 3;
+      return 4;
+    };
 
-      // Special case: 'paid' filter also shows 'over paid'
-      if (filterStatus === 'paid') {
-        return renewal.status === 'paid' || renewal.status === 'over paid';
-      }
+    return merged
+      .filter(renewal => {
+        if (filterType !== 'all' && renewal.membershipType !== filterType) return false;
+        if (filterStatus === 'all') return true;
 
-      return renewal.status === filterStatus;
-    });
-  }, [renewals, members, selectedYear, filterType, filterStatus]);
+        // Special case: 'paid' filter also shows 'over paid'
+        if (filterStatus === 'paid') {
+          return renewal.status === 'paid' || renewal.status === 'over paid';
+        }
+
+        return renewal.status === filterStatus;
+      })
+      .sort((a, b) => {
+        const weightA = statusWeight(a.status);
+        const weightB = statusWeight(b.status);
+
+        if (weightA !== weightB) {
+          return weightA - weightB;
+        }
+
+        // Secondary sort: alphabetically by member name
+        const nameA = (members.find(m => m.id === a.memberId)?.name || a.memberId).toLowerCase();
+        const nameB = (members.find(m => m.id === b.memberId)?.name || b.memberId).toLowerCase();
+
+        return nameA.localeCompare(nameB);
+      });
+  }, [renewals, members, selectedYear, filterType, filterStatus, membershipRules, calculationMode, membershipTransactions]);
 
   const membershipTypeColors: Record<MembershipType, string> = {
     Guest: 'bg-blue-100 text-blue-800',
@@ -312,41 +481,80 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
 
       {/* Membership Type Breakdown */}
       {summary && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Breakdown by Membership Type</h2>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {Object.entries(summary.byMembershipType).map(([type, stats]) => (
-                <div key={type} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${membershipTypeColors[type as MembershipType]}`}>
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </span>
-                    <span className="text-sm text-gray-600">RM{MembershipDues[type as MembershipType]}</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Total:</span>
-                      <span className="font-medium">{stats.total}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-green-600">Paid:</span>
-                      <span className="font-medium text-green-600">{stats.paid}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-yellow-600">Pending:</span>
-                      <span className="font-medium text-yellow-600">{stats.pending}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-red-600">Overdue:</span>
-                      <span className="font-medium text-red-600">{stats.overdue}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-6 overflow-x-auto">
+            <table className="w-full min-w-[700px] border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="pb-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                    Membership Type
+                  </th>
+                  {Object.entries(summary.byMembershipType).map(([type]) => (
+                    <th key={type} className="pb-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-4">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${membershipTypeColors[type as MembershipType] || 'bg-slate-100 text-slate-800'}`}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                <tr>
+                  <td className="py-3.5 font-medium text-gray-500 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                    Standard Dues
+                  </td>
+                  {Object.entries(summary.byMembershipType).map(([type]) => {
+                    const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
+                    const standardDues = rules[type as MembershipType]?.duesAmount ?? MembershipDues[type as MembershipType] ?? 0;
+                    return (
+                      <td key={type} className="py-3.5 text-center text-gray-500 font-medium px-4">
+                        RM{standardDues}
+                      </td>
+                    );
+                  })}
+                </tr>
+                <tr>
+                  <td className="py-3.5 font-semibold text-gray-700 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                    Total
+                  </td>
+                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
+                    <td key={type} className="py-3.5 text-center font-bold text-gray-900 px-4">
+                      {stats.total}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="py-3.5 font-semibold text-green-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                    Paid
+                  </td>
+                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
+                    <td key={type} className="py-3.5 text-center font-bold text-green-600 px-4">
+                      {stats.paid}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="py-3.5 font-semibold text-yellow-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                    Pending
+                  </td>
+                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
+                    <td key={type} className="py-3.5 text-center font-bold text-yellow-600 px-4">
+                      {stats.pending}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="py-3.5 font-semibold text-red-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                    Overdue
+                  </td>
+                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
+                    <td key={type} className="py-3.5 text-center font-bold text-red-600 px-4">
+                      {stats.overdue}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -394,9 +602,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">#</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type / Size</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Membership Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dues</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid Date</th>
@@ -404,46 +613,58 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {displayRenewals.map((renewal) => (
-                    <tr key={renewal.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {(() => {
-                          const m = members.find(mem => mem.id === renewal.memberId);
-                          return (
-                            <div className="flex flex-col">
-                              <div className="text-sm font-medium text-gray-900">
-                                {m?.name || renewal.memberId}
+                  {displayRenewals.map((renewal, index) => {
+                    const targetDues = (renewal as any).targetDues ?? renewal.amount ?? 0;
+                    const paidAmount = renewal.amount ?? 0;
+                    const outstanding = targetDues - paidAmount;
+
+                    return (
+                      <tr key={renewal.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono w-16">
+                          {index + 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {(() => {
+                            const m = members.find(mem => mem.id === renewal.memberId);
+                            return (
+                              <div className="flex flex-col">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {m?.name || renewal.memberId}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="mb-1">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${membershipTypeColors[renewal.membershipType]}`}>
-                            {renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1)}
+                            );
+                          })()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="mb-1">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : ''}`}>
+                              {renewal.membershipType ? renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1) : 'Unknown'}
+                            </span>
+                          </div>
+                        </td>
+                        <td 
+                          className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${outstanding < 0 ? 'text-purple-600' : 'text-gray-900'}`}
+                          title={`应缴: RM${targetDues} | 已付: RM${paidAmount}`}
+                        >
+                          {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[renewal.status]}`}>
+                            {renewal.status.charAt(0).toUpperCase() + renewal.status.slice(1)}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        RM{(renewal.amount ?? 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[renewal.status]}`}>
-                          {renewal.status.charAt(0).toUpperCase() + renewal.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {fmtDate(renewal.dueDate)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {renewal.remindersSent || 0}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {fmtDate(renewal.dueDate)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {renewal.remindersSent || 0}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 
@@ -457,21 +678,32 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4 p-4">
-              {displayRenewals.map((renewal) => {
+              {displayRenewals.map((renewal, index) => {
                 const m = members.find(mem => mem.id === renewal.memberId);
+                const targetDues = (renewal as any).targetDues ?? renewal.amount ?? 0;
+                const paidAmount = renewal.amount ?? 0;
+                const outstanding = targetDues - paidAmount;
+
                 return (
                   <div key={renewal.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-900">{m?.name || renewal.memberId}</span>
+                        <span className="text-sm font-bold text-gray-900">
+                          #{index + 1} - {m?.name || renewal.memberId}
+                        </span>
                         <div className="mt-1">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${membershipTypeColors[renewal.membershipType]}`}>
-                            {renewal.membershipType}
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : ''}`}>
+                            {renewal.membershipType || 'Unknown'}
                           </span>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-bold text-gray-900">RM{(renewal.amount ?? 0).toLocaleString()}</div>
+                        <div 
+                          className={`text-sm font-bold ${outstanding < 0 ? 'text-purple-600' : 'text-gray-900'}`}
+                          title={`应缴: RM${targetDues} | 已付: RM${paidAmount}`}
+                        >
+                          {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
+                        </div>
                         <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[renewal.status]}`}>
                           {renewal.status}
                         </span>
@@ -500,8 +732,24 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         {/* 会费流水 Card */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">会费流水</h2>
-            <p className="text-sm text-gray-500 mt-1">按年份筛选：{selectedYear}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">会费流水</h2>
+                <p className="text-sm text-gray-500 mt-1">按年份筛选：{selectedYear}</p>
+              </div>
+              {hasEditPermission && (
+                <button
+                  type="button"
+                  onClick={handleAutoMatchMembers}
+                  disabled={autoMatching}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="根据交易描述/参考号自动匹配关联会员"
+                >
+                  {autoMatching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
+                  {autoMatching ? '匹配中...' : '✨ 一键匹配会员'}
+                </button>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
             {(() => {
@@ -537,9 +785,29 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                                 <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.description}>{tx.description}</div>
                               </td>
                               <td className="px-4 py-2">
-                                <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}>
-                                  {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
-                                </div>
+                                {(() => {
+                                  const matchedMember = findMatchingMember(tx, members);
+                                  if (tx.memberId) {
+                                    return (
+                                      <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={matchedMember?.name || tx.memberId}>
+                                        {matchedMember?.name || tx.memberId}
+                                      </div>
+                                    );
+                                  } else if (matchedMember) {
+                                    return (
+                                      <div className="flex flex-col">
+                                        <span
+                                          className="inline-flex items-center gap-1 w-fit px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60"
+                                          title="系统通过交易描述/银行参考号自动匹配"
+                                        >
+                                          ✨ {matchedMember.name}
+                                        </span>
+                                      </div>
+                                    );
+                                  } else {
+                                    return <div className="text-xs text-gray-400 italic">—</div>;
+                                  }
+                                })()}
                                 <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.projectId || '—'}>{tx.projectId || '—'}</div>
                               </td>
                               <td className="px-4 py-2 text-right">
@@ -578,8 +846,16 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                           </div>
                           <div className="text-xs font-bold text-gray-800 mb-1 truncate">{tx.description}</div>
                           <div className="flex justify-between items-center mt-2">
-                            <div className="text-[10px] text-gray-500 truncate max-w-[150px]">
-                              {tx.memberId ? (members.find(m => m.id === tx.memberId)?.name ?? tx.memberId) : '—'}
+                            <div className="text-[10px] text-gray-500 truncate max-w-[180px]">
+                              {(() => {
+                                const matchedMember = findMatchingMember(tx, members);
+                                if (tx.memberId) {
+                                  return <span>👤 {matchedMember?.name || tx.memberId}</span>;
+                                } else if (matchedMember) {
+                                  return <span className="text-amber-700 font-semibold">✨ 智能匹配: {matchedMember.name}</span>;
+                                }
+                                return '—';
+                              })()}
                             </div>
                             {hasEditPermission && (
                               <button
