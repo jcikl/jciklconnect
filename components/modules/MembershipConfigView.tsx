@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { MembershipType, MembershipRuleConfig } from '../../types';
 import { MembershipConfigService, DEFAULT_MEMBERSHIP_RULES } from '../../services/membershipConfigService';
-import { Save, AlertCircle } from 'lucide-react';
+import { Save, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button, useToast } from '../ui/Common';
+import { MembersService } from '../../services/membersService';
 
 const MEMBERSHIP_TYPES: MembershipType[] = ['Guest', 'Probation', 'Full', 'Honorary', 'Senator', 'Visiting', 'Associate'];
 
@@ -11,6 +12,9 @@ export const MembershipConfigView: React.FC = () => {
   const [calculationMode, setCalculationMode] = useState<'calendar' | 'payment_date'>('calendar');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncingTypes, setSyncingTypes] = useState(false);
+  const [syncingRecords, setSyncingRecords] = useState(false);
+  const [syncYear, setSyncYear] = useState(new Date().getFullYear());
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -41,6 +45,57 @@ export const MembershipConfigView: React.FC = () => {
     }
   };
 
+  const handleBatchSyncMembershipTypes = async () => {
+    const confirmed = window.confirm(
+      `根据 ${syncYear} 年会费记录与当前 Config，批量推断并写入 members.membershipType？\n\n` +
+        '不修改 membership 字段。请先保存 Config 再执行。'
+    );
+    if (!confirmed) return;
+
+    setSyncingTypes(true);
+    try {
+      const result = await MembersService.batchSyncMembershipTypes({ year: syncYear });
+      showToast(
+        `membershipType: updated ${result.updated}, unchanged ${result.alreadyCorrect}`,
+        'success'
+      );
+      if (result.errors.length > 0) {
+        console.error('batchSyncMembershipTypes errors:', result.errors);
+      }
+    } catch (e) {
+      showToast('Failed to sync membershipType', 'error');
+    } finally {
+      setSyncingTypes(false);
+    }
+  };
+
+  const handleBatchSyncMembershipRecords = async () => {
+    const confirmed = window.confirm(
+      `根据 membershipType 与当前 Config，批量更新 ${syncYear} 年 members.membership？\n\n` +
+        '仅更新已有 membership 记录（不新建）。请先保存 Config。'
+    );
+    if (!confirmed) return;
+
+    setSyncingRecords(true);
+    try {
+      const result = await MembersService.batchSyncMembershipRecords({
+        year: syncYear,
+        onlyExistingRecords: true,
+      });
+      showToast(
+        `membership: updated ${result.updated}, already correct ${result.alreadyCorrect}`,
+        'success'
+      );
+      if (result.errors.length > 0) {
+        console.error('batchSyncMembershipRecords errors:', result.errors);
+      }
+    } catch (e) {
+      showToast('Failed to sync membership records', 'error');
+    } finally {
+      setSyncingRecords(false);
+    }
+  };
+
   const updateRule = (type: MembershipType, updates: Partial<MembershipRuleConfig>) => {
     setRules(prev => ({
       ...prev,
@@ -62,10 +117,39 @@ export const MembershipConfigView: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900">Membership Config</h2>
           <p className="text-sm text-slate-500">Configure dues and requirements for each membership type.</p>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
-          <Save size={16} />
-          {saving ? 'Saving...' : 'Save Changes'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <span>Sync year</span>
+            <input
+              type="number"
+              className="w-24 p-2 border rounded-lg text-sm"
+              value={syncYear}
+              onChange={(e) => setSyncYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
+            />
+          </label>
+          <Button
+            variant="outline"
+            onClick={handleBatchSyncMembershipTypes}
+            disabled={syncingTypes || syncingRecords || saving}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw size={16} className={syncingTypes ? 'animate-spin' : ''} />
+            {syncingTypes ? 'Syncing...' : 'Sync membershipType'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleBatchSyncMembershipRecords}
+            disabled={syncingTypes || syncingRecords || saving}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw size={16} className={syncingRecords ? 'animate-spin' : ''} />
+            {syncingRecords ? 'Syncing...' : 'Sync membership'}
+          </Button>
+          <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+            <Save size={16} />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

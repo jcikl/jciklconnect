@@ -9,7 +9,6 @@ import {
 import {
   isValidEmail,
   isValidDate,
-  isValidTier,
   isValidGender,
   isValidPhone,
   notEmpty,
@@ -54,14 +53,6 @@ export const memberImportConfig: BatchImportConfig = {
       aliases: ['Phone', '电话', '手机', 'Mobile', 'Tel', 'Telephone', 'Phone Number'],
       validators: [isValidPhone],
       preprocessor: createChainedPreprocessor(formatPhonePreprocessor),
-    },
-    {
-      key: 'tier',
-      label: 'Tier',
-      required: false,
-      aliases: ['Tier', '等级', 'Level', 'Membership Level', 'Status', 'Member Type'],
-      validators: [isValidTier],
-      preprocessor: trimUpperPreprocessor,
     },
     {
       key: 'idNumber',
@@ -329,7 +320,6 @@ export const memberImportConfig: BatchImportConfig = {
     { key: 'name', label: 'Name', width: 120 },
     { key: 'email', label: 'Email', width: 180 },
     { key: 'phone', label: 'Phone', width: 130 },
-    { key: 'tier', label: 'Tier', width: 100 },
     { key: 'idNumber', label: 'National ID', width: 120 },
     { key: 'dateOfBirth', label: 'DOB', width: 120, formatter: formatDateToDDMMMYYYY },
     { key: 'gender', label: 'Gender', width: 80 },
@@ -356,12 +346,13 @@ export const memberImportConfig: BatchImportConfig = {
 
   // Import function - called for each valid row
   importer: async (row, context) => {
-    // Find existing member by email
-    const email = row.email?.toLowerCase();
+    // Find existing member by ID number
+    const normalizeIdNumber = (value: any) => String(value || '').replace(/\s/g, '').toUpperCase();
+    const idNumber = normalizeIdNumber(row.idNumber);
     let existingId = row._existingId;
 
-    if (!existingId && email && context?.members && Array.isArray(context.members)) {
-      const existing = context.members.find((m: any) => m.email?.toLowerCase() === email);
+    if (!existingId && idNumber && context?.members && Array.isArray(context.members)) {
+      const existing = context.members.find((m: any) => normalizeIdNumber(m.idNumber) === idNumber);
       if (existing) {
         existingId = existing.id;
       }
@@ -380,11 +371,11 @@ export const memberImportConfig: BatchImportConfig = {
       
       // List of all fields that can be updated from the import row
       const updateableFields = [
-        'name', 'email', 'phone', 'tier', 'idNumber', 'dateOfBirth', 'gender', 
+        'name', 'email', 'phone', 'idNumber', 'dateOfBirth', 'gender', 
         'address', 'emergencyContactName', 'emergencyContactPhone', 'areaId', 
         'nationality', 'companyName', 'departmentAndPosition', 'linkedin', 
         'facebook', 'instagram', 'wechat', 'hobbies', 'joinDate', 
-        'membershipType', 'introducer', 'fullName', 'ethnicity', 
+        'introducer', 'fullName', 'ethnicity', 
         'businessCategory', 'industry', 'cutStyle', 'tshirtSize', 
         'jacketSize', 'embroideredName', 'tshirtStatus', 'companyWebsite', 
         'acceptInternationalBusiness', 'companyDescription'
@@ -392,11 +383,6 @@ export const memberImportConfig: BatchImportConfig = {
 
       updateableFields.forEach(field => {
         let val = row[field];
-        
-        // Special formatting for tier
-        if (field === 'tier' && typeof val === 'string' && val.length > 0) {
-          val = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
-        }
 
         // Only include in update if the value is not empty
         if (!isEmptyValue(val)) {
@@ -413,9 +399,7 @@ export const memberImportConfig: BatchImportConfig = {
         name: row.name,
         email: row.email,
         phone: row.phone || '',
-        tier: (row.tier && typeof row.tier === 'string') 
-          ? (row.tier.charAt(0).toUpperCase() + row.tier.slice(1).toLowerCase()) 
-          : 'Bronze',
+        tier: 'Bronze',
         idNumber: row.idNumber || '',
         dateOfBirth: row.dateOfBirth || '',
         gender: row.gender || '',
@@ -432,7 +416,6 @@ export const memberImportConfig: BatchImportConfig = {
         wechat: row.wechat || '',
         hobbies: row.hobbies || [],
         joinDate: row.joinDate || new Date().toISOString().split('T')[0],
-        membershipType: row.membershipType || 'GUEST',
         introducer: row.introducer || '',
         fullName: row.fullName || row.name,
         ethnicity: row.ethnicity || '',
@@ -464,16 +447,18 @@ export const memberImportConfig: BatchImportConfig = {
   },
 
   rowPostProcessor: (row, context) => {
-    if (row.valid && context?.members && Array.isArray(context.members)) {
-      const email = row.parsed?.email?.toLowerCase?.();
-      if (email) {
-        const existing = context.members.find((m: any) => m.email?.toLowerCase() === email);
+    if (context?.members && Array.isArray(context.members)) {
+      const normalizeIdNumber = (value: any) => String(value || '').replace(/\s/g, '').toUpperCase();
+      const idNumber = normalizeIdNumber(row.parsed?.idNumber);
+      if (idNumber) {
+        const existing = context.members.find((m: any) => normalizeIdNumber(m.idNumber) === idNumber);
         if (existing) {
           row.isUpdate = true;
-          row.parsed._existingId = existing.id; // optimization to prevent duplicate searching later
+          row.parsed._existingId = existing.id;
         }
       }
+
     }
     return row;
-  }
+  },
 };

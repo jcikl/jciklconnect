@@ -21,37 +21,67 @@ service cloud.firestore {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              getUserRole() != null &&
-             getUserRole() in ['GUEST', 'PROBATION', 'MEMBER', 'BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE', 'INACTIVE'];
+             getUserRole() in ['GUEST', 'PROBATION', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE', 'INACTIVE'];
     }
     
+    function memberData() {
+      return get(/databases/$(database)/documents/members/$(request.auth.uid)).data;
+    }
+
+    // Synced from boardMembers when assigned to the current calendar-year board
+    function isCurrentBoardMember() {
+      return exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             memberData().get('isCurrentBoardMember', false) == true;
+    }
+
     function isBoard() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-             getUserRole() != null &&
-             getUserRole() in ['BOARD', 'ADMIN'];
+             (
+               (getUserRole() != null && getUserRole() in ['BOARD', 'ADMIN']) ||
+               isCurrentBoardMember()
+             );
     }
     
     function isAdmin() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              getUserRole() != null &&
-             getUserRole() == 'ADMIN';
+             getUserRole() in ['ADMIN', 'SUPER_ADMIN'];
+    }
+
+    function isDeveloper() {
+      return isAuthenticated() && (
+        request.auth.token.get('developer', false) == true ||
+        request.auth.token.get('isDeveloper', false) == true ||
+        (
+          exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+          memberData().get('isDeveloper', false) == true
+        ) ||
+        getUserRole() == 'SUPER_ADMIN'
+      );
     }
     
     // Roles that can read members at org/LO level (组织财政、活动财政、管理员、组织秘书、BOARD)
     function canReadOrgMembers() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-             getUserRole() != null &&
-             getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'];
+             (
+               (getUserRole() != null &&
+                getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE']) ||
+               isCurrentBoardMember()
+             );
     }
 
     // Roles that can edit members
     function canEditMembers() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-             getUserRole() != null &&
-             getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY'];
+             (
+               (getUserRole() != null &&
+                getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY']) ||
+               isCurrentBoardMember()
+             );
     }
     
     function getMyLoId() {
@@ -145,26 +175,29 @@ service cloud.firestore {
       allow read, create, update, delete: if isAuthenticated();
     }
     
-    // Finance roles: org-level and activity-level (Story 1.4)
+    // Finance roles: org-level, activity-level, and current-calendar-year board (dynamic)
     function canAccessFinance() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-             getUserRole() != null &&
-             getUserRole() in ['BOARD', 'ADMIN', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'];
+             (
+               isCurrentBoardMember() ||
+               (getUserRole() != null &&
+                getUserRole() in ['BOARD', 'ADMIN', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'])
+             );
     }
     
-    // Transactions: 组织财政/活动财政/BOARD/ADMIN 可读写；多 LO 时按 loId 限制（文档无 loId 时兼容）
+    // Transactions: board / finance roles; multi-LO scoped by loId unless isBoard()
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && 
-        (getUserRole() in ['BOARD', 'ADMIN'] || 
+        (isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
       allow create, update, delete: if canAccessFinance();
     }
 
-    // Transaction Splits: same rules as transactions - finance roles can create/read/update/delete
+    // Transaction Splits: same rules as transactions
     match /transactionSplits/{splitId} {
       allow read: if isAuthenticated() && 
-        (getUserRole() in ['BOARD', 'ADMIN'] || 
+        (isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
       allow create, update, delete: if canAccessFinance();
     }
@@ -416,6 +449,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isBoard();
     }
+
+    // Probation to Full Member promotion workflow
+    match /manualPromotionRequests/{requestId} {
+      allow read, create, update, delete: if isBoard() || isAdmin() || isDeveloper();
+    }
+
+    match /promotionHistory/{historyId} {
+      allow read, create, update, delete: if isBoard() || isAdmin() || isDeveloper();
+    }
     
     // Activity Plans collection
     match /activityPlans/{planId} {
@@ -595,9 +637,7 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
     match /inventory_alerts/{docId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow read: if isAuthenticated() && isMember();
       allow create, update, delete: if isBoard();
     }
     
@@ -607,10 +647,10 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
     
-    // Finance: bank accounts (PaymentRequestsView — "Claim From" dropdown for all members)
+    // Finance: bank accounts (PaymentRequestsView — members read; board manages)
     match /bankAccounts/{docId} {
       allow read: if isMember();
-      allow create, update, delete: if isBoard();
+      allow create, update, delete: if isBoard() || canAccessFinance();
     }
     
     // Finance: payment requests (PaymentRequestsView - for members to submit, edit, and view)
@@ -674,4 +714,3 @@ service cloud.firestore {
     }
   }
 }
-

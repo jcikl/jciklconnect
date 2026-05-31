@@ -48,6 +48,11 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
       }));
 
       setTerms(summaries.sort((a, b) => b.year.localeCompare(a.year)));
+
+      // Ensure member docs reflect current-year board (grants Access Permissions / isBoard)
+      await BoardManagementService.syncCurrentYearBoardAssignees().catch((err) => {
+        console.warn('Current-year board member sync skipped:', err);
+      });
     } catch (err) {
       console.error('Failed to load board terms:', err);
       showToast('Failed to load board summaries', 'error');

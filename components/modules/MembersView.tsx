@@ -13,14 +13,28 @@ import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs } f
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MemberEditForm } from './MemberEditForm';
 import { LoadingState } from '../ui/Loading';
-import { useMembers } from '../../hooks/useMembers';
+import { useMembers, type UseMembersResult } from '../../hooks/useMembers';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
-import { UserRole, Member, MemberTier, ProbationTask, MembershipDues, BoardMember } from '../../types';
+import {
+  UserRole,
+  Member,
+  MemberTier,
+  MemberCreateInput,
+  MembershipType,
+  MembershipRuleConfig,
+  ProbationTask,
+  MembershipDues,
+  BoardMember,
+} from '../../types';
+import {
+  DEFAULT_MEMBERSHIP_RULES,
+  MembershipConfigService,
+  computeMembershipTypeFromMember,
+} from '../../services/membershipConfigService';
 import { MembersService } from '../../services/membersService';
-import { MEMBER_SELF_EDITABLE_FIELDS } from '../../config/constants';
+import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS } from '../../config/constants';
 import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
-import { MembershipConfigService } from '../../services/membershipConfigService';
 import { INDUSTRY_OPTIONS } from '../../config/constants';
 import { HobbyClubsService } from '../../services/hobbyClubsService';
 import { HobbyClub } from '../../types';
@@ -34,11 +48,14 @@ import { BoardManagementService } from '../../services/boardManagementService';
 import { AIPredictionService, MemberChurnPrediction } from '../../services/aiPredictionService';
 import { MentorMatching } from './MemberManagement/MentorMatching';
 import { PromotionTracking } from './MemberManagement/PromotionTracking';
+import { SenatorshipManagement } from './MemberManagement/SenatorshipManagement';
 import { BoardOfDirectorsSection } from './MemberManagement/BoardOfDirectorsSection';
 import { MemberBatchImportModal } from './Members/MemberBatchImportModal';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useBatchMode } from '../../contexts/BatchModeContext';
 import { formatDateToDDMMMYYYY } from '../../utils/dateUtils';
+import { MembershipTypeDisplay } from '../shared/MembershipTypeDisplay';
+import { ColumnFilterHeader } from '../ui/ColumnFilterHeader';
 
 const HOBBY_OPTIONS = [
   "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
@@ -47,12 +64,6 @@ const HOBBY_OPTIONS = [
   "Liquor/ Wine Tasting", "Make Up", "Movie", "Other E-Sport", "Pickle Ball",
   "Pilates", "Public Speaking", "Reading", "Rock Climbing", "Singing",
   "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
-];
-
-const COUNTRIES = [
-  'Malaysia', 'Singapore', 'Indonesia', 'Thailand', 'Vietnam', 'Philippines',
-  'China', 'Japan', 'South Korea', 'India', 'Australia', 'New Zealand',
-  'United States', 'United Kingdom', 'Canada', 'Germany', 'France', 'Other'
 ];
 
 /** Dues status labels (Story 8.1) */
@@ -214,7 +225,9 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [activeTab, setActiveTab] = useState<'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'mentorship' | 'promotion-tracking'>('directory');
+  const [activeTab, setActiveTab] = useState<
+    'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'mentorship' | 'promotion-tracking' | 'senatorship'
+  >('directory');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -229,7 +242,22 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [addModalHobbies, setAddModalHobbies] = useState<string[]>([]);
   const [addModalInterestedIndustries, setAddModalInterestedIndustries] = useState<string[]>([]);
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
-  const { members, loading, error, createMember, updateMember, deleteMember, batchUpdateMembers, batchDeleteMembers, loadMembers } = useMembers(loIdFilter);
+  const [roleFilters, setRoleFilters] = useState<UserRole[]>([]);
+  const [membershipTypeFilters, setMembershipTypeFilters] = useState<MembershipType[]>([]);
+  const [membershipRules, setMembershipRules] = useState<
+    Record<MembershipType, MembershipRuleConfig>
+  >(DEFAULT_MEMBERSHIP_RULES);
+  const {
+    members,
+    loading,
+    error,
+    createMember,
+    updateMember,
+    deleteMember,
+    batchUpdateMembers,
+    batchDeleteMembers,
+    loadMembers,
+  }: UseMembersResult = useMembers(loIdFilter);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { setIsBatchMode } = useBatchMode();
 
@@ -253,25 +281,58 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [batchSetValue, setBatchSetValue] = useState<any>('');
 
   const { member: currentMember } = useAuth();
-  const { isAdmin, isBoard, isOrganizationSecretary, isDeveloper } = usePermissions();
+  const { isAdmin, isBoard, isDeveloper } = usePermissions();
   const { showToast } = useToast();
-  const canManageMembers = isAdmin || isBoard || isOrganizationSecretary || isDeveloper;
+  const canManageMembers = isAdmin || isBoard || isDeveloper;
 
   const selectedMember = members.find(m => m.id === selectedMemberId);
 
-  // Filter members based on search
+  useEffect(() => {
+    MembershipConfigService.getRules().then(setMembershipRules).catch(() => {});
+  }, []);
+
+  const getMemberDisplayMembershipType = (member: Member): MembershipType =>
+    computeMembershipTypeFromMember(
+      {
+        nationality: member.nationality,
+        dateOfBirth: member.dateOfBirth,
+        senatorCertified: member.senatorCertified,
+        senatorshipId: member.senatorshipId,
+        senatorshipBoardValidated: member.senatorshipBoardValidated,
+        role: member.role,
+        membershipType: member.membershipType,
+      },
+      membershipRules
+    );
+
+  // Filter members based on search + column filters
   const filteredMembers = useMemo(() => {
     const term = (searchQuery || searchTerm).toLowerCase();
-    return term
-      ? members.filter(m =>
-        (m.name ?? '').toLowerCase().includes(term) ||
-        (m.email ?? '').toLowerCase().includes(term) ||
-        (m.phone ?? '').toLowerCase().includes(term) ||
-        (m.fullName ?? '').toLowerCase().includes(term) ||
-        (m.address ?? '').toLowerCase().includes(term)
-      )
-      : members;
-  }, [members, searchTerm, searchQuery]);
+    let list = members;
+
+    if (term) {
+      list = list.filter(
+        (m) =>
+          (m.name ?? '').toLowerCase().includes(term) ||
+          (m.email ?? '').toLowerCase().includes(term) ||
+          (m.phone ?? '').toLowerCase().includes(term) ||
+          (m.fullName ?? '').toLowerCase().includes(term) ||
+          (m.address ?? '').toLowerCase().includes(term)
+      );
+    }
+
+    if (roleFilters.length > 0) {
+      list = list.filter((m) => roleFilters.includes(m.role));
+    }
+
+    if (membershipTypeFilters.length > 0) {
+      list = list.filter((m) =>
+        membershipTypeFilters.includes(getMemberDisplayMembershipType(m))
+      );
+    }
+
+    return list;
+  }, [members, searchTerm, searchQuery, roleFilters, membershipTypeFilters, membershipRules]);
 
   // Paginate filtered members
   const paginatedMembers = useMemo(() => {
@@ -301,10 +362,10 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
   const isAllSelected = paginatedMembers.length > 0 && paginatedMembers.every(m => selectedIds.has(m.id));
 
-  // Reset to page 1 when search term changes
+  // Reset to page 1 when search or column filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, searchQuery]);
+  }, [searchTerm, searchQuery, roleFilters, membershipTypeFilters]);
 
   // Handle Ctrl+A for Select All on current page
   useEffect(() => {
@@ -471,43 +532,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     try {
       const formNationality = formData.get('nationality') as string || 'Malaysia';
       const formDateOfBirth = formData.get('dateOfBirth') as string || undefined;
-      const formMembershipType = (formData.get('membershipType') as any) || undefined;
       const formSenatorshipId = formData.get('senatorshipId') as string || undefined;
-
-      if (formMembershipType) {
-        const rules = await MembershipConfigService.getRules();
-        const rule = rules[formMembershipType as keyof typeof rules];
-        if (rule) {
-          if (rule.nationalityLimit === 'Malaysian' && formNationality !== 'Malaysia') {
-            showToast(`Nationality mismatch: ${formMembershipType} requires Malaysian`, 'error');
-            return;
-          }
-          if (rule.nationalityLimit === 'Non-Malaysian' && formNationality === 'Malaysia') {
-            showToast(`Nationality mismatch: ${formMembershipType} requires Non-Malaysian`, 'error');
-            return;
-          }
-          if (rule.requiresSenatorship && !formSenatorshipId?.trim()) {
-            showToast(`Senatorship ID is required for ${formMembershipType}`, 'error');
-            return;
-          }
-          if (formDateOfBirth) {
-            const birthYear = new Date(formDateOfBirth).getFullYear();
-            const currentYear = new Date().getFullYear();
-            let age = currentYear - birthYear;
-            if (rule.ageLimit.min && age < rule.ageLimit.min) {
-              showToast(`Age limit not met: ${formMembershipType} requires min age ${rule.ageLimit.min}`, 'error');
-              return;
-            }
-            if (rule.ageLimit.max && age > rule.ageLimit.max) {
-              showToast(`Age limit exceeded: ${formMembershipType} requires max age ${rule.ageLimit.max}`, 'error');
-              return;
-            }
-          } else if (rule.ageLimit.min || rule.ageLimit.max) {
-            showToast(`Date of Birth is required to validate age for ${formMembershipType}`, 'error');
-            return;
-          }
-        }
-      }
+      const formRole = (formData.get('role') as UserRole) || UserRole.MEMBER;
 
       const skillsInput = formData.get('skills') as string;
       const skills = skillsInput ? skillsInput.split(',').map(s => s.trim()).filter(s => s.length > 0) : [];
@@ -516,11 +542,11 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
       const interestedIndustries = addModalInterestedIndustries.length > 0 ? addModalInterestedIndustries : undefined;
 
-      const newMember: Omit<Member, 'id'> = {
+      const newMember: MemberCreateInput = {
         name,
         email,
         phone: formData.get('phone') as string || '',
-        role: (formData.get('role') as UserRole) || UserRole.MEMBER,
+        role: formRole,
         tier: (formData.get('tier') as MemberTier) || MemberTier.BRONZE,
         points: 0,
         joinDate: new Date().toISOString().split('T')[0],
@@ -543,9 +569,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         introducer: formData.get('introducer') as string || undefined,
         bio: formData.get('bio') as string || undefined,
 
-        // Membership
-        membershipType: formMembershipType,
-        senatorCertified: formData.get('senatorCertified') === 'on',
         senatorshipId: formSenatorshipId,
 
         // Professional
@@ -626,13 +649,14 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           <div className="space-y-2">
             <div>
               <Tabs
-                tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking']}
+                tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking', 'Senatorship']}
                 activeTab={
                   activeTab === 'directory' ? 'Directory' :
                     activeTab === 'guest' ? 'Guest' :
                       activeTab === 'statistics' ? 'Statistics' :
                         activeTab === 'board-of-directors' ? 'Board of Directors' :
-                          activeTab === 'mentorship' ? 'Mentorship' : 'Promotion Tracking'
+                          activeTab === 'mentorship' ? 'Mentorship' :
+                            activeTab === 'senatorship' ? 'Senatorship' : 'Promotion Tracking'
                 }
                 onTabChange={(tab) => {
                   if (tab === 'Directory') setActiveTab('directory');
@@ -640,6 +664,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   else if (tab === 'Statistics') setActiveTab('statistics');
                   else if (tab === 'Board of Directors') setActiveTab('board-of-directors');
                   else if (tab === 'Mentorship') setActiveTab('mentorship');
+                  else if (tab === 'Senatorship') setActiveTab('senatorship');
                   else setActiveTab('promotion-tracking');
                 }}
               />
@@ -654,6 +679,11 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                     onToggleSelection={toggleSelection}
                     onToggleAll={toggleAll}
                     isAllSelected={isAllSelected}
+                    roleFilters={roleFilters}
+                    onRoleFiltersChange={setRoleFilters}
+                    membershipTypeFilters={membershipTypeFilters}
+                    onMembershipTypeFiltersChange={setMembershipTypeFilters}
+                    getDisplayMembershipType={getMemberDisplayMembershipType}
                   />
                   {filteredMembers.length > 0 && (
                     <div className="mt-4">
@@ -691,6 +721,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
               {activeTab === 'promotion-tracking' && (
                 <PromotionTracking searchQuery={searchQuery} />
+              )}
+
+              {activeTab === 'senatorship' && (
+                <SenatorshipManagement
+                  members={members}
+                  canValidate={canManageMembers}
+                  searchQuery={searchQuery}
+                  onMembersChanged={loadMembers}
+                />
               )}
             </div>
           </div>
@@ -834,7 +873,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   <Input name="fullName" label="Full Name (ID Card)" />
                   <Input name="idNumber" label="ID Number" />
                   <Input name="dateOfBirth" label="Date of Birth" type="date" />
-                  <Select name="nationality" label="Nationality" defaultValue="Malaysia" options={COUNTRIES.map(c => ({ label: c, value: c }))} />
+                  <Select name="nationality" label="Nationality" defaultValue="Malaysia" options={NATIONALITY_OPTIONS.map(c => ({ label: c, value: c }))} />
 
                   <div className="col-span-2 grid grid-cols-2 gap-4">
                     <div>
@@ -871,13 +910,11 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Internal Profile</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <Select name="role" label="System Role" defaultValue={UserRole.MEMBER} options={[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => ({ label: r, value: r }))} />
-                  <Select name="membershipType" label="Membership Type" options={['Full', 'Probation', 'Honorary', 'Visiting', 'Senator', 'Associate'].map(t => ({ label: t, value: t }))} />
+                  <p className="col-span-2 text-xs text-slate-500 -mt-2">
+                    Membership type is computed from profile. Senatorship numbers are validated under the Senatorship tab.
+                  </p>
                   <Input name="introducer" label="Introducer Name" placeholder="Who brought them in?" />
-                  <div className="flex items-center gap-2 mt-6">
-                    <input type="checkbox" id="add-senatorCertified" name="senatorCertified" className="w-4 h-4" />
-                    <label htmlFor="add-senatorCertified" className="text-sm">Senator Certified</label>
-                  </div>
-                  <Input name="senatorshipId" label="Senatorship ID" placeholder="e.g. 12345" />
+                  <Input name="senatorshipId" label="Senatorship Number (optional)" placeholder="e.g. 12345" />
                 </div>
               </section>
 
@@ -1276,6 +1313,35 @@ const BatchActionBar: React.FC<{
   );
 };
 
+const ROLE_FILTER_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: UserRole.GUEST, label: 'Guest' },
+  { value: UserRole.PROBATION, label: 'Probation' },
+  { value: UserRole.MEMBER, label: 'Member' },
+  { value: UserRole.BOARD, label: 'Board' },
+  { value: UserRole.ADMIN, label: 'Admin' },
+  { value: UserRole.SUPER_ADMIN, label: 'Super Admin' },
+  { value: UserRole.INACTIVE, label: 'Inactive' },
+];
+
+const MEMBERSHIP_TYPE_FILTER_OPTIONS: { value: MembershipType; label: string }[] = [
+  { value: 'Guest', label: 'Guest' },
+  { value: 'Probation', label: 'Probation' },
+  { value: 'Full', label: 'Full' },
+  { value: 'Honorary', label: 'Honorary' },
+  { value: 'Senator', label: 'Senator' },
+  { value: 'Visiting', label: 'Visiting' },
+  { value: 'Associate', label: 'Associate' },
+];
+
+const membershipTypeBadgeVariant = (
+  type?: MembershipType
+): 'success' | 'warning' | 'info' | 'neutral' => {
+  if (type === 'Full') return 'success';
+  if (type === 'Probation') return 'warning';
+  if (type === 'Visiting' || type === 'Senator') return 'info';
+  return 'neutral';
+};
+
 // Member Table Component
 const MemberTable: React.FC<{
   members: Member[],
@@ -1283,14 +1349,31 @@ const MemberTable: React.FC<{
   selectedIds: Set<string>,
   onToggleSelection: (id: string) => void,
   onToggleAll: () => void,
-  isAllSelected: boolean
-}> = ({ members, onSelect, selectedIds, onToggleSelection, onToggleAll, isAllSelected }) => {
+  isAllSelected: boolean,
+  roleFilters: UserRole[],
+  onRoleFiltersChange: (roles: UserRole[]) => void,
+  membershipTypeFilters: MembershipType[],
+  onMembershipTypeFiltersChange: (types: MembershipType[]) => void,
+  getDisplayMembershipType: (member: Member) => MembershipType,
+}> = ({
+  members,
+  onSelect,
+  selectedIds,
+  onToggleSelection,
+  onToggleAll,
+  isAllSelected,
+  roleFilters,
+  onRoleFiltersChange,
+  membershipTypeFilters,
+  onMembershipTypeFiltersChange,
+  getDisplayMembershipType,
+}) => {
   return (
     <Card noPadding>
       {/* Desktop View */}
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden md:block overflow-x-auto overflow-y-visible">
         <table className="w-full text-left">
-          <thead>
+          <thead className="relative z-10">
             <tr className="bg-slate-50/50">
               <th className="px-6 py-4 w-10">
                 <input
@@ -1301,7 +1384,22 @@ const MemberTable: React.FC<{
                 />
               </th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-500">Member</th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-500">Role</th>
+              <th className="px-6 py-4 overflow-visible">
+                <ColumnFilterHeader
+                  label="Role"
+                  options={ROLE_FILTER_OPTIONS}
+                  selected={roleFilters}
+                  onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
+                />
+              </th>
+              <th className="px-6 py-4 overflow-visible">
+                <ColumnFilterHeader
+                  label="Membership Type"
+                  options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
+                  selected={membershipTypeFilters}
+                  onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
+                />
+              </th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-500">Tier / Points</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-500">Engagement</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-500">Risk Status</th>
@@ -1333,6 +1431,11 @@ const MemberTable: React.FC<{
                 </td>
                 <td className="px-6 py-4">
                   <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
+                </td>
+                <td className="px-6 py-4">
+                  <Badge variant={membershipTypeBadgeVariant(getDisplayMembershipType(member))}>
+                    {getDisplayMembershipType(member)}
+                  </Badge>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
@@ -1369,6 +1472,20 @@ const MemberTable: React.FC<{
       </div>
 
       {/* Mobile View */}
+      <div className="md:hidden border-b border-slate-100 px-4 py-3 flex flex-wrap gap-4 bg-slate-50/50">
+        <ColumnFilterHeader
+          label="Role"
+          options={ROLE_FILTER_OPTIONS}
+          selected={roleFilters}
+          onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
+        />
+        <ColumnFilterHeader
+          label="Membership Type"
+          options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
+          selected={membershipTypeFilters}
+          onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
+        />
+      </div>
       <div className="md:hidden divide-y divide-slate-100">
         {members.map(member => (
           <div
@@ -1392,6 +1509,13 @@ const MemberTable: React.FC<{
                 </div>
               </div>
               <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
+            </div>
+
+            <div className="mb-3">
+              <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Membership Type</span>
+              <Badge variant={membershipTypeBadgeVariant(getDisplayMembershipType(member))}>
+                {getDisplayMembershipType(member)}
+              </Badge>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-3">
@@ -1459,6 +1583,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [loadingClubs, setLoadingClubs] = useState(false);
   const [editFormTab, setEditFormTab] = useState<'basic' | 'professional' | 'contact' | 'apparel'>('basic');
   const [boardPositions, setBoardPositions] = useState<BoardMember[]>([]);
+  const [commissionDirectorPositions, setCommissionDirectorPositions] = useState<BoardMember[]>([]);
 
   const mentor = members.find(m => m.id === member.mentorId);
   const mentees = members.filter(m => member.menteeIds?.includes(m.id));
@@ -1486,8 +1611,12 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   useEffect(() => {
     const loadBoardPositions = async () => {
       try {
-        const positions = await BoardManagementService.getMemberBoardPositions(member.id);
+        const [positions, commissionPositions] = await Promise.all([
+          BoardManagementService.getMemberBoardPositions(member.id),
+          BoardManagementService.getMemberCommissionDirectorPositions(member.id),
+        ]);
         setBoardPositions(positions);
+        setCommissionDirectorPositions(commissionPositions);
       } catch (err) {
         console.error('Failed to load board positions:', err);
       }
@@ -1892,7 +2021,16 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                 <div>
                   <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
-                  <p className="font-bold text-slate-900">{member.membershipType || 'Standard'}</p>
+                  <MembershipTypeDisplay
+                    member={{
+                      nationality: member.nationality,
+                      dateOfBirth: member.dateOfBirth,
+                      senatorCertified: member.senatorCertified,
+                      senatorshipId: member.senatorshipId,
+                      role: member.role,
+                      membershipType: member.membershipType,
+                    }}
+                  />
                 </div>
                 {member.senatorCertified && (
                   <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
@@ -2107,7 +2245,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
               </div>
 
-              {/* Merged & sorted: careerHistory + boardPositions from Firestore */}
+              {/* Merged & sorted: careerHistory + board positions + commission director roles from Firestore */}
               {(() => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -2122,7 +2260,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 };
 
                 type TimelineItem = {
-                  sortKey: string; type: 'career' | 'board';
+                  sortKey: string; type: 'career' | 'board' | 'commission';
                   year: string; title: string; subtitle?: string;
                   bodStatus?: 'former' | 'current' | 'elected';
                 };
@@ -2143,6 +2281,18 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                     year: bp.term,
                     title: bp.position,
                     subtitle: `Board of Directors – ${bp.term}`,
+                    bodStatus: getBodStatus(bp),
+                  });
+                });
+
+                // Commission Director records from Board of Directors assignments
+                commissionDirectorPositions.forEach(bp => {
+                  items.push({
+                    sortKey: bp.term,
+                    type: 'commission',
+                    year: bp.term,
+                    title: 'Commission Director',
+                    subtitle: `Under ${bp.position} - ${bp.term}`,
                     bodStatus: getBodStatus(bp),
                   });
                 });
@@ -2175,6 +2325,30 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       </div>
                     );
                   }
+                  if (item.type === 'commission') {
+                    const statusConfig = {
+                      current: { dot: 'bg-sky-100 text-sky-600', badge: 'bg-sky-100 text-sky-700', label: 'Current', icon: 'text-sky-500' },
+                      elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
+                      former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Former', icon: 'text-slate-400' },
+                    };
+                    const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
+                    return (
+                      <div key={`commission-${idx}`} className="relative">
+                        <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
+                          <UserCog size={14} />
+                        </div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs text-slate-400 font-mono">{item.year}</span>
+                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <UserCog size={10} className={cfg.icon} />
+                          <p className={`text-xs font-medium ${cfg.icon}`}>{item.subtitle}</p>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={`career-${idx}`} className="relative">
                       <div className="absolute -left-8 bg-blue-100 text-jci-blue p-1 rounded-full border-4 border-white">
@@ -2189,7 +2363,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               })()}
 
               {/* Empty state */}
-              {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && (
+              {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
                 <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
               )}
             </div>

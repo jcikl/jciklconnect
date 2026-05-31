@@ -330,7 +330,11 @@ export interface Member {
   hasPaidInitiationFee?: boolean;
   introducer?: string;
   senatorCertified?: boolean;
-  senatorshipId?: string; // Senatorship ID for Senators
+  senatorshipId?: string; // Senatorship number (locked after board validation)
+  /** Set when Board of Directors validates senatorship number */
+  senatorshipBoardValidated?: boolean;
+  senatorshipValidatedAt?: string;
+  senatorshipValidatedBy?: string;
   age?: number;
   // New fields for Deep Profiling
   bio?: string;
@@ -343,6 +347,8 @@ export interface Member {
   boardHistory?: BoardPosition[]; // Historical board positions
   currentBoardYear?: number; // Current board year (if on board)
   currentBoardPosition?: string; // Current board position
+  /** True when member holds an active board position for the current calendar year (synced from boardMembers) */
+  isCurrentBoardMember?: boolean;
   // Leaderboard visibility
   leaderboardVisibility?: 'public' | 'members_only' | 'private';
   lastLogin?: string; // Last login date
@@ -361,6 +367,11 @@ export interface Member {
     jciInspireCompleted?: string;          // e.g. "JCIM Inspire 2026 - Completed"
     promotedToFull?: boolean;
     completedDate?: any;
+  };
+
+  engagementProgress?: {
+    firstYear?: Record<string, MemberEngagementRequirementProgress>;
+    secondYear?: Record<string, MemberEngagementRequirementProgress>;
   };
 
   // 1. 基本信息 (Basic Information)
@@ -413,6 +424,17 @@ export interface Member {
   personaType?: string; // Learning-oriented, Practical-oriented, etc.
   tendencyTags?: string[]; // Directional, Category, and Activity tags
 }
+
+export interface MemberEngagementRequirementProgress {
+  detail?: string;
+  date?: string;
+  completed?: boolean;
+}
+
+/** Create payload; membershipType is computed on save if omitted */
+export type MemberCreateInput = Omit<Member, 'id' | 'membershipType'> & {
+  membershipType?: MembershipType;
+};
 
 export interface BusinessProfile {
   id: string;

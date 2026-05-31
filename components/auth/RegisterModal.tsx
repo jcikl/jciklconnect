@@ -4,7 +4,7 @@ import { Mail, Lock, User, AlertCircle, Phone, CheckCircle, ChevronRight, Chevro
 import { Modal, Button, useToast, ProgressBar } from '../ui/Common';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
-import { JOIN_US_SURVEY_QUESTIONS } from '../../config/constants';
+import { JOIN_US_SURVEY_QUESTIONS, NATIONALITY_OPTIONS } from '../../config/constants';
 
 // Hobbies options from MembersView
 const HOBBY_OPTIONS = [
@@ -14,13 +14,6 @@ const HOBBY_OPTIONS = [
   "Liquor/ Wine Tasting", "Make Up", "Movie", "Other E-Sport", "Pickle Ball",
   "Pilates", "Public Speaking", "Reading", "Rock Climbing", "Singing",
   "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
-];
-
-// Nationality options
-const COUNTRIES = [
-  'Malaysia', 'Singapore', 'Indonesia', 'Thailand', 'Vietnam', 'Philippines',
-  'China', 'Japan', 'South Korea', 'India', 'Australia', 'New Zealand',
-  'United States', 'United Kingdom', 'Canada', 'Germany', 'France', 'Other'
 ];
 
 interface RegisterModalProps {
@@ -381,7 +374,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               label="Nationality"
               value={formData.nationality}
               onChange={handleChange}
-              options={COUNTRIES.map(c => ({ label: c, value: c }))}
+              options={NATIONALITY_OPTIONS.map(c => ({ label: c, value: c }))}
             />
           </div>
         );

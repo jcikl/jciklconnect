@@ -617,6 +617,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         jacketSize: m.jacketSize,
         introducer: m.introducer,
         joinDate: m.joinDate,
+        membership: m.membership,
       }));
       setMembers(mappedMembers);
       return mappedMembers;
@@ -1457,6 +1458,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           hasEditPermission={hasPermission('canEditFinance')}
           formatCurrency={(n) => formatCurrency(n)}
           formatDate={(d) => formatDate(d)}
+          onMembershipDataChanged={loadData}
           members={members}
         />
       )}

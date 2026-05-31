@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { DuesRenewalService } from '../../../services/duesRenewalService';
 import { FinanceService } from '../../../services/financeService';
+import { MembersService } from '../../../services/membersService';
 import {
   MembershipType,
   MembershipDues,
@@ -24,9 +25,20 @@ import {
   MembershipStatus,
   MembershipRuleConfig
 } from '../../../types';
-import { MembershipConfigService, resolveMembershipPurpose, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
+import {
+  MembershipConfigService,
+  resolveMembershipPurpose,
+  DEFAULT_MEMBERSHIP_RULES,
+  getTargetDuesForMembershipType,
+  resolveMembershipTypeFromDues,
+} from '../../../services/membershipConfigService';
 import type { Transaction } from '../../../types';
 // Re-scan trigger
+
+/** First-year membership dues (base + registration), shown as "New" in breakdown */
+const NEW_MEMBERSHIP_DUES = 350;
+
+type RenewalWithTargetDues = DuesRenewalTransaction & { targetDues: number };
 
 /** Fuzzy-match a transaction to a member via description / referenceNumber */
 const findMatchingMember = (
@@ -65,6 +77,8 @@ interface DuesRenewalDashboardProps {
   hasEditPermission?: boolean;
   formatCurrency?: (amount: number) => string;
   formatDate?: (date: string) => string;
+  /** 批量修复会员首次会费后刷新父级数据 */
+  onMembershipDataChanged?: () => void | Promise<void>;
   /** 会员列表，用于显示 memberId 对应的姓名 */
   members?: Array<{
     id: string;
@@ -87,6 +101,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   hasEditPermission = false,
   formatCurrency: fmtCurrency = (n) => n.toLocaleString('en-MY', { style: 'currency', currency: 'MYR' }),
   formatDate: fmtDate = (d) => new Date(d).toLocaleDateString(),
+  onMembershipDataChanged,
   members = [],
 }) => {
   const [summary, setSummary] = useState<DuesRenewalSummary | null>(null);
@@ -104,6 +119,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   const [creatingRenewals, setCreatingRenewals] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [autoMatching, setAutoMatching] = useState(false);
+  const [fixingFirstDues, setFixingFirstDues] = useState(false);
+  const [syncingMembershipTypes, setSyncingMembershipTypes] = useState(false);
+  const [syncingMembershipRecords, setSyncingMembershipRecords] = useState(false);
 
   /** One-click: fuzzy-match all unlinked membership transactions and persist memberId to Firestore */
   const handleAutoMatchMembers = async () => {
@@ -119,14 +137,17 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       const unlinked = filteredByYear.filter(tx => !tx.memberId);
       let matched = 0;
       let skipped = 0;
+      const rules = await MembershipConfigService.getRules();
 
       for (const tx of unlinked) {
         const member = findMatchingMember(tx, members);
         if (member) {
-          await FinanceService.updateTransaction(tx.id, { 
+          const purpose = resolveMembershipPurpose(tx.amount, selectedYear, rules);
+          await FinanceService.updateTransaction(tx.id, {
             memberId: member.id,
             projectId: `${selectedYear} membership`,
-            category: 'Membership'
+            category: 'Membership',
+            purpose,
           });
           matched++;
         } else {
@@ -144,6 +165,101 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       setAutoMatching(false);
     }
   };
+
+  const handleFixFirstMembershipDues = async () => {
+    const confirmed = window.confirm(
+      '将所有会员「首个会费年份」的应缴 dues 调整为 RM350，并根据已付金额重新计算状态？\n\n仅影响 members.membership 中最早年份的记录。'
+    );
+    if (!confirmed) return;
+
+    setFixingFirstDues(true);
+    try {
+      const result = await MembersService.fixFirstMembershipDuesTo350();
+      alert(
+        `首次会费调整完成\n` +
+          `扫描会员: ${result.scanned}\n` +
+          `已更新: ${result.updated}\n` +
+          `无 membership 记录: ${result.skippedNoMembership}\n` +
+          `已是 RM350: ${result.alreadyCorrect}` +
+          (result.errors.length > 0 ? `\n失败: ${result.errors.length}（见控制台）` : '')
+      );
+      if (result.errors.length > 0) {
+        console.error('fixFirstMembershipDuesTo350 errors:', result.errors);
+      }
+      await onMembershipDataChanged?.();
+      await loadDashboardData();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '未知错误';
+      alert(`首次会费调整失败: ${message}`);
+    } finally {
+      setFixingFirstDues(false);
+    }
+  };
+
+  const handleBatchSyncMembershipTypes = async () => {
+    const confirmed = window.confirm(
+      `根据 ${selectedYear} 年会费记录、角色与 Membership Config，批量推断并写入 members.membershipType？\n\n` +
+        '不会修改 membership 字段。建议先确保 membership 数据准确，或之后执行「同步 membership」。'
+    );
+    if (!confirmed) return;
+
+    setSyncingMembershipTypes(true);
+    try {
+      const result = await MembersService.batchSyncMembershipTypes({ year: selectedYear });
+      alert(
+        `membershipType 同步完成（${result.year} 年）\n` +
+          `扫描: ${result.scanned}\n` +
+          `已更新: ${result.updated}\n` +
+          `无需变更: ${result.alreadyCorrect}` +
+          (result.errors.length > 0 ? `\n失败: ${result.errors.length}（见控制台）` : '')
+      );
+      if (result.errors.length > 0) {
+        console.error('batchSyncMembershipTypes errors:', result.errors);
+      }
+      await onMembershipDataChanged?.();
+      await loadDashboardData();
+    } catch (err: unknown) {
+      alert(`membershipType 同步失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setSyncingMembershipTypes(false);
+    }
+  };
+
+  const handleBatchSyncMembershipRecords = async () => {
+    const confirmed = window.confirm(
+      `根据每位会员的 membershipType 与 Membership Config，批量更新 ${selectedYear} 年的 members.membership？\n\n` +
+        '将写入 dues / status 等；可为符合条件会员新建该年记录。不会修改 membershipType。'
+    );
+    if (!confirmed) return;
+
+    setSyncingMembershipRecords(true);
+    try {
+      const result = await MembersService.batchSyncMembershipRecords({
+        year: selectedYear,
+        membershipTransactions,
+        onlyExistingRecords: false,
+      });
+      alert(
+        `membership 同步完成（${result.year} 年）\n` +
+          `扫描: ${result.scanned}\n` +
+          `更新: ${result.updated}\n` +
+          `新建: ${result.created}\n` +
+          `未达本年度: ${result.skippedNotEligible}\n` +
+          `已是最新: ${result.alreadyCorrect}` +
+          (result.errors.length > 0 ? `\n失败: ${result.errors.length}（见控制台）` : '')
+      );
+      if (result.errors.length > 0) {
+        console.error('batchSyncMembershipRecords errors:', result.errors);
+      }
+      await onMembershipDataChanged?.();
+      await loadDashboardData();
+    } catch (err: unknown) {
+      alert(`membership 同步失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setSyncingMembershipRecords(false);
+    }
+  };
+
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
   const [calculationMode, setCalculationMode] = useState<'calendar' | 'payment_date'>('calendar');
 
@@ -209,7 +325,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     }
   };
 
-  const displayRenewals = React.useMemo(() => {
+  const mergedRenewals = React.useMemo((): RenewalWithTargetDues[] => {
     const getEffectiveJoinYear = (m: any): number => {
       if (calculationMode === 'payment_date') {
         const memberTxs = membershipTransactions.filter(
@@ -250,21 +366,11 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       const joinYear = getEffectiveJoinYear(m);
       const isFirstYear = joinYear === selectedYear;
 
-      const getTargetDues = (mType: MembershipType) => {
-        const baseDues = rules[mType]?.duesAmount ?? MembershipDues[mType] ?? 0;
-        if ((mType === 'Probation' || mType === 'Full') && isFirstYear) {
-          return baseDues + 50; // Probation first-year exception: base (300) + registration fee (50) = 350
-        }
-        return baseDues;
-      };
+      const getTargetDues = (mType: MembershipType) =>
+        getTargetDuesForMembershipType(mType, isFirstYear, rules);
 
-      const resolveTypeFromDues = (amt: number, currentType: MembershipType) => {
-        if (amt === 0) return currentType;
-        const matched = Object.entries(rules).find(([_, ruleConfig]) => ruleConfig.duesAmount === amt);
-        if (matched) return matched[0] as MembershipType;
-        if (amt === (rules.Probation?.duesAmount ?? 300) + 50) return 'Probation';
-        return currentType;
-      };
+      const resolveTypeFromDues = (amt: number, currentType: MembershipType) =>
+        resolveMembershipTypeFromDues(amt, rules, currentType);
 
       if (membershipData) {
         const rawType = m.membershipType || 'Probation';
@@ -313,9 +419,30 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         status: 'pending',
         dueDate: new Date(selectedYear, 2, 31).toISOString(),
         isRenewal: !isFirstYear,
-      } as DuesRenewalTransaction & { targetDues: number };
+      } as RenewalWithTargetDues;
     });
 
+    return merged;
+  }, [renewals, members, selectedYear, membershipRules, calculationMode, membershipTransactions]);
+
+  const newMembershipBreakdown = React.useMemo(() => {
+    const stats = { total: 0, paid: 0, pending: 0, overdue: 0 };
+    mergedRenewals.forEach((renewal) => {
+      if (renewal.targetDues !== NEW_MEMBERSHIP_DUES) return;
+      stats.total += 1;
+      const status = (renewal.status || '').toLowerCase();
+      if (status === 'paid' || status === 'over paid') {
+        stats.paid += 1;
+      } else if (status === 'overdue') {
+        stats.overdue += 1;
+      } else {
+        stats.pending += 1;
+      }
+    });
+    return stats;
+  }, [mergedRenewals]);
+
+  const displayRenewals = React.useMemo(() => {
     const statusWeight = (status: string) => {
       const s = status?.toLowerCase() || '';
       if (s === 'paid' || s === 'over paid') return 1;
@@ -324,7 +451,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       return 4;
     };
 
-    return merged
+    return mergedRenewals
       .filter(renewal => {
         if (filterType !== 'all' && renewal.membershipType !== filterType) return false;
         if (filterStatus === 'all') return true;
@@ -350,7 +477,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
 
         return nameA.localeCompare(nameB);
       });
-  }, [renewals, members, selectedYear, filterType, filterStatus, membershipRules, calculationMode, membershipTransactions]);
+  }, [mergedRenewals, members, filterType, filterStatus]);
 
   const membershipTypeColors: Record<MembershipType, string> = {
     Guest: 'bg-blue-100 text-blue-800',
@@ -406,6 +533,52 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+          {hasEditPermission && (
+            <>
+              <button
+                type="button"
+                onClick={handleBatchSyncMembershipTypes}
+                disabled={syncingMembershipTypes || syncingMembershipRecords || loading}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="从会费记录/角色推断并写入 membershipType"
+              >
+                {syncingMembershipTypes ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Users className="w-4 h-4" />
+                )}
+                {syncingMembershipTypes ? '同步中...' : '同步 membershipType'}
+              </button>
+              <button
+                type="button"
+                onClick={handleBatchSyncMembershipRecords}
+                disabled={syncingMembershipTypes || syncingMembershipRecords || loading}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="按 membershipType + Config 写入 membership[年份]"
+              >
+                {syncingMembershipRecords ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Calendar className="w-4 h-4" />
+                )}
+                {syncingMembershipRecords ? '同步中...' : '同步 membership'}
+              </button>
+              <button
+                type="button"
+                onClick={handleFixFirstMembershipDues}
+                disabled={fixingFirstDues || loading}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold bg-violet-50 text-violet-800 border border-violet-200 hover:bg-violet-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="将每位会员 membership 中最早年份的 dues 设为 RM350"
+              >
+                {fixingFirstDues ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <DollarSign className="w-4 h-4" />
+                )}
+                {fixingFirstDues ? '调整中...' : '首次会费 → RM350'}
+              </button>
+            </>
+          )}
           <button
             onClick={loadDashboardData}
             disabled={loading}
@@ -496,6 +669,14 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       </span>
                     </th>
                   ))}
+                  <th className="pb-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-4">
+                    <span
+                      className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800"
+                      title="首年会费 RM350（含注册费）"
+                    >
+                      New
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
@@ -512,6 +693,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       </td>
                     );
                   })}
+                  <td className="py-3.5 text-center text-teal-700 font-semibold px-4">
+                    RM{NEW_MEMBERSHIP_DUES}
+                  </td>
                 </tr>
                 <tr>
                   <td className="py-3.5 font-semibold text-gray-700 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
@@ -522,6 +706,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       {stats.total}
                     </td>
                   ))}
+                  <td className="py-3.5 text-center font-bold text-teal-800 px-4">
+                    {newMembershipBreakdown.total}
+                  </td>
                 </tr>
                 <tr>
                   <td className="py-3.5 font-semibold text-green-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
@@ -532,6 +719,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       {stats.paid}
                     </td>
                   ))}
+                  <td className="py-3.5 text-center font-bold text-green-600 px-4">
+                    {newMembershipBreakdown.paid}
+                  </td>
                 </tr>
                 <tr>
                   <td className="py-3.5 font-semibold text-yellow-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
@@ -542,6 +732,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       {stats.pending}
                     </td>
                   ))}
+                  <td className="py-3.5 text-center font-bold text-yellow-600 px-4">
+                    {newMembershipBreakdown.pending}
+                  </td>
                 </tr>
                 <tr>
                   <td className="py-3.5 font-semibold text-red-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
@@ -552,6 +745,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       {stats.overdue}
                     </td>
                   ))}
+                  <td className="py-3.5 text-center font-bold text-red-600 px-4">
+                    {newMembershipBreakdown.overdue}
+                  </td>
                 </tr>
               </tbody>
             </table>

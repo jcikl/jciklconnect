@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Tabs, useToast } from '../ui/Common';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Button, Tabs } from '../ui/Common';
 import { Member, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
-import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS, INTERNATIONAL_PARTNERSHIP_OPTIONS } from '../../config/constants';
-import { MembershipConfigService } from '../../services/membershipConfigService';
+import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS, INTERNATIONAL_PARTNERSHIP_OPTIONS, nationalityOptionsForValue } from '../../config/constants';
+import {
+  MembershipConfigService,
+  computeMembershipTypeFromMember,
+} from '../../services/membershipConfigService';
+import { MembershipTypeDisplay } from '../shared/MembershipTypeDisplay';
 
 interface MemberEditFormProps {
   member: Member;
@@ -12,12 +16,6 @@ interface MemberEditFormProps {
   /** When true (member/guest self-edit), only Contact + Apparel tabs, submit restricted to MEMBER_SELF_EDITABLE_FIELDS */
   selfEditableOnly?: boolean;
 }
-
-const COUNTRIES = [
-  'Malaysia', 'Singapore', 'Indonesia', 'Thailand', 'Vietnam', 'Philippines',
-  'China', 'Japan', 'South Korea', 'India', 'Australia', 'New Zealand',
-  'United States', 'United Kingdom', 'Canada', 'Germany', 'France', 'Other'
-];
 
 const HOBBY_OPTIONS = [
   "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
@@ -49,6 +47,7 @@ function initFormValues(member: Member) {
     membershipType: member.membershipType || '',
     senatorCertified: member.senatorCertified || false,
     senatorshipId: member.senatorshipId || '',
+    senatorshipBoardValidated: member.senatorshipBoardValidated || false,
     attendanceRate: member.attendanceRate ?? 0,
     churnRisk: member.churnRisk,
 
@@ -90,8 +89,7 @@ function initFormValues(member: Member) {
 
 export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit, onCancel, selfEditableOnly = false }) => {
   const { isAdmin, isDeveloper } = usePermissions();
-  const { showToast } = useToast();
-  const canEditMembership = isAdmin || isDeveloper;
+  const canEditSystemStatus = isAdmin || isDeveloper;
   const [activeTab, setActiveTab] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'membership'>(selfEditableOnly ? 'contact' : 'basic');
   const [formValues, setFormValues] = useState(() => initFormValues(member));
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
@@ -104,6 +102,19 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     setFormValues(initFormValues(member));
   }, [member.id]);
 
+  const membershipTypePreview = useMemo(
+    () => ({
+      nationality: formValues.nationality,
+      dateOfBirth: formValues.dateOfBirth,
+      senatorCertified: member.senatorCertified,
+      senatorshipId: formValues.senatorshipId,
+      senatorshipBoardValidated: member.senatorshipBoardValidated,
+      role: formValues.role,
+      membershipType: member.membershipType,
+    }),
+    [formValues, member.membershipType, member.senatorCertified, member.senatorshipBoardValidated]
+  );
+
   const handleChange = (field: string, value: string | number | boolean | string[]) => {
     setFormValues(prev => {
       const newValues = { ...prev, [field]: value };
@@ -115,7 +126,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         } else {
           newValues.membershipYear = new Date().getFullYear();
         }
-        newValues.membershipType = 'Probation';
       }
 
       return newValues;
@@ -131,45 +141,26 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       .filter(s => s.length > 0);
     const interestedIndustriesArr = formValues.interestedIndustries;
 
-    const targetType = (formValues.membershipType as Member['membershipType']) || member.membershipType;
-    if (membershipRules && targetType && membershipRules[targetType] && canEditMembership) {
-      const rule = membershipRules[targetType];
-      
-      // Nationality Check
-      if (rule.nationalityLimit === 'Malaysian' && formValues.nationality !== 'Malaysia') {
-         showToast(`Nationality mismatch: ${targetType} requires Malaysian`, 'error');
-         return;
-      }
-      if (rule.nationalityLimit === 'Non-Malaysian' && formValues.nationality === 'Malaysia') {
-         showToast(`Nationality mismatch: ${targetType} requires Non-Malaysian`, 'error');
-         return;
-      }
-      
-      // Senatorship Check
-      if (rule.requiresSenatorship && !formValues.senatorshipId?.trim()) {
-         showToast(`Senatorship ID is required for ${targetType}`, 'error');
-         return;
-      }
-      
-      // Age Check
-      if (formValues.dateOfBirth) {
-         const birthYear = new Date(formValues.dateOfBirth).getFullYear();
-         const currentYear = new Date().getFullYear();
-         let age = currentYear - birthYear;
-         
-         if (rule.ageLimit.min && age < rule.ageLimit.min) {
-            showToast(`Age limit not met: ${targetType} requires min age ${rule.ageLimit.min} (Current Age: ${age})`, 'error');
-            return;
-         }
-         if (rule.ageLimit.max && age > rule.ageLimit.max) {
-            showToast(`Age limit exceeded: ${targetType} requires max age ${rule.ageLimit.max} (Current Age: ${age})`, 'error');
-            return;
-         }
-      } else if (rule.ageLimit.min || rule.ageLimit.max) {
-         showToast(`Date of Birth is required to validate age for ${targetType}`, 'error');
-         return;
-      }
-    }
+    const senatorshipLocked = member.senatorshipBoardValidated === true;
+    const senatorshipIdValue = senatorshipLocked
+      ? member.senatorshipId
+      : formValues.senatorshipId?.trim() || undefined;
+
+    const computedMembershipType =
+      membershipRules
+        ? computeMembershipTypeFromMember(
+            {
+              nationality: formValues.nationality,
+              dateOfBirth: formValues.dateOfBirth,
+              senatorCertified: member.senatorCertified,
+              senatorshipId: senatorshipIdValue,
+              senatorshipBoardValidated: member.senatorshipBoardValidated,
+              role: (formValues.role as UserRole) || member.role,
+              membershipType: member.membershipType,
+            },
+            membershipRules
+          )
+        : member.membershipType;
 
     const updates: Partial<Member> = {
       name: formValues.name || member.name,
@@ -181,9 +172,10 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       tier: (formValues.tier as MemberTier) || member.tier,
       attendanceRate: typeof formValues.attendanceRate === 'number' ? formValues.attendanceRate : member.attendanceRate,
       churnRisk: formValues.churnRisk || member.churnRisk,
-      membershipType: (formValues.membershipType as Member['membershipType']) || member.membershipType,
-      senatorCertified: formValues.senatorCertified,
-      senatorshipId: formValues.senatorshipId || undefined,
+      membershipType: computedMembershipType,
+      ...(senatorshipIdValue !== undefined && !senatorshipLocked
+        ? { senatorshipId: senatorshipIdValue }
+        : {}),
 
       fullName: formValues.fullName || undefined,
       idNumber: formValues.idNumber || undefined,
@@ -302,8 +294,12 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               <div className="flex flex-row items-center gap-3">
                 <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Nationality</label>
                 <select name="nationality" value={formValues.nationality} onChange={(e) => handleChange('nationality', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white">
-                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {nationalityOptionsForValue(formValues.nationality).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
+              </div>
+              <div className="flex flex-row items-center gap-3">
+                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Introducer</label>
+                <input name="introducer" value={formValues.introducer} onChange={(e) => handleChange('introducer', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
             </div>
             <div className="flex flex-row items-center gap-3">
@@ -356,8 +352,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   name="role"
                   value={formValues.role}
                   onChange={(e) => handleChange('role', e.target.value)}
-                  disabled={!canEditMembership}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  disabled={!canEditSystemStatus}
+                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 >
                   {[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -368,8 +364,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   name="tier"
                   value={formValues.tier}
                   onChange={(e) => handleChange('tier', e.target.value)}
-                  disabled={!canEditMembership}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  disabled={!canEditSystemStatus}
+                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 >
                   {['Bronze', 'Silver', 'Gold', 'Platinum'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -382,8 +378,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   <select
                     value={formValues.membershipYear}
                     onChange={(e) => handleChange('membershipYear', parseInt(e.target.value))}
-                    disabled={!canEditMembership}
-                    className={`flex-1 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2.5 md:py-2 text-sm font-bold text-amber-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 ${!canEditMembership ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    disabled={!canEditSystemStatus}
+                    className={`flex-1 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2.5 md:py-2 text-sm font-bold text-amber-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 ${!canEditSystemStatus ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
                     {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 2 - i).map(y => (
                       <option key={y} value={y}>{y}</option>
@@ -392,30 +388,46 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 </div>
               )}
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">Membership Type</label>
-                <select
-                  name="membershipType"
-                  value={formValues.membershipType}
-                  onChange={(e) => handleChange('membershipType', e.target.value)}
-                  disabled={!canEditMembership}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
-                >
-                  {['Full', 'Probation', 'Honorary', 'Visiting', 'Senator', 'Associate'].map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">Introducer</label>
-                <input
-                  name="introducer"
-                  value={formValues.introducer}
-                  onChange={(e) => handleChange('introducer', e.target.value)}
-                  disabled={!canEditMembership}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
-                />
+              <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
+                <div className="flex flex-row items-center gap-3 min-w-0">
+                  <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">
+                    Membership Type
+                  </label>
+                  <div className="flex-1 min-w-0">
+                    <MembershipTypeDisplay member={membershipTypePreview} showDetails={false} />
+                  </div>
+                </div>
+                <div className="flex flex-row items-start gap-3 min-w-0">
+                  <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700 md:pt-2">
+                    Senatorship Number
+                  </label>
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <input
+                      name="senatorshipId"
+                      value={formValues.senatorshipId}
+                      onChange={(e) => handleChange('senatorshipId', e.target.value)}
+                      disabled={member.senatorshipBoardValidated === true}
+                      placeholder="e.g. 12345"
+                      className={`w-full rounded-lg border px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${
+                        member.senatorshipBoardValidated
+                          ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    />
+                    {member.senatorshipBoardValidated && (
+                      <p className="text-xs text-green-700 leading-snug">
+                        <span className="font-medium">Board validated</span>
+                        {member.senatorshipValidatedAt && (
+                          <span className="text-slate-500">
+                            {' '}
+                            · {new Date(member.senatorshipValidatedAt).toLocaleDateString()}
+                            {member.senatorshipValidatedBy ? ` by ${member.senatorshipValidatedBy}` : ''}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-row items-center gap-3">
@@ -425,8 +437,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   type="number"
                   value={String(formValues.attendanceRate)}
                   onChange={(e) => { const v = parseInt(e.target.value, 10); handleChange('attendanceRate', isNaN(v) ? 0 : v); }}
-                  disabled={!canEditMembership}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  disabled={!canEditSystemStatus}
+                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 />
               </div>
 
@@ -436,40 +448,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   name="churnRisk"
                   value={formValues.churnRisk}
                   onChange={(e) => handleChange('churnRisk', e.target.value)}
-                  disabled={!canEditMembership}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  disabled={!canEditSystemStatus}
+                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 >
                   {['Low', 'Medium', 'High'].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
 
-              {formValues.membershipType === 'Senator' && (
-                <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 col-span-1 md:col-span-2">
-                  <span className="hidden md:block md:w-40 md:shrink-0" />
-                  <div className={`flex items-center gap-2 p-3 bg-blue-50 rounded-lg flex-1 ${!canEditMembership ? 'opacity-60' : ''}`}>
-                    <input
-                      type="checkbox"
-                      id="senatorCertified"
-                      checked={formValues.senatorCertified}
-                      onChange={(e) => handleChange('senatorCertified', e.target.checked)}
-                      disabled={!canEditMembership}
-                      className={`w-5 h-5 rounded border-gray-300 text-jci-blue focus:ring-jci-blue ${!canEditMembership ? 'cursor-not-allowed' : ''}`}
-                    />
-                    <label htmlFor="senatorCertified" className={`text-sm font-bold md:font-medium text-blue-900 ${canEditMembership ? 'cursor-pointer' : 'cursor-not-allowed'}`}>Senator Certified</label>
-                  </div>
-                  <div className="flex-1 flex flex-row items-center gap-3">
-                    <label className="w-28 shrink-0 text-sm font-semibold text-slate-700">Senatorship ID</label>
-                    <input
-                      name="senatorshipId"
-                      value={formValues.senatorshipId}
-                      onChange={(e) => handleChange('senatorshipId', e.target.value)}
-                      disabled={!canEditMembership}
-                      placeholder="e.g. 12345"
-                      className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${!canEditMembership ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : 'bg-white'}`}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}

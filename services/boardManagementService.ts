@@ -11,7 +11,13 @@ import {
   where,
   Timestamp,
   orderBy,
+  deleteField,
 } from 'firebase/firestore';
+import {
+  getCurrentBoardCalendarYear,
+  hasActiveBoardRecordForCurrentYear,
+  isActiveBoardRecordForYear,
+} from '../utils/boardMembership';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Member, UserRole, BoardPosition, BoardMember, BoardTransition } from '../types';
@@ -186,12 +192,10 @@ export class BoardManagementService {
         updatedAt: new Date().toISOString(),
       });
 
-      // Update member role to regular member
       await MembersService.updateMember(boardMember.memberId, {
         role: UserRole.MEMBER,
-        currentBoardYear: undefined,
-        currentBoardPosition: undefined,
       });
+      await this.clearMemberCurrentBoardStatus(boardMember.memberId);
     } catch (error) {
       console.error('Error archiving board member:', error);
       throw error;
@@ -212,11 +216,13 @@ export class BoardManagementService {
       const boardMembersRef = collection(db, 'boardMembers');
       await addDoc(boardMembersRef, boardMemberData);
 
-      // Update member role to board member
+      const termYear = parseInt(boardMember.term, 10);
+      const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
       await MembersService.updateMember(boardMember.memberId, {
         role: UserRole.BOARD,
-        currentBoardYear: parseInt(boardMember.term),
+        currentBoardYear: termYear,
         currentBoardPosition: boardMember.position,
+        ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
       });
     } catch (error) {
       console.error('Error activating board member:', error);
@@ -353,10 +359,126 @@ export class BoardManagementService {
         };
         await addDoc(boardMembersRef, newMember);
       }
+
+      await this.syncMemberDocumentsForTerm(year, assignments, existing);
     } catch (error) {
       console.error('Error setting board for term:', error);
       throw error;
     }
+  }
+
+  /** Clear current-board fields on a member (used when term ends or assignment removed). */
+  static async clearMemberCurrentBoardStatus(memberId: string): Promise<void> {
+    if (isDevMode()) return;
+    const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+    await updateDoc(memberRef, {
+      currentBoardYear: deleteField(),
+      currentBoardPosition: deleteField(),
+      isCurrentBoardMember: false,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Keep members/{id} in sync with boardMembers so usePermissions and Firestore rules grant board access.
+   */
+  private static async syncMemberDocumentsForTerm(
+    year: string,
+    assignments: Array<{ memberId: string; position: string }>,
+    previousBoardRecords: BoardMember[]
+  ): Promise<void> {
+    const yearNum = parseInt(year, 10);
+    const currentYear = getCurrentBoardCalendarYear();
+    const isCurrentTerm = yearNum === currentYear;
+    const newMemberIds = new Set(
+      assignments.map((a) => a.memberId).filter((id): id is string => Boolean(id))
+    );
+
+    if (isCurrentTerm) {
+      for (const { memberId, position } of assignments) {
+        if (!memberId) continue;
+        await MembersService.updateMember(memberId, {
+          currentBoardYear: yearNum,
+          currentBoardPosition: position,
+          isCurrentBoardMember: true,
+        });
+      }
+
+      const previousIds = new Set(previousBoardRecords.map((b) => b.memberId));
+      for (const memberId of previousIds) {
+        if (!newMemberIds.has(memberId)) {
+          await this.clearMemberCurrentBoardStatus(memberId);
+        }
+      }
+      return;
+    }
+
+    // Past/future term edit: only clear stale flags pointing at this non-current year
+    for (const memberId of newMemberIds) {
+      const member = await MembersService.getMemberById(memberId);
+      if (member?.currentBoardYear === yearNum) {
+        await this.clearMemberCurrentBoardStatus(memberId);
+      }
+    }
+  }
+
+  /** Push current-year boardMembers assignments onto member docs (fixes legacy data). */
+  static async syncCurrentYearBoardAssignees(): Promise<void> {
+    if (isDevMode()) return;
+    const year = String(getCurrentBoardCalendarYear());
+    const board = await this.getBoardMembersByYear(year);
+    const active = board.filter((b) => b.isActive !== false);
+    await this.syncMemberDocumentsForTerm(
+      year,
+      active.map((b) => ({ memberId: b.memberId, position: b.position })),
+      active
+    );
+  }
+
+  /**
+   * Self-heal: if boardMembers shows an active current-year position but member doc is out of sync, fix it.
+   * Returns fields to merge into in-memory member state when updated.
+   */
+  static async ensureMemberBoardFieldsSynced(
+    member: Member
+  ): Promise<Partial<Member> | null> {
+    if (isDevMode()) return null;
+
+    const currentYear = getCurrentBoardCalendarYear();
+    const records = await this.getMemberBoardPositions(member.id);
+    const activeRecord = records.find((r) => isActiveBoardRecordForYear(r, currentYear));
+
+    const shouldBeOnBoard = !!activeRecord;
+    const flaggedOnBoard =
+      member.isCurrentBoardMember === true || member.currentBoardYear === currentYear;
+
+    if (shouldBeOnBoard) {
+      const needsUpdate =
+        !flaggedOnBoard ||
+        member.currentBoardPosition !== activeRecord.position ||
+        member.currentBoardYear !== currentYear;
+
+      if (!needsUpdate) return null;
+
+      const updates: Partial<Member> = {
+        currentBoardYear: currentYear,
+        currentBoardPosition: activeRecord.position,
+        isCurrentBoardMember: true,
+      };
+      await MembersService.updateMember(member.id, updates);
+      return updates;
+    }
+
+    if (flaggedOnBoard && !hasActiveBoardRecordForCurrentYear(records)) {
+      await this.clearMemberCurrentBoardStatus(member.id);
+      return {
+        currentBoardYear: undefined,
+        currentBoardPosition: undefined,
+        isCurrentBoardMember: false,
+      };
+    }
+
+    return null;
   }
 
   // Legacy methods for backward compatibility
@@ -522,6 +644,27 @@ export class BoardManagementService {
     }
   }
 
+  // Get all board records where a member serves as a Commission Director
+  static async getMemberCommissionDirectorPositions(memberId: string): Promise<BoardMember[]> {
+    if (isDevMode()) {
+      return [];
+    }
+
+    try {
+      const boardMembersRef = collection(db, 'boardMembers');
+      const q = query(boardMembersRef, where('commissionDirectorIds', 'array-contains', memberId));
+      const snapshot = await getDocs(q);
+
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as BoardMember[];
+    } catch (error) {
+      console.error('Error getting commission director positions for member:', error);
+      return [];
+    }
+  }
+
   // Get board history for a member
   static async getMemberBoardHistory(memberId: string): Promise<BoardPosition[]> {
     try {
@@ -533,4 +676,3 @@ export class BoardManagementService {
     }
   }
 }
-

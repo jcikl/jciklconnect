@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { UserRole } from '../types';
 import { isDevMode } from '../utils/devMode';
+import { isMemberCurrentBoard } from '../utils/boardMembership';
 
 interface Permission {
   canViewMembers: boolean;
@@ -190,10 +191,9 @@ export const usePermissions = () => {
     
     let basePermissions = ROLE_PERMISSIONS[member.role] || ROLE_PERMISSIONS[UserRole.MEMBER];
     
-    // SECONDARY ACCESS PERMISSION: If they are a current board member, grant Board permissions automatically.
-    const currentYear = new Date().getFullYear();
-    const isCurrentBoardMember = member.currentBoardYear === currentYear || member.boardHistory?.some(b => b.year === currentYear);
-    
+    // SECONDARY ACCESS: current calendar-year board (synced from boardMembers → member doc)
+    const isCurrentBoardMember = isMemberCurrentBoard(member);
+
     if (isCurrentBoardMember && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN) {
       basePermissions = {
         ...basePermissions,
@@ -253,8 +253,21 @@ export const usePermissions = () => {
   // Determine effective role (simulated role in dev mode, or actual member role)
   const effectiveRole = devMode && simulatedRole ? simulatedRole : (member?.role || UserRole.GUEST);
 
-  const currentYear = new Date().getFullYear();
-  const isCurrentBoardMember = member?.currentBoardYear === currentYear || member?.boardHistory?.some(b => b.year === currentYear);
+  const isCurrentBoardMember = isMemberCurrentBoard(member);
+  const isLegacyBoardRole = effectiveRole === UserRole.BOARD;
+  const isBoardUser = isCurrentBoardMember || isLegacyBoardRole;
+  const isPlainMember =
+    (effectiveRole === UserRole.MEMBER || effectiveRole === UserRole.PROBATION) && !isBoardUser;
+
+  /** Workspace modules (Events Mgmt, Finance, etc.) — board, admin, finance roles; not plain members/guests */
+  const canAccessWorkspaceModules =
+    effectiveRole !== UserRole.GUEST &&
+    (isBoardUser ||
+      effectiveRole === UserRole.ADMIN ||
+      effectiveRole === UserRole.SUPER_ADMIN ||
+      effectiveRole === UserRole.ORGANIZATION_SECRETARY ||
+      effectiveRole === UserRole.ORGANIZATION_FINANCE ||
+      effectiveRole === UserRole.ACTIVITY_FINANCE);
 
   return {
     permissions,
@@ -263,8 +276,11 @@ export const usePermissions = () => {
     hasAllPermissions,
     isGuest: effectiveRole === UserRole.GUEST,
     isProbationMember: effectiveRole === UserRole.PROBATION, // Kept for backward compat with MembersView probation flow
-    isMember: effectiveRole === UserRole.MEMBER || effectiveRole === UserRole.PROBATION || isCurrentBoardMember,
-    isBoard: isCurrentBoardMember || false,
+    isMember: effectiveRole === UserRole.MEMBER || effectiveRole === UserRole.PROBATION,
+    isPlainMember,
+    isCurrentBoardMember: isBoardUser,
+    isBoard: isBoardUser,
+    canAccessWorkspaceModules,
     isAdmin: effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN,
     isOrganizationSecretary: false, // Deprecated - use dynamic assignment
     isOrganizationFinance: false, // Deprecated - use dynamic assignment

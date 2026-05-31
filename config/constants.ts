@@ -204,6 +204,8 @@ export const INDUSTRY_OPTIONS = [
   'Other'
 ] as const;
 
+export { NATIONALITY_OPTIONS, nationalityOptionsForValue } from './nationalities';
+
 export const INTERNATIONAL_PARTNERSHIP_OPTIONS = [
   { label: 'Distributors', description: 'To help resell and distribute products in local or international markets' },
   { label: 'Resellers', description: 'To purchase and resell products/services to end users' },

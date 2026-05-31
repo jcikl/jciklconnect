@@ -19,6 +19,7 @@ import { MOCK_DEV_ADMIN } from '../services/mockData';
 import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
 import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored } from '../utils/authStorage';
 import { MembersService } from '../services/membersService';
+import { BoardManagementService } from '../services/boardManagementService';
 
 interface AuthContextType {
   user: User | null;
@@ -147,6 +148,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             if (memberData && isMounted && !checkDevMode()) {
+              try {
+                const boardSync = await BoardManagementService.ensureMemberBoardFieldsSynced(memberData);
+                if (boardSync) {
+                  memberData = { ...memberData, ...boardSync };
+                }
+              } catch (boardSyncErr) {
+                console.warn('Board membership sync skipped:', boardSyncErr);
+              }
               setMember(memberData);
             } else if (!memberData && isMounted && !checkDevMode()) {
               // Still no member record for this account — sign out so they cannot use the app

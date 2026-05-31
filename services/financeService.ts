@@ -21,7 +21,12 @@ import { isDevMode } from '../utils/devMode';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
 import { removeUndefined } from '../utils/dataUtils';
-import { MembershipConfigService, resolveMembershipPurpose } from './membershipConfigService';
+import {
+  MembershipConfigService,
+  resolveMembershipPurpose,
+  computeMembershipTypeFromMember,
+  roleForMembershipType,
+} from './membershipConfigService';
 
 
 export class FinanceService {
@@ -227,6 +232,15 @@ export class FinanceService {
       const existingSplits = await this.getTransactionSplits(parentTransactionId);
       const existingSplitIds = new Set(existingSplits.map(s => s.id));
       const newSplitIds = splits.filter(s => s.id).map(s => s.id);
+      const membershipSyncTargets = new Map<string, string>();
+      const addMembershipSyncTarget = (split?: Partial<TransactionSplit> | Partial<typeof splits[number]>) => {
+        if (split?.category !== 'Membership' || !split.memberId) return;
+        const year = split.year || this.getMembershipYearFromProjectId((split as any).projectId);
+        if (!year) return;
+        membershipSyncTargets.set(`${split.memberId}:${year}`, `${year} membership`);
+      };
+      existingSplits.forEach(addMembershipSyncTarget);
+      splits.forEach(addMembershipSyncTarget);
 
       // Delete splits that were removed
       for (const split of existingSplits) {
@@ -302,6 +316,11 @@ export class FinanceService {
         purpose: '',
         updatedAt: Timestamp.now(),
       });
+
+      for (const [key, projectId] of membershipSyncTargets.entries()) {
+        const [memberId] = key.split(':');
+        await this.syncMemberMembership(memberId, projectId);
+      }
 
       return splitIds;
     } catch (error) {
@@ -591,15 +610,37 @@ export class FinanceService {
 
       // Sync with Member Membership if category is Membership or was Membership
       if (updates.category === 'Membership' || currentTransaction.category === 'Membership') {
-        const memberId = updates.memberId || currentTransaction.memberId;
+        const hasMemberIdUpdate = Object.prototype.hasOwnProperty.call(updates, 'memberId');
+        const nextMemberIdRaw = hasMemberIdUpdate ? updates.memberId : currentTransaction.memberId;
+        const memberId = typeof nextMemberIdRaw === 'string' ? nextMemberIdRaw.trim() : nextMemberIdRaw;
         const projectId = updates.projectId || currentTransaction.projectId;
-        
+
         if (memberId) {
-          await this.syncMemberMembership(memberId as string, projectId);
+          const mergedForSync: Transaction = {
+            ...currentTransaction,
+            ...updates,
+            id: transactionId,
+            memberId,
+            category: (updates.category || currentTransaction.category) as Transaction['category'],
+            projectId,
+            date: updates.date
+              ? this.normalizeTransactionDate(updates.date)
+              : this.normalizeTransactionDate(currentTransaction.date),
+          };
+          await this.syncMemberMembership(memberId as string, projectId, {
+            includeTransactions: [mergedForSync],
+          });
         }
-        
-        // If memberId changed, sync the old member too
-        if (updates.memberId && currentTransaction.memberId && updates.memberId !== currentTransaction.memberId) {
+
+        // If memberId changed/cleared, or year changed, sync the old member too
+        if (
+          currentTransaction.memberId &&
+          (
+            !memberId ||
+            memberId !== currentTransaction.memberId ||
+            projectId !== currentTransaction.projectId
+          )
+        ) {
           await this.syncMemberMembership(currentTransaction.memberId as string, currentTransaction.projectId);
         }
       }
@@ -631,11 +672,38 @@ export class FinanceService {
       transactionIds.map(async (txId) => {
         try {
           const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, txId);
+          const currentDoc = await getDoc(transactionRef);
+          const currentTransaction = currentDoc.exists()
+            ? ({ id: currentDoc.id, ...currentDoc.data() } as Transaction)
+            : null;
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
             updatedAt: Timestamp.now(),
           };
+          if (categoryUpdates.category === 'Membership' && categoryUpdates.year && !categoryUpdates.projectId) {
+            updateData.projectId = `${categoryUpdates.year} membership`;
+          }
           await updateDoc(transactionRef, updateData);
+
+          const nextTransaction = {
+            ...(currentTransaction || {}),
+            ...categoryUpdates,
+            ...(updateData.projectId ? { projectId: updateData.projectId } : {}),
+          } as Transaction;
+
+          if (nextTransaction.category === 'Membership' && nextTransaction.memberId) {
+            const projectId = nextTransaction.projectId || this.getMembershipProjectIdFromYear(categoryUpdates.year);
+            await this.syncMemberMembership(nextTransaction.memberId, projectId);
+          }
+
+          if (
+            currentTransaction?.category === 'Membership' &&
+            currentTransaction.memberId &&
+            (currentTransaction.memberId !== nextTransaction.memberId || currentTransaction.projectId !== nextTransaction.projectId)
+          ) {
+            await this.syncMemberMembership(currentTransaction.memberId, currentTransaction.projectId);
+          }
+
           return { success: true };
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -675,11 +743,33 @@ export class FinanceService {
       splitIds.map(async (splitId) => {
         try {
           const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
+          const currentDoc = await getDoc(splitRef);
+          const currentSplit = currentDoc.exists()
+            ? ({ id: currentDoc.id, ...currentDoc.data() } as TransactionSplit)
+            : null;
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
             updatedAt: Timestamp.now(),
           };
           await updateDoc(splitRef, updateData);
+
+          const nextSplit = { ...(currentSplit || {}), ...categoryUpdates } as TransactionSplit;
+          if (nextSplit.category === 'Membership' && nextSplit.memberId) {
+            const projectId = this.getMembershipProjectIdFromYear(nextSplit.year || categoryUpdates.year);
+            await this.syncMemberMembership(nextSplit.memberId, projectId);
+          }
+
+          if (
+            currentSplit?.category === 'Membership' &&
+            currentSplit.memberId &&
+            (currentSplit.memberId !== nextSplit.memberId || currentSplit.year !== nextSplit.year)
+          ) {
+            await this.syncMemberMembership(
+              currentSplit.memberId,
+              this.getMembershipProjectIdFromYear(currentSplit.year)
+            );
+          }
+
           return { success: true };
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -840,8 +930,13 @@ export class FinanceService {
 
   /**
    * Synchronize member membership summary based on transactions
+   * @param includeTransactions Merged immediately after updateDoc to avoid query lag missing fresh links
    */
-  static async syncMemberMembership(memberId: string, projectId?: string): Promise<void> {
+  static async syncMemberMembership(
+    memberId: string,
+    projectId?: string,
+    options?: { includeTransactions?: Transaction[] }
+  ): Promise<void> {
     if (isDevMode()) return;
 
     try {
@@ -850,21 +945,74 @@ export class FinanceService {
       if (!yearMatch) return;
       const year = yearMatch[1];
       const yearNum = parseInt(year, 10);
+      const canonicalProjectId = this.getMembershipProjectIdFromYear(yearNum) || projectId;
 
-      // 2. Fetch all transactions for this member, category Membership, and same projectId
+      // 2. Fetch membership transactions for member (filter by year in memory — resilient to projectId variants)
       const q = query(
         collection(db, COLLECTIONS.TRANSACTIONS),
         where('memberId', '==', memberId),
-        where('category', '==', 'Membership'),
-        where('projectId', '==', projectId)
+        where('category', '==', 'Membership')
       );
       const snapshot = await getDocs(q);
-      const transactions = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction));
+      const queriedTransactions = snapshot.docs
+        .map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            date: this.normalizeTransactionDate(data.date),
+          } as Transaction;
+        })
+        .filter(tx => this.transactionBelongsToMembershipYear(tx, yearNum));
+
+      const transactions = this.mergeMembershipTransactionsForYear(
+        queriedTransactions,
+        options?.includeTransactions,
+        memberId,
+        yearNum
+      );
+
+      // Include split records too. Split membership payments carry year/memberId on the split,
+      // while date/type/bank details live on the parent transaction.
+      const splitQuery = query(
+        collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+        where('memberId', '==', memberId),
+        where('category', '==', 'Membership'),
+        where('year', '==', yearNum)
+      );
+      const splitSnapshot = await getDocs(splitQuery);
+      const splitTransactions: Transaction[] = [];
+      for (const splitDoc of splitSnapshot.docs) {
+        const split = { id: splitDoc.id, ...splitDoc.data() } as TransactionSplit;
+        const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
+        const parent = parentDoc.exists() ? parentDoc.data() : {};
+        splitTransactions.push({
+          id: split.id,
+          date: this.normalizeTransactionDate((parent as any).date),
+          description: split.description,
+          purpose: split.purpose,
+          amount: split.amount,
+          type: (parent as any).type || 'Income',
+          category: 'Membership',
+          status: (parent as any).status || 'Pending',
+          projectId: canonicalProjectId,
+          memberId,
+          parentTransactionId: split.parentTransactionId,
+        } as Transaction);
+      }
+
+      const allMembershipTransactions = [...transactions, ...splitTransactions];
 
       // 3. Calculate total amount
-      const totalAmount = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-      const latestTx = transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-      const transactionIds = transactions.map(t => t.id);
+      const totalAmount = allMembershipTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      const latestTx = [...allMembershipTransactions].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      )[0];
+      const transactionIds = allMembershipTransactions.map(t => t.id).filter(Boolean) as string[];
+      const membershipPurpose = latestTx
+        ? (latestTx.purpose || latestTx.description || undefined)
+        : undefined;
+      const paymentDate = latestTx ? latestTx.date : undefined;
 
       // 4. Fetch the member to get current membershipType and existing membership data
       const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
@@ -877,10 +1025,28 @@ export class FinanceService {
       const type = member.membershipType || 'Probation';
       const duesAmount = currentMembership[yearStr]?.dues || MembershipDues[type as keyof typeof MembershipDues] || 0;
 
+      // No linked membership transactions for this member/year:
+      // rollback linkage-derived fields and reset to pending summary.
+      if (allMembershipTransactions.length === 0) {
+        currentMembership[yearStr] = {
+          year: yearNum,
+          dues: duesAmount,
+          amount: 0,
+          status: 'pending',
+          transactionId: [],
+        };
+
+        await updateDoc(memberRef, {
+          membership: currentMembership,
+          updatedAt: Timestamp.now(),
+        });
+        return;
+      }
+
       // 5. Determine status based on amount - dues
       let status: MembershipStatus = 'pending';
       const balance = totalAmount - duesAmount;
-      
+
       if (totalAmount === 0) {
         status = 'pending';
       } else if (balance === 0) {
@@ -891,18 +1057,16 @@ export class FinanceService {
         status = 'partial';
       }
 
-      // 6. Update member.membership[year] - Unified update logic
-      if (currentMembership[yearStr] || transactions.length > 0) {
-        currentMembership[yearStr] = {
-          year: yearNum,
-          dues: duesAmount,
-          amount: totalAmount,
-          status: status,
-          transactionId: transactionIds,
-          purpose: latestTx ? latestTx.description : undefined,
-          paymentDate: latestTx ? latestTx.date : null
-        };
-      }
+      // 6. Update member.membership[year]
+      currentMembership[yearStr] = {
+        year: yearNum,
+        dues: duesAmount,
+        amount: totalAmount,
+        status: status,
+        transactionId: transactionIds,
+        purpose: membershipPurpose,
+        paymentDate: paymentDate ?? null,
+      };
 
       const updates: any = {
         membership: currentMembership,
@@ -915,10 +1079,22 @@ export class FinanceService {
           updates.hasPaidInitiationFee = true;
         }
 
-        // Rule: Guest -> Probation when payment of 350+ is confirmed
+        // Guest first-year payment (350+): promote to Config-eligible type (not always Probation)
         if ((member.role === 'GUEST' || !member.role) && totalAmount >= 350) {
-          updates.role = 'PROBATION';
-          updates.membershipType = 'Probation';
+          const rules = await MembershipConfigService.getRules();
+          const promotedType = computeMembershipTypeFromMember(
+            {
+              nationality: member.nationality,
+              dateOfBirth: member.dateOfBirth,
+              senatorCertified: member.senatorCertified,
+              senatorshipId: member.senatorshipId,
+              role: 'PROBATION',
+              membershipType: member.membershipType,
+            },
+            rules
+          );
+          updates.membershipType = promotedType;
+          updates.role = roleForMembershipType(promotedType, member.role);
         }
       }
 
@@ -928,6 +1104,52 @@ export class FinanceService {
     } catch (error) {
       console.error('Error syncing member membership:', error);
     }
+  }
+
+  private static normalizeTransactionDate(date: unknown): string {
+    if (!date) return new Date().toISOString();
+    if (typeof date === 'string') return date;
+    if (typeof date === 'object' && date !== null && 'toDate' in date && typeof (date as { toDate: () => Date }).toDate === 'function') {
+      return (date as { toDate: () => Date }).toDate().toISOString();
+    }
+    return new Date(date as string | number).toISOString();
+  }
+
+  private static transactionBelongsToMembershipYear(tx: Transaction, yearNum: number): boolean {
+    const fromProject = this.getMembershipYearFromProjectId(tx.projectId);
+    if (fromProject !== undefined) return fromProject === yearNum;
+    return new Date(this.normalizeTransactionDate(tx.date)).getFullYear() === yearNum;
+  }
+
+  private static mergeMembershipTransactionsForYear(
+    queried: Transaction[],
+    included: Transaction[] | undefined,
+    memberId: string,
+    yearNum: number
+  ): Transaction[] {
+    const byId = new Map<string, Transaction>();
+    const add = (tx: Transaction) => {
+      if (!tx.id) return;
+      if (tx.memberId !== memberId) return;
+      if (tx.category !== 'Membership') return;
+      if (!this.transactionBelongsToMembershipYear(tx, yearNum)) return;
+      byId.set(tx.id, {
+        ...tx,
+        date: this.normalizeTransactionDate(tx.date),
+      });
+    };
+    queried.forEach(add);
+    (included ?? []).forEach(add);
+    return Array.from(byId.values());
+  }
+
+  private static getMembershipYearFromProjectId(projectId?: string): number | undefined {
+    const year = projectId?.match(/^(\d+)/)?.[1];
+    return year ? parseInt(year, 10) : undefined;
+  }
+
+  private static getMembershipProjectIdFromYear(year?: number): string | undefined {
+    return year ? `${year} membership` : undefined;
   }
 
   // Get all bank accounts with dynamic balance

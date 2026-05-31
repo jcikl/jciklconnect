@@ -1,12 +1,24 @@
 // Members Data Hook
 import { useState, useEffect, useCallback } from 'react';
 import { MembersService } from '../services/membersService';
-import { Member } from '../types';
+import { Member, MemberCreateInput } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
 
-export const useMembers = (loIdFilter?: string | null) => {
+export interface UseMembersResult {
+  members: Member[];
+  loading: boolean;
+  error: string | null;
+  loadMembers: () => Promise<void>;
+  createMember: (memberData: MemberCreateInput) => Promise<string>;
+  updateMember: (memberId: string, updates: Partial<Member>) => Promise<void>;
+  deleteMember: (memberId: string) => Promise<void>;
+  batchUpdateMembers: (memberIds: string[], updates: Partial<Member>) => Promise<void>;
+  batchDeleteMembers: (memberIds: string[]) => Promise<void>;
+}
+
+export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +63,7 @@ export const useMembers = (loIdFilter?: string | null) => {
     loadMembers();
   }, [loadMembers, authLoading, currentMember, isDevModeFromAuth]);
 
-  const createMember = async (memberData: Omit<Member, 'id'>) => {
+  const createMember = async (memberData: MemberCreateInput) => {
     try {
       const id = await MembersService.createMember(memberData, user?.uid ?? undefined);
       await loadMembers();
@@ -128,6 +140,6 @@ export const useMembers = (loIdFilter?: string | null) => {
     deleteMember,
     batchUpdateMembers,
     batchDeleteMembers,
-  };
+  } satisfies UseMembersResult;
 };
 

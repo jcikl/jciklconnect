@@ -7,36 +7,286 @@ import {
   PromotionSettings,
   ManualPromotionRequest,
   Member,
+  MemberEngagementRequirementProgress,
   Event,
   UserRole,
   MemberTier
 } from '../types';
 import { MembersService } from './membersService';
+import {
+  MembershipConfigService,
+  computeMembershipTypeFromMember,
+} from './membershipConfigService';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
+
+export type EngagementYear = 'firstYear' | 'secondYear';
+
+export interface EngagementRequirementDefinition {
+  key: string;
+  group: 'Leadership Experience' | 'Skills Development' | 'JCI Experience';
+  title: string;
+  description: string;
+  inputType: 'text' | 'select';
+  options?: string[];
+}
+
+export interface EngagementRequirementStatus extends EngagementRequirementDefinition {
+  progress: MemberEngagementRequirementProgress;
+  isCompleted: boolean;
+}
+
+export interface MemberEngagementProgressSummary {
+  year: EngagementYear;
+  memberId: string;
+  memberName: string;
+  requirements: EngagementRequirementStatus[];
+  completedCount: number;
+  totalCount: number;
+  overallProgress: number;
+  isCompleted: boolean;
+}
 
 export class PromotionService {
   private static readonly PROBATION_DUES = 350; // RM350
   private static readonly FULL_MEMBER_DUES = 300; // RM300
 
-  /**
-   * Get promotion progress for a Probation Member
-   */
-  static async getPromotionProgress(memberId: string): Promise<PromotionProgress | null> {
-    // In real implementation, this would fetch from database
-    const member = await this.getMemberById(memberId);
-    if (!member || member.membershipType !== 'Probation') {
-      return null;
-    }
+  static readonly ENGAGEMENT_REQUIREMENTS: Record<EngagementYear, EngagementRequirementDefinition[]> = {
+    firstYear: [
+      {
+        key: 'leadership_local_project_committee',
+        group: 'Leadership Experience',
+        title: 'Local Project / Activity Leadership',
+        description: 'Serve as a Local Project or Activity Organizing Chairperson or Committee.',
+        inputType: 'select',
+        options: ['Local Project Organizing Chairperson', 'Activity Organizing Chairperson', 'Organizing Committee']
+      },
+      {
+        key: 'skills_jci_malaysia_inspire',
+        group: 'Skills Development',
+        title: 'JCI Malaysia Inspire',
+        description: 'Graduate from JCI Malaysia Inspire.',
+        inputType: 'select',
+        options: ['JCI Malaysia Inspire']
+      },
+      {
+        key: 'skills_jci_discover',
+        group: 'Skills Development',
+        title: 'JCI Discover',
+        description: 'Graduate from JCI Discover.',
+        inputType: 'select',
+        options: ['JCI Discover']
+      },
+      {
+        key: 'skills_jci_explore',
+        group: 'Skills Development',
+        title: 'JCI Explore',
+        description: 'Graduate from JCI Explore.',
+        inputType: 'select',
+        options: ['JCI Explore']
+      },
+      {
+        key: 'experience_area_or_national_convention',
+        group: 'JCI Experience',
+        title: 'Area / National Convention',
+        description: 'Register and attend Area and/or National Convention.',
+        inputType: 'select',
+        options: ['Area Convention', 'National Convention']
+      }
+    ],
+    secondYear: [
+      {
+        key: 'leadership_project_chair_or_commission_director',
+        group: 'Leadership Experience',
+        title: 'Project Chairperson / Commission Director',
+        description: 'Serve as a Local Project or Activity Organizing Chairperson, or Commission Director.',
+        inputType: 'select',
+        options: ['Local Project Organizing Chairperson', 'Activity Organizing Chairperson', 'Commission Director']
+      },
+      {
+        key: 'skills_effective_meeting',
+        group: 'Skills Development',
+        title: 'JCI Effective Meeting',
+        description: 'Graduate from JCI Effective Meeting.',
+        inputType: 'select',
+        options: ['JCI Effective Meeting']
+      },
+      {
+        key: 'skills_malaysia_empower',
+        group: 'Skills Development',
+        title: 'JCI Malaysia Empower',
+        description: 'Graduate from JCI Malaysia Empower.',
+        inputType: 'select',
+        options: ['JCI Malaysia Empower']
+      },
+      {
+        key: 'skills_parliamentary_procedure',
+        group: 'Skills Development',
+        title: 'Parliamentary Procedure Course',
+        description: 'Graduate from Parliamentary Procedure Course.',
+        inputType: 'select',
+        options: ['Parliamentary Procedure Course']
+      },
+      {
+        key: 'experience_local_academy_or_area_summit',
+        group: 'JCI Experience',
+        title: 'Local Academy / Area Summit',
+        description: 'Register and attend Local Academy or Area Summit.',
+        inputType: 'select',
+        options: ['Local Academy', 'Area Summit']
+      },
+      {
+        key: 'experience_area_convention',
+        group: 'JCI Experience',
+        title: 'Area Convention',
+        description: 'Register and attend Area Convention.',
+        inputType: 'select',
+        options: ['Area Convention']
+      },
+      {
+        key: 'experience_national_convention',
+        group: 'JCI Experience',
+        title: 'National Convention',
+        description: 'Register and attend National Convention.',
+        inputType: 'select',
+        options: ['National Convention']
+      },
+      {
+        key: 'experience_national_events',
+        group: 'JCI Experience',
+        title: 'National Events',
+        description: 'Register and attend National Events.',
+        inputType: 'text'
+      }
+    ]
+  };
 
-    const requirements = await this.checkAllRequirements(memberId);
+  private static async getComputedMembershipType(member: Member): Promise<string> {
+    const rules = await MembershipConfigService.getRules();
+    return this.getComputedMembershipTypeWithRules(member, rules);
+  }
+
+  private static getComputedMembershipTypeWithRules(
+    member: Member,
+    rules: Awaited<ReturnType<typeof MembershipConfigService.getRules>>
+  ): string {
+    return computeMembershipTypeFromMember(
+      {
+        nationality: member.nationality,
+        dateOfBirth: member.dateOfBirth,
+        senatorCertified: member.senatorCertified,
+        senatorshipId: member.senatorshipId,
+        role: member.role,
+        membershipType: member.membershipType,
+      },
+      rules
+    );
+  }
+
+  private static createBaseRequirements(): PromotionRequirement[] {
+    return [
+      {
+        id: 'bod_meeting',
+        type: 'bod_meeting_attendance',
+        name: 'BOD Meeting Attendance',
+        description: 'Attend at least one Board of Directors meeting',
+        isCompleted: false
+      },
+      {
+        id: 'organizing_committee',
+        type: 'event_organizing_committee',
+        name: 'Event Organizing Committee',
+        description: 'Serve as organizing committee member for at least one event',
+        isCompleted: false
+      },
+      {
+        id: 'event_participation',
+        type: 'event_participation',
+        name: 'Event Participation',
+        description: 'Participate in at least two events',
+        isCompleted: false
+      },
+      {
+        id: 'jci_inspire',
+        type: 'jci_inspire_completion',
+        name: 'Course Completion',
+        description: 'Complete the JCIM Inspire course OR JCI KL New Membersâ€™ Orientation',
+        isCompleted: false
+      }
+    ];
+  }
+
+  private static getRequirementCompletionFromMember(
+    member: Member,
+    requirementType: PromotionRequirement['type']
+  ): {
+    completedAt: Date;
+    details: any;
+    evidence?: string[];
+  } | null {
+    const progress = member.promotionProgress;
+
+    switch (requirementType) {
+      case 'bod_meeting_attendance': {
+        const value = progress?.bodMeetingAttended;
+        return value?.trim()
+          ? { completedAt: new Date(), details: { meetingId: value }, evidence: [] }
+          : null;
+      }
+
+      case 'event_organizing_committee': {
+        const value = progress?.eventOrganizerParticipation;
+        return value?.trim()
+          ? { completedAt: new Date(), details: { eventName: value }, evidence: [] }
+          : null;
+      }
+
+      case 'event_participation': {
+        const value = progress?.eventParticipation;
+        if (!value?.trim()) return null;
+
+        const events = value.split(/[,\n;]+/).filter(e => e.trim().length > 0);
+        return events.length >= 2
+          ? { completedAt: new Date(), details: { eventNames: events }, evidence: [] }
+          : null;
+      }
+
+      case 'jci_inspire_completion': {
+        const value = progress?.jciInspireCompleted;
+        return value?.trim()
+          ? { completedAt: new Date(), details: { courseName: value }, evidence: [] }
+          : null;
+      }
+
+      default:
+        return null;
+    }
+  }
+
+  private static checkAllRequirementsForMember(member: Member): PromotionRequirement[] {
+    return this.createBaseRequirements().map(requirement => {
+      const completion = this.getRequirementCompletionFromMember(member, requirement.type);
+      if (!completion) return requirement;
+
+      return {
+        ...requirement,
+        isCompleted: true,
+        completedAt: completion.completedAt,
+        completionDetails: completion.details,
+        evidence: completion.evidence
+      };
+    });
+  }
+
+  private static buildPromotionProgress(member: Member): PromotionProgress {
+    const requirements = this.checkAllRequirementsForMember(member);
     const completedCount = requirements.filter(req => req.isCompleted).length;
     const overallProgress = (completedCount / requirements.length) * 100;
     const isEligibleForPromotion = completedCount === requirements.length;
 
     return {
-      id: `progress_${memberId}`,
-      memberId,
+      id: `progress_${member.id}`,
+      memberId: member.id,
       memberName: member.name,
       currentMembershipType: 'Probation',
       requirements,
@@ -48,9 +298,88 @@ export class PromotionService {
   }
 
   /**
+   * Get promotion progress for a Probation Member
+   */
+  static async getPromotionProgress(memberId: string): Promise<PromotionProgress | null> {
+    const member = await this.getMemberById(memberId);
+    if (!member) return null;
+    return this.getPromotionProgressForMember(member);
+  }
+
+  static async getPromotionProgressForMember(member: Member): Promise<PromotionProgress | null> {
+    const computedType = await this.getComputedMembershipType(member);
+    if (computedType !== 'Probation') {
+      return null;
+    }
+
+    return this.buildPromotionProgress(member);
+  }
+
+  static buildEngagementProgress(member: Member, year: EngagementYear): MemberEngagementProgressSummary {
+    const storedProgress = member.engagementProgress?.[year] || {};
+
+    const requirements = this.ENGAGEMENT_REQUIREMENTS[year].map((definition) => {
+      const progress = storedProgress[definition.key] || {};
+      const isCompleted = progress.completed === true || Boolean(progress.detail?.trim() && progress.date?.trim());
+
+      return {
+        ...definition,
+        progress,
+        isCompleted
+      };
+    });
+
+    const completedCount = requirements.filter(req => req.isCompleted).length;
+    const totalCount = requirements.length;
+    const isCompleted = totalCount > 0 && completedCount === totalCount;
+
+    return {
+      year,
+      memberId: member.id,
+      memberName: member.fullName || member.name,
+      requirements,
+      completedCount,
+      totalCount,
+      overallProgress: totalCount > 0 ? (completedCount / totalCount) * 100 : 0,
+      isCompleted
+    };
+  }
+
+  static async saveEngagementRequirement(
+    memberId: string,
+    year: EngagementYear,
+    requirementKey: string,
+    progress: MemberEngagementRequirementProgress
+  ): Promise<void> {
+    const member = await this.getMemberById(memberId);
+    if (!member) throw new Error('Member not found');
+
+    const currentEngagement = member.engagementProgress || {};
+    const yearProgress = currentEngagement[year] || {};
+    const cleanProgress = {
+      detail: progress.detail || '',
+      date: progress.date || '',
+      completed: progress.completed ?? Boolean(progress.detail?.trim() && progress.date?.trim())
+    };
+
+    await MembersService.updateMember(memberId, {
+      engagementProgress: {
+        ...currentEngagement,
+        [year]: {
+          ...yearProgress,
+          [requirementKey]: cleanProgress
+        }
+      }
+    } as any);
+  }
+
+  /**
    * Check all four promotion requirements for a member
    */
   static async checkAllRequirements(memberId: string): Promise<PromotionRequirement[]> {
+    const member = await this.getMemberById(memberId);
+    return member ? this.checkAllRequirementsForMember(member) : this.createBaseRequirements();
+
     const requirements: PromotionRequirement[] = [
       {
         id: 'bod_meeting',
@@ -107,6 +436,9 @@ export class PromotionService {
     details: any;
     evidence?: string[];
   } | null> {
+    const member = await this.getMemberById(memberId);
+    return member ? this.getRequirementCompletionFromMember(member, requirementType) : null;
+
     // In real implementation, this would query the database
     switch (requirementType) {
       case 'bod_meeting_attendance':
@@ -161,8 +493,12 @@ export class PromotionService {
     reason?: string
   ): Promise<PromotionHistory | null> {
     const member = await this.getMemberById(memberId);
-    if (!member || member.membershipType !== 'Probation') {
-      throw new Error('Member not found or not a Probation Member');
+    if (!member) {
+      throw new Error('Member not found');
+    }
+    const computedType = await this.getComputedMembershipType(member);
+    if (computedType !== 'Probation') {
+      throw new Error('Member is not a Probation Member (computed from profile)');
     }
 
     const progress = await this.getPromotionProgress(memberId);
@@ -217,8 +553,11 @@ export class PromotionService {
     overrideRequirements: boolean = false
   ): Promise<ManualPromotionRequest> {
     const member = await this.getMemberById(memberId);
-    if (!member || member.membershipType !== 'Probation') {
-      throw new Error('Member not found or not a Probation Member');
+    if (!member) {
+      throw new Error('Member not found');
+    }
+    if ((await this.getComputedMembershipType(member)) !== 'Probation') {
+      throw new Error('Member is not a Probation Member (computed from profile)');
     }
 
     const progress = await this.getPromotionProgress(memberId);
@@ -257,8 +596,8 @@ export class PromotionService {
     activityData: any
   ): Promise<void> {
     const member = await this.getMemberById(memberId);
-    if (!member || member.membershipType !== 'Probation') {
-      return; // Only track for Probation Members
+    if (!member || (await this.getComputedMembershipType(member)) !== 'Probation') {
+      return;
     }
 
     // Record the activity
@@ -286,6 +625,38 @@ export class PromotionService {
     requirementCompletionRates: Record<string, number>;
   }> {
     const probationMembers = await this.getProbationMembers();
+    return this.calculatePromotionStatistics(probationMembers);
+  }
+
+  static async getPromotionTrackingOverview(loIdFilter?: string | null): Promise<{
+    statistics: {
+      totalProbationMembers: number;
+      eligibleForPromotion: number;
+      promotedThisYear: number;
+      averageTimeToPromotion: number;
+      requirementCompletionRates: Record<string, number>;
+    };
+    members: Awaited<ReturnType<typeof PromotionService.getProbationMembersForDisplay>>;
+  }> {
+    const rules = await MembershipConfigService.getRules();
+    const allMembers = await MembersService.getAllMembers(loIdFilter);
+    const probationMembers = this.getProbationMembersFromList(allMembers, rules);
+
+    const [statistics, members] = await Promise.all([
+      this.calculatePromotionStatistics(probationMembers),
+      Promise.resolve(this.toProbationMembersForDisplay(probationMembers, rules))
+    ]);
+
+    return { statistics, members };
+  }
+
+  private static async calculatePromotionStatistics(probationMembers: Member[]): Promise<{
+    totalProbationMembers: number;
+    eligibleForPromotion: number;
+    promotedThisYear: number;
+    averageTimeToPromotion: number;
+    requirementCompletionRates: Record<string, number>;
+  }> {
     const totalProbationMembers = probationMembers.length;
 
     let eligibleForPromotion = 0;
@@ -297,12 +668,12 @@ export class PromotionService {
     };
 
     for (const member of probationMembers) {
-      const progress = await this.getPromotionProgress(member.id);
-      if (progress?.isEligibleForPromotion) {
+      const progress = this.buildPromotionProgress(member);
+      if (progress.isEligibleForPromotion) {
         eligibleForPromotion++;
       }
 
-      progress?.requirements.forEach(req => {
+      progress.requirements.forEach(req => {
         if (req.isCompleted) {
           requirementCounts[req.type]++;
         }
@@ -341,17 +712,71 @@ export class PromotionService {
   }
 
   private static async getProbationMembers(loIdFilter?: string | null): Promise<Member[]> {
+    const rules = await MembershipConfigService.getRules();
     const all = await MembersService.getAllMembers(loIdFilter);
-    return all.filter((m) => (m.membershipType || '') === 'Probation');
+    return this.getProbationMembersFromList(all, rules);
   }
 
-  /** Public API for UI: list of probation members for display (id, name, joinDate). */
-  static async getProbationMembersForDisplay(loIdFilter?: string | null): Promise<{ id: string; name: string; joinDate: string }[]> {
-    const probation = await this.getProbationMembers(loIdFilter);
+  private static getProbationMembersFromList(
+    members: Member[],
+    rules: Awaited<ReturnType<typeof MembershipConfigService.getRules>>
+  ): Member[] {
+    return members.filter(
+      (m) =>
+        this.getComputedMembershipTypeWithRules(m, rules) === 'Probation'
+    );
+  }
+
+  /** Public API for UI: probation members with computed membership type */
+  static async getProbationMembersForDisplay(loIdFilter?: string | null): Promise<
+    {
+      id: string;
+      name: string;
+      fullName?: string;
+      joinDate: string;
+      nationality?: string;
+      dateOfBirth?: string;
+      senatorCertified?: boolean;
+      senatorshipId?: string;
+      role?: string;
+      membershipType?: string;
+      computedMembershipType: string;
+    }[]
+  > {
+    const rules = await MembershipConfigService.getRules();
+    const allMembers = await MembersService.getAllMembers(loIdFilter);
+    const probation = this.getProbationMembersFromList(allMembers, rules);
+    return this.toProbationMembersForDisplay(probation, rules);
+  }
+
+  private static toProbationMembersForDisplay(
+    probation: Member[],
+    rules: Awaited<ReturnType<typeof MembershipConfigService.getRules>>
+  ): {
+    id: string;
+    name: string;
+    fullName?: string;
+    joinDate: string;
+    nationality?: string;
+    dateOfBirth?: string;
+    senatorCertified?: boolean;
+    senatorshipId?: string;
+    role?: string;
+    membershipType?: string;
+    computedMembershipType: string;
+  }[] {
     return probation.map((m) => ({
       id: m.id,
       name: m.name || '',
-      joinDate: (typeof m.joinDate === 'string' ? m.joinDate : m.joinDate ? String(m.joinDate) : '') || ''
+      fullName: m.fullName,
+      joinDate: (typeof m.joinDate === 'string' ? m.joinDate : m.joinDate ? String(m.joinDate) : '') || '',
+      nationality: m.nationality,
+      dateOfBirth: m.dateOfBirth,
+      senatorCertified: m.senatorCertified,
+      senatorshipId: m.senatorshipId,
+      role: m.role,
+      membershipType: m.membershipType,
+      computedMembershipType: this.getComputedMembershipTypeWithRules(m, rules),
     }));
   }
 

@@ -121,54 +121,57 @@ const GuestHeader = ({
   ];
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between">
-        {/* Logo */}
-        <Link
-          to="/"
-          onClick={() => handleNavigation('home')}
-          className="flex items-center hover:opacity-80 transition-opacity"
-        >
-          <img
-            src="/JCI Kuala Lumpur-transparent.png"
-            alt="JCI Kuala Lumpur Logo"
-            className="h-8 md:h-10 w-auto object-contain"
-          />
-        </Link>
-
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex space-x-8">
-          {navItems.map(item => (
-            <Link
-              key={item.page}
-              to={item.page === 'home' ? '/' : `/${item.page}`}
-              onClick={() => handleNavigation(item.page)}
-              className={`no-underline font-medium transition-colors ${activePage === item.page ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Right side: Login + Mobile Menu Toggle */}
-        <div className="flex items-center gap-3">
-          <Button onClick={onLogin} size="sm" className="hidden sm:inline-flex">Log In</Button>
-          <button
-            className="md:hidden w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle navigation menu"
+    <>
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between">
+          {/* Logo */}
+          <Link
+            to="/"
+            onClick={() => handleNavigation('home')}
+            className="flex items-center hover:opacity-80 transition-opacity"
           >
-            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+            <img
+              src="/JCI Kuala Lumpur-transparent.png"
+              alt="JCI Kuala Lumpur Logo"
+              className="h-8 md:h-10 w-auto object-contain"
+            />
+          </Link>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex space-x-8">
+            {navItems.map(item => (
+              <Link
+                key={item.page}
+                to={item.page === 'home' ? '/' : `/${item.page}`}
+                onClick={() => handleNavigation(item.page)}
+                className={`no-underline font-medium transition-colors ${activePage === item.page ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Right side: Login + Mobile Menu Toggle */}
+          <div className="flex items-center gap-3">
+            <Button onClick={onLogin} size="sm" className="hidden sm:inline-flex">Log In</Button>
+            <button
+              className="md:hidden w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Mobile Navigation Panel */}
       <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+        className={`md:hidden fixed top-16 left-0 right-0 z-40 overflow-hidden bg-white shadow-xl border-t border-slate-100 transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
       >
-        <nav className="bg-white border-t border-slate-100 px-4 py-3 space-y-1">
+        <nav className="px-4 py-3 space-y-1">
           {navItems.map(item => (
             <button
               key={item.page}
@@ -194,7 +197,7 @@ const GuestHeader = ({
           </div>
         </nav>
       </div>
-    </header>
+    </>
   );
 };
 
@@ -1473,8 +1476,18 @@ export const JCIKLApp: React.FC = () => {
 
   const { user, member, loading: authLoading, signOut, simulatedRole } = useAuth();
   const { showToast } = useToast();
-  const { isBoard, isAdmin, isDeveloper, isMember, isGuest, isOrganizationSecretary, effectiveRole, hasPermission } = usePermissions();
-  const canViewLeads = isAdmin || isBoard || isOrganizationSecretary;
+  const {
+    isBoard,
+    isAdmin,
+    isDeveloper,
+    isMember,
+    isPlainMember,
+    isGuest,
+    canAccessWorkspaceModules,
+    effectiveRole,
+    hasPermission,
+  } = usePermissions();
+  const canViewLeads = isAdmin || isBoard;
   const [leadList, setLeadList] = useState<{ id: string; name: string; email: string; phone?: string | null; interests?: string[] | null; createdAt: string }[]>([]);
   const [leadListLoading, setLeadListLoading] = useState(false);
 
@@ -1800,12 +1813,12 @@ export const JCIKLApp: React.FC = () => {
       case 'CLUBS': return <HobbyClubsView searchQuery={searchQuery} />;
       case 'SURVEYS': return <SurveysView searchQuery={searchQuery} />;
       case 'BENEFITS': return <MemberBenefitsView searchQuery={searchQuery} />;
-      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
-      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
+      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
+      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
       case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
-      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
+      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
       case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
-      case 'REPORTS': if (member?.role === UserRole.GUEST || isMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
+      case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
       case 'TOYYIB': return <ToyyibView />;
       case 'CANVA': return <CanvaView />;
@@ -1903,16 +1916,16 @@ export const JCIKLApp: React.FC = () => {
                 onClick={() => { handleViewChange('BOUNTIES'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
-              {!(isMember || isGuest) && (
+              {canAccessWorkspaceModules && (
                 <SidebarItem
                   icon={<Users size={18} />}
-                  label={member?.role === UserRole.MEMBER || member?.role === UserRole.GUEST ? 'Profile' : 'Members'}
+                  label="Members"
                   isActive={view === 'MEMBERS'}
                   onClick={() => { handleViewChange('MEMBERS'); setIsSidebarOpen(false); }}
                   isCollapsed={isSidebarCollapsed}
                 />
               )}
-              {!(isMember || isGuest) && (
+              {canAccessWorkspaceModules && (
                 <SidebarItem
                   icon={<Calendar size={18} />}
                   label="Event List"
@@ -1921,7 +1934,7 @@ export const JCIKLApp: React.FC = () => {
                   isCollapsed={isSidebarCollapsed}
                 />
               )}
-              {!(isMember || isGuest) && (
+              {canAccessWorkspaceModules && (
                 <SidebarItem
                   icon={<MessageSquare size={18} />}
                   label="Communication"
@@ -1965,7 +1978,7 @@ export const JCIKLApp: React.FC = () => {
                 <div className="pt-4 mt-4 border-t border-slate-100">
                   <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Workspace</p>
 
-                  {!(isMember || isGuest) && (
+                  {canAccessWorkspaceModules && (
                     <SidebarItem
                       icon={<FolderKanban size={18} />}
                       label="Events Management"
@@ -1981,7 +1994,7 @@ export const JCIKLApp: React.FC = () => {
                     onClick={() => { handleViewChange('SURVEYS'); setIsSidebarOpen(false); }}
                     isCollapsed={isSidebarCollapsed}
                   />
-                  {!(isMember || isGuest) && (
+                  {canAccessWorkspaceModules && (
                     <SidebarItem
                       icon={<FileText size={18} />}
                       label="Payment Requests"
@@ -2008,7 +2021,7 @@ export const JCIKLApp: React.FC = () => {
                       />
                     </>
                   )}
-                  {isAdmin && (
+                  {(isBoard || isAdmin) && (
                     <>
                       <SidebarItem
                         icon={<Megaphone size={18} />}
@@ -2020,7 +2033,7 @@ export const JCIKLApp: React.FC = () => {
 
                     </>
                   )}
-                  {!(isMember || isGuest) && (
+                  {canAccessWorkspaceModules && (
                     <SidebarItem
                       icon={<Award size={18} />}
                       label="Gamification"
@@ -2031,7 +2044,7 @@ export const JCIKLApp: React.FC = () => {
                   )}
                 </div>
               )}
-              {member?.role !== UserRole.GUEST && !isMember && (
+              {member?.role !== UserRole.GUEST && (isAdmin || isDeveloper) && (
                 <div className="pt-4 mt-4 border-t border-slate-100 px-2">
                   <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>System</p>
                   {(isBoard || isAdmin || isDeveloper) && (
@@ -2094,7 +2107,7 @@ export const JCIKLApp: React.FC = () => {
                       />
                     </>
                   )}
-                  {!(isMember || isGuest) && (
+                  {(isBoard || isAdmin) && (
                     <SidebarItem
                       icon={<Workflow size={18} />}
                       label="Automation Studio"
@@ -2362,59 +2375,60 @@ export const JCIKLApp: React.FC = () => {
           </div>
         </Modal>
 
-        {/* Floating Bottom Navigation Bar (Mobile) */}
-        {
-          (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
-            <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
-              <button
-                onClick={() => handleViewChange('DASHBOARD')}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
-              >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <LayoutDashboard size={20} />
-                </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                  else handleViewChange('PAYMENT_REQUESTS');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}
-              >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'PAYMENT_REQUESTS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <FileText size={20} />
-                </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}>Claim</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                  else handleViewChange('DIRECTORY');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
-              >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <Building2 size={20} />
-                </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                  else handleViewChange('BENEFITS');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
-              >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <Gift size={20} />
-                </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
-              </button>
-            </div>
-          )
-        }
       </div >
+
+      {/* Floating Bottom Navigation Bar (Mobile) */}
+      {
+        (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
+          <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
+            <button
+              onClick={() => handleViewChange('DASHBOARD')}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                <LayoutDashboard size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
+            </button>
+            <button
+              onClick={() => {
+                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                else handleViewChange('PAYMENT_REQUESTS');
+              }}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'PAYMENT_REQUESTS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                <FileText size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}>Claim</span>
+            </button>
+            <button
+              onClick={() => {
+                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                else handleViewChange('DIRECTORY');
+              }}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                <Building2 size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
+            </button>
+            <button
+              onClick={() => {
+                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                else handleViewChange('BENEFITS');
+              }}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
+            >
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                <Gift size={20} />
+              </div>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
+            </button>
+          </div>
+        )
+      }
 
       <Modal
         isOpen={isUpgradeModalOpen}
