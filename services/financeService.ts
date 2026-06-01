@@ -18,7 +18,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType } from '../types';
 import { isDevMode } from '../utils/devMode';
-import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS } from './mockData';
+import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS, MOCK_MEMBERS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
 import { removeUndefined } from '../utils/dataUtils';
 import {
@@ -28,6 +28,10 @@ import {
   roleForMembershipType,
 } from './membershipConfigService';
 
+
+
+// In-memory store for transaction splits in Dev Mode
+let devModeSplits: TransactionSplit[] = [];
 
 export class FinanceService {
   // Get all transactions
@@ -110,7 +114,15 @@ export class FinanceService {
   static async createTransaction(transactionData: Omit<Transaction, 'id'>): Promise<string> {
     if (isDevMode()) {
       console.log('[Dev Mode] Mocking transaction creation');
-      return `mock-tx-${Date.now()}`;
+      const id = `mock-tx-${Date.now()}`;
+      const newTx: Transaction = {
+        id,
+        ...transactionData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      MOCK_TRANSACTIONS.push(newTx);
+      return id;
     }
 
     try {
@@ -208,8 +220,81 @@ export class FinanceService {
     createdBy: string
   ): Promise<string[]> {
     if (isDevMode()) {
-      console.log(`[Dev Mode] Would create/update ${splits.length} splits for transaction ${parentTransactionId}`);
-      return splits.map((_, i) => `mock-split-${i}`);
+      console.log(`[Dev Mode] Creating/updating ${splits.length} splits for transaction ${parentTransactionId}`);
+      // Find parent transaction
+      const parentTransaction = MOCK_TRANSACTIONS.find(t => t.id === parentTransactionId);
+      if (!parentTransaction) {
+        throw new Error('Parent transaction not found');
+      }
+
+      // Validate split amounts sum to parent amount
+      const totalSplitAmount = splits.reduce((sum, split) => sum + split.amount, 0);
+      if (Math.abs(totalSplitAmount - parentTransaction.amount) > 0.01) {
+        throw new Error(
+          `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentTransaction.amount})`
+        );
+      }
+
+      // Delete existing splits for this transaction that were removed
+      const newSplitIds = splits.filter(s => s.id).map(s => s.id);
+      devModeSplits = devModeSplits.filter(s => s.parentTransactionId !== parentTransactionId || newSplitIds.includes(s.id));
+
+      const splitIds: string[] = [];
+      splits.forEach((split, index) => {
+        if (split.id && devModeSplits.some(s => s.id === split.id)) {
+          // Update
+          const idx = devModeSplits.findIndex(s => s.id === split.id);
+          devModeSplits[idx] = {
+            ...devModeSplits[idx],
+            category: split.category,
+            projectId: split.projectId,
+            memberId: split.memberId,
+            purpose: split.purpose,
+            paymentRequestId: split.paymentRequestId,
+            amount: split.amount,
+            description: split.description,
+            year: split.year,
+          };
+          splitIds.push(split.id);
+        } else {
+          // Create
+          const newId = split.id || `mock-split-${parentTransactionId}-${index}-${Date.now()}`;
+          const newSplit: TransactionSplit = {
+            id: newId,
+            parentTransactionId,
+            category: split.category,
+            type: parentTransaction.type,
+            projectId: split.projectId || '',
+            memberId: split.memberId || '',
+            purpose: split.purpose || '',
+            paymentRequestId: split.paymentRequestId || '',
+            amount: split.amount,
+            description: split.description,
+            createdAt: new Date().toISOString(),
+            createdBy,
+            year: split.year,
+          };
+          devModeSplits.push(newSplit);
+          splitIds.push(newId);
+        }
+      });
+
+      // Update parent transaction
+      const parentIdx = MOCK_TRANSACTIONS.findIndex(t => t.id === parentTransactionId);
+      if (parentIdx !== -1) {
+        MOCK_TRANSACTIONS[parentIdx] = {
+          ...MOCK_TRANSACTIONS[parentIdx],
+          isSplit: true,
+          splitIds,
+          originalCategory: MOCK_TRANSACTIONS[parentIdx].category,
+          category: '' as any,
+          projectId: '',
+          purpose: '',
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      return splitIds;
     }
 
     try {
@@ -332,7 +417,7 @@ export class FinanceService {
   // Get transaction splits
   static async getTransactionSplits(transactionId: string): Promise<TransactionSplit[]> {
     if (isDevMode()) {
-      return [];
+      return devModeSplits.filter(s => s.parentTransactionId === transactionId);
     }
 
     try {
@@ -355,7 +440,7 @@ export class FinanceService {
   // Get ALL transaction splits in bulk
   static async getAllTransactionSplits(): Promise<TransactionSplit[]> {
     if (isDevMode()) {
-      return [];
+      return devModeSplits;
     }
     try {
       const snapshot = await getDocs(collection(db, COLLECTIONS.TRANSACTION_SPLITS));
@@ -377,6 +462,13 @@ export class FinanceService {
   ): Promise<void> {
     if (isDevMode()) {
       console.log(`[Dev Mode] Mocking update for split ${splitId}`);
+      const idx = devModeSplits.findIndex(s => s.id === splitId);
+      if (idx !== -1) {
+        devModeSplits[idx] = {
+          ...devModeSplits[idx],
+          ...updates,
+        } as TransactionSplit;
+      }
       return;
     }
 
@@ -416,6 +508,27 @@ export class FinanceService {
   static async deleteTransactionSplit(splitId: string): Promise<void> {
     if (isDevMode()) {
       console.log(`[Dev Mode] Mocking deletion for split ${splitId}`);
+      const splitIdx = devModeSplits.findIndex(s => s.id === splitId);
+      if (splitIdx === -1) return;
+      const split = devModeSplits[splitIdx];
+      devModeSplits.splice(splitIdx, 1);
+
+      // Update parent transaction splitIds array
+      const remainingSplits = devModeSplits.filter(s => s.parentTransactionId === split.parentTransactionId);
+      const remainingIds = remainingSplits.map(s => s.id);
+      
+      const parentIdx = MOCK_TRANSACTIONS.findIndex(t => t.id === split.parentTransactionId);
+      if (parentIdx !== -1) {
+        const parentTx = MOCK_TRANSACTIONS[parentIdx];
+        const originalCategory = (parentTx as any).originalCategory || parentTx.category || '';
+        MOCK_TRANSACTIONS[parentIdx] = {
+          ...parentTx,
+          splitIds: remainingIds,
+          isSplit: remainingIds.length > 0,
+          category: remainingIds.length === 0 ? originalCategory : '',
+          updatedAt: new Date().toISOString(),
+        };
+      }
       return;
     }
 
@@ -499,6 +612,14 @@ export class FinanceService {
   static async updateTransaction(transactionId: string, updates: Partial<Transaction>): Promise<void> {
     if (isDevMode()) {
       console.log(`[Dev Mode] Mocking update for transaction ${transactionId}`);
+      const idx = MOCK_TRANSACTIONS.findIndex(t => t.id === transactionId);
+      if (idx !== -1) {
+        MOCK_TRANSACTIONS[idx] = {
+          ...MOCK_TRANSACTIONS[idx],
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        } as Transaction;
+      }
       return;
     }
 
@@ -665,7 +786,76 @@ export class FinanceService {
   ): Promise<{ updated: number; errors: string[] }> {
     if (isDevMode()) {
       console.log(`[Dev Mode] Batch updating category for ${transactionIds.length} transactions`);
-      return { updated: transactionIds.length, errors: [] };
+      let updatedCount = 0;
+      for (const txId of transactionIds) {
+        const idx = MOCK_TRANSACTIONS.findIndex(t => t.id === txId);
+        if (idx !== -1) {
+          const currentTransaction = MOCK_TRANSACTIONS[idx];
+          
+          // Determine the final category
+          const finalCategory = categoryUpdates.category !== undefined 
+            ? categoryUpdates.category 
+            : currentTransaction?.category;
+
+          const updateData: any = {
+            ...removeUndefined(categoryUpdates),
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Apply category-specific cleanup rules
+          if (finalCategory === 'Membership') {
+            const yearVal = categoryUpdates.year || currentTransaction?.year || 
+              (currentTransaction?.date ? new Date(currentTransaction.date).getFullYear() : new Date().getFullYear());
+            
+            if (!categoryUpdates.projectId) {
+              updateData.projectId = `${yearVal} membership`;
+            }
+            
+            const memberIdVal = categoryUpdates.memberId !== undefined ? categoryUpdates.memberId : currentTransaction?.memberId;
+            if (memberIdVal) {
+              const rules = await MembershipConfigService.getRules();
+              const memberObj = MOCK_MEMBERS.find(m => m.id === memberIdVal) || null;
+              const membershipType = memberObj?.membershipType || 'Full';
+              const resolvedPurpose = resolveMembershipPurpose(
+                currentTransaction?.amount || 0,
+                yearVal,
+                rules
+              );
+              if (!categoryUpdates.purpose) {
+                updateData.purpose = resolvedPurpose;
+              }
+            }
+          } else if (finalCategory === 'Administrative') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            // Only clear projectId/purpose if user didn't explicitly provide them
+            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
+              updateData.purpose = null;
+            }
+          } else if (finalCategory === 'Projects & Activities') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
+              updateData.purpose = null;
+            }
+          }
+
+          MOCK_TRANSACTIONS[idx] = {
+            ...currentTransaction,
+            ...updateData,
+          } as Transaction;
+          updatedCount++;
+        }
+      }
+      return { updated: updatedCount, errors: [] };
     }
 
     const results = await Promise.all(
@@ -676,13 +866,60 @@ export class FinanceService {
           const currentTransaction = currentDoc.exists()
             ? ({ id: currentDoc.id, ...currentDoc.data() } as Transaction)
             : null;
+
+          const finalCategory = categoryUpdates.category !== undefined 
+            ? categoryUpdates.category 
+            : currentTransaction?.category;
+
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
             updatedAt: Timestamp.now(),
           };
-          if (categoryUpdates.category === 'Membership' && categoryUpdates.year && !categoryUpdates.projectId) {
-            updateData.projectId = `${categoryUpdates.year} membership`;
+
+          // Apply category-specific cleanup rules
+          if (finalCategory === 'Membership') {
+            const yearVal = categoryUpdates.year || currentTransaction?.year || 
+              (currentTransaction?.date ? new Date(currentTransaction.date).getFullYear() : new Date().getFullYear());
+            
+            if (!categoryUpdates.projectId) {
+              updateData.projectId = `${yearVal} membership`;
+            }
+            
+            const memberIdVal = categoryUpdates.memberId !== undefined ? categoryUpdates.memberId : currentTransaction?.memberId;
+            if (memberIdVal) {
+              const rules = await MembershipConfigService.getRules();
+              const resolvedPurpose = resolveMembershipPurpose(
+                currentTransaction?.amount || 0,
+                yearVal,
+                rules
+              );
+              // Only auto-set purpose if user didn't explicitly provide one
+              if (!('purpose' in categoryUpdates)) {
+                updateData.purpose = resolvedPurpose;
+              }
+            }
+          } else if (finalCategory === 'Administrative') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
+              updateData.purpose = null;
+            }
+          } else if (finalCategory === 'Projects & Activities') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
+              updateData.purpose = null;
+            }
           }
+
           await updateDoc(transactionRef, updateData);
 
           const nextTransaction = {
@@ -736,7 +973,57 @@ export class FinanceService {
   ): Promise<{ updated: number; errors: string[] }> {
     if (isDevMode()) {
       console.log(`[Dev Mode] Batch updating category for ${splitIds.length} splits`);
-      return { updated: splitIds.length, errors: [] };
+      let updatedCount = 0;
+      for (const splitId of splitIds) {
+        const idx = devModeSplits.findIndex(s => s.id === splitId);
+        if (idx !== -1) {
+          const currentSplit = devModeSplits[idx];
+          
+          const finalCategory = categoryUpdates.category !== undefined 
+            ? categoryUpdates.category 
+            : currentSplit?.category;
+
+          const updateData: any = {
+            ...removeUndefined(categoryUpdates),
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Apply category-specific cleanup rules
+          if (finalCategory === 'Membership') {
+            const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
+            if (!categoryUpdates.projectId) {
+              updateData.projectId = `${yearVal} membership`;
+            }
+          } else if (finalCategory === 'Administrative') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
+              updateData.purpose = null;
+            }
+          } else if (finalCategory === 'Projects & Activities') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
+              updateData.purpose = null;
+            }
+          }
+
+          devModeSplits[idx] = {
+            ...currentSplit,
+            ...updateData,
+          } as TransactionSplit;
+          updatedCount++;
+        }
+      }
+      return { updated: updatedCount, errors: [] };
     }
 
     const results = await Promise.all(
@@ -747,10 +1034,44 @@ export class FinanceService {
           const currentSplit = currentDoc.exists()
             ? ({ id: currentDoc.id, ...currentDoc.data() } as TransactionSplit)
             : null;
+
+          const finalCategory = categoryUpdates.category !== undefined 
+            ? categoryUpdates.category 
+            : currentSplit?.category;
+
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
             updatedAt: Timestamp.now(),
           };
+
+          // Apply category-specific cleanup rules
+          if (finalCategory === 'Membership') {
+            const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
+            if (!categoryUpdates.projectId) {
+              updateData.projectId = `${yearVal} membership`;
+            }
+          } else if (finalCategory === 'Administrative') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
+              updateData.purpose = null;
+            }
+          } else if (finalCategory === 'Projects & Activities') {
+            if (categoryUpdates.memberId === undefined) {
+              updateData.memberId = null;
+            }
+            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
+              updateData.projectId = null;
+            }
+            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
+              updateData.purpose = null;
+            }
+          }
+
           await updateDoc(splitRef, updateData);
 
           const nextSplit = { ...(currentSplit || {}), ...categoryUpdates } as TransactionSplit;

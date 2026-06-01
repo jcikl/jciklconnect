@@ -708,6 +708,12 @@ service cloud.firestore {
       allow write: if isBoard() || isAuthenticated(); // Allow members to update (e.g. birthday processing)
     }
 
+    // Publications (E-Newsletters): public read for guest page; Board/Admin can manage
+    match /publications/{docId} {
+      allow read: if true;  // Public — shows on Guest E-Newsletters page
+      allow create, update, delete: if isBoard();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

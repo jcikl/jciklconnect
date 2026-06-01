@@ -923,6 +923,9 @@ export interface Transaction {
   inventoryLinkId?: string;
   inventoryVariant?: string;
   inventoryQuantity?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  originalCategory?: string;
 }
 
 export interface BankAccount {

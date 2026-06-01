@@ -70,6 +70,7 @@ export const COLLECTIONS = {
   CONTRACTS: 'contracts',
   OPPORTUNITY_DROPS: 'opportunityDrops',
   POINT_ESCROW: 'pointEscrow', // For holding funds during bounty/contract
+  PUBLICATIONS: 'publications',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

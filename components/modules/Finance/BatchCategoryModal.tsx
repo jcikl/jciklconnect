@@ -156,12 +156,8 @@ export function BatchCategoryModal({
             const resolvedPurpose = resolveMembershipPurpose(duesAmount, y, rules);
             setPurpose(resolvedPurpose);
             setEnablePurpose(true);
-        } else if (category !== 'Membership' && enablePurpose) {
-            // Clear purpose if category changes from Membership and purpose was auto-enabled
-            setPurpose('');
-            setEnablePurpose(false);
         }
-    }, [category, memberId, year, members, currentYear, enablePurpose, membershipRules]);
+    }, [category, memberId, year, members, currentYear, membershipRules]);
 
     // Clear projectId if it becomes incompatible with the current year filter
     useEffect(() => {
@@ -399,20 +395,30 @@ export function BatchCategoryModal({
                                 options={adminPurposes}
                                 value={purpose}
                                 onChange={(value) => setPurpose(value)}
+                                disabled={!enablePurpose}
                                 placeholder="Select or type purpose..."
                             />
                         ) : category === 'Membership' ? (
-                            <Forms.Input
-                                value={purpose}
-                                readOnly
-                                disabled
-                                className="bg-slate-50"
-                            />
+                            <div>
+                                <Forms.Input
+                                    value={purpose}
+                                    onChange={(e) => setPurpose(e.target.value)}
+                                    disabled={!enablePurpose}
+                                    placeholder="Auto-generated from dues rules..."
+                                    className={!enablePurpose ? 'bg-slate-50' : ''}
+                                />
+                                {enablePurpose && (
+                                    <p className="text-[10px] text-slate-400 mt-1 italic">
+                                        * Auto-filled from dues rules. You can override manually.
+                                    </p>
+                                )}
+                            </div>
                         ) : (
                             <Combobox
                                 options={projectPurposesByProject?.[projectId] || []}
                                 value={purpose}
                                 onChange={(value) => setPurpose(value)}
+                                disabled={!enablePurpose}
                                 placeholder="Select or type purpose..."
                             />
                         )}

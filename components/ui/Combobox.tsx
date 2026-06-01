@@ -51,8 +51,8 @@ export const Combobox: React.FC<ComboboxProps> = ({
         if (inputRef.current && open) {
             const rect = inputRef.current.getBoundingClientRect();
             setDropdownPosition({
-                top: rect.bottom + window.scrollY,
-                left: rect.left + window.scrollX,
+                top: rect.bottom,
+                left: rect.left,
                 width: rect.width
             });
         }

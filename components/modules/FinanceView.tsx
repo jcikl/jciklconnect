@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings } from 'lucide-react';
+import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -188,6 +188,37 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const { user } = useAuth();
 
   const UNASSIGNED_PROJECT_ID = 'UNASSIGNED_PROJECT'; // Consistent internal ID for uncategorized projects
+  const getTransactionAccountLabel = (
+    item: Partial<Transaction | TransactionSplit>,
+    parent?: Partial<Transaction>
+  ) => {
+    const category = item.category || parent?.category || '';
+    const projectId = item.projectId || parent?.projectId || '';
+    const memberId = item.memberId || parent?.memberId || '';
+    const bankAccountId = ('bankAccountId' in item ? item.bankAccountId : undefined) || parent?.bankAccountId || '';
+    const bankAccountName = accounts.find(a => a.id === bankAccountId)?.name;
+
+    if (category === 'Projects & Activities') {
+      if (projectId === UNASSIGNED_PROJECT_ID) return 'Unassigned';
+
+      return projectAccounts.find(a => a.projectId === projectId || a.id === projectId)?.projectName
+        || projects.find(p => p.id === projectId)?.name
+        || projects.find(p => p.id === projectId)?.title
+        || projectId
+        || bankAccountName
+        || '—';
+    }
+
+    if (category === 'Administrative') {
+      return projectId || bankAccountName || '—';
+    }
+
+    if (category === 'Membership') {
+      return members.find(m => m.id === memberId)?.name || bankAccountName || '—';
+    }
+
+    return bankAccountName || projectId || memberId || '—';
+  };
 
   const projectTransactions = useMemo(() => {
     // Filter for Projects & Activities category
@@ -386,7 +417,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             tx.type.toLowerCase(),
             (tx.purpose || '').toLowerCase(),
             (tx.projectId || '').toLowerCase(),
-            (tx.memberId || '').toLowerCase()
+            (tx.memberId || '').toLowerCase(),
+            (accounts.find(a => a.id === tx.bankAccountId)?.name || '').toLowerCase(),
+            (projects.find(p => p.id === tx.projectId)?.name || '').toLowerCase()
           ];
 
           const parentMatch = parentFields.some(field => field.includes(term));
@@ -397,7 +430,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             s.category.toLowerCase().includes(term) ||
             s.description.toLowerCase().includes(term) ||
             s.purpose?.toLowerCase().includes(term) ||
-            String(s.amount).includes(term)
+            String(s.amount).includes(term) ||
+            (projects.find(p => p.id === s.projectId)?.name || '').toLowerCase().includes(term)
           );
 
           return splitMatch;
@@ -463,7 +497,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             tx.type.toLowerCase(),
             (tx.purpose || '').toLowerCase(),
             (tx.projectId || '').toLowerCase(),
-            (tx.memberId || '').toLowerCase()
+            (tx.memberId || '').toLowerCase(),
+            (accounts.find(a => a.id === tx.bankAccountId)?.name || '').toLowerCase(),
+            (projects.find(p => p.id === tx.projectId)?.name || '').toLowerCase()
           ];
           if (parentFields.some(field => field.includes(term))) return true;
           return transactionSplits[tx.id]?.some(s =>
@@ -472,7 +508,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             s.purpose?.toLowerCase().includes(term) ||
             String(s.amount).includes(term) ||
             (s.projectId || '').toLowerCase().includes(term) ||
-            (s.memberId || '').toLowerCase().includes(term)
+            (s.memberId || '').toLowerCase().includes(term) ||
+            (projects.find(p => p.id === s.projectId)?.name || '').toLowerCase().includes(term)
           );
         });
       }
@@ -766,6 +803,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       setInventoryItems(inventory);
       setProjects(projList);
       setAdministrativeProjectIds(getAdministrativeProjectIds());
+      try {
+        const projectAccountList = await projectFinancialService.getAllProjectAccounts();
+        setProjectAccounts(projectAccountList);
+      } catch (projectAccountError) {
+        console.error('Failed to load project account labels', projectAccountError);
+      }
 
       const mappedMembers = memberList.map(m => ({
         id: m.id,
@@ -1464,7 +1507,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
 
       {moduleTab === 'Administrative' && hasPermission('canViewFinance') && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
           {(() => {
             const activeYear = adminAccountYearFilter;
             const adminTransactions = transactions.filter(t => isTransactionInCategory(t, 'Administrative'));
@@ -1494,7 +1537,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
             return (
               <>
-                <div className="lg:col-span-1 space-y-6">
+                <div className="lg:col-span-2 space-y-6">
                   <Card title={`Administrative Summary ${activeYear === 0 ? '(All Time)' : `(${activeYear})`}`}>
                     <div className="mb-4">
                       <Select
@@ -1563,7 +1606,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     </div>
                   </Card>
                 </div>
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-5">
                   <Card
                     title={adminProjectIdFilter === UNASSIGNED_PROJECT_ID ? 'Admin Transactions · Unassigned' : (adminProjectIdFilter ? `Admin Transactions · ${adminProjectIdFilter}` : 'Admin Transactions')}
                     action={adminProjectIdFilter && (
@@ -1585,16 +1628,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <LoadingState loading={loading} error={error} empty={filteredAdminTx.length === 0} emptyMessage={adminProjectIdFilter ? `No transactions for this account.` : "No admin transactions found. Use 'New Transaction' above to add one."}>
                           {/* Desktop View */}
                           <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full text-left text-sm">
+                            <table className="w-full table-fixed text-left text-sm">
                               <thead className="bg-slate-50 text-slate-500">
                                 <tr>
-                                  <th className="py-3 px-4 font-semibold">Date</th>
+                                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Date</th>
                                   <th className="py-3 px-4 font-semibold">Description</th>
-                                  <th className="py-3 px-4 font-semibold">Account</th>
-                                  <th className="py-3 px-4 font-semibold">Ref No.</th>
-                                  <th className="py-3 px-4 font-semibold">Type</th>
-                                  <th className="py-3 px-4 font-semibold">Status</th>
-                                  <th className="py-3 px-4 font-semibold text-right">Amount</th>
+                                  <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">Amount</th>
                                   <th className="py-3 px-4 font-semibold text-center">Actions</th>
                                 </tr>
                               </thead>
@@ -1603,25 +1642,33 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                   .map(tx => (
                                     <tr key={tx.id} className="hover:bg-slate-50">
-                                      <td className="py-3 px-4 text-slate-500">{formatDate(tx.date)}</td>
-                                      <td className="py-3 px-4 font-medium text-slate-900">{tx.description}</td>
-                                      <td className="py-3 px-4 text-slate-600">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}</td>
-                                      <td className="py-3 px-4 text-slate-600">{tx.referenceNumber ?? '—'}</td>
-                                      <td className="py-3 px-4">
-                                        <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'}>{tx.type}</Badge>
-                                      </td>
-                                      <td className="py-3 px-4">
-                                        {(() => {
-                                          const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                          const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                          if (tx.isSplit) {
-                                            return <Badge variant="info">Split</Badge>;
-                                          } else if (hasProjectId && hasPurpose) {
-                                            return <Badge variant="success">Categorized</Badge>;
-                                          } else {
-                                            return <Badge variant="warning">Uncategorized</Badge>;
-                                          }
-                                        })()}
+                                      <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                                      <td className="py-3 px-4 max-w-0 overflow-hidden">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                          {(() => {
+                                            const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                            const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                            if (tx.isSplit) {
+                                              return <Badge variant="info" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Split</Badge>;
+                                            } else if (hasProjectId && hasPurpose) {
+                                              return <Badge variant="success" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Categorized</Badge>;
+                                            } else {
+                                              return <Badge variant="warning" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Uncategorized</Badge>;
+                                            }
+                                          })()}
+                                          <span className="font-medium text-slate-900 truncate min-w-0">{tx.description}</span>
+                                          {tx.referenceNumber && (
+                                            <span className="text-[11px] text-slate-400 font-mono shrink-0">({tx.referenceNumber})</span>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                          <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5 h-4.5 flex items-center">
+                                            {tx.type}
+                                          </Badge>
+                                          <span className="text-xs text-slate-500 font-medium">
+                                            {tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}
+                                          </span>
+                                        </div>
                                       </td>
                                       <td className={`py-3 px-4 text-right font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-900'}`}>
                                         {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
@@ -1659,16 +1706,18 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                       {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
                                     </div>
                                   </div>
-                                  
+
                                   <div className="grid grid-cols-2 gap-2 mb-3">
                                     <div>
                                       <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Account</span>
                                       <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}</p>
                                     </div>
-                                    <div>
-                                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
-                                      <p className="text-xs text-slate-700 truncate">{tx.referenceNumber ?? '—'}</p>
-                                    </div>
+                                    {tx.referenceNumber && (
+                                      <div>
+                                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
+                                        <p className="text-xs text-slate-700 font-mono truncate">{tx.referenceNumber}</p>
+                                      </div>
+                                    )}
                                   </div>
 
                                   <div className="flex items-center justify-between pt-3 border-t border-slate-50">
@@ -1802,8 +1851,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
 
       {moduleTab === 'Project Account' && (
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 space-y-6">
+        <div className="grid lg:grid-cols-7 gap-6">
+          <div className="lg:col-span-2 space-y-6">
             <Card title="Project Statistics">
               <div className="mb-4">
                 <Select
@@ -1922,7 +1971,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               </LoadingState>
             </Card>
           </div>
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-5">
             <Card
               title={selectedProjectFilter === UNASSIGNED_PROJECT_ID ? 'Project Transactions · Unassigned' : (selectedProjectFilter ? `Project Transactions · ${projectAccounts.find(p => p.projectId === selectedProjectFilter)?.projectName || selectedProjectFilter}` : 'Project Transactions')}
               action={selectedProjectFilter && (
@@ -1935,16 +1984,18 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   <LoadingState loading={loading} error={error} empty={filteredProjectTx.length === 0} emptyMessage={selectedProjectFilter ? `No transactions for this project.` : "No project transactions found. Use 'New Transaction' above to add one."}>
                     {/* Desktop View */}
                     <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full text-left text-sm">
+                      <table className="w-full table-fixed text-left text-sm">
+                        <colgroup>
+                          <col className="w-32" />
+                          <col />
+                          <col className="w-36" />
+                          <col className="w-24" />
+                        </colgroup>
                         <thead className="bg-slate-50 text-slate-500">
                           <tr>
-                            <th className="py-3 px-4 font-semibold">Date</th>
+                            <th className="py-3 px-4 font-semibold whitespace-nowrap">Date</th>
                             <th className="py-3 px-4 font-semibold">Description</th>
-                            <th className="py-3 px-4 font-semibold">Project</th>
-                            <th className="py-3 px-4 font-semibold">Ref No.</th>
-                            <th className="py-3 px-4 font-semibold">Type</th>
-                            <th className="py-3 px-4 font-semibold">Status</th>
-                            <th className="py-3 px-4 font-semibold text-right">Amount</th>
+                            <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">Amount</th>
                             <th className="py-3 px-4 font-semibold text-center">Actions</th>
                           </tr>
                         </thead>
@@ -1953,25 +2004,33 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                             .map(tx => (
                               <tr key={tx.id} className="hover:bg-slate-50">
-                                <td className="py-3 px-4 text-slate-500">{formatDate(tx.date)}</td>
-                                <td className="py-3 px-4 font-medium text-slate-900">{tx.description}</td>
-                                <td className="py-3 px-4 text-slate-600">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}</td>
-                                <td className="py-3 px-4 text-slate-600">{tx.referenceNumber ?? '—'}</td>
-                                <td className="py-3 px-4">
-                                  <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'}>{tx.type}</Badge>
-                                </td>
-                                <td className="py-3 px-4">
-                                  {(() => {
-                                    const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                    const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                    if (tx.isSplit) {
-                                      return <Badge variant="info">Split</Badge>;
-                                    } else if (hasProjectId && hasPurpose) {
-                                      return <Badge variant="success">Categorized</Badge>;
-                                    } else {
-                                      return <Badge variant="warning">Uncategorized</Badge>;
-                                    }
-                                  })()}
+                                <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                                <td className="py-3 px-4 max-w-0 overflow-hidden">
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    {(() => {
+                                      const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                      const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                      if (tx.isSplit) {
+                                        return <Badge variant="info" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Split</Badge>;
+                                      } else if (hasProjectId && hasPurpose) {
+                                        return <Badge variant="success" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Categorized</Badge>;
+                                      } else {
+                                        return <Badge variant="warning" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Uncategorized</Badge>;
+                                      }
+                                    })()}
+                                    <span className="font-medium text-slate-900 truncate min-w-0">{tx.description}</span>
+                                    {tx.referenceNumber && (
+                                      <span className="text-[11px] text-slate-400 font-mono shrink-0">({tx.referenceNumber})</span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5 h-4.5 flex items-center">
+                                      {tx.type}
+                                    </Badge>
+                                    <span className="text-xs text-slate-500 font-medium">
+                                      {tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className={`py-3 px-4 text-right font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-900'}`}>
                                   {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
@@ -2009,16 +2068,18 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                 {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
                               </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-2 mb-3">
                               <div>
                                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Project</span>
                                 <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}</p>
                               </div>
-                              <div>
-                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
-                                <p className="text-xs text-slate-700 truncate">{tx.referenceNumber ?? '—'}</p>
-                              </div>
+                              {tx.referenceNumber && (
+                                <div>
+                                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
+                                  <p className="text-xs text-slate-700 font-mono truncate">{tx.referenceNumber}</p>
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex items-center justify-between pt-3 border-t border-slate-50">
@@ -2057,28 +2118,40 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Transactions' && (
         <div className="space-y-4">
           <Card>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="w-full md:w-48">
-                <Select
-                  value={bankAccountFilter}
-                  onChange={(e) => setBankAccountFilter(e.target.value)}
-                  options={[
-                    { label: 'All Accounts', value: 'All' },
-                    ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
-                  ]}
-                />
+            <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
+              <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                <div className="w-full md:w-48">
+                  <Select
+                    value={bankAccountFilter}
+                    onChange={(e) => setBankAccountFilter(e.target.value)}
+                    options={[
+                      { label: 'All Accounts', value: 'All' },
+                      ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
+                    ]}
+                  />
+                </div>
+                <div className="w-full md:w-48">
+                  <Select
+                    value={txCategoryFilter}
+                    onChange={(e) => setTxCategoryFilter(e.target.value)}
+                    options={[
+                      { label: 'All Categories', value: 'All' },
+                      { label: 'Projects & Activities', value: 'Projects & Activities' },
+                      { label: 'Membership', value: 'Membership' },
+                      { label: 'Administrative', value: 'Administrative' },
+                      { label: 'Uncategorized', value: 'Uncategorized' }
+                    ]}
+                  />
+                </div>
               </div>
-              <div className="w-full md:w-48">
-                <Select
-                  value={txCategoryFilter}
-                  onChange={(e) => setTxCategoryFilter(e.target.value)}
-                  options={[
-                    { label: 'All Categories', value: 'All' },
-                    { label: 'Projects & Activities', value: 'Projects & Activities' },
-                    { label: 'Membership', value: 'Membership' },
-                    { label: 'Administrative', value: 'Administrative' },
-                    { label: 'Uncategorized', value: 'Uncategorized' }
-                  ]}
+              <div className="w-full md:w-72">
+                <Input
+                  type="text"
+                  placeholder="Search Date, Desc, Ref No, Account, Purpose..."
+                  value={txSearchTerm}
+                  onChange={(e) => setTxSearchTerm(e.target.value)}
+                  icon={<Search size={18} />}
+                  className="w-full"
                 />
               </div>
             </div>
@@ -2086,10 +2159,18 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             <LoadingState loading={loading} error={error} empty={transactions.length === 0} emptyMessage="No transactions found">
               {/* Desktop View */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full table-fixed text-left text-sm">
+                  <colgroup>
+                    <col style={{ width: '2.5rem' }} />
+                    <col style={{ width: '7.5rem' }} />
+                    <col style={{ width: '35%' }} />
+                    <col style={{ width: '9rem' }} />
+                    <col style={{ width: '10rem' }} />
+                    <col style={{ width: '9rem' }} />
+                  </colgroup>
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
-                      <th className="py-3 px-2 w-8">
+                      <th className="py-3 px-2 font-semibold">
                         <input
                           type="checkbox"
                           checked={(() => {
@@ -2104,14 +2185,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                           className="accent-blue-600 cursor-pointer"
                         />
                       </th>
-                      <th className="py-3 px-4 font-semibold">Date</th>
-                      <th className="py-3 px-4 font-semibold">Description</th>
-                      <th className="py-3 px-4 font-semibold">Ref No.</th>
-                      <th className="py-3 px-4 font-semibold">Category</th>
-                      <th className="py-3 px-4 font-semibold">Status</th>
-                      <th className="py-3 px-4 font-semibold text-right">Amount</th>
-                      <th className="py-3 px-4 font-semibold text-right">Running Balance</th>
-                      <th className="py-3 px-4 font-semibold text-center">Actions</th>
+                      <th className="py-3 px-3 font-semibold whitespace-nowrap">Date</th>
+                      <th className="py-3 px-3 font-semibold">Description</th>
+                      <th className="py-3 px-3 font-semibold text-right whitespace-nowrap">Amount</th>
+                      <th className="py-3 px-3 font-semibold text-right whitespace-nowrap">Bal.</th>
+                      <th className="py-3 px-3 font-semibold text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2147,30 +2225,43 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                               className="accent-blue-600 cursor-pointer"
                             />
                           </td>
-                          <td className="py-4 px-4 text-slate-500">{formatDate(tx.date)}</td>
-                          <td className="py-4 px-4">
-                            <div className="font-medium text-slate-900">{tx.description}</div>
-                            <div className="text-xs text-slate-400">{tx.type}</div>
-                            {tx.isSplit && (
-                              <div className="text-xs text-blue-600 mt-1">⤷ Split into {transactionSplits[tx.id]?.length || 0} parts</div>
-                            )}
-                          </td>
-                          <td className="py-4 px-4 text-slate-600">{tx.referenceNumber ?? '—'}</td>
-                          <td className="py-4 px-4">
-                            <Badge variant={tx.isSplit ? "info" : "neutral"}>{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
-                          </td>
-                          <td className="py-4 px-4">
-                            {(() => {
-                              const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                              const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                              if (tx.isSplit) {
-                                return <Badge variant="info">Split</Badge>;
-                              } else if (hasProjectId && hasPurpose) {
-                                return <Badge variant="success">Categorized</Badge>;
-                              } else {
-                                return <Badge variant="warning">Uncategorized</Badge>;
-                              }
-                            })()}
+                          <td className="py-4 px-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                          <td className="py-4 px-4 max-w-0 overflow-hidden">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              {(() => {
+                                const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                if (tx.isSplit) {
+                                  return <Badge variant="info" className="text-[10px] py-0 px-1.5 shrink-0">Split</Badge>;
+                                } else if (hasProjectId && hasPurpose) {
+                                  return <Badge variant="success" className="text-[10px] py-0 px-1.5 shrink-0">Categorized</Badge>;
+                                } else {
+                                  return <Badge variant="warning" className="text-[10px] py-0 px-1.5 shrink-0">Uncategorized</Badge>;
+                                }
+                              })()}
+                              <span className="font-medium text-slate-900 truncate min-w-0">{tx.description}</span>
+                              {tx.referenceNumber && (
+                                <span className="text-[11px] text-slate-400 font-mono shrink-0">({tx.referenceNumber})</span>
+                              )}
+                            </div>
+                            <div
+                              className="mt-1 overflow-hidden text-xs text-slate-500 whitespace-nowrap text-ellipsis"
+                              title={`${tx.isSplit ? 'Split' : (tx.category || '—')} | ${getTransactionAccountLabel(tx)} | ${tx.purpose || '—'}`}
+                            >
+                              <span className="font-medium text-slate-600">
+                                {tx.isSplit ? 'Split' : (tx.category || '—')}
+                              </span>
+                              <span className="mx-1 text-slate-300">|</span>
+                              <span>{getTransactionAccountLabel(tx)}</span>
+                              <span className="mx-1 text-slate-300">|</span>
+                              <span>{tx.purpose || '—'}</span>
+                              {tx.isSplit && (
+                                <>
+                                  <span className="mx-1 text-slate-300">|</span>
+                                  <span className="text-blue-600">Split into {transactionSplits[tx.id]?.length || 0} parts</span>
+                                </>
+                              )}
+                            </div>
                           </td>
                           <td className={`py-4 px-4 text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
                             {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
@@ -2257,7 +2348,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         {/* Split Transaction Rows */}
                         {tx.isSplit && transactionSplits[tx.id] && transactionSplits[tx.id].map((split, idx) => (
                           <tr key={`${tx.id}-split-${idx}`} className={`bg-blue-50/30 ${selectedSplitIds.has(split.id) ? 'bg-blue-100/50' : ''}`}>
-                            <td className="py-2 px-2 w-8">
+                            <td className="py-2 px-2">
                               <input
                                 type="checkbox"
                                 checked={selectedSplitIds.has(split.id)}
@@ -2271,26 +2362,21 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                               />
                             </td>
                             <td className="py-2 px-4 pl-12"></td>
-                            <td className="py-2 px-4 pl-12">
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="text-slate-400">↳</span>
-                                <span className="text-slate-600">{split.description}</span>
+                            <td className="py-2 px-4 pl-12 max-w-0 overflow-hidden">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <span className="text-slate-400 shrink-0">↳</span>
+                                <span className="text-slate-600 truncate min-w-0">{split.description}</span>
                               </div>
-                            </td>
-                            <td className="py-2 px-4"></td>
-                            <td className="py-2 px-4">
-                              <Badge variant="info" className="text-xs">{split.category}</Badge>
-                            </td>
-                            <td className="py-2 px-4">
-                              {(() => {
-                                const hasProjectId = split.projectId && split.projectId.trim() !== '';
-                                const hasPurpose = split.purpose && split.purpose.trim() !== '';
-                                if (hasProjectId && hasPurpose) {
-                                  return <Badge variant="success" className="text-xs">Categorized</Badge>;
-                                } else {
-                                  return <Badge variant="warning" className="text-xs">Uncategorized</Badge>;
-                                }
-                              })()}
+                              <div
+                                className="mt-0.5 overflow-hidden text-xs text-slate-500 whitespace-nowrap text-ellipsis"
+                                title={`${split.category || '—'} | ${getTransactionAccountLabel(split, tx)} | ${split.purpose || '—'}`}
+                              >
+                                <span className="font-medium text-slate-600">{split.category || '—'}</span>
+                                <span className="mx-1 text-slate-300">|</span>
+                                <span>{getTransactionAccountLabel(split, tx)}</span>
+                                <span className="mx-1 text-slate-300">|</span>
+                                <span>{split.purpose || '—'}</span>
+                              </div>
                             </td>
                             <td className={`py-2 px-4 text-right font-mono text-sm ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
                               {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
@@ -2614,7 +2700,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate;
           return {
             id: p.id,
-            name: p.name || p.id,
+            name: p.name || p.title || p.id,
             year: pDate ? new Date(pDate).getFullYear() : undefined
           };
         })}

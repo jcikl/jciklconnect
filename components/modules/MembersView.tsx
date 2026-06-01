@@ -2234,30 +2234,31 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             )}
           </Card>
 
-          <Card title="JCI Career Path">
-            <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-              {/* Join milestone */}
-              <div className="relative">
-                <div className="absolute -left-8 bg-green-100 text-green-600 p-1 rounded-full border-4 border-white">
-                  <UserPlus size={14} />
+          <div className="grid xl:grid-cols-2 gap-6 items-start">
+            <Card title="JCI Career Path">
+              <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                {/* Join milestone */}
+                <div className="relative">
+                  <div className="absolute -left-8 bg-green-100 text-green-600 p-1 rounded-full border-4 border-white">
+                    <UserPlus size={14} />
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono mb-1 block">{member.joinDate}</span>
+                  <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
                 </div>
-                <span className="text-xs text-slate-400 font-mono mb-1 block">{member.joinDate}</span>
-                <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
-              </div>
 
-              {/* Merged & sorted: careerHistory + board positions + commission director roles from Firestore */}
-              {(() => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
+                {/* Merged & sorted: careerHistory + board positions + commission director roles from Firestore */}
+                {(() => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
 
-                // Date-based status helper
-                const getBodStatus = (bp: BoardMember): 'former' | 'current' | 'elected' => {
-                  const start = bp.startDate ? new Date(bp.startDate) : null;
-                  const end = bp.endDate ? new Date(bp.endDate) : null;
-                  if (end && today > end) return 'former';
-                  if (start && today < start) return 'elected';
-                  return 'current';
-                };
+                  // Date-based status helper
+                  const getBodStatus = (bp: BoardMember): 'former' | 'current' | 'elected' => {
+                    const start = bp.startDate ? new Date(bp.startDate) : null;
+                    const end = bp.endDate ? new Date(bp.endDate) : null;
+                    if (end && today > end) return 'former';
+                    if (start && today < start) return 'elected';
+                    return 'current';
+                  };
 
                 type TimelineItem = {
                   sortKey: string; type: 'career' | 'board' | 'commission';
@@ -2362,12 +2363,66 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 });
               })()}
 
-              {/* Empty state */}
-              {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
-                <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
-              )}
-            </div>
-          </Card>
+                {/* Empty state */}
+                {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
+                  <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
+                )}
+              </div>
+            </Card>
+
+            <Card title="JCI Trainer Pathway">
+              <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                {[
+                  {
+                    label: 'Foundation',
+                    title: 'Training Participation',
+                    description: 'Attend chapter learning sessions and build facilitation confidence.',
+                    status: member.attendanceRate >= 70 ? 'Active' : 'Upcoming',
+                    tone: member.attendanceRate >= 70 ? 'green' : 'slate',
+                    icon: GraduationCap,
+                  },
+                  {
+                    label: 'Practice',
+                    title: 'Local Facilitation',
+                    description: 'Support workshops, emcee segments, or lead small-group activities.',
+                    status: member.role === UserRole.BOARD || member.role === UserRole.ADMIN ? 'Ready' : 'Next',
+                    tone: member.role === UserRole.BOARD || member.role === UserRole.ADMIN ? 'blue' : 'amber',
+                    icon: UserCheck,
+                  },
+                  {
+                    label: 'Certification',
+                    title: 'JCI Trainer Development',
+                    description: 'Track pathway toward certified trainer opportunities.',
+                    status: 'Planned',
+                    tone: 'slate',
+                    icon: Award,
+                  },
+                ].map((step) => {
+                  const Icon = step.icon;
+                  const toneClass = {
+                    green: { dot: 'bg-green-100 text-green-600', badge: 'bg-green-100 text-green-700' },
+                    blue: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700' },
+                    amber: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700' },
+                    slate: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600' },
+                  }[step.tone];
+
+                  return (
+                    <div key={step.title} className="relative">
+                      <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${toneClass.dot}`}>
+                        <Icon size={14} />
+                      </div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs text-slate-400 font-mono">{step.label}</span>
+                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${toneClass.badge}`}>{step.status}</span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900">{step.title}</h4>
+                      <p className="text-sm text-slate-600">{step.description}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
 
           <Card title="Recent Badges">
             <div className="flex gap-4">

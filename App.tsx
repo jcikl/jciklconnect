@@ -6,7 +6,8 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield
+  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield,
+  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -64,11 +65,13 @@ import { ToyyibView } from './components/modules/ToyyibView';
 import { WhapiConfigView } from './components/modules/WhapiConfigView';
 import { MembershipConfigView } from './components/modules/MembershipConfigView';
 import { AccessConfigView } from './components/modules/AccessConfigView';
+import { PublicationsView } from './components/modules/PublicationsView';
+import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
 import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 
 // --- View Definitions ---
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS';
 
 // --- Helper Components ---
 
@@ -1023,65 +1026,140 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   );
 };
 
+// Newsletter thumbnail component with error fallback
+const NewsletterThumbnail = ({ src, alt }: { src: string | null | undefined; alt: string }) => {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center p-6 text-center">
+        <FileText size={40} className="text-slate-300 mb-2 group-hover:scale-110 transition-transform duration-300" />
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">No Preview Image</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+      loading="lazy"
+    />
+  );
+};
+
 // Guest E-Newsletters Page
 const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory') => void;
 }) => {
-  const newsletters = [
-    {
-      year: '2025',
-      items: [
-        { issue: 'Issue 1', title: 'JCI KL 2025 E-Newsletter', link: '#' },
-      ],
-    },
-    {
-      year: '2024',
-      items: [
-        { issue: 'Issue 1', title: 'JCI KL 2024 E-Newsletter', link: '#' },
-        { issue: 'Issue 2', title: 'JCI KL 2024 E-Newsletter', link: '#' },
-        { issue: 'Issue 3', title: 'JCI KL 2024 E-Newsletter', link: '#' },
-      ],
-    },
-    {
-      year: '2023',
-      items: [
-        { issue: 'Issue 1', title: 'JCI KL 2023 E-Newsletter', link: '#' },
-        { issue: 'Issue 2', title: 'JCI KL 2023 E-Newsletter', link: '#' },
-        { issue: 'Issue 3', title: 'JCI KL 2023 E-Newsletter', link: '#' },
-      ],
-    },
-    {
-      year: '2022',
-      items: [
-        { issue: 'Issue 1', title: 'JCI KL 2022 E-Newsletter', link: '#' },
-        { issue: 'Issue 2', title: 'JCI KL 2022 E-Newsletter', link: '#' },
-        { issue: 'Issue 3', title: 'JCI KL 2022 E-Newsletter', link: '#' },
-        { issue: 'Issue 4', title: 'JCI KL 2022 E-Newsletter', link: '#' },
-        { issue: 'Awards Compilation Booklet', title: '2022 Awards Compilation Booklet', link: '#' },
-      ],
-    },
-    {
-      year: '2021',
-      items: [
-        { issue: 'E-Magazine', title: 'JCI KL 69th Installation & Awards Banquet E-Magazine', link: '#' },
-        { issue: 'Issue 1', title: 'JCI KL 2021 E-Newsletter', link: '#' },
-        { issue: 'Issue 2', title: 'JCI KL 2021 E-Newsletter', link: '#' },
-        { issue: 'Issue 3', title: 'JCI KL 2021 E-Newsletter', link: '#' },
-        { issue: 'Issue 4', title: 'JCI KL 2021 E-Newsletter', link: '#' },
-      ],
-    },
-    {
-      year: '2020',
-      items: [
-        { issue: 'Issue 1', title: 'JCI KL 2020 E-Newsletter', link: '#' },
-        { issue: 'Issue 2', title: 'JCI KL 2020 E-Newsletter', link: '#' },
-        { issue: 'Issue 3', title: 'JCI KL 2020 E-Newsletter', link: '#' },
-        { issue: 'Issue 4', title: 'JCI KL 2020 E-Newsletter', link: '#' },
-      ],
-    },
-  ];
+  const [dbPublications, setDbPublications] = useState<any[]>([]);
+  const [loadingPubs, setLoadingPubs] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const fetchPubs = async () => {
+      try {
+        const data = await PublicationService.getPublished();
+        if (active) {
+          setDbPublications(data);
+        }
+      } catch (err) {
+        console.error('Failed to load publications from Firestore', err);
+      } finally {
+        if (active) setLoadingPubs(false);
+      }
+    };
+    fetchPubs();
+    return () => { active = false; };
+  }, []);
+
+  const newsletters = useMemo(() => {
+    if (loadingPubs) return [];
+    const groups: Record<string, any[]> = {};
+    dbPublications.forEach(p => {
+      groups[p.year] = groups[p.year] || [];
+      const driveId = extractGoogleDriveFileId(p.pdfUrl);
+      groups[p.year].push({
+        issue: p.issue,
+        title: p.title,
+        link: toGoogleDrivePreviewUrl(p.pdfUrl),
+        thumbnail: driveId ? `https://lh3.googleusercontent.com/d/${driveId}=w400` : null,
+      });
+    });
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map(year => ({
+        year,
+        items: groups[year]
+      }));
+  }, [dbPublications, loadingPubs]);
+
+  // PDF Reader State
+  const [selectedNewsletter, setSelectedNewsletter] = useState<{
+    issue: string;
+    title: string;
+    link: string;
+    year: string;
+    thumbnail?: string | null;
+  } | null>(null);
+
+  const [readerTheme, setReaderTheme] = useState<'light' | 'dark'>('dark');
+  const [readerZoom, setReaderZoom] = useState<'fit' | 'wide' | 'full'>('fit');
+
+  const { showToast } = useToast();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Flattened newsletters to support simple navigation inside reader
+  const flatNewsletters = newsletters.flatMap((yg) =>
+    yg.items.map((item) => ({ ...item, year: yg.year }))
+  );
+
+  const currentIdx = selectedNewsletter
+    ? flatNewsletters.findIndex(
+        (item) =>
+          item.title === selectedNewsletter.title &&
+          item.issue === selectedNewsletter.issue
+      )
+    : -1;
+
+  const handlePrevNewsletter = () => {
+    if (currentIdx > 0) {
+      setSelectedNewsletter(flatNewsletters[currentIdx - 1]);
+    }
+  };
+
+  const handleNextNewsletter = () => {
+    if (currentIdx < flatNewsletters.length - 1) {
+      setSelectedNewsletter(flatNewsletters[currentIdx + 1]);
+    }
+  };
+
+  const activeUrl = selectedNewsletter && selectedNewsletter.link !== '#' ? selectedNewsletter.link : null;
+
+  const handleCopyLink = () => {
+    if (!selectedNewsletter) return;
+    const currentUrl = window.location.href.split('#')[0];
+    const hash = `newsletter-${selectedNewsletter.year}-${selectedNewsletter.issue.replace(/\s+/g, '-').toLowerCase()}`;
+    navigator.clipboard.writeText(`${currentUrl}#${hash}`);
+    showToast('Direct newsletter link copied to clipboard!', 'success');
+  };
+
+  const handlePrint = () => {
+    if (iframeRef.current && activeUrl) {
+      try {
+        iframeRef.current.contentWindow?.print();
+      } catch (e) {
+        window.open(activeUrl, '_blank');
+        showToast('Opening PDF in new tab to print due to browser cross-origin policy.', 'info');
+      }
+    } else {
+      showToast('Load a PDF document to trigger printing.', 'error');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1089,55 +1167,362 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="enewsletters" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">E-Newsletters</h1>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
-              Stay updated with our latest news, events, and achievements.
+        <section className="py-20 bg-gradient-to-r from-jci-navy to-jci-blue text-white relative overflow-hidden" aria-label="Page header">
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+          <div className="absolute -left-16 -top-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
+          <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-sky-400/10 rounded-full blur-3xl"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <h1 className="text-4xl md:text-6xl font-extrabold mb-6 tracking-tight drop-shadow-sm">
+              E-Newsletters
+            </h1>
+            <p className="text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto font-light leading-relaxed">
+              Stay connected and inspired. Access our extensive digital repository of stories, developmental projects, achievements, and impact.
             </p>
           </div>
         </section>
 
         <section className="py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="space-y-12">
-              {newsletters.map((yearGroup) => (
-                <div key={yearGroup.year}>
-                  <h2 className="text-3xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-jci-blue">
-                    JCI KL {yearGroup.year} E-Newsletter
-                  </h2>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {yearGroup.items.map((item, index) => (
-                      <Card key={index} className="hover:shadow-lg transition-shadow cursor-pointer">
-                        <div className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <Badge variant="info">{item.issue}</Badge>
-                          </div>
-                          <h3 className="text-lg font-bold text-slate-900 mb-2">{item.title}</h3>
-                          <a
-                            href={item.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-jci-blue hover:text-jci-navy font-medium text-sm inline-flex items-center gap-1"
+            {newsletters.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto p-8 animate-in fade-in duration-300">
+                <BookOpen size={48} className="text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-slate-800">No Publications Yet</h3>
+                <p className="text-sm text-slate-500 mt-2 leading-relaxed max-w-sm mx-auto">
+                  There are currently no active publications. Please check back later or contact local chapter administrators!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-16">
+                {newsletters.map((yearGroup) => (
+                  <div key={yearGroup.year} className="animate-in fade-in slide-in-from-bottom-6 duration-500">
+                    <div className="flex items-center gap-4 mb-8 pb-3 border-b border-slate-200">
+                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                        JCI KL {yearGroup.year} Publications
+                      </h2>
+                      <span className="bg-sky-100 text-jci-blue font-bold px-3 py-1 rounded-full text-xs uppercase tracking-wider">
+                        {yearGroup.items.length} {yearGroup.items.length === 1 ? 'Issue' : 'Issues'}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                      {yearGroup.items.map((item, index) => (
+                        <Card
+                          key={index}
+                          onClick={() => setSelectedNewsletter({ ...item, year: yearGroup.year })}
+                          className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer border border-slate-200 hover:border-jci-blue group overflow-hidden bg-white flex flex-col h-full"
+                        >
+                          {/* Thumbnail / Header Preview Image */}
+                          <div 
+                            className="w-full bg-slate-100 overflow-hidden relative border-b border-slate-100 flex items-center justify-center"
+                            style={{ aspectRatio: '210/297' }}
                           >
-                            View Newsletter
-                            <FileText size={16} />
-                          </a>
-                        </div>
-                      </Card>
-                    ))}
+                            <NewsletterThumbnail src={item.thumbnail} alt={`${item.title} Cover`} />
+                            {/* Floating Badge */}
+                            <div className="absolute top-3 left-3 z-10">
+                              <Badge variant="jci">{item.issue}</Badge>
+                            </div>
+                          </div>
+
+                          <div className="p-5 flex flex-col flex-1 justify-between">
+                            <div>
+                              <h3 className="text-base font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors leading-snug line-clamp-2" title={item.title}>
+                                {item.title}
+                              </h3>
+                            </div>
+                            
+                            <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-4">
+                              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                                {yearGroup.year} Edition
+                              </span>
+                              <span className="text-jci-blue font-bold text-xs inline-flex items-center gap-1 group-hover:underline">
+                                Read Online
+                                <FileText size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                              </span>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
-
       </main>
-      <GuestFooter />
+
+      {/* PDF Viewer Interactive Modal */}
+      {selectedNewsletter && (
+        <Modal
+          isOpen={!!selectedNewsletter}
+          onClose={() => {
+            setSelectedNewsletter(null);
+          }}
+          title={
+            <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+              <span className="bg-sky-100 text-jci-blue text-xs font-bold px-2.5 py-1 rounded-md uppercase self-start md:self-auto">
+                {selectedNewsletter.year} • {selectedNewsletter.issue}
+              </span>
+              <h2 className="text-lg font-bold text-slate-800 line-clamp-1">{selectedNewsletter.title}</h2>
+            </div>
+          }
+          size="4xl"
+          scrollInBody={false}
+          className="h-[92vh] max-h-[92vh] md:max-h-[92vh] flex flex-col"
+        >
+          {/* Main split dashboard pane */}
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 h-full">
+            
+            {/* Left Viewer pane */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-slate-900 border-b md:border-b-0 md:border-r border-slate-200 relative min-h-[400px] md:min-h-0">
+              
+              {/* Floating interactive toolbar */}
+              <div className="bg-slate-950/90 text-white px-4 py-3 flex items-center justify-between border-b border-slate-800 z-10 backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800">
+                    <button
+                      onClick={() => setReaderTheme('light')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        readerTheme === 'light' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Light
+                    </button>
+                    <button
+                      onClick={() => setReaderTheme('dark')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        readerTheme === 'dark' ? 'bg-slate-950 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Dark
+                    </button>
+                  </div>
+                </div>
+
+                {activeUrl && (
+                  <div className="hidden sm:flex items-center gap-2 bg-slate-900 rounded-lg p-0.5 border border-slate-800">
+                    <button
+                      onClick={() => setReaderZoom('fit')}
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        readerZoom === 'fit' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Standard
+                    </button>
+                    <button
+                      onClick={() => setReaderZoom('wide')}
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        readerZoom === 'wide' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Wide
+                    </button>
+                    <button
+                      onClick={() => setReaderZoom('full')}
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        readerZoom === 'full' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Full Width
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2.5">
+                  {activeUrl && (
+                    <>
+                      <button
+                        onClick={handlePrint}
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
+                        title="Print PDF"
+                      >
+                        <Printer size={16} />
+                      </button>
+                      <a
+                        href={activeUrl}
+                        download={`${selectedNewsletter.title.replace(/\s+/g, '_')}.pdf`}
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
+                        title="Download PDF"
+                      >
+                        <Download size={16} />
+                      </a>
+                      <a
+                        href={activeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
+                        title="Open in new tab"
+                      >
+                        <ExternalLink size={16} />
+                      </a>
+                    </>
+                  )}
+                  <button
+                    onClick={handleCopyLink}
+                    className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
+                    title="Share Newsletter"
+                  >
+                    <Share2 size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Reader viewport */}
+              <div className={`flex-1 h-full flex flex-col justify-between p-4 ${
+                readerTheme === 'dark' ? 'bg-slate-950' : 'bg-slate-100'
+              } transition-colors duration-300 relative overflow-y-auto`}>
+                
+                {activeUrl ? (
+                  <div className="flex-grow w-full flex justify-center items-center h-full min-h-[300px]">
+                    <iframe
+                      ref={iframeRef}
+                      src={activeUrl}
+                      title={selectedNewsletter.title}
+                      className={`h-full rounded-lg border shadow-2xl transition-all duration-300 ${
+                        readerTheme === 'dark' ? 'border-slate-800 bg-slate-900' : 'border-slate-300 bg-white'
+                      } ${
+                        readerZoom === 'fit' ? 'w-full max-w-3xl' : readerZoom === 'wide' ? 'w-full max-w-5xl' : 'w-full'
+                      }`}
+                      style={{ height: '100%', minHeight: '520px' }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-4 text-slate-800 rounded-lg min-h-[480px]">
+                    
+                    {/* Beautiful digital newsletter cover style */}
+                    <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 transform hover:scale-[1.01] transition-transform duration-300">
+                      
+                      {/* Cover Header */}
+                      <div className="bg-gradient-to-br from-jci-navy via-jci-blue to-sky-600 p-6 text-white text-center relative overflow-hidden">
+                        <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+                        <div className="absolute -left-10 -top-10 w-28 h-28 bg-white/5 rounded-full blur-xl"></div>
+                        
+                        <div className="inline-block bg-white/15 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 backdrop-blur-md">
+                          Digital Issue simulation
+                        </div>
+                        <h2 className="text-xl font-extrabold tracking-tight leading-snug">{selectedNewsletter.title}</h2>
+                        <div className="flex items-center justify-center gap-2 mt-3 text-xs text-sky-100 font-medium">
+                          <span>{selectedNewsletter.issue}</span>
+                          <span>•</span>
+                          <span>{selectedNewsletter.year}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Cover Body */}
+                      <div className="p-5 space-y-5 bg-white">
+                        <div className="space-y-2">
+                          <h4 className="text-[10px] font-bold text-jci-blue uppercase tracking-widest">Featured Highlights Inside</h4>
+                          <div className="grid grid-cols-1 gap-2.5 mt-2">
+                            <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100 hover:bg-sky-50/40 hover:border-sky-100 transition-colors">
+                              <span className="flex-shrink-0 w-5.5 h-5.5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xs">1</span>
+                              <div>
+                                <h5 className="font-bold text-xs text-slate-900 leading-none">President's Term Message</h5>
+                                <p className="text-[10px] text-slate-500 mt-1 leading-normal">Core directives and welcoming visions for term growth.</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100 hover:bg-sky-50/40 hover:border-sky-100 transition-colors">
+                              <span className="flex-shrink-0 w-5.5 h-5.5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xs">2</span>
+                              <div>
+                                <h5 className="font-bold text-xs text-slate-900 leading-none">Sustainable Outreach</h5>
+                                <p className="text-[10px] text-slate-500 mt-1 leading-normal">Community campaigns, project impact matrices, and SDG reviews.</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100 hover:bg-sky-50/40 hover:border-sky-100 transition-colors">
+                              <span className="flex-shrink-0 w-5.5 h-5.5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xs">3</span>
+                              <div>
+                                <h5 className="font-bold text-xs text-slate-900 leading-none">Banquet & Awards Compilation</h5>
+                                <p className="text-[10px] text-slate-500 mt-1 leading-normal">Review of banquet highlights and local organization awardees.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* PDF Page navigation toolbar simulation */}
+                <div className="bg-slate-900/85 px-4 py-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-white text-xs max-w-sm mx-auto w-full mt-4 backdrop-blur shadow-xl relative z-10">
+                  <button
+                    onClick={handlePrevNewsletter}
+                    disabled={currentIdx <= 0}
+                    className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold"
+                    title="Previous newsletter publication"
+                  >
+                    <ChevronLeft size={16} />
+                    <span>Prev Issue</span>
+                  </button>
+                  
+                  <span className="font-bold text-slate-400 select-none">
+                    Issue {currentIdx + 1} of {flatNewsletters.length}
+                  </span>
+                  
+                  <button
+                    onClick={handleNextNewsletter}
+                    disabled={currentIdx >= flatNewsletters.length - 1}
+                    className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold"
+                    title="Next newsletter publication"
+                  >
+                    <span>Next Issue</span>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Control & Metadata Panel (Desktop) */}
+            <div className="w-full md:w-80 bg-white flex flex-col overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <BookOpen size={14} className="text-jci-blue" />
+                  Available Archives
+                </h3>
+                <span className="bg-sky-100 text-jci-blue font-bold px-2 py-0.5 rounded-full text-[10px] uppercase">
+                  {flatNewsletters.length} Issues
+                </span>
+              </div>
+
+              {/* Sidebar Content viewport */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-2.5">
+                  {flatNewsletters.map((item, idx) => {
+                    const isCurrent = item.title === selectedNewsletter.title && item.issue === selectedNewsletter.issue;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          setSelectedNewsletter(item);
+                        }}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                          isCurrent
+                            ? 'bg-sky-50/80 border-jci-blue text-jci-blue shadow-sm'
+                            : 'bg-slate-50/50 border-slate-200/60 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <FileText size={16} className={`flex-shrink-0 mt-0.5 ${isCurrent ? 'text-jci-blue' : 'text-slate-400'}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-extrabold truncate leading-tight">{item.title}</p>
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400">
+                            <span>{item.year}</span>
+                            <span>•</span>
+                            <span>{item.issue}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
+
 
 // Guest Business Directory Page
 const GuestDirectoryPage = ({ onLogin, onRegister, onPageChange }: {
@@ -1825,6 +2210,7 @@ export const JCIKLApp: React.FC = () => {
       case 'WHAPI_CONFIG': return <WhapiConfigView />;
       case 'MEMBERSHIP_CONFIG': return <MembershipConfigView />;
       case 'ACCESS_CONFIG': return <AccessConfigView />;
+      case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={member?.role || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
       default:
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
@@ -2044,7 +2430,7 @@ export const JCIKLApp: React.FC = () => {
                   )}
                 </div>
               )}
-              {member?.role !== UserRole.GUEST && (isAdmin || isDeveloper) && (
+              {member?.role !== UserRole.GUEST && (isBoard || isAdmin || isDeveloper) && (
                 <div className="pt-4 mt-4 border-t border-slate-100 px-2">
                   <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>System</p>
                   {(isBoard || isAdmin || isDeveloper) && (
@@ -2096,6 +2482,13 @@ export const JCIKLApp: React.FC = () => {
                         label="Access Config"
                         isActive={view === 'ACCESS_CONFIG'}
                         onClick={() => { handleViewChange('ACCESS_CONFIG'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<BookOpen size={18} />}
+                        label="Publications"
+                        isActive={view === 'PUBLICATIONS'}
+                        onClick={() => { handleViewChange('PUBLICATIONS'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem
