@@ -1740,7 +1740,11 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                       return (m.name ?? '').toLowerCase().includes(q) || (m.phone ?? '').toLowerCase().includes(q);
                     })
                     .sort((a, b) => {
-                      // 1. Paid Status Priority (Paid > Pending > Overdue)
+                      // 1. WhatsApp Group Priority (In Group > Not In Group)
+                      if (a.whatsappGroup && !b.whatsappGroup) return -1;
+                      if (!a.whatsappGroup && b.whatsappGroup) return 1;
+
+                      // 2. Paid Status Priority (Paid > Pending > Overdue)
                       const getDuesScore = (status: string) => {
                         if (status === 'Paid') return 3;
                         if (status === 'Pending') return 2;
@@ -1751,10 +1755,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                       if (scoreA !== scoreB) {
                         return scoreB - scoreA; // Descending: Paid(3) comes before Pending(2)
                       }
-
-                      // 2. WhatsApp Group Priority (Not In Group > In Group)
-                      if (!a.whatsappGroup && b.whatsappGroup) return -1;
-                      if (a.whatsappGroup && !b.whatsappGroup) return 1;
 
                       // 3. Name Alphabetical
                       return (a.name ?? '').localeCompare(b.name ?? '');
