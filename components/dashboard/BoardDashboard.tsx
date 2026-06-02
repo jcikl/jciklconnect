@@ -28,6 +28,15 @@ import { AdvertisementService, Advertisement } from '../../services/advertisemen
 
 type MemberWithDues = Member & { duesStatus: string; duesYear: number; duesPaidDate?: string; latestPaidYear?: string | null };
 
+const HOBBY_OPTIONS = [
+  "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
+  "Cigar", "Cooking", "Cycling", "Dancing", "Diving",
+  "E-Sport Mlbb", "Fashion", "Golf", "Hiking", "Leadership",
+  "Liquor/ Wine Tasting", "Make Up", "Movie", "Other E-Sport", "Pickle Ball",
+  "Pilates", "Public Speaking", "Reading", "Rock Climbing", "Singing",
+  "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
+];
+
 interface BoardDashboardProps {
   onNavigate?: (view: any, memberId?: string | null) => void;
   onOpenNotifications: () => void;
@@ -115,6 +124,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
   const [duesStatusFilter, setDuesStatusFilter] = useState<'All' | 'Paid' | 'Pending' | 'Overdue'>('All');
   const [insightSearch, setInsightSearch] = useState('');
   const [selectedBirthdayMonth, setSelectedBirthdayMonth] = useState<number>(new Date().getMonth());
+  const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [aiInsights, setAiInsights] = useState<{
     churnRisk: any[];
     topRecommendations: any[];
@@ -1813,6 +1823,130 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                 </div>
               </Card>
             </div>
+
+            {/* Hobbies Insight Card */}
+            <Card
+              title={
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <Heart className="text-pink-500" size={20} />
+                    <span className="font-bold text-lg text-slate-800">Hobbies & Interests</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedHobbies.length > 0 && (
+                      <Badge variant="neutral" className="bg-pink-50 text-pink-700 border-pink-200 text-xs">
+                        {selectedHobbies.length} selected
+                      </Badge>
+                    )}
+                    {selectedHobbies.length > 0 && (
+                      <button
+                        onClick={() => setSelectedHobbies([])}
+                        className="text-[10px] text-slate-400 hover:text-red-500 transition-colors font-medium"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              }
+              className="border-t-4 border-t-pink-400"
+              noPadding
+            >
+              {/* Hobby Selector Chips */}
+              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-3">Select hobbies to filter members</p>
+                <div className="flex flex-wrap gap-2">
+                  {HOBBY_OPTIONS.map(hobby => {
+                    const isSelected = selectedHobbies.includes(hobby);
+                    const count = members.filter(m => Array.isArray(m.hobbies) && m.hobbies.includes(hobby)).length;
+                    return (
+                      <button
+                        key={hobby}
+                        onClick={() => {
+                          setSelectedHobbies(prev =>
+                            prev.includes(hobby) ? prev.filter(h => h !== hobby) : [...prev, hobby]
+                          );
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border ${
+                          isSelected
+                            ? 'bg-pink-500 text-white border-pink-500 shadow-sm shadow-pink-200'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-pink-300 hover:text-pink-600'
+                        }`}
+                      >
+                        {hobby}
+                        {count > 0 && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Filtered Members List */}
+              {selectedHobbies.length > 0 ? (
+                <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+                  {(() => {
+                    const filteredMembers = members.filter(m =>
+                      Array.isArray(m.hobbies) && selectedHobbies.some(h => m.hobbies!.includes(h))
+                    );
+                    if (filteredMembers.length === 0) {
+                      return (
+                        <div className="py-12 text-center">
+                          <Heart className="mx-auto text-slate-300 mb-3" size={32} />
+                          <p className="text-slate-500 font-medium text-sm">No members found with the selected hobbies</p>
+                        </div>
+                      );
+                    }
+                    return filteredMembers
+                      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+                      .map(m => {
+                        const matchingHobbies = selectedHobbies.filter(h => Array.isArray(m.hobbies) && m.hobbies.includes(h));
+                        return (
+                          <div key={m.id} className="px-6 py-3 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                {(m.name ?? '?')[0]?.toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm text-slate-900 truncate">{m.name}</p>
+                                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                  <Phone size={11} className="text-slate-400 flex-shrink-0" />
+                                  <span className="truncate">{m.phone || '—'}</span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-1 justify-end flex-shrink-0 max-w-[50%]">
+                              {matchingHobbies.map(h => (
+                                <span key={h} className="inline-block px-2 py-0.5 rounded-full bg-pink-50 text-pink-600 text-[9px] font-semibold border border-pink-100 whitespace-nowrap">
+                                  {h}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      });
+                  })()}
+                </div>
+              ) : (
+                <div className="py-10 text-center">
+                  <Heart className="mx-auto text-slate-200 mb-3" size={36} />
+                  <p className="text-slate-400 font-medium text-sm">Select one or more hobbies above to see matching members</p>
+                </div>
+              )}
+
+              {/* Footer */}
+              {selectedHobbies.length > 0 && (
+                <div className="px-6 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
+                  <span>Matching: {members.filter(m => Array.isArray(m.hobbies) && selectedHobbies.some(h => m.hobbies!.includes(h))).length} members</span>
+                  <span>{selectedHobbies.length} hobbies selected</span>
+                </div>
+              )}
+            </Card>
           </div>
         )}
       </div>
