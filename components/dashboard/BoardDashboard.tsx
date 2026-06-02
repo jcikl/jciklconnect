@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search, Bell, LogOut, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3 } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search, Bell, LogOut, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3, MessageCircle, Phone, XCircle } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
 import { Select, Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
@@ -1686,6 +1686,103 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                 </Card>
               );
             })()}
+
+            {/* WhatsApp Group Status Card */}
+            <Card
+              title={
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="text-green-500" size={20} />
+                    <span className="font-bold text-lg text-slate-800">WhatsApp Group Status</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="success" className="bg-green-50 text-green-700 border-green-100 text-xs">
+                      {members.filter(m => m.whatsappGroup).length} In Group
+                    </Badge>
+                    <Badge variant="neutral" className="bg-slate-50 text-slate-600 border-slate-200 text-xs">
+                      {members.filter(m => !m.whatsappGroup).length} Not In Group
+                    </Badge>
+                  </div>
+                </div>
+              }
+              className="border-t-4 border-t-green-400"
+              noPadding
+            >
+              {/* Table Header */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100 text-[11px] uppercase font-bold tracking-wider text-slate-500">
+                <div className="col-span-4">Member Name</div>
+                <div className="col-span-3">Phone Number</div>
+                <div className="col-span-2 text-center">Dues Status</div>
+                <div className="col-span-3 text-center">WhatsApp Group</div>
+              </div>
+
+              {/* Member Rows */}
+              <div className="divide-y divide-slate-100 max-h-[480px] overflow-y-auto">
+                {[...members]
+                  .filter(m => {
+                    if (!insightSearch) return true;
+                    const q = insightSearch.toLowerCase();
+                    return (m.name ?? '').toLowerCase().includes(q) || (m.phone ?? '').toLowerCase().includes(q);
+                  })
+                  .sort((a, b) => {
+                    // Sort: In group first, then by name
+                    if (a.whatsappGroup && !b.whatsappGroup) return -1;
+                    if (!a.whatsappGroup && b.whatsappGroup) return 1;
+                    return (a.name ?? '').localeCompare(b.name ?? '');
+                  })
+                  .map(m => (
+                    <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-6 py-3 hover:bg-slate-50/80 transition-colors items-center">
+                      {/* Name */}
+                      <div className="col-span-4 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-jci-blue to-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {(m.name ?? '?')[0]?.toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-slate-900 truncate">{m.name}</p>
+                          <p className="text-[10px] text-slate-400 md:hidden">{m.phone || 'No phone'}</p>
+                        </div>
+                      </div>
+
+                      {/* Phone */}
+                      <div className="col-span-3 hidden md:flex items-center gap-2 text-sm text-slate-600">
+                        <Phone size={13} className="text-slate-400 flex-shrink-0" />
+                        <span className="truncate">{m.phone || '—'}</span>
+                      </div>
+
+                      {/* Dues Status */}
+                      <div className="col-span-2 flex justify-center">
+                        <Badge
+                          variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
+                          className="text-[10px] px-2 py-0.5"
+                        >
+                          {m.duesStatus}
+                        </Badge>
+                      </div>
+
+                      {/* WhatsApp Status */}
+                      <div className="col-span-3 flex justify-center">
+                        {m.whatsappGroup ? (
+                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-100">
+                            <CheckCircle size={12} className="text-green-500" />
+                            <span className="text-[11px] font-semibold text-green-700">In Group</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-100">
+                            <XCircle size={12} className="text-red-400" />
+                            <span className="text-[11px] font-semibold text-red-600">Not In Group</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
+                <span>Total: {members.length} members</span>
+                <span>In Group: {members.filter(m => m.whatsappGroup).length} / {members.length}</span>
+              </div>
+            </Card>
           </div>
         )}
       </div>
