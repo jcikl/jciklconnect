@@ -102,6 +102,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
   const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const [duesStatusFilter, setDuesStatusFilter] = useState<'All' | 'Paid' | 'Pending' | 'Overdue'>('All');
   const [insightSearch, setInsightSearch] = useState('');
+  const [selectedBirthdayMonth, setSelectedBirthdayMonth] = useState<number>(new Date().getMonth());
   const [aiInsights, setAiInsights] = useState<{
     churnRisk: any[];
     topRecommendations: any[];
@@ -1530,7 +1531,17 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                     onChange={(e) => setInsightSearch(e.target.value)}
                   />
                 </div>
-                <div className="w-full md:w-64">
+                <div className="w-full md:w-48">
+                  <Select
+                    options={monthNamesBase.map((name, index) => ({
+                      label: `🎂 ${name}`,
+                      value: index.toString()
+                    }))}
+                    value={selectedBirthdayMonth.toString()}
+                    onChange={(e) => setSelectedBirthdayMonth(parseInt(e.target.value, 10))}
+                  />
+                </div>
+                <div className="w-full md:w-48">
                   <Select
                     options={[
                       { label: 'All Dues Status', value: 'All' },
@@ -1545,141 +1556,136 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
               </div>
             </Card>
 
-            {/* Monthly Birthday Grid */}
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {rotatedMonths.map((month) => {
-                const monthMembers = memberInsightsGroups[month.index];
-                if (monthMembers.length === 0 && !insightSearch && duesStatusFilter === 'All') {
-                  return null;
-                }
+            {/* Single Birthday Month Card */}
+            {(() => {
+              const monthName = monthNamesBase[selectedBirthdayMonth];
+              const monthMembers = memberInsightsGroups[selectedBirthdayMonth] || [];
+              const isCurrent = selectedBirthdayMonth === new Date().getMonth();
 
-                if (monthMembers.length === 0) return null;
-
-                return (
-                  <Card
-                    key={month.name}
-                    title={
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="text-jci-blue" size={18} />
-                          <span className="font-bold">{month.name}</span>
-                        </div>
-                        {month.isCurrent && (
-                          <Badge variant="info" className="animate-pulse">
-                            Current Month
-                          </Badge>
-                        )}
+              return (
+                <Card
+                  title={
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="text-jci-blue" size={20} />
+                        <span className="font-bold text-lg text-slate-800">Birthdays in {monthName}</span>
                       </div>
-                    }
-                    className={`h-full border-t-4 ${month.isCurrent
-                      ? 'border-t-jci-blue bg-blue-50/30'
-                      : 'border-t-slate-200'
-                      }`}
-                    noPadding
-                  >
-                    <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
-                      {[...monthMembers].sort((a, b) => {
-                        const dateA = a.dateOfBirth ? new Date(a.dateOfBirth).getDate() : 0;
-                        const dateB = b.dateOfBirth ? new Date(b.dateOfBirth).getDate() : 0;
+                      {isCurrent && (
+                        <Badge variant="info" className="animate-pulse bg-blue-50 text-jci-blue border-blue-100 px-3 py-1 text-xs">
+                          Current Month
+                        </Badge>
+                      )}
+                    </div>
+                  }
+                  className={`border-t-4 ${isCurrent ? 'border-t-jci-blue bg-blue-50/10' : 'border-t-slate-200'}`}
+                  noPadding
+                >
+                  {monthMembers.length > 0 ? (
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {[...monthMembers].sort((a, b) => {
+                          const dateA = a.dateOfBirth ? new Date(a.dateOfBirth).getDate() : 0;
+                          const dateB = b.dateOfBirth ? new Date(b.dateOfBirth).getDate() : 0;
 
-                        if (month.isCurrent) {
-                          const today = new Date().getDate();
-                          const isFutureA = dateA >= today;
-                          const isFutureB = dateB >= today;
+                          if (isCurrent) {
+                            const today = new Date().getDate();
+                            const isFutureA = dateA >= today;
+                            const isFutureB = dateB >= today;
 
-                          if (isFutureA && !isFutureB) return -1;
-                          if (!isFutureA && isFutureB) return 1;
-                        }
-                        return dateA - dateB;
-                      }).map(m => {
-                        const isBirthdayToday = m.dateOfBirth &&
-                          new Date(m.dateOfBirth).getDate() === new Date().getDate() &&
-                          new Date(m.dateOfBirth).getMonth() === new Date().getMonth();
+                            if (isFutureA && !isFutureB) return -1;
+                            if (!isFutureA && isFutureB) return 1;
+                          }
+                          return dateA - dateB;
+                        }).map(m => {
+                          const isBirthdayToday = m.dateOfBirth &&
+                            new Date(m.dateOfBirth).getDate() === new Date().getDate() &&
+                            new Date(m.dateOfBirth).getMonth() === new Date().getMonth();
 
-                        return (
-                          <div key={m.id} className={`p-3 rounded-xl border shadow-sm hover:shadow-md transition-all group ${isBirthdayToday
-                            ? 'bg-gradient-to-br from-jci-blue to-blue-600 text-white border-blue-400 shadow-lg scale-[1.03] z-10'
-                            : 'bg-white border-slate-100'
-                            }`}>
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className={`font-bold transition-colors leading-none ${isBirthdayToday ? 'text-white' : 'text-slate-900 group-hover:text-jci-blue'
-                                    }`}>{m.name}</h4>
-                                  <Badge
-                                    variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
-                                    className={`text-[10px] px-1.5 py-0 ${isBirthdayToday ? 'bg-white text-jci-blue border-none' : ''}`}
-                                  >
-                                    {m.duesStatus}
-                                  </Badge>
-                                  {isBirthdayToday && (
-                                    <Badge variant="success" className="bg-pink-500 text-white border-none text-[10px] animate-bounce">
-                                      HAPPY BIRTHDAY! 🎂
+                          return (
+                            <div key={m.id} className={`p-4 rounded-2xl border shadow-sm hover:shadow-md transition-all group ${isBirthdayToday
+                              ? 'bg-gradient-to-br from-jci-blue to-blue-600 text-white border-blue-400 shadow-lg scale-[1.03] z-10'
+                              : 'bg-white border-slate-100'
+                              }`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className={`font-bold transition-colors leading-tight ${isBirthdayToday ? 'text-white' : 'text-slate-900 group-hover:text-jci-blue'
+                                      }`}>{m.name}</h4>
+                                    <Badge
+                                      variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
+                                      className={`text-[10px] px-1.5 py-0 ${isBirthdayToday ? 'bg-white text-jci-blue border-none' : ''}`}
+                                    >
+                                      {m.duesStatus}
                                     </Badge>
-                                  )}
+                                    {isBirthdayToday && (
+                                      <Badge variant="success" className="bg-pink-500 text-white border-none text-[10px] animate-bounce">
+                                        HAPPY BIRTHDAY! 🎂
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="mt-1">
+                                    {m.duesYear && (
+                                      <span className={`text-[10px] font-medium ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'}`}>FY {m.duesYear}</span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="mt-1">
-                                  {m.duesYear && (
-                                    <span className={`text-[10px] font-medium ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'}`}>FY {m.duesYear}</span>
-                                  )}
+                                <div className={`p-1.5 rounded-lg ${isBirthdayToday ? 'bg-white/20' : 'bg-jci-blue/10'}`}>
+                                  <Gift size={14} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
                                 </div>
                               </div>
-                              <div className={`p-1.5 rounded-lg ${isBirthdayToday ? 'bg-white/20' : 'bg-jci-blue/10'}`}>
-                                <Gift size={14} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
+
+                              <div className={`grid grid-cols-2 gap-2 mt-3 pt-3 border-t ${isBirthdayToday ? 'border-white/20' : 'border-slate-50'}`}>
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-pink-50'} rounded-md`}>
+                                    <Cake size={12} className={isBirthdayToday ? 'text-white' : 'text-pink-500'} />
+                                  </div>
+                                  <div>
+                                    <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Birthday</p>
+                                    <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.dateOfBirth ? new Date(m.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-blue-50'} rounded-md`}>
+                                    <Users size={12} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
+                                  </div>
+                                  <div>
+                                    <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Joined</p>
+                                    <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.joinDate ? m.joinDate.split('-')[0] : 'N/A'}</p>
+                                  </div>
+                                </div>
                               </div>
+
+                              {m.duesPaidDate && m.duesStatus === 'Paid' && (
+                                <div className={`mt-2 flex items-center gap-1.5 text-[10px] p-1.5 rounded-lg border ${isBirthdayToday
+                                  ? 'text-white bg-white/10 border-white/20'
+                                  : 'text-green-600 bg-green-50/50 border-green-100/50'
+                                  }`}>
+                                  <CheckCircle size={10} />
+                                  <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
+                                </div>
+                              )}
                             </div>
-
-                            <div className={`grid grid-cols-2 gap-2 mt-3 pt-3 border-t ${isBirthdayToday ? 'border-white/20' : 'border-slate-50'}`}>
-                              <div className="flex items-center gap-2">
-                                <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-pink-50'} rounded-md`}>
-                                  <Cake size={12} className={isBirthdayToday ? 'text-white' : 'text-pink-500'} />
-                                </div>
-                                <div>
-                                  <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Birthday</p>
-                                  <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.dateOfBirth ? new Date(m.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : 'N/A'}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className={`p-1 ${isBirthdayToday ? 'bg-white/20' : 'bg-blue-50'} rounded-md`}>
-                                  <Users size={12} className={isBirthdayToday ? 'text-white' : 'text-jci-blue'} />
-                                </div>
-                                <div>
-                                  <p className={`text-[10px] ${isBirthdayToday ? 'text-white/70' : 'text-slate-400'} uppercase font-bold tracking-wider`}>Joined</p>
-                                  <p className={`text-xs font-semibold ${isBirthdayToday ? 'text-white' : 'text-slate-700'}`}>{m.joinDate ? m.joinDate.split('-')[0] : 'N/A'}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {m.duesPaidDate && m.duesStatus === 'Paid' && (
-                              <div className={`mt-2 flex items-center gap-1.5 text-[10px] p-1.5 rounded-lg border ${isBirthdayToday
-                                ? 'text-white bg-white/10 border-white/20'
-                                : 'text-green-600 bg-green-50/50 border-green-100/50'
-                                }`}>
-                                <CheckCircle size={10} />
-                                <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="px-4 py-2 bg-slate-50/50 border-t border-slate-100">
-                      <p className="text-[10px] text-slate-400 font-medium">{monthMembers.length} {monthMembers.length === 1 ? 'member' : 'members'}</p>
+                  ) : (
+                    <div className="py-16 text-center bg-slate-50/30 rounded-b-2xl border-t border-slate-100">
+                      <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                        <Cake className="text-slate-400" size={32} />
+                      </div>
+                      <h3 className="text-slate-700 font-bold text-lg">No Birthdays This Month</h3>
+                      <p className="text-slate-500 text-sm mt-1 max-w-sm mx-auto">No members have birthdays in {monthName} matching the active dues status filter or search query.</p>
                     </div>
-                  </Card>
-                );
-              })}
-
-              {Object.values(memberInsightsGroups).every(g => g.length === 0) && (
-                <div className="col-span-full py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                  <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-                    <Users className="text-slate-400" size={24} />
+                  )}
+                  
+                  <div className="px-6 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
+                    <span>Total Members: {monthMembers.length}</span>
+                    <span>Selected Month: {monthName}</span>
                   </div>
-                  <h3 className="text-slate-900 font-semibold">No members found</h3>
-                  <p className="text-slate-500 text-sm mt-1">Try adjusting your filters or search terms.</p>
-                </div>
-              )}
-            </div>
+                </Card>
+              );
+            })()}
           </div>
         )}
       </div>
