@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, MessageSquare, CheckCircle, ExternalLink, Save, Activity, BarChart2 } from 'lucide-react';
+import { Settings, Shield, MessageSquare, CheckCircle, ExternalLink, Save, Activity, BarChart2, Users, RefreshCw } from 'lucide-react';
 import { Card, Button, Badge, useToast, ProgressBar } from '../ui/Common';
 import { Input } from '../ui/Form';
+import { useMembers } from '../../hooks/useMembers';
 
 export const WhapiConfigView: React.FC = () => {
   const { showToast } = useToast();
@@ -10,6 +11,12 @@ export const WhapiConfigView: React.FC = () => {
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState<'connected' | 'disconnected' | 'unknown'>('unknown');
   
+  // Member Sync states
+  const { members, updateMember, loading: membersLoading } = useMembers();
+  const [groupId, setGroupId] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ type: 'info' | 'success' | 'error', message: string } | null>(null);
+
   const [quotaData, setQuotaData] = useState<{
     messages: { used: number, total: number | string },
     chats: { used: number, total: number | string },
@@ -23,6 +30,10 @@ export const WhapiConfigView: React.FC = () => {
       setApiKey(savedConfig);
       setStatus('connected');
       fetchQuota(savedConfig);
+    }
+    const savedGroupId = localStorage.getItem('whapi_sync_group_id');
+    if (savedGroupId) {
+      setGroupId(savedGroupId);
     }
   }, []);
 
@@ -99,6 +110,92 @@ export const WhapiConfigView: React.FC = () => {
       setLoading(false);
       fetchQuota(apiKey);
     }, 800);
+  };
+
+  const handleSyncGroup = async () => {
+    if (!apiKey) {
+      showToast('Please save your Whapi Token first', 'warning');
+      return;
+    }
+    if (!groupId) {
+      showToast('Please enter a WhatsApp Group ID', 'warning');
+      return;
+    }
+
+    setSyncing(true);
+    setSyncStatus({ type: 'info', message: 'Connecting to Whapi and fetching group participants...' });
+
+    try {
+      const response = await fetch(`https://gate.whapi.cloud/groups/${groupId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || `Failed to fetch group details (${response.status})`);
+      }
+
+      const groupData = await response.json();
+      const participants = groupData.participants || [];
+      
+      setSyncStatus({ type: 'info', message: `Found ${participants.length} participants. Analyzing members...` });
+
+      // Create a set of normalized participant phone numbers (last 9 digits)
+      const participantPhones = new Set();
+      participants.forEach((p) => {
+        const rawPhone = p.id.split('@')[0];
+        const digits = rawPhone.replace(/\D/g, '');
+        if (digits.length >= 9) {
+          participantPhones.add(digits.slice(-9));
+        } else if (digits) {
+          participantPhones.add(digits);
+        }
+      });
+
+      let matchedCount = 0;
+      let updatedCount = 0;
+
+      setSyncStatus({ type: 'info', message: `Updating ${members.length} members in database...` });
+
+      const promises = members.map(async (m) => {
+        if (!m.phone) return;
+        
+        const memberDigits = m.phone.replace(/\D/g, '');
+        const normalized = memberDigits.length >= 9 ? memberDigits.slice(-9) : memberDigits;
+        const isInGroup = participantPhones.has(normalized);
+
+        if (isInGroup) {
+          matchedCount++;
+        }
+
+        // Only update if status actually changed to optimize DB writes
+        if (m.whatsappGroup !== isInGroup) {
+          await updateMember(m.id, { whatsappGroup: isInGroup });
+          updatedCount++;
+        }
+      });
+
+      await Promise.all(promises);
+
+      setSyncStatus({
+        type: 'success',
+        message: `Sync completed! Out of ${members.length} members, ${matchedCount} are in the WhatsApp group. Updated ${updatedCount} members' statuses.`
+      });
+      showToast('WhatsApp Group sync completed successfully!', 'success');
+    } catch (e) {
+      console.error('Group sync error:', e);
+      setSyncStatus({
+        type: 'error',
+        message: `Sync failed: ${e instanceof Error ? e.message : 'Unknown error occurred'}`
+      });
+      showToast('Sync failed. Please check Group ID and API Token.', 'error');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleTestConnection = async () => {
@@ -252,6 +349,53 @@ export const WhapiConfigView: React.FC = () => {
                   <Badge variant="neutral" className="border-none">Not Configured</Badge>
                 </div>
               </div>
+            </div>
+          </Card>
+
+          <Card className="bg-white border border-slate-200">
+            <div className="p-6 space-y-4">
+              <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800">
+                <Users size={20} className="text-jci-blue" />
+                WhatsApp Group Sync
+              </h3>
+              <p className="text-xs text-slate-500">
+                Sync and update JCI members' WhatsApp group membership status in a single click using Whapi.
+              </p>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase">WhatsApp Group ID</label>
+                <Input
+                  type="text"
+                  value={groupId}
+                  onChange={(e) => {
+                    setGroupId(e.target.value);
+                    localStorage.setItem('whapi_sync_group_id', e.target.value);
+                  }}
+                  placeholder="e.g. 120363405028630543@g.us"
+                  className="w-full text-xs"
+                />
+              </div>
+
+              <Button
+                onClick={handleSyncGroup}
+                isLoading={syncing}
+                disabled={!apiKey || !groupId || membersLoading}
+                variant="primary"
+                className="w-full flex items-center justify-center gap-2 text-xs"
+              >
+                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                Sync Group Status
+              </Button>
+
+              {syncStatus && (
+                <div className={`p-3 rounded-lg text-xs leading-relaxed border ${
+                  syncStatus.type === 'error' ? 'bg-red-50 text-red-700 border-red-100' :
+                  syncStatus.type === 'success' ? 'bg-green-50 text-green-700 border-green-100' :
+                  'bg-blue-50 text-blue-700 border-blue-100 animate-pulse'
+                }`}>
+                  {syncStatus.message}
+                </div>
+              )}
             </div>
           </Card>
         </div>
