@@ -1677,7 +1677,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                                     : 'text-green-600 bg-green-50/50 border-green-100/50'
                                     }`}>
                                     <CheckCircle size={10} />
-                                    <span className="font-medium">Paid on {new Date(m.duesPaidDate).toLocaleDateString()}</span>
+                                    <span className="font-medium">{m.duesPaidDate && !isNaN(Date.parse(m.duesPaidDate)) ? `Paid on ${new Date(m.duesPaidDate).toLocaleDateString()}` : 'Paid'}</span>
                                   </div>
                                 )}
                               </div>
@@ -1726,9 +1726,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
               >
                 {/* Table Header */}
                 <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100 text-[11px] uppercase font-bold tracking-wider text-slate-500">
-                  <div className="col-span-4">Member Name</div>
-                  <div className="col-span-3">Phone Number</div>
-                  <div className="col-span-2 text-center">Dues Status</div>
+                  <div className="col-span-6">Member Name & Phone</div>
+                  <div className="col-span-3 text-center">Dues Status</div>
                   <div className="col-span-3 text-center">WhatsApp Group</div>
                 </div>
 
@@ -1748,25 +1747,22 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                     })
                     .map(m => (
                       <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-6 py-3 hover:bg-slate-50/80 transition-colors items-center">
-                        {/* Name */}
-                        <div className="col-span-4 flex items-center gap-3">
+                        {/* Name & Phone */}
+                        <div className="col-span-6 flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-jci-blue to-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {(m.name ?? '?')[0]?.toUpperCase()}
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-sm text-slate-900 truncate">{m.name}</p>
-                            <p className="text-[10px] text-slate-400 md:hidden">{m.phone || 'No phone'}</p>
+                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                              <Phone size={11} className="text-slate-400 flex-shrink-0" />
+                              <span className="truncate">{m.phone || '—'}</span>
+                            </p>
                           </div>
                         </div>
 
-                        {/* Phone */}
-                        <div className="col-span-3 hidden md:flex items-center gap-2 text-sm text-slate-600">
-                          <Phone size={13} className="text-slate-400 flex-shrink-0" />
-                          <span className="truncate">{m.phone || '—'}</span>
-                        </div>
-
                         {/* Dues Status */}
-                        <div className="col-span-2 flex flex-col items-center justify-center gap-0.5">
+                        <div className="col-span-3 flex flex-col items-center justify-center gap-0.5">
                           <Badge
                             variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
                             className="text-[10px] px-2 py-0.5"
