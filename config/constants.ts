@@ -232,10 +232,12 @@ export const INTERNATIONAL_PARTNERSHIP_OPTIONS = [
 export const JOIN_US_SURVEY_QUESTIONS = [
   {
     id: 'Q1',
-    title: '如果你参加一个30人的聚会，你通常希望：',
+    title: 'If you attend a 30-person gathering, what would you most want to get out of it?',
+    titleZh: '如果你参加一个30人的聚会，你通常希望：',
     options: [
       {
-        label: '学习如何成为全场焦点，提升表达底气',
+        label: 'Learn how to speak confidently and become more expressive in front of others',
+        labelZh: '学习如何成为全场焦点，提升表达底气',
         value: 'A',
         mapping: {
           direction: 'Individual',
@@ -244,7 +246,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '结识2-3位能直接在事业上帮到我或合作的人',
+        label: 'Meet 2–3 people who can directly help or collaborate with me on my career or business',
+        labelZh: '结识2-3位能直接在事业上帮到我或合作的人',
         value: 'B',
         mapping: {
           direction: 'Business',
@@ -253,7 +256,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '观察别人是如何组织这场活动的，学习管理经验',
+        label: 'Observe how the event is organised and pick up leadership and management insights',
+        labelZh: '观察别人是如何组织这场活动的，学习管理经验',
         value: 'C',
         mapping: {
           direction: 'Community',
@@ -262,7 +266,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '认识一些不同背景的朋友，单纯跳出原有圈子',
+        label: 'Make new friends from different backgrounds and step outside my usual social circle',
+        labelZh: '认识一些不同背景的朋友，单纯跳出原有圈子',
         value: 'D',
         mapping: {
           direction: 'International',
@@ -274,10 +279,12 @@ export const JOIN_US_SURVEY_QUESTIONS = [
   },
   {
     id: 'Q2',
-    title: '在目前的工作或生活中，哪种感觉最让你困扰？',
+    title: 'Which of these feels most frustrating in your current work or life?',
+    titleZh: '在目前的工作或生活中，哪种感觉最让你困扰？',
     options: [
       {
-        label: '有想法但说不出来，或者说服不了别人',
+        label: 'I have ideas but struggle to express them clearly or persuade others',
+        labelZh: '有想法但说不出来，或者说服不了别人',
         value: 'A',
         mapping: {
           direction: 'Individual',
@@ -286,7 +293,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '每天重复劳动，感觉视野越来越窄',
+        label: 'My days feel repetitive and my perspective is getting narrower',
+        labelZh: '每天重复劳动，感觉视野越来越窄',
         value: 'B',
         mapping: {
           direction: 'International',
@@ -295,7 +303,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '朋友圈太单一，遇到问题找不到专业人士请教',
+        label: "My network is too limited — I can't find the right people when I need advice",
+        labelZh: '朋友圈太单一，遇到问题找不到专业人士请教',
         value: 'C',
         mapping: {
           direction: 'Business',
@@ -304,7 +313,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '想做点有意义的事，但不知道从哪开始上手',
+        label: "I want to do something meaningful but don't know where to start",
+        labelZh: '想做点有意义的事，但不知道从哪开始上手',
         value: 'D',
         mapping: {
           direction: 'Community',
@@ -316,10 +326,12 @@ export const JOIN_US_SURVEY_QUESTIONS = [
   },
   {
     id: 'Q3',
-    title: '如果有一个周末，你更愿意如何度过？',
+    title: 'If you had a free weekend, how would you most like to spend it?',
+    titleZh: '如果有一个周末，你更愿意如何度过？',
     options: [
       {
-        label: '参加一场能拿证书、有干货的实战训练营',
+        label: 'Attending a hands-on training with practical takeaways and a certificate',
+        labelZh: '参加一场能拿证书、有干货的实战训练营',
         value: 'A',
         mapping: {
           direction: 'Individual',
@@ -328,7 +340,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '策划并执行一个能落地、看得到社会反馈的小项目',
+        label: 'Planning and running a small project that creates real, visible community impact',
+        labelZh: '策划并执行一个能落地、看得到社会反馈的小项目',
         value: 'B',
         mapping: {
           direction: 'Community',
@@ -337,7 +350,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '与一群创业者或高管共进晚餐，交换商业信息',
+        label: 'Having dinner with entrepreneurs and executives to exchange business ideas',
+        labelZh: '与一群创业者或高管共进晚餐，交换商业信息',
         value: 'C',
         mapping: {
           direction: 'Business',
@@ -346,7 +360,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '出发去另一个城市或国家，看看外面的世界',
+        label: 'Travelling to another city or country to explore new perspectives',
+        labelZh: '出发去另一个城市或国家，看看外面的世界',
         value: 'D',
         mapping: {
           direction: 'International',
@@ -358,10 +373,12 @@ export const JOIN_US_SURVEY_QUESTIONS = [
   },
   {
     id: 'Q4',
-    title: '加入JCI一年后，你最希望别人怎么评价你？',
+    title: 'After one year in JCI, how would you most love others to describe you?',
+    titleZh: '加入JCI一年后，你最希望别人怎么评价你？',
     options: [
       {
-        label: '“你现在的谈吐和自信程度判若两人。”',
+        label: '"You\'ve completely transformed — so much more confident and articulate now."',
+        labelZh: '"你现在的谈吐和自信程度判若两人。"',
         value: 'A',
         mapping: {
           direction: 'Individual',
@@ -370,7 +387,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '“你的事业因为这个平台得到了实际的增长。”',
+        label: '"Your business actually grew because of the connections you made here."',
+        labelZh: '"你的事业因为这个平台得到了实际的增长。"',
         value: 'B',
         mapping: {
           direction: 'Business',
@@ -379,7 +397,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '“你成功带领团队完成了一个了不起的挑战。”',
+        label: '"You led a team and pulled off something truly impressive."',
+        labelZh: '"你成功带领团队完成了一个了不起的挑战。"',
         value: 'C',
         mapping: {
           direction: 'Community',
@@ -388,7 +407,8 @@ export const JOIN_US_SURVEY_QUESTIONS = [
         }
       },
       {
-        label: '“你的眼界变高了，看问题的维度完全不一样。”',
+        label: '"Your worldview has expanded — you think on a completely different level now."',
+        labelZh: '"你的眼界变高了，看问题的维度完全不一样。"',
         value: 'D',
         mapping: {
           direction: 'International',
@@ -400,11 +420,33 @@ export const JOIN_US_SURVEY_QUESTIONS = [
   },
   {
     id: 'Q5',
-    title: '你每周愿意为这个“更好的自己”拨出多少小时？',
+    title: 'If this community keeps delivering value, how many events or gatherings would you typically join per month?',
+    titleZh: '如果这里能持续带给你价值，你认为自己平均每月愿意参与多少次活动或聚会？',
     options: [
-      { label: '2小时（轻度参与）', value: 'A', mapping: { direction: 'None', category: 'Engagement', items: ['Casual'] } },
-      { label: '5小时（积极分子）', value: 'B', mapping: { direction: 'None', category: 'Engagement', items: ['Active'] } },
-      { label: '10小时以上（核心骨干潜力）', value: 'C', mapping: { direction: 'None', category: 'Engagement', items: ['Core'] } }
+      {
+        label: 'Around 1 time (e.g. attend an event that interests me, meet new people, and learn about the organisation)',
+        labelZh: '1次左右 (例如参加感兴趣的活动，认识新朋友和了解组织文化)',
+        value: 'A',
+        mapping: { direction: 'None', category: 'Engagement', items: ['Casual'] }
+      },
+      {
+        label: '2–3 times (e.g. regularly join activities, gatherings, or learning sessions)',
+        labelZh: '2-3次 (例如定期参与活动、聚会或学习交流)',
+        value: 'B',
+        mapping: { direction: 'None', category: 'Engagement', items: ['Active'] }
+      },
+      {
+        label: '4–5 times (e.g. actively participate in various events and project planning to enrich my experience)',
+        labelZh: '4-5次 (例如积极参与不同活动和项目筹办，丰富自己的体验)',
+        value: 'C',
+        mapping: { direction: 'None', category: 'Engagement', items: ['Core'] }
+      },
+      {
+        label: 'As many as my schedule allows — I want to be fully involved',
+        labelZh: '只要时间允许，我愿意参加更多',
+        value: 'D',
+        mapping: { direction: 'None', category: 'Engagement', items: ['All-in'] }
+      }
     ]
   }
 ];

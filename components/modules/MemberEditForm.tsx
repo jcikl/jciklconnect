@@ -15,6 +15,7 @@ interface MemberEditFormProps {
   onCancel: () => void;
   /** When true (member/guest self-edit), only Contact + Apparel tabs, submit restricted to MEMBER_SELF_EDITABLE_FIELDS */
   selfEditableOnly?: boolean;
+  initialTab?: 'basic' | 'professional' | 'contact' | 'apparel' | 'membership';
 }
 
 const HOBBY_OPTIONS = [
@@ -87,12 +88,20 @@ function initFormValues(member: Member) {
   };
 }
 
-export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit, onCancel, selfEditableOnly = false }) => {
+export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit, onCancel, selfEditableOnly = false, initialTab }) => {
   const { isAdmin, isDeveloper } = usePermissions();
   const canEditSystemStatus = isAdmin || isDeveloper;
-  const [activeTab, setActiveTab] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'membership'>(selfEditableOnly ? 'contact' : 'basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'membership'>(
+    initialTab || (selfEditableOnly ? 'contact' : 'basic')
+  );
   const [formValues, setFormValues] = useState(() => initFormValues(member));
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     MembershipConfigService.getRules().then(setMembershipRules).catch(() => {});

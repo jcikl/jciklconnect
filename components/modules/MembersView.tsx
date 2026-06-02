@@ -6,7 +6,7 @@ import {
   TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw,
   Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
   Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog,
-  Target, Coins, ArrowUpRight
+  Target, Coins, ArrowUpRight, Edit
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs } from '../ui/Common';
@@ -33,7 +33,7 @@ import {
   computeMembershipTypeFromMember,
 } from '../../services/membershipConfigService';
 import { MembersService } from '../../services/membersService';
-import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS } from '../../config/constants';
+import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS, JOIN_US_SURVEY_QUESTIONS } from '../../config/constants';
 import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
 import { INDUSTRY_OPTIONS } from '../../config/constants';
 import { HobbyClubsService } from '../../services/hobbyClubsService';
@@ -288,7 +288,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const selectedMember = members.find(m => m.id === selectedMemberId);
 
   useEffect(() => {
-    MembershipConfigService.getRules().then(setMembershipRules).catch(() => {});
+    MembershipConfigService.getRules().then(setMembershipRules).catch(() => { });
   }, []);
 
   const getMemberDisplayMembershipType = (member: Member): MembershipType =>
@@ -1368,205 +1368,211 @@ const MemberTable: React.FC<{
   onMembershipTypeFiltersChange,
   getDisplayMembershipType,
 }) => {
-  return (
-    <Card noPadding>
-      {/* Desktop View */}
-      <div className="hidden md:block overflow-x-auto overflow-y-visible">
-        <table className="w-full text-left">
-          <thead className="relative z-10">
-            <tr className="bg-slate-50/50">
-              <th className="px-6 py-4 w-10">
-                <input
-                  type="checkbox"
-                  className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
-                  checked={isAllSelected}
-                  onChange={onToggleAll}
-                />
-              </th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-500">Member</th>
-              <th className="px-6 py-4 overflow-visible">
-                <ColumnFilterHeader
-                  label="Role"
-                  options={ROLE_FILTER_OPTIONS}
-                  selected={roleFilters}
-                  onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
-                />
-              </th>
-              <th className="px-6 py-4 overflow-visible">
-                <ColumnFilterHeader
-                  label="Membership Type"
-                  options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
-                  selected={membershipTypeFilters}
-                  onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
-                />
-              </th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-500">Tier / Points</th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-500">Engagement</th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-500">Risk Status</th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-500">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map(member => (
-              <tr
-                key={member.id}
-                className={`hover:bg-slate-50 transition-colors ${selectedIds.has(member.id) ? 'bg-blue-50/50' : ''}`}
-              >
-                <td className="px-6 py-4">
+    return (
+      <Card noPadding>
+        {/* Desktop View */}
+        <div className="hidden md:block overflow-x-auto overflow-y-visible">
+          <table className="w-full text-left">
+            <thead className="relative z-10">
+              <tr className="bg-slate-50/50">
+                <th className="px-6 py-4 w-10">
                   <input
                     type="checkbox"
                     className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
-                    checked={selectedIds.has(member.id)}
-                    onChange={() => onToggleSelection(member.id)}
+                    checked={isAllSelected}
+                    onChange={onToggleAll}
                   />
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center space-x-3">
-                    <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
-                    <div>
-                      <div className="font-medium text-slate-900">{member.name}</div>
-                      <div className="text-xs text-slate-500">{member.email}</div>
+                </th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-500">Member</th>
+                <th className="px-6 py-4 overflow-visible">
+                  <ColumnFilterHeader
+                    label="Role"
+                    options={ROLE_FILTER_OPTIONS}
+                    selected={roleFilters}
+                    onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
+                  />
+                </th>
+                <th className="px-6 py-4 overflow-visible">
+                  <ColumnFilterHeader
+                    label="Membership Type"
+                    options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
+                    selected={membershipTypeFilters}
+                    onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
+                  />
+                </th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-500">Tier / Points</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-500">Engagement</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-500">Risk Status</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-500">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map(member => (
+                <tr
+                  key={member.id}
+                  className={`hover:bg-slate-50 transition-colors ${selectedIds.has(member.id) ? 'bg-blue-50/50' : ''}`}
+                >
+                  <td className="px-6 py-4">
+                    <input
+                      type="checkbox"
+                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
+                      checked={selectedIds.has(member.id)}
+                      onChange={() => onToggleSelection(member.id)}
+                    />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-3">
+                      <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
+                      <div>
+                        <div className="font-medium text-slate-900">{member.name}</div>
+                        <div className="text-xs text-slate-500">{member.email}</div>
+                      </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant={membershipTypeBadgeVariant(getDisplayMembershipType(member))}>
+                      {getDisplayMembershipType(member)}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className={`text-sm font-medium ${member.tier === 'Platinum' ? 'text-purple-600' : member.tier === 'Gold' ? 'text-amber-600' : 'text-slate-600'}`}>
+                        {member.tier}
+                      </span>
+                      <span className="text-xs text-slate-500">{member.points} pts</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 w-48">
+                    <div className="flex items-center space-x-2">
+                      <ProgressBar progress={member.attendanceRate} color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'} />
+                      <span className="text-xs font-medium text-slate-600">{member.attendanceRate}%</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {member.churnRisk === 'High' && (
+                      <Badge variant="error">At Risk</Badge>
+                    )}
+                    {member.churnRisk === 'Low' && (
+                      <Badge variant="success">Stable</Badge>
+                    )}
+                    {member.churnRisk === 'Medium' && (
+                      <Badge variant="warning">Monitor</Badge>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <Button variant="ghost" size="sm" onClick={() => onSelect(member.id)}>View</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile View */}
+        <div className="md:hidden border-b border-slate-100 px-4 py-3 flex flex-wrap gap-4 bg-slate-50/50">
+          <ColumnFilterHeader
+            label="Role"
+            options={ROLE_FILTER_OPTIONS}
+            selected={roleFilters}
+            onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
+          />
+          <ColumnFilterHeader
+            label="Membership Type"
+            options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
+            selected={membershipTypeFilters}
+            onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
+          />
+        </div>
+        <div className="md:hidden divide-y divide-slate-100">
+          {members.map(member => (
+            <div
+              key={member.id}
+              className={`p-4 transition-colors ${selectedIds.has(member.id) ? 'bg-blue-50/50' : ''}`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className="pr-1">
+                    <input
+                      type="checkbox"
+                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
+                      checked={selectedIds.has(member.id)}
+                      onChange={() => onToggleSelection(member.id)}
+                    />
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
-                </td>
-                <td className="px-6 py-4">
-                  <Badge variant={membershipTypeBadgeVariant(getDisplayMembershipType(member))}>
-                    {getDisplayMembershipType(member)}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col">
-                    <span className={`text-sm font-medium ${member.tier === 'Platinum' ? 'text-purple-600' : member.tier === 'Gold' ? 'text-amber-600' : 'text-slate-600'}`}>
+                  <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
+                  <div>
+                    <div className="font-bold text-slate-900">{member.name}</div>
+                    <div className="text-xs text-slate-500">{member.email}</div>
+                  </div>
+                </div>
+                <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
+              </div>
+
+              <div className="mb-3">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Membership Type</span>
+                <Badge variant={membershipTypeBadgeVariant(getDisplayMembershipType(member))}>
+                  {getDisplayMembershipType(member)}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Tier / Points</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-sm font-bold ${member.tier === 'Platinum' ? 'text-purple-600' : member.tier === 'Gold' ? 'text-amber-600' : 'text-slate-600'}`}>
                       {member.tier}
                     </span>
                     <span className="text-xs text-slate-500">{member.points} pts</span>
                   </div>
-                </td>
-                <td className="px-6 py-4 w-48">
-                  <div className="flex items-center space-x-2">
-                    <ProgressBar progress={member.attendanceRate} color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'} />
-                    <span className="text-xs font-medium text-slate-600">{member.attendanceRate}%</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Status</span>
+                  <div>
+                    {member.churnRisk === 'High' && <Badge variant="error">At Risk</Badge>}
+                    {member.churnRisk === 'Low' && <Badge variant="success">Stable</Badge>}
+                    {member.churnRisk === 'Medium' && <Badge variant="warning">Monitor</Badge>}
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  {member.churnRisk === 'High' && (
-                    <Badge variant="error">At Risk</Badge>
-                  )}
-                  {member.churnRisk === 'Low' && (
-                    <Badge variant="success">Stable</Badge>
-                  )}
-                  {member.churnRisk === 'Medium' && (
-                    <Badge variant="warning">Monitor</Badge>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  <Button variant="ghost" size="sm" onClick={() => onSelect(member.id)}>View</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile View */}
-      <div className="md:hidden border-b border-slate-100 px-4 py-3 flex flex-wrap gap-4 bg-slate-50/50">
-        <ColumnFilterHeader
-          label="Role"
-          options={ROLE_FILTER_OPTIONS}
-          selected={roleFilters}
-          onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
-        />
-        <ColumnFilterHeader
-          label="Membership Type"
-          options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
-          selected={membershipTypeFilters}
-          onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
-        />
-      </div>
-      <div className="md:hidden divide-y divide-slate-100">
-        {members.map(member => (
-          <div
-            key={member.id}
-            className={`p-4 transition-colors ${selectedIds.has(member.id) ? 'bg-blue-50/50' : ''}`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-3">
-                <div className="pr-1">
-                  <input
-                    type="checkbox"
-                    className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
-                    checked={selectedIds.has(member.id)}
-                    onChange={() => onToggleSelection(member.id)}
-                  />
-                </div>
-                <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
-                <div>
-                  <div className="font-bold text-slate-900">{member.name}</div>
-                  <div className="text-xs text-slate-500">{member.email}</div>
                 </div>
               </div>
-              <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
-            </div>
 
-            <div className="mb-3">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Membership Type</span>
-              <Badge variant={membershipTypeBadgeVariant(getDisplayMembershipType(member))}>
-                {getDisplayMembershipType(member)}
-              </Badge>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-3">
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Tier / Points</span>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-sm font-bold ${member.tier === 'Platinum' ? 'text-purple-600' : member.tier === 'Gold' ? 'text-amber-600' : 'text-slate-600'}`}>
-                    {member.tier}
-                  </span>
-                  <span className="text-xs text-slate-500">{member.points} pts</span>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400">Engagement</span>
+                  <span className="text-xs font-bold text-slate-700">{member.attendanceRate}%</span>
                 </div>
+                <ProgressBar
+                  progress={member.attendanceRate}
+                  color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'}
+                />
               </div>
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Status</span>
-                <div>
-                  {member.churnRisk === 'High' && <Badge variant="error">At Risk</Badge>}
-                  {member.churnRisk === 'Low' && <Badge variant="success">Stable</Badge>}
-                  {member.churnRisk === 'Medium' && <Badge variant="warning">Monitor</Badge>}
-                </div>
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={() => onSelect(member.id)}
+                >
+                  View Profile
+                </Button>
               </div>
             </div>
+          ))}
+        </div>
+      </Card>
+    );
+  };
 
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] uppercase tracking-wider text-slate-400">Engagement</span>
-                <span className="text-xs font-bold text-slate-700">{member.attendanceRate}%</span>
-              </div>
-              <ProgressBar
-                progress={member.attendanceRate}
-                color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'}
-              />
-            </div>
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-xs"
-                onClick={() => onSelect(member.id)}
-              >
-                View Profile
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-};
-
-const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member, onBack, isSelfView = false }) => {
+const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
+  // Always derive the latest member data from the live members array so the UI
+  // updates automatically after every save (without a page reload).
+  const member = useMemo(
+    () => members.find(m => m.id === memberProp.id) ?? memberProp,
+    [members, memberProp]
+  );
   const { isAdmin, isDeveloper, hasPermission, effectiveRole } = usePermissions();
   const canEditMembers = hasPermission('canEditMembers');
   const { showToast } = useToast();
@@ -1583,6 +1589,165 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [loadingClubs, setLoadingClubs] = useState(false);
   const [editFormTab, setEditFormTab] = useState<'basic' | 'professional' | 'contact' | 'apparel'>('basic');
   const [boardPositions, setBoardPositions] = useState<BoardMember[]>([]);
+  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {};
+    if (member.surveyAnswers) {
+      Object.keys(member.surveyAnswers).forEach(key => {
+        const val = member.surveyAnswers![key];
+        init[key] = Array.isArray(val) ? val : (val ? [val] : []);
+      });
+    }
+    return init;
+  });
+  const [assessmentShowZh, setAssessmentShowZh] = useState(false);
+  const [savingAssessment, setSavingAssessment] = useState(false);
+  const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
+
+  const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | null>(null);
+  const [inlineValues, setInlineValues] = useState<any>(null);
+
+  const HOBBY_OPTIONS = [
+    "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
+    "Cigar", "Cooking", "Cycling", "Dancing", "Diving",
+    "E-Sport Mlbb", "Fashion", "Golf", "Hiking", "Leadership",
+    "Liquor/ Wine Tasting", "Make Up", "Movie", "Other E-Sport", "Pickle Ball",
+    "Pilates", "Public Speaking", "Reading", "Rock Climbing", "Singing",
+    "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
+  ];
+
+  const startInlineEdit = (card: 'basic' | 'professional' | 'contact' | 'apparel') => {
+    setInlineValues({
+      name: member.name || '',
+      fullName: member.fullName || '',
+      idNumber: member.idNumber || '',
+      dateOfBirth: member.dateOfBirth || '',
+      gender: member.gender || '',
+      ethnicity: member.ethnicity || '',
+      nationality: member.nationality || 'Malaysia',
+      introducer: member.introducer || '',
+      bio: member.bio || '',
+      hobbies: Array.isArray(member.hobbies) ? [...member.hobbies] : [],
+      skills: Array.isArray(member.skills) ? member.skills.join(', ') : (member.skills || ''),
+
+      companyName: member.companyName || '',
+      companyWebsite: member.companyWebsite || '',
+      companyDescription: member.companyDescription || '',
+      departmentAndPosition: member.departmentAndPosition || '',
+      acceptInternationalBusiness: member.acceptInternationalBusiness || '',
+      businessCategory: Array.isArray(member.businessCategory) ? [...member.businessCategory] : [],
+      industry: member.industry || '',
+      interestedIndustries: Array.isArray(member.interestedIndustries) ? [...member.interestedIndustries] : [],
+      internationalPartnershipTypes: Array.isArray(member.internationalPartnershipTypes) ? [...member.internationalPartnershipTypes] : [],
+      specialOffer: member.specialOffer || '',
+
+      phone: member.phone || '',
+      alternatePhone: member.alternatePhone || '',
+      whatsappGroup: !!member.whatsappGroup,
+      email: member.email || '',
+      address: member.address || '',
+      linkedin: member.linkedin || '',
+      facebook: member.facebook || '',
+      instagram: member.instagram || '',
+      wechat: member.wechat || '',
+      emergencyContactName: member.emergencyContactName || '',
+      emergencyContactPhone: member.emergencyContactPhone || '',
+      emergencyContactRelationship: member.emergencyContactRelationship || '',
+
+      cutStyle: member.cutStyle || '',
+      tshirtSize: member.tshirtSize || '',
+      jacketSize: member.jacketSize || '',
+      embroideredName: member.embroideredName || '',
+      tshirtStatus: member.tshirtStatus || 'NA',
+    });
+    setActiveInlineEditCard(card);
+  };
+
+  const handleInlineSave = async (card: 'basic' | 'professional' | 'contact' | 'apparel', updates: Partial<Member>) => {
+    try {
+      await updateMember(member.id, updates);
+      setActiveInlineEditCard(null);
+      showToast('Profile updated successfully', 'success');
+    } catch (err) {
+      showToast('Failed to update profile', 'error');
+    }
+  };
+
+  // Sync assessmentAnswers whenever the live member's surveyAnswers change (e.g. after save)
+  useEffect(() => {
+    if (!showAssessmentModal) {
+      const synced: Record<string, string[]> = {};
+      if (member.surveyAnswers) {
+        Object.keys(member.surveyAnswers).forEach(key => {
+          const val = member.surveyAnswers![key];
+          synced[key] = Array.isArray(val) ? val : (val ? [val] : []);
+        });
+      }
+      setAssessmentAnswers(synced);
+    }
+  }, [member.surveyAnswers, showAssessmentModal]);
+
+  const diagnosePersona = (answers: Record<string, string[]>) => {
+    const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+    const tags = new Set<string>();
+
+    JOIN_US_SURVEY_QUESTIONS.forEach(q => {
+      const selectedValues = answers[q.id] || [];
+      if (!selectedValues.length) return;
+
+      selectedValues.forEach(answer => {
+        if (['Q1', 'Q2', 'Q3', 'Q4'].includes(q.id)) {
+          counts[answer] = (counts[answer] || 0) + 1;
+        }
+
+        const option = q.options.find(opt => opt.value === answer);
+        if (option && option.mapping) {
+          if (option.mapping.direction !== 'None') tags.add(option.mapping.direction);
+          if (option.mapping.category !== 'Engagement') tags.add(option.mapping.category);
+          option.mapping.items.forEach(item => tags.add(item));
+        }
+      });
+    });
+
+    let dominant = 'A';
+    let max = -1;
+    ['A', 'B', 'C', 'D'].forEach(key => {
+      if (counts[key] > max) {
+        max = counts[key];
+        dominant = key;
+      }
+    });
+
+    const personas: Record<string, string> = {
+      A: 'Learning-oriented (学习型)',
+      B: 'Practical-oriented (务实型)',
+      C: 'Backbone-oriented (骨干型)',
+      D: 'Explorer-oriented (探索型)'
+    };
+
+    return {
+      personaType: personas[dominant],
+      tendencyTags: Array.from(tags)
+    };
+  };
+
+  const handleSaveAssessment = async () => {
+    setSavingAssessment(true);
+    try {
+      const { personaType, tendencyTags } = diagnosePersona(assessmentAnswers);
+      await updateMember(member.id, {
+        surveyAnswers: assessmentAnswers,
+        personaType,
+        tendencyTags
+      });
+      showToast('Personalized assessment updated successfully', 'success');
+      setShowAssessmentModal(false);
+    } catch (err) {
+      showToast('Failed to update assessment', 'error');
+    } finally {
+      setSavingAssessment(false);
+    }
+  };
   const [commissionDirectorPositions, setCommissionDirectorPositions] = useState<BoardMember[]>([]);
 
   const mentor = members.find(m => m.id === member.mentorId);
@@ -1644,8 +1809,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       await MembersService.assignMentor(member.id, mentorId);
       showToast('Mentor assigned successfully', 'success');
       setShowMentorMatchModal(false);
-      // Refresh member data
-      window.location.reload();
     } catch (err) {
       showToast('Failed to assign mentor', 'error');
     }
@@ -1668,7 +1831,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     try {
       await updateMember(member.id, updates);
       setShowEditModal(false);
-      window.location.reload();
     } catch (err) {
       // Error is handled in the hook
     }
@@ -1686,6 +1848,66 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       setShowDeleteConfirm(false);
     }
   };
+
+  // JCI Pillar Diagnosis dynamic scoring
+  const pillarDiagnosis = useMemo(() => {
+    const tags = member.tendencyTags || [];
+
+    // 1. Individual
+    let indTagsScore = tags.includes('Individual') ? 10 : 0;
+    const indTagItems = ['Effective Communications', 'Public Speaking', 'JCIM Inspire', 'Mentorship', 'Local Academy', 'Explore/Discover workshop', 'JCIM Empower', 'Leadership Series', 'Workshops', 'Personal Transformation', 'TOYM'];
+    indTagsScore += tags.filter(t => indTagItems.includes(t)).length * 4;
+    const indBase = 60;
+    const indAttendance = Math.round((member.attendanceRate || 0) * 0.15);
+    const indPersona = member.personaType?.includes('Learning') ? 10 : 0;
+    const individual = Math.min(99, Math.max(20, indBase + Math.min(25, indTagsScore) + indAttendance + indPersona));
+
+    // 2. Business
+    let bizTagsScore = tags.includes('Business') ? 10 : 0;
+    const bizTagItems = ['JIB', 'CYEA', 'CYE', 'BCP', 'Networking', 'BSP', 'BSP Supercharge'];
+    bizTagsScore += tags.filter(t => bizTagItems.includes(t)).length * 5;
+    const bizBase = 40;
+    const bizWillingness = member.acceptInternationalBusiness === 'Yes' ? 25 : member.acceptInternationalBusiness === 'Willing to Explore' ? 12 : 0;
+    const bizProfile = (member.companyName || member.profession) ? 5 : 0;
+    const bizPersona = member.personaType?.includes('Practical') ? 10 : 0;
+    const business = Math.min(99, Math.max(15, bizBase + Math.min(25, bizTagsScore) + bizWillingness + bizProfile + bizPersona));
+
+    // 3. Community
+    let commTagsScore = tags.includes('Community') ? 10 : 0;
+    const commTagItems = ['Project Management', 'Leadership Toolkit', 'Leaders School Program', 'Chairperson', 'Zero Waste', 'Blood Donation', 'SDA'];
+    commTagsScore += tags.filter(t => commTagItems.includes(t)).length * 5;
+    const commBase = 50;
+    const commRole = (member.role === UserRole.BOARD || member.role === UserRole.ADMIN || member.isCurrentBoardMember) ? 20 : member.role === UserRole.MEMBER ? 10 : 0;
+    const commPersona = member.personaType?.includes('Backbone') ? 10 : 0;
+    const community = Math.min(99, Math.max(15, commBase + Math.min(25, commTagsScore) + commRole + commPersona));
+
+    // 4. International
+    let intTagsScore = tags.includes('International') ? 15 : 0;
+    const intTagItems = ['ASPAC', 'World Congress', 'Twin Chapter', 'National Convention', 'Conference'];
+    intTagsScore += tags.filter(t => intTagItems.includes(t)).length * 5;
+    const intBase = 30;
+    const intWillingness = member.acceptInternationalBusiness === 'Yes' ? 10 : member.acceptInternationalBusiness === 'Willing to Explore' ? 5 : 0;
+    const intConnections = (member.internationalConnections && member.internationalConnections.length > 0) ? 15 : 0;
+    const intPersona = member.personaType?.includes('Explorer') ? 10 : 0;
+    const international = Math.min(99, Math.max(15, intBase + Math.min(25, intTagsScore) + intWillingness + intConnections + intPersona));
+
+    // Calculate dynamic dominant persona
+    let dominant = 'LOCAL COMMUNITY LEADER';
+    if (member.personaType) {
+      if (member.personaType.includes('Learning')) dominant = 'CONTINUOUS SELF-IMPROVER';
+      else if (member.personaType.includes('Practical')) dominant = 'GLOBAL ASSET HUNTER';
+      else if (member.personaType.includes('Backbone')) dominant = 'COMMUNITY BACKBONE LEAD';
+      else if (member.personaType.includes('Explorer')) dominant = 'GLOBAL HORIZONS EXPLORER';
+    } else {
+      const maxScore = Math.max(individual, business, community, international);
+      if (maxScore === individual) dominant = 'CONTINUOUS SELF-IMPROVER';
+      else if (maxScore === business) dominant = 'GLOBAL ASSET HUNTER';
+      else if (maxScore === community) dominant = 'COMMUNITY BACKBONE LEAD';
+      else if (maxScore === international) dominant = 'GLOBAL HORIZONS EXPLORER';
+    }
+
+    return { individual, business, community, international, dominant };
+  }, [member]);
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300">
@@ -1740,7 +1962,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
             <div className="flex gap-2 w-full md:w-auto">
               {(canEditMembers || isSelfView) && (
-                <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)} className="flex-1 md:flex-none h-10 px-6 font-bold">Edit Profile</Button>
+                <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-1 md:flex-none h-10 px-6 font-bold">Edit Profile</Button>
               )}
               {(isAdmin || isDeveloper) && !isSelfView && (
                 <Button
@@ -1752,7 +1974,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                     try {
                       await updateMember(member.id, { role: newRole });
                       showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
-                      window.location.reload();
                     } catch (err) {
                       showToast('Failed to update member status', 'error');
                     }
@@ -1804,15 +2025,28 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             <Target size={120} />
           </div>
           <div className="relative z-10 p-2">
-            <h3 className="text-sm font-black text-blue-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Sparkles size={16} /> JCI Pillar Diagnosis
-            </h3>
+            <div className="flex justify-between items-center mb-4 gap-2">
+              <h3 className="text-sm font-black text-blue-300 uppercase tracking-widest flex items-center gap-2">
+                <Sparkles size={16} /> JCI Pillar Diagnosis
+              </h3>
+              {(canEditMembers || isSelfView) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAssessmentModal(true)}
+                  className="text-[10px] bg-white/10 hover:bg-white/20 text-white border border-white/20 px-2.5 py-1 h-auto flex items-center gap-1 font-bold rounded-lg transition-all"
+                >
+                  <Settings size={12} />
+                  Update Assessment
+                </Button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: 'Individual', val: member.attendanceRate > 80 ? 95 : 65, color: 'bg-blue-400' },
-                { label: 'Business', val: member.acceptInternationalBusiness === 'Yes' ? 90 : 40, color: 'bg-emerald-400' },
-                { label: 'Community', val: member.role !== UserRole.GUEST ? 85 : 30, color: 'bg-purple-400' },
-                { label: 'International', val: member.acceptInternationalBusiness === 'Willing to Explore' ? 75 : 20, color: 'bg-orange-400' }
+                { label: 'Individual', val: pillarDiagnosis.individual, color: 'bg-blue-400' },
+                { label: 'Business', val: pillarDiagnosis.business, color: 'bg-emerald-400' },
+                { label: 'Community', val: pillarDiagnosis.community, color: 'bg-purple-400' },
+                { label: 'International', val: pillarDiagnosis.international, color: 'bg-orange-400' }
               ].map((p, i) => (
                 <div key={i} className="space-y-2">
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
@@ -1832,7 +2066,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             <div className="mt-6 p-3 bg-white/5 rounded-xl border border-white/10">
               <p className="text-[10px] text-blue-200 font-bold uppercase mb-1">Dominant Persona</p>
               <p className="text-lg font-black italic text-white flex items-center gap-2">
-                {member.acceptInternationalBusiness === 'Yes' ? 'GLOBAL ASSET HUNTER' : 'LOCAL COMMUNITY LEADER'}
+                {pillarDiagnosis.dominant}
                 <Badge className="bg-jci-blue text-blue text-[8px]">AI Profile</Badge>
               </p>
             </div>
@@ -1874,60 +2108,248 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="space-y-6">
-          <Card title="Basic Information">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-slate-500 block text-xs uppercase font-medium">Full Name (ID)</span>
-                  <p className="font-medium text-slate-900">{member.fullName || 'Not provided'}</p>
+          <Card
+            title="Basic Information"
+            action={
+              (canEditMembers || isSelfView) && activeInlineEditCard !== 'basic' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                  onClick={() => startInlineEdit('basic')}
+                  title="Edit Basic Info"
+                >
+                  <Edit size={14} />
+                </Button>
+              )
+            }
+          >
+            {activeInlineEditCard === 'basic' && inlineValues ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name (Short)<span className="text-red-500 ml-1">*</span></label>
+                    <input
+                      type="text"
+                      value={inlineValues.name}
+                      onChange={e => setInlineValues({...inlineValues, name: e.target.value})}
+                      required
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name (ID)</label>
+                    <input
+                      type="text"
+                      value={inlineValues.fullName}
+                      onChange={e => setInlineValues({...inlineValues, fullName: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
+                    <input
+                      type="text"
+                      value={inlineValues.idNumber}
+                      onChange={e => setInlineValues({...inlineValues, idNumber: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
+                    <input
+                      type="date"
+                      value={inlineValues.dateOfBirth}
+                      onChange={e => setInlineValues({...inlineValues, dateOfBirth: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
+                    <select
+                      value={inlineValues.gender}
+                      onChange={e => setInlineValues({...inlineValues, gender: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ethnicity</label>
+                    <select
+                      value={inlineValues.ethnicity}
+                      onChange={e => setInlineValues({...inlineValues, ethnicity: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                    >
+                      <option value="">Select Ethnicity</option>
+                      <option value="Chinese">Chinese</option>
+                      <option value="Malay">Malay</option>
+                      <option value="Indian">Indian</option>
+                      <option value="Others">Others</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
+                    <input
+                      type="text"
+                      value={inlineValues.nationality}
+                      onChange={e => setInlineValues({...inlineValues, nationality: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
+                    <input
+                      type="text"
+                      value={inlineValues.introducer}
+                      onChange={e => setInlineValues({...inlineValues, introducer: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-xs uppercase font-medium">ID Number</span>
-                  <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-xs uppercase font-medium">Gender</span>
-                  <p className="font-medium text-slate-900">{member.gender || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
-                  <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
-                  <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
-                  <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
-                </div>
-              </div>
 
-              <div className="border-t pt-3">
-                <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
-                <p className="text-sm font-medium text-slate-900">{member.introducer || 'Direct Join'}</p>
-              </div>
+                <div className="border-t pt-3">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
+                  <textarea
+                    value={inlineValues.bio}
+                    onChange={e => setInlineValues({...inlineValues, bio: e.target.value})}
+                    rows={2}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y"
+                  />
+                </div>
 
-              <div className="border-t pt-3">
-                <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</span>
-                <p className="text-sm text-slate-600 line-clamp-4 italic">
-                  {member.bio || 'No biography provided.'}
-                </p>
-              </div>
+                <div className="border-t pt-3">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Hobbies</label>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 border border-slate-200 rounded-lg bg-slate-50">
+                    {HOBBY_OPTIONS.map(opt => {
+                      const isChecked = inlineValues.hobbies.includes(opt);
+                      return (
+                        <label key={opt} className="cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={e => {
+                              const newHobbies = e.target.checked
+                                ? [...inlineValues.hobbies, opt]
+                                : inlineValues.hobbies.filter((h: string) => h !== opt);
+                              setInlineValues({ ...inlineValues, hobbies: newHobbies });
+                            }}
+                            className="hidden"
+                          />
+                          <span className={`inline-block px-2 py-1 rounded text-[10px] font-semibold border ${
+                            isChecked
+                              ? 'bg-jci-blue text-white border-jci-blue'
+                              : 'bg-white text-slate-600 border-slate-300 hover:border-jci-blue'
+                          }`}>
+                            {opt}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              <div className="border-t pt-3">
-                <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Hobbies</span>
-                <div className="flex flex-wrap gap-1">
-                  {Array.isArray(member.hobbies) && member.hobbies.length > 0 ? (
-                    member.hobbies.map(hobby => (
-                      <Badge key={hobby} variant="neutral" className="text-[10px]">{hobby}</Badge>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-400 italic">No hobbies listed</span>
-                  )}
+                <div className="border-t pt-3">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Skills</label>
+                  <input
+                    type="text"
+                    value={inlineValues.skills}
+                    onChange={e => setInlineValues({...inlineValues, skills: e.target.value})}
+                    placeholder="e.g. Public Speaking, Event Management (comma separated)"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={() => {
+                    const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+                    handleInlineSave('basic', {
+                      name: inlineValues.name,
+                      fullName: inlineValues.fullName,
+                      idNumber: inlineValues.idNumber,
+                      dateOfBirth: inlineValues.dateOfBirth,
+                      gender: inlineValues.gender,
+                      ethnicity: inlineValues.ethnicity,
+                      nationality: inlineValues.nationality,
+                      introducer: inlineValues.introducer,
+                      bio: inlineValues.bio,
+                      hobbies: inlineValues.hobbies,
+                      skills: skillsArr,
+                    });
+                  }}>Save</Button>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-medium">Full Name (ID)</span>
+                    <p className="font-medium text-slate-900">{member.fullName || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-medium">ID Number</span>
+                    <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-medium">Gender</span>
+                    <p className="font-medium text-slate-900">{member.gender || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
+                    <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
+                    <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
+                    <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
+                  <p className="text-sm font-medium text-slate-900">{member.introducer || 'Direct Join'}</p>
+                </div>
+
+                <div className="border-t pt-3">
+                  <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</span>
+                  <p className="text-sm text-slate-600 line-clamp-4 italic">
+                    {member.bio || 'No biography provided.'}
+                  </p>
+                </div>
+
+                <div className="border-t pt-3">
+                  <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Hobbies</span>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.isArray(member.hobbies) && member.hobbies.length > 0 ? (
+                      member.hobbies.map(hobby => (
+                        <Badge key={hobby} variant="neutral" className="text-[10px]">{hobby}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">No hobbies listed</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Skills</span>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.isArray(member.skills) && member.skills.length > 0 ? (
+                      member.skills.map(skill => (
+                        <Badge key={skill} variant="neutral" className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100">{skill}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">No skills listed</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card title="Quick Stats">
@@ -1986,16 +2408,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             </div>
           </Card>
 
-          <Card title="Skills Matrix">
-            <div className="flex flex-wrap gap-2">
-              {Array.isArray(member.skills) && member.skills.map(skill => (
-                <Badge key={skill} variant="neutral">{skill}</Badge>
-              ))}
-              <button className="px-2 py-1 text-xs border border-dashed border-slate-300 rounded hover:border-jci-blue hover:text-jci-blue transition-colors">
-                + Add
-              </button>
-            </div>
-          </Card>
 
           <Card title="Hobby Clubs">
             {loadingClubs ? (
@@ -2059,178 +2471,566 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   <span className="text-slate-500">Last Payment Date:</span>
                   <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</span>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowPaymentHistoryModal(true)}
+                  className="mt-2 w-full font-bold text-slate-700 hover:text-jci-blue border-slate-200 hover:border-jci-blue flex items-center justify-center gap-1.5"
+                >
+                  <Clock size={12} /> View Payment History
+                </Button>
               </div>
             </div>
           </Card>
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <Card title="Professional & Business">
-            <div className="space-y-6">
-              <div className="text-sm">
-                <p className="font-bold text-slate-900 leading-tight">{member.companyName || 'Freelance / Not Provided'}</p>
-                {member.companyWebsite && (
-                  <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline">
-                    Visit Website
-                  </a>
+          <Card
+            title="Professional & Business"
+            action={
+              (canEditMembers || isSelfView) && activeInlineEditCard !== 'professional' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                  onClick={() => startInlineEdit('professional')}
+                  title="Edit Professional Info"
+                >
+                  <Edit size={14} />
+                </Button>
+              )
+            }
+          >
+            {activeInlineEditCard === 'professional' && inlineValues ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Name</label>
+                    <input
+                      type="text"
+                      value={inlineValues.companyName}
+                      onChange={e => setInlineValues({...inlineValues, companyName: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Website</label>
+                    <input
+                      type="text"
+                      value={inlineValues.companyWebsite}
+                      onChange={e => setInlineValues({...inlineValues, companyWebsite: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position / Title</label>
+                    <input
+                      type="text"
+                      value={inlineValues.departmentAndPosition}
+                      onChange={e => setInlineValues({...inlineValues, departmentAndPosition: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Industry</label>
+                    <select
+                      value={inlineValues.industry}
+                      onChange={e => setInlineValues({...inlineValues, industry: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    >
+                      <option value="">Select Industry</option>
+                      {INDUSTRY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Intl. Business Engagement</label>
+                    <select
+                      value={inlineValues.acceptInternationalBusiness}
+                      onChange={e => setInlineValues({...inlineValues, acceptInternationalBusiness: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    >
+                      <option value="">Select Option</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                      <option value="Willing to Explore">Willing to Explore</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-t pt-3">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories (Comma separated)</label>
+                    <input
+                      type="text"
+                      value={inlineValues.businessCategory.join(', ')}
+                      onChange={e => {
+                        const cats = e.target.value.split(',').map(c => c.trim()).filter(c => c.length > 0);
+                        setInlineValues({...inlineValues, businessCategory: cats});
+                      }}
+                      placeholder="e.g. Retail, Consulting"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Intl. Partnerships (Comma separated)</label>
+                    <input
+                      type="text"
+                      value={inlineValues.internationalPartnershipTypes.join(', ')}
+                      onChange={e => {
+                        const partners = e.target.value.split(',').map(p => p.trim()).filter(p => p.length > 0);
+                        setInlineValues({...inlineValues, internationalPartnershipTypes: partners});
+                      }}
+                      placeholder="e.g. Distributor, Joint Venture"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
+                  <textarea
+                    value={inlineValues.companyDescription}
+                    onChange={e => setInlineValues({...inlineValues, companyDescription: e.target.value})}
+                    rows={2}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
+                  />
+                </div>
+
+                <div className="border-t pt-3">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Special Member Offer</label>
+                  <input
+                    type="text"
+                    value={inlineValues.specialOffer}
+                    onChange={e => setInlineValues({...inlineValues, specialOffer: e.target.value})}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={() => handleInlineSave('professional', {
+                    companyName: inlineValues.companyName,
+                    companyWebsite: inlineValues.companyWebsite,
+                    departmentAndPosition: inlineValues.departmentAndPosition,
+                    industry: inlineValues.industry,
+                    acceptInternationalBusiness: inlineValues.acceptInternationalBusiness,
+                    businessCategory: inlineValues.businessCategory,
+                    internationalPartnershipTypes: inlineValues.internationalPartnershipTypes,
+                    companyDescription: inlineValues.companyDescription,
+                    specialOffer: inlineValues.specialOffer,
+                  })}>Save</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="text-sm">
+                  <p className="font-bold text-slate-900 leading-tight">{member.companyName || 'Freelance / Not Provided'}</p>
+                  {member.companyWebsite && (
+                    <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline">
+                      Visit Website
+                    </a>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                  <div>
+                    <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
+                    <p className="font-medium text-slate-900">{member.departmentAndPosition || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
+                    <p className="font-medium text-slate-900">{member.industry || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
+                    <p className="font-medium text-slate-900">{member.acceptInternationalBusiness || 'Unknown'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div>
+                    <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
+                        member.businessCategory.map((cat, idx) => (
+                          <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-slate-400 italic">None</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-xs uppercase font-medium">International Partnerships</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Array.isArray(member.internationalPartnershipTypes) && member.internationalPartnershipTypes.length > 0 ? (
+                        member.internationalPartnershipTypes.map((type, idx) => (
+                          <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
+                        ))
+                      ) : (
+                        <span className="text-slate-400 italic">None</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {member.companyDescription && (
+                  <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
+                    <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
+                    <p className="text-xs text-slate-600 leading-relaxed">{member.companyDescription}</p>
+                  </div>
+                )}
+
+                {member.specialOffer && (
+                  <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
+                    <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
+                    <p className="text-sm font-medium text-slate-800">{member.specialOffer}</p>
+                  </div>
                 )}
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                  <p className="font-medium text-slate-900">{member.departmentAndPosition || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
-                  <p className="font-medium text-slate-900">{member.industry || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
-                  <p className="font-medium text-slate-900">{member.acceptInternationalBusiness || 'Unknown'}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
-                      member.businessCategory.map((cat, idx) => (
-                        <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
-                      ))
-                    ) : (
-                      <span className="text-slate-400 italic">None</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Interested Industries</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {Array.isArray(member.interestedIndustries) && member.interestedIndustries.length > 0 ? (
-                      member.interestedIndustries.map((ind, idx) => (
-                        <Badge key={idx} variant="info" className="text-[10px] bg-indigo-50 text-indigo-600 border-indigo-100">{ind}</Badge>
-                      ))
-                    ) : (
-                      <span className="text-slate-400 italic">None</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">International Partnerships</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {Array.isArray(member.internationalPartnershipTypes) && member.internationalPartnershipTypes.length > 0 ? (
-                      member.internationalPartnershipTypes.map((type, idx) => (
-                        <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
-                      ))
-                    ) : (
-                      <span className="text-slate-400 italic">None</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {member.companyDescription && (
-                <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
-                  <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
-                  <p className="text-xs text-slate-600 leading-relaxed">{member.companyDescription}</p>
-                </div>
-              )}
-
-              {member.specialOffer && (
-                <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
-                  <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
-                  <p className="text-sm font-medium text-slate-800">{member.specialOffer}</p>
-                </div>
-              )}
-            </div>
+            )}
           </Card>
 
-          <Card title="Contact Information">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                    <Phone size={16} />
+          <Card
+            title="Contact Information"
+            action={
+              (canEditMembers || isSelfView) && activeInlineEditCard !== 'contact' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                  onClick={() => startInlineEdit('contact')}
+                  title="Edit Contact Info"
+                >
+                  <Edit size={14} />
+                </Button>
+              )
+            }
+          >
+            {activeInlineEditCard === 'contact' && inlineValues ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Primary Phone</label>
+                    <input
+                      type="text"
+                      value={inlineValues.phone}
+                      onChange={e => setInlineValues({...inlineValues, phone: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
-                    <p className="text-sm font-bold">{member.phone || 'N/A'}</p>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Alternate Phone</label>
+                    <input
+                      type="text"
+                      value={inlineValues.alternatePhone}
+                      onChange={e => setInlineValues({...inlineValues, alternatePhone: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={inlineValues.email}
+                      onChange={e => setInlineValues({...inlineValues, email: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WhatsApp Group Added</label>
+                    <select
+                      value={inlineValues.whatsappGroup ? 'Yes' : 'No'}
+                      onChange={e => setInlineValues({...inlineValues, whatsappGroup: e.target.value === 'Yes'})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    >
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
+                    <textarea
+                      value={inlineValues.address}
+                      onChange={e => setInlineValues({...inlineValues, address: e.target.value})}
+                      rows={2}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
+                    />
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                    <Phone size={16} className="rotate-90" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
-                    <p className="text-sm font-bold">{member.alternatePhone || 'N/A'}</p>
+
+                <div className="border-t pt-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Emergency Contact</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name</label>
+                      <input
+                        type="text"
+                        value={inlineValues.emergencyContactName}
+                        onChange={e => setInlineValues({...inlineValues, emergencyContactName: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Relationship</label>
+                      <input
+                        type="text"
+                        value={inlineValues.emergencyContactRelationship}
+                        onChange={e => setInlineValues({...inlineValues, emergencyContactRelationship: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
+                      <input
+                        type="text"
+                        value={inlineValues.emergencyContactPhone}
+                        onChange={e => setInlineValues({...inlineValues, emergencyContactPhone: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-jci-blue">
-                    <MessageCircle size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium">WhatsApp Group</p>
-                    <p className="text-sm font-bold">{member.whatsappGroup || 'Not Added'}</p>
+
+                <div className="border-t pt-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Social Media Links</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-slate-500 block text-xs font-medium mb-1">LinkedIn</label>
+                      <input
+                        type="text"
+                        value={inlineValues.linkedin}
+                        onChange={e => setInlineValues({...inlineValues, linkedin: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-500 block text-xs font-medium mb-1">Facebook</label>
+                      <input
+                        type="text"
+                        value={inlineValues.facebook}
+                        onChange={e => setInlineValues({...inlineValues, facebook: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-500 block text-xs font-medium mb-1">Instagram</label>
+                      <input
+                        type="text"
+                        value={inlineValues.instagram}
+                        onChange={e => setInlineValues({...inlineValues, instagram: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-500 block text-xs font-medium mb-1">WeChat ID</label>
+                      <input
+                        type="text"
+                        value={inlineValues.wechat}
+                        onChange={e => setInlineValues({...inlineValues, wechat: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                    <MapPin size={16} />
+
+                <div className="flex justify-end gap-2 pt-3 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={() => handleInlineSave('contact', {
+                    phone: inlineValues.phone,
+                    alternatePhone: inlineValues.alternatePhone,
+                    email: inlineValues.email,
+                    whatsappGroup: inlineValues.whatsappGroup,
+                    address: inlineValues.address,
+                    emergencyContactName: inlineValues.emergencyContactName,
+                    emergencyContactRelationship: inlineValues.emergencyContactRelationship,
+                    emergencyContactPhone: inlineValues.emergencyContactPhone,
+                    linkedin: inlineValues.linkedin,
+                    facebook: inlineValues.facebook,
+                    instagram: inlineValues.instagram,
+                    wechat: inlineValues.wechat,
+                  })}>Save</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                      <Phone size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
+                      <p className="text-sm font-bold">{member.phone || 'N/A'}</p>
+                    </div>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                      <Phone size={16} className="rotate-90" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
+                      <p className="text-sm font-bold">{member.alternatePhone || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-jci-blue">
+                      <MessageCircle size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-medium">WhatsApp Group</p>
+                      <p className="text-sm font-bold">{member.whatsappGroup ? 'Yes' : 'Not Added'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                      <MapPin size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-medium">Address</p>
+                      <p className="text-sm text-slate-700">{member.address || 'No address on file'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1">Emergency Contact</h4>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium">Address</p>
-                    <p className="text-sm text-slate-700">{member.address || 'No address on file'}</p>
+                    <p className="text-sm font-bold text-slate-900">{member.emergencyContactName || 'None Listed'}</p>
+                    <p className="text-xs text-slate-500">{member.emergencyContactRelationship} • {member.emergencyContactPhone}</p>
+                  </div>
+
+                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
+                  <div className="flex gap-4">
+                    {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Linkedin size={20} /></a>}
+                    {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Facebook size={20} /></a>}
+                    {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Instagram size={20} /></a>}
+                    {member.wechat && <div className="text-slate-400 flex items-center gap-1"><MessageCircle size={20} /><span className="text-xs font-medium">{member.wechat}</span></div>}
                   </div>
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1">Emergency Contact</h4>
-                <div>
-                  <p className="text-sm font-bold text-slate-900">{member.emergencyContactName || 'None Listed'}</p>
-                  <p className="text-xs text-slate-500">{member.emergencyContactRelationship} • {member.emergencyContactPhone}</p>
-                </div>
-
-                <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
-                <div className="flex gap-4">
-                  {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Linkedin size={20} /></a>}
-                  {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Facebook size={20} /></a>}
-                  {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Instagram size={20} /></a>}
-                  {member.wechat && <div className="text-slate-400 flex items-center gap-1"><MessageCircle size={20} /><span className="text-xs font-medium">{member.wechat}</span></div>}
-                </div>
-              </div>
-            </div>
+            )}
           </Card>
 
-          <Card title="Apparel & Items">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-3 border rounded-lg text-center">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">Cut Style</span>
-                <p className="font-bold text-slate-900">{member.cutStyle || 'N/A'}</p>
+          <Card
+            title="Apparel & Items"
+            action={
+              (canEditMembers || isSelfView) && activeInlineEditCard !== 'apparel' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                  onClick={() => startInlineEdit('apparel')}
+                  title="Edit Apparel Size"
+                >
+                  <Edit size={14} />
+                </Button>
+              )
+            }
+          >
+            {activeInlineEditCard === 'apparel' && inlineValues ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Cut Style</label>
+                    <select
+                      value={inlineValues.cutStyle}
+                      onChange={e => setInlineValues({...inlineValues, cutStyle: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    >
+                      <option value="">Select Cut</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">T-Shirt Size</label>
+                    <select
+                      value={inlineValues.tshirtSize}
+                      onChange={e => setInlineValues({...inlineValues, tshirtSize: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    >
+                      <option value="">Select Size</option>
+                      {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Jacket Size</label>
+                    <select
+                      value={inlineValues.jacketSize}
+                      onChange={e => setInlineValues({...inlineValues, jacketSize: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    >
+                      <option value="">Select Size</option>
+                      {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Logo Status</label>
+                    <select
+                      value={inlineValues.tshirtStatus}
+                      onChange={e => setInlineValues({...inlineValues, tshirtStatus: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    >
+                      <option value="NA">NA</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Received">Received</option>
+                      <option value="Delivered">Delivered</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Embroidered Name</label>
+                  <input
+                    type="text"
+                    value={inlineValues.embroideredName}
+                    onChange={e => setInlineValues({...inlineValues, embroideredName: e.target.value})}
+                    placeholder="Embroidered Name on Jacket"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={() => handleInlineSave('apparel', {
+                    cutStyle: inlineValues.cutStyle,
+                    tshirtSize: inlineValues.tshirtSize,
+                    jacketSize: inlineValues.jacketSize,
+                    tshirtStatus: inlineValues.tshirtStatus,
+                    embroideredName: inlineValues.embroideredName,
+                  })}>Save</Button>
+                </div>
               </div>
-              <div className="p-3 border rounded-lg text-center">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">T-Shirt</span>
-                <p className="font-bold text-slate-900">{member.tshirtSize || 'N/A'}</p>
-              </div>
-              <div className="p-3 border rounded-lg text-center">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">Jacket</span>
-                <p className="font-bold text-slate-900">{member.jacketSize || 'N/A'}</p>
-              </div>
-              <div className="p-3 border rounded-lg text-center">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">Logo Status</span>
-                <Badge variant={member.tshirtStatus === 'Received' || member.tshirtStatus === 'Delivered' ? 'success' : 'warning'}>
-                  {member.tshirtStatus || 'N/A'}
-                </Badge>
-              </div>
-            </div>
-            {member.embroideredName && (
-              <div className="mt-4 p-2 bg-slate-50 rounded text-center border-t border-slate-200">
-                <span className="text-xs text-slate-500">Embroidered Name: </span>
-                <span className="text-sm font-bold text-slate-900 italic">"{member.embroideredName}"</span>
-              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 border rounded-lg text-center">
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Cut Style</span>
+                    <p className="font-bold text-slate-900">{member.cutStyle || 'N/A'}</p>
+                  </div>
+                  <div className="p-3 border rounded-lg text-center">
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">T-Shirt</span>
+                    <p className="font-bold text-slate-900">{member.tshirtSize || 'N/A'}</p>
+                  </div>
+                  <div className="p-3 border rounded-lg text-center">
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Jacket</span>
+                    <p className="font-bold text-slate-900">{member.jacketSize || 'N/A'}</p>
+                  </div>
+                  <div className="p-3 border rounded-lg text-center">
+                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Logo Status</span>
+                    <Badge variant={member.tshirtStatus === 'Received' || member.tshirtStatus === 'Delivered' ? 'success' : 'warning'}>
+                      {member.tshirtStatus || 'N/A'}
+                    </Badge>
+                  </div>
+                </div>
+                {member.embroideredName && (
+                  <div className="mt-4 p-2 bg-slate-50 rounded text-center border-t border-slate-200">
+                    <span className="text-xs text-slate-500">Embroidered Name: </span>
+                    <span className="text-sm font-bold text-slate-900 italic">"{member.embroideredName}"</span>
+                  </div>
+                )}
+              </>
             )}
           </Card>
 
@@ -2260,108 +3060,108 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                     return 'current';
                   };
 
-                type TimelineItem = {
-                  sortKey: string; type: 'career' | 'board' | 'commission';
-                  year: string; title: string; subtitle?: string;
-                  bodStatus?: 'former' | 'current' | 'elected';
-                };
-                const items: TimelineItem[] = [];
+                  type TimelineItem = {
+                    sortKey: string; type: 'career' | 'board' | 'commission';
+                    year: string; title: string; subtitle?: string;
+                    bodStatus?: 'former' | 'current' | 'elected';
+                  };
+                  const items: TimelineItem[] = [];
 
-                // Career history from member profile
-                if (Array.isArray(member.careerHistory)) {
-                  member.careerHistory.forEach(m => {
-                    items.push({ sortKey: String(m.year), type: 'career', year: String(m.year), title: m.role, subtitle: m.description });
+                  // Career history from member profile
+                  if (Array.isArray(member.careerHistory)) {
+                    member.careerHistory.forEach(m => {
+                      items.push({ sortKey: String(m.year), type: 'career', year: String(m.year), title: m.role, subtitle: m.description });
+                    });
+                  }
+
+                  // Board positions from Firestore boardMembers collection
+                  boardPositions.forEach(bp => {
+                    items.push({
+                      sortKey: bp.term,
+                      type: 'board',
+                      year: bp.term,
+                      title: bp.position,
+                      subtitle: `Board of Directors – ${bp.term}`,
+                      bodStatus: getBodStatus(bp),
+                    });
                   });
-                }
 
-                // Board positions from Firestore boardMembers collection
-                boardPositions.forEach(bp => {
-                  items.push({
-                    sortKey: bp.term,
-                    type: 'board',
-                    year: bp.term,
-                    title: bp.position,
-                    subtitle: `Board of Directors – ${bp.term}`,
-                    bodStatus: getBodStatus(bp),
+                  // Commission Director records from Board of Directors assignments
+                  commissionDirectorPositions.forEach(bp => {
+                    items.push({
+                      sortKey: bp.term,
+                      type: 'commission',
+                      year: bp.term,
+                      title: 'Commission Director',
+                      subtitle: `Under ${bp.position} - ${bp.term}`,
+                      bodStatus: getBodStatus(bp),
+                    });
                   });
-                });
 
-                // Commission Director records from Board of Directors assignments
-                commissionDirectorPositions.forEach(bp => {
-                  items.push({
-                    sortKey: bp.term,
-                    type: 'commission',
-                    year: bp.term,
-                    title: 'Commission Director',
-                    subtitle: `Under ${bp.position} - ${bp.term}`,
-                    bodStatus: getBodStatus(bp),
-                  });
-                });
+                  // Sort chronologically
+                  items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
-                // Sort chronologically
-                items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-
-                return items.map((item, idx) => {
-                  if (item.type === 'board') {
-                    const statusConfig = {
-                      current:  { dot: 'bg-amber-100 text-amber-600',  badge: 'bg-amber-100 text-amber-700',  label: '现任', icon: 'text-amber-500' },
-                      elected:  { dot: 'bg-blue-100 text-blue-600',    badge: 'bg-blue-100 text-blue-700',    label: 'Elected', icon: 'text-blue-500' },
-                      former:   { dot: 'bg-slate-100 text-slate-500',  badge: 'bg-slate-100 text-slate-600',  label: '历届', icon: 'text-slate-400' },
-                    };
-                    const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
+                  return items.map((item, idx) => {
+                    if (item.type === 'board') {
+                      const statusConfig = {
+                        current: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700', label: '现任', icon: 'text-amber-500' },
+                        elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
+                        former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: '历届', icon: 'text-slate-400' },
+                      };
+                      const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
+                      return (
+                        <div key={`board-${idx}`} className="relative">
+                          <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
+                            <Award size={14} />
+                          </div>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs text-slate-400 font-mono">{item.year}</span>
+                            <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Shield size={10} className={cfg.icon} />
+                            <p className={`text-xs font-medium ${cfg.icon}`}>Board of Directors</p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (item.type === 'commission') {
+                      const statusConfig = {
+                        current: { dot: 'bg-sky-100 text-sky-600', badge: 'bg-sky-100 text-sky-700', label: 'Current', icon: 'text-sky-500' },
+                        elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
+                        former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Former', icon: 'text-slate-400' },
+                      };
+                      const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
+                      return (
+                        <div key={`commission-${idx}`} className="relative">
+                          <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
+                            <UserCog size={14} />
+                          </div>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs text-slate-400 font-mono">{item.year}</span>
+                            <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <UserCog size={10} className={cfg.icon} />
+                            <p className={`text-xs font-medium ${cfg.icon}`}>{item.subtitle}</p>
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
-                      <div key={`board-${idx}`} className="relative">
-                        <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
-                          <Award size={14} />
+                      <div key={`career-${idx}`} className="relative">
+                        <div className="absolute -left-8 bg-blue-100 text-jci-blue p-1 rounded-full border-4 border-white">
+                          <Briefcase size={14} />
                         </div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs text-slate-400 font-mono">{item.year}</span>
-                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
-                        </div>
+                        <span className="text-xs text-slate-400 font-mono mb-1 block">{item.year}</span>
                         <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <Shield size={10} className={cfg.icon} />
-                          <p className={`text-xs font-medium ${cfg.icon}`}>Board of Directors</p>
-                        </div>
+                        {item.subtitle && <p className="text-sm text-slate-600">{item.subtitle}</p>}
                       </div>
                     );
-                  }
-                  if (item.type === 'commission') {
-                    const statusConfig = {
-                      current: { dot: 'bg-sky-100 text-sky-600', badge: 'bg-sky-100 text-sky-700', label: 'Current', icon: 'text-sky-500' },
-                      elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
-                      former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Former', icon: 'text-slate-400' },
-                    };
-                    const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
-                    return (
-                      <div key={`commission-${idx}`} className="relative">
-                        <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
-                          <UserCog size={14} />
-                        </div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs text-slate-400 font-mono">{item.year}</span>
-                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <UserCog size={10} className={cfg.icon} />
-                          <p className={`text-xs font-medium ${cfg.icon}`}>{item.subtitle}</p>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={`career-${idx}`} className="relative">
-                      <div className="absolute -left-8 bg-blue-100 text-jci-blue p-1 rounded-full border-4 border-white">
-                        <Briefcase size={14} />
-                      </div>
-                      <span className="text-xs text-slate-400 font-mono mb-1 block">{item.year}</span>
-                      <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                      {item.subtitle && <p className="text-sm text-slate-600">{item.subtitle}</p>}
-                    </div>
-                  );
-                });
-              })()}
+                  });
+                })()}
 
                 {/* Empty state */}
                 {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
@@ -2374,36 +3174,52 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                 {[
                   {
-                    label: 'Foundation',
-                    title: 'Training Participation',
-                    description: 'Attend chapter learning sessions and build facilitation confidence.',
-                    status: member.attendanceRate >= 70 ? 'Active' : 'Upcoming',
-                    tone: member.attendanceRate >= 70 ? 'green' : 'slate',
+                    label: 'Level 1',
+                    title: 'JCI Certified Trainer',
+                    description: 'Pre-requisites: Graduate from JCI Discover',
+                    status: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'Completed' : 'Upcoming',
+                    tone: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'green' : 'slate',
                     icon: GraduationCap,
                   },
                   {
-                    label: 'Practice',
-                    title: 'Local Facilitation',
-                    description: 'Support workshops, emcee segments, or lead small-group activities.',
-                    status: member.role === UserRole.BOARD || member.role === UserRole.ADMIN ? 'Ready' : 'Next',
-                    tone: member.role === UserRole.BOARD || member.role === UserRole.ADMIN ? 'blue' : 'amber',
+                    label: 'Level 2',
+                    title: 'JCIM Intermediate Trainer',
+                    description: 'Pre-requisites: Graduate from JCI Presenter/ JCI Facilitator, JCIM Inspire, JCIM Empower',
+                    status: (member.skills?.includes('JCI Presenter') || member.skills?.includes('JCI Facilitator') || member.points >= 400) ? 'Completed' : (member.points >= 150 ? 'In Progress' : 'Upcoming'),
+                    tone: (member.skills?.includes('JCI Presenter') || member.skills?.includes('JCI Facilitator') || member.points >= 400) ? 'green' : (member.points >= 150 ? 'blue' : 'slate'),
                     icon: UserCheck,
                   },
                   {
-                    label: 'Certification',
-                    title: 'JCI Trainer Development',
-                    description: 'Track pathway toward certified trainer opportunities.',
-                    status: 'Planned',
-                    tone: 'slate',
+                    label: 'Level 3',
+                    title: 'JCIM Certified Trainer',
+                    description: 'Pre-requisites: Accumulate 10 training hours, graduate from JCIM TTT 1',
+                    status: (member.skills?.includes('JCIM TTT 1') || member.points >= 800) ? 'Completed' : (member.points >= 400 ? 'In Progress' : 'Upcoming'),
+                    tone: (member.skills?.includes('JCIM TTT 1') || member.points >= 800) ? 'green' : (member.points >= 400 ? 'blue' : 'slate'),
                     icon: Award,
+                  },
+                  {
+                    label: 'Level 4',
+                    title: 'JCIM Principal Trainer',
+                    description: 'Pre-requisites: Accumulate 25 training hours, Head trainer of JCIM Empower or JCIM Inspire, graduate from JCIM TTT 2',
+                    status: (member.skills?.includes('JCIM TTT 2') || member.points >= 1500) ? 'Completed' : (member.points >= 800 ? 'In Progress' : 'Upcoming'),
+                    tone: (member.skills?.includes('JCIM TTT 2') || member.points >= 1500) ? 'green' : (member.points >= 800 ? 'blue' : 'slate'),
+                    icon: Shield,
+                  },
+                  {
+                    label: 'Level 5',
+                    title: 'JCIM Master Trainer',
+                    description: 'Pre-requisites: Accumulate 30 training hours, assistant trainer to area academy',
+                    status: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'Completed' : (member.points >= 1500 ? 'In Progress' : 'Upcoming'),
+                    tone: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'green' : (member.points >= 1500 ? 'blue' : 'slate'),
+                    icon: Zap,
                   },
                 ].map((step) => {
                   const Icon = step.icon;
                   const toneClass = {
-                    green: { dot: 'bg-green-100 text-green-600', badge: 'bg-green-100 text-green-700' },
-                    blue: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700' },
-                    amber: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700' },
-                    slate: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600' },
+                    green: { dot: 'bg-green-100 text-green-600', badge: 'bg-green-100 text-green-700 font-bold border border-green-200' },
+                    blue: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700 font-bold border border-blue-200' },
+                    amber: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700 font-bold border border-amber-200' },
+                    slate: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600 font-bold border border-slate-200' },
                   }[step.tone];
 
                   return (
@@ -2413,10 +3229,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       </div>
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-xs text-slate-400 font-mono">{step.label}</span>
-                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${toneClass.badge}`}>{step.status}</span>
+                        <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-full ${toneClass.badge}`}>{step.status}</span>
                       </div>
                       <h4 className="text-sm font-bold text-slate-900">{step.title}</h4>
-                      <p className="text-sm text-slate-600">{step.description}</p>
+                      <p className="text-xs text-slate-600 leading-normal">{step.description}</p>
                     </div>
                   );
                 })}
@@ -2440,6 +3256,245 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         </div>
       </div>
 
+      {showAssessmentModal && (
+        <Modal
+          isOpen={showAssessmentModal}
+          onClose={() => setShowAssessmentModal(false)}
+          title="Personalized Assessment Update"
+          size="lg"
+        >
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                Update member's alignment answers to recalculate JCI Pillar Diagnosis scores and tags.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAssessmentShowZh(v => !v)}
+                title={assessmentShowZh ? 'Switch to English' : '切换到中文'}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${assessmentShowZh
+                  ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                  : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
+                  }`}
+              >
+                <span className="text-[11px]">🌐</span>
+                {assessmentShowZh ? 'EN' : '中文'}
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {JOIN_US_SURVEY_QUESTIONS.map((q, idx) => {
+                const selectedValues = assessmentAnswers[q.id] || [];
+                const isAnswered = selectedValues.length > 0;
+                return (
+                  <div
+                    key={q.id}
+                    className={`rounded-xl border-2 overflow-hidden transition-all duration-200 ${isAnswered ? 'border-blue-200 shadow-sm' : 'border-slate-100'
+                      }`}
+                  >
+                    {/* Question Header */}
+                    <div
+                      className={`px-4 py-3 flex items-center justify-between gap-3 ${isAnswered ? 'bg-blue-50/60' : 'bg-slate-50/80'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <span
+                          className={`flex-none flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold border-2 transition-all ${isAnswered
+                            ? 'bg-jci-blue text-white border-jci-blue shadow-sm'
+                            : 'bg-white text-slate-400 border-slate-200'
+                            }`}
+                        >
+                          {isAnswered ? <CheckCircle size={12} /> : idx + 1}
+                        </span>
+                        <h4
+                          className={`text-xs font-bold leading-snug ${isAnswered ? 'text-slate-800' : 'text-slate-600'
+                            }`}
+                        >
+                          {assessmentShowZh ? (q as any).titleZh ?? q.title : q.title}
+                        </h4>
+                      </div>
+                      {isAnswered && (
+                        <span className="text-[10px] font-bold text-jci-blue bg-blue-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                          {selectedValues.length} selected
+                        </span>
+                      )}
+                    </div>
+                    {/* Options */}
+                    <div className="px-2 pb-2 pt-1 grid grid-cols-1 gap-0.5">
+                      {q.options.map(opt => {
+                        const isSelected = selectedValues.includes(opt.value);
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              const current = assessmentAnswers[q.id] || [];
+                              const updated = isSelected
+                                ? current.filter(v => v !== opt.value)
+                                : [...current, opt.value];
+                              setAssessmentAnswers({
+                                ...assessmentAnswers,
+                                [q.id]: updated
+                              });
+                            }}
+                            className={`
+                              w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 group border-none outline-none
+                              ${isSelected ? 'bg-blue-50/80' : 'hover:bg-slate-50'}
+                            `}
+                          >
+                            {/* Checkbox indicator */}
+                            <div
+                              className={`
+                                flex-none w-4 h-4 rounded border flex items-center justify-center transition-all duration-150
+                                ${isSelected
+                                  ? 'bg-jci-blue border-jci-blue text-white'
+                                  : 'border-slate-300 group-hover:border-blue-300 bg-white'
+                                }
+                              `}
+                            >
+                              {isSelected && (
+                                <svg width="8" height="6" viewBox="0 0 10 8" fill="none">
+                                  <path
+                                    d="M1 4L3.5 6.5L9 1"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                            </div>
+                            <span
+                              className={`text-[12px] font-semibold leading-relaxed flex-1 ${isSelected ? 'text-jci-blue' : 'text-slate-600'
+                                }`}
+                            >
+                              {assessmentShowZh ? (opt as any).labelZh ?? opt.label : opt.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
+              <Button
+                variant="outline"
+                onClick={() => setShowAssessmentModal(false)}
+                disabled={savingAssessment}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveAssessment}
+                isLoading={savingAssessment}
+              >
+                Save & Recalculate
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showPaymentHistoryModal && (
+        <Modal
+          isOpen={showPaymentHistoryModal}
+          onClose={() => setShowPaymentHistoryModal(false)}
+          title={`Membership Dues History — ${member.name}`}
+          size="md"
+          bottomSheet
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Complete record of annual membership dues payments.
+            </p>
+
+            <div className="divide-y divide-slate-100">
+              {member.membership && Object.keys(member.membership).length > 0 ? (
+                Object.keys(member.membership)
+                  .sort((a, b) => b.localeCompare(a))
+                  .map((yr) => {
+                    const record = member.membership![yr];
+                    const isPaid = record.status === 'paid' || record.status === 'over paid';
+                    const isPending = record.status === 'pending';
+                    const statusColorClass = isPaid
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : isPending
+                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                        : 'bg-red-100 text-red-800 border border-red-200';
+
+                    const isCurrentYear = yr === String(new Date().getFullYear());
+
+                    return (
+                      <div key={yr} className={`py-4 flex items-start justify-between gap-4 first:pt-0 last:pb-0 ${isCurrentYear ? 'relative' : ''}`}>
+                        {isCurrentYear && (
+                          <div className="absolute -left-1 top-3 bottom-3 w-0.5 bg-jci-blue rounded-full" />
+                        )}
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-sm font-black ${isCurrentYear ? 'text-jci-blue' : 'text-slate-900'}`}>
+                              {yr} Membership Dues
+                            </span>
+                            {isCurrentYear && (
+                              <span className="text-[9px] font-black uppercase tracking-wider bg-jci-blue/10 text-jci-blue px-1.5 py-0.5 rounded">
+                                Current Year
+                              </span>
+                            )}
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${statusColorClass}`}>
+                              {record.status}
+                            </span>
+                          </div>
+                          {record.paymentDate && (
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              <Calendar size={11} className="text-slate-400" />
+                              Paid on: {formatDateToDDMMMYYYY(record.paymentDate)}
+                            </p>
+                          )}
+                          {record.purpose && (
+                            <p className="text-xs text-slate-500 italic leading-relaxed">
+                              "{record.purpose}"
+                            </p>
+                          )}
+                          {Array.isArray(record.transactionId) && record.transactionId.length > 0 && (
+                            <p className="text-[10px] text-slate-400 font-mono">
+                              {record.transactionId.length} transaction{record.transactionId.length > 1 ? 's' : ''} linked
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className={`text-base font-black ${isPaid ? 'text-green-700' : isPending ? 'text-amber-700' : 'text-red-700'}`}>
+                            RM {record.amount || 0}
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-medium">
+                            Target: RM {record.dues || 0}
+                          </p>
+                          {record.dues > 0 && record.amount >= record.dues && (
+                            <p className="text-[10px] text-green-600 font-bold">✓ Fulfilled</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="py-10 text-center text-slate-400">
+                  <Coins size={36} className="mx-auto mb-3 text-slate-200" />
+                  <p className="text-sm font-medium">No payment history found.</p>
+                  <p className="text-xs mt-1">Dues records will appear here once processed.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => setShowPaymentHistoryModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {showMentorMatchModal && (
         <MentorMatchingModal
           mentee={member}
@@ -2457,23 +3512,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         />
       )}
 
-      {showEditModal && (
-        <Modal
-          isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          title={isSelfView ? `Edit Your Profile` : `Edit Member Profile: ${member.name}`}
-          size="xl"
-          bottomSheet
-          scrollInBody={false}
-        >
-          <MemberEditForm
-            member={member}
-            onSubmit={handleEditProfile}
-            onCancel={() => setShowEditModal(false)}
-            selfEditableOnly={isSelfView}
-          />
-        </Modal>
-      )}
 
       {showDeleteConfirm && (
         <Modal

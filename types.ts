@@ -420,7 +420,7 @@ export interface Member {
   tshirtStatus?: 'NA' | 'Requested' | 'Sent' | 'Delivered' | 'Received'; // T恤领取状态
 
   // 5. 准会员调查 (Join Us Survey)
-  surveyAnswers?: Record<string, string>; // Q1-Q5 answers
+  surveyAnswers?: Record<string, string | string[]>; // Q1-Q5 answers
   personaType?: string; // Learning-oriented, Practical-oriented, etc.
   tendencyTags?: string[]; // Directional, Category, and Activity tags
 }

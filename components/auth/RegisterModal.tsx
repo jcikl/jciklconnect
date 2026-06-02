@@ -42,7 +42,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     password: '',
     confirmPassword: '',
     // Step 3: Profile & Survey
-    surveyAnswers: {} as Record<string, string>,
+    surveyAnswers: {} as Record<string, string[]>,
     selectedHobbies: [] as string[],
     // Step 4: Agreement
     agreeToTerms: false,
@@ -50,6 +50,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showZh, setShowZh] = useState(false);
   const { signUp } = useAuth();
   const { showToast } = useToast();
 
@@ -118,10 +119,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         }
         return true;
       case 3:
-        // Validate all survey questions are answered
-        const answeredCount = Object.keys(formData.surveyAnswers).length;
+        // Validate all survey questions have at least one answer
+        const answeredCount = Object.keys(formData.surveyAnswers).filter(
+          k => formData.surveyAnswers[k]?.length > 0
+        ).length;
         if (answeredCount < JOIN_US_SURVEY_QUESTIONS.length) {
-          setError(`Please answer all ${JOIN_US_SURVEY_QUESTIONS.length} assessment questions`);
+          setError(`Please answer all ${JOIN_US_SURVEY_QUESTIONS.length} assessment questions (${answeredCount}/${JOIN_US_SURVEY_QUESTIONS.length} answered)`);
           return false;
         }
         return true;
@@ -220,7 +223,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         nationality: 'Malaysia',
         password: '',
         confirmPassword: '',
-        surveyAnswers: {},
+        surveyAnswers: {} as Record<string, string[]>,
         selectedHobbies: [],
         agreeToTerms: false,
         agreeToPrivacy: false,
@@ -237,25 +240,27 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   /**
    * Helper to diagnose persona and tags based on survey responses
    */
-  const diagnosePersona = (answers: Record<string, string>) => {
+  const diagnosePersona = (answers: Record<string, string[]>) => {
     const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
     const tags = new Set<string>();
 
-    // Q1-Q4 map to Directions A-D
+    // Q1-Q4 map to Directions A-D (multi-select: each selection counts)
     JOIN_US_SURVEY_QUESTIONS.forEach(q => {
-      const answer = answers[q.id];
-      if (!answer) return;
+      const selectedValues = answers[q.id] || [];
+      if (!selectedValues.length) return;
 
-      if (['Q1', 'Q2', 'Q3', 'Q4'].includes(q.id)) {
-        counts[answer] = (counts[answer] || 0) + 1;
-      }
+      selectedValues.forEach(answer => {
+        if (['Q1', 'Q2', 'Q3', 'Q4'].includes(q.id)) {
+          counts[answer] = (counts[answer] || 0) + 1;
+        }
 
-      const option = q.options.find(opt => opt.value === answer);
-      if (option && option.mapping) {
-        if (option.mapping.direction !== 'None') tags.add(option.mapping.direction);
-        if (option.mapping.category !== 'Engagement') tags.add(option.mapping.category);
-        option.mapping.items.forEach(item => tags.add(item));
-      }
+        const option = q.options.find(opt => opt.value === answer);
+        if (option && option.mapping) {
+          if (option.mapping.direction !== 'None') tags.add(option.mapping.direction);
+          if (option.mapping.category !== 'Engagement') tags.add(option.mapping.category);
+          option.mapping.items.forEach(item => tags.add(item));
+        }
+      });
     });
 
     // Determine dominant direction
@@ -409,112 +414,107 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
         );
 
-      case 3:
+      case 3: {
+        const answeredQCount = Object.keys(formData.surveyAnswers).filter(
+          k => formData.surveyAnswers[k]?.length > 0
+        ).length;
         return (
-          <div className="space-y-6 animate-fade-in pr-1">
-            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-start gap-4 mb-4">
-              <div className="bg-blue-600 p-2 rounded-lg text-white shadow-md">
-                <Sparkles size={20} />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">Personalized Assessment</h4>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Tell us more about your goals. We'll use this to match you with the best projects and growth opportunities.
-                </p>
-              </div>
+          <div className="space-y-2 animate-fade-in pr-1">
+            {/* Header row with toggle */}
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="font-bold text-slate-500 text-sm leading-tight">Personalized Assessment</h4>
+              <button
+                type="button"
+                onClick={() => setShowZh(v => !v)}
+                title={showZh ? 'Switch to English' : '切换到中文'}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                  showZh
+                    ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                    : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                <span className="text-[11px]">🌐</span>
+                {showZh ? 'EN' : '中文'}
+              </button>
             </div>
-
-            {JOIN_US_SURVEY_QUESTIONS.map((q, idx) => (
-              <div key={q.id} className="space-y-4 p-1">
-                <div className="flex items-start gap-3">
-                  <span className="flex-none flex items-center justify-center w-6 h-6 rounded-full bg-jci-blue/10 text-[10px] font-bold text-jci-blue border border-jci-blue/20 mt-0.5">
-                    {idx + 1}
-                  </span>
-                  <h4 className="text-sm font-semibold text-slate-900 leading-snug">{q.title}</h4>
-                </div>
-                <div className="grid grid-cols-1 gap-2 ml-9">
-                  {q.options.map(opt => (
-                    <label
-                      key={opt.value}
-                      className={`
-                        relative flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all duration-200
-                        ${formData.surveyAnswers[q.id] === opt.value
-                          ? 'border-jci-blue bg-blue-50/50 shadow-sm ring-1 ring-jci-blue/20 scale-[1.01]'
-                          : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
-                        }
-                      `}
-                    >
-                      <input
-                        type="radio"
-                        name={q.id}
-                        value={opt.value}
-                        checked={formData.surveyAnswers[q.id] === opt.value}
-                        onChange={() => {
-                          setFormData({
-                            ...formData,
-                            surveyAnswers: { ...formData.surveyAnswers, [q.id]: opt.value }
-                          });
-                          if (error) setError(null);
-                        }}
-                        className="hidden"
-                      />
-                      <div className={`
-                        w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center transition-all
-                        ${formData.surveyAnswers[q.id] === opt.value ? 'border-jci-blue bg-jci-blue' : 'border-slate-300'}
-                      `}>
-                        {formData.surveyAnswers[q.id] === opt.value && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                        )}
-                      </div>
-                      <span className={`text-xs font-medium leading-relaxed ${formData.surveyAnswers[q.id] === opt.value ? 'text-jci-blue' : 'text-slate-600'}`}>
-                        {opt.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            <div className="pt-4 border-t border-slate-100">
-              <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <Star size={16} className="text-amber-500" />
-                Hobbies & Interests (Optional)
-              </label>
-              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
-                {HOBBY_OPTIONS.map(opt => (
-                  <label key={opt} className="cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.selectedHobbies.includes(opt)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormData({ ...formData, selectedHobbies: [...formData.selectedHobbies, opt] });
-                        } else {
-                          setFormData({ ...formData, selectedHobbies: formData.selectedHobbies.filter(h => h !== opt) });
-                        }
-                      }}
-                      className="hidden"
-                    />
-                    <span className={`
-                      inline-block px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 
-                      ${formData.selectedHobbies.includes(opt)
-                        ? 'bg-jci-blue text-white border-jci-blue shadow-md'
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-jci-blue/30'
-                      }
-                    `}>
-                      {opt}
+            <p className="text-sm text-slate-500 mb-4">
+              Select all that apply — we'll match you with the best opportunities.
+            </p>
+            {JOIN_US_SURVEY_QUESTIONS.map((q, idx) => {
+              const selectedValues: string[] = formData.surveyAnswers[q.id] || [];
+              const isAnswered = selectedValues.length > 0;
+              return (
+                <div key={q.id} className={`rounded-2xl border-2 overflow-hidden transition-all duration-200 ${isAnswered ? 'border-blue-200 shadow-sm' : 'border-slate-100'
+                  }`}>
+                  {/* Question header */}
+                  <div className={`px-4 py-3 flex items-center gap-3 ${isAnswered ? 'bg-blue-50/60' : 'bg-slate-50/80'
+                    }`}>
+                    <span className={`flex-none flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold border-2 transition-all ${isAnswered
+                      ? 'bg-jci-blue text-white border-jci-blue shadow-md'
+                      : 'bg-white text-slate-400 border-slate-200'
+                      }`}>
+                      {isAnswered ? <CheckCircle size={13} /> : idx + 1}
                     </span>
-                  </label>
-                ))}
-              </div>
-              {formData.selectedHobbies.length > 0 && (
-                <p className="text-[10px] font-bold text-jci-blue mt-2 ml-1 uppercase tracking-widest">
-                  {formData.selectedHobbies.length} Items Selected
-                </p>
-              )}
-            </div>
+                    <h4 className={`text-[13px] font-semibold leading-snug flex-1 ${isAnswered ? 'text-slate-800' : 'text-slate-600'
+                      }`}>{showZh ? (q as any).titleZh ?? q.title : q.title}</h4>
+                    {isAnswered && (
+                      <span className="text-[10px] font-bold text-jci-blue bg-blue-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                        {selectedValues.length} selected
+                      </span>
+                    )}
+                  </div>
+                  {/* Options */}
+                  <div className="px-2 pb-2 grid grid-cols-1 gap-0.5">
+                    {q.options.map(opt => {
+                      const isSelected = selectedValues.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            const current: string[] = formData.surveyAnswers[q.id] || [];
+                            const updated = isSelected
+                              ? current.filter(v => v !== opt.value)
+                              : [...current, opt.value];
+                            setFormData({
+                              ...formData,
+                              surveyAnswers: { ...formData.surveyAnswers, [q.id]: updated }
+                            });
+                            if (error) setError(null);
+                          }}
+                          className={`
+                            w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all duration-150 group
+                            ${isSelected
+                              ? 'bg-blue-50'
+                              : 'hover:bg-slate-50'
+                            }
+                          `}
+                        >
+                          {/* Checkbox indicator */}
+                          <div className={`
+                            flex-none w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-150
+                            ${isSelected ? 'bg-jci-blue border-jci-blue' : 'border-slate-300 group-hover:border-blue-300'}
+                          `}>
+                            {isSelected && (
+                              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </div>
+                          <span className={`text-[12px] font-medium leading-relaxed flex-1 ${isSelected ? 'text-jci-blue' : 'text-slate-600'
+                            }`}>
+                            {showZh ? (opt as any).labelZh ?? opt.label : opt.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
+      }
 
       case 4:
         return (
