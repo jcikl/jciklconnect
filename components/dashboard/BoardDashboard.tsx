@@ -1531,17 +1531,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                     onChange={(e) => setInsightSearch(e.target.value)}
                   />
                 </div>
-                <div className="w-full md:w-48">
-                  <Select
-                    options={monthNamesBase.map((name, index) => ({
-                      label: `🎂 ${name}`,
-                      value: index.toString()
-                    }))}
-                    value={selectedBirthdayMonth.toString()}
-                    onChange={(e) => setSelectedBirthdayMonth(parseInt(e.target.value, 10))}
-                  />
-                </div>
-                <div className="w-full md:w-48">
+                <div className="w-full md:w-64">
                   <Select
                     options={[
                       { label: 'All Dues Status', value: 'All' },
@@ -1565,16 +1555,28 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
               return (
                 <Card
                   title={
-                    <div className="flex items-center justify-between w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
                       <div className="flex items-center gap-2">
                         <Calendar className="text-jci-blue" size={20} />
                         <span className="font-bold text-lg text-slate-800">Birthdays in {monthName}</span>
                       </div>
-                      {isCurrent && (
-                        <Badge variant="info" className="animate-pulse bg-blue-50 text-jci-blue border-blue-100 px-3 py-1 text-xs">
-                          Current Month
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {isCurrent && (
+                          <Badge variant="info" className="animate-pulse bg-blue-50 text-jci-blue border-blue-100 px-3 py-1 text-xs whitespace-nowrap">
+                            Current Month
+                          </Badge>
+                        )}
+                        <div className="w-40">
+                          <Select
+                            options={monthNamesBase.map((name, index) => ({
+                              label: `🎂 ${name}`,
+                              value: index.toString()
+                            }))}
+                            value={selectedBirthdayMonth.toString()}
+                            onChange={(e) => setSelectedBirthdayMonth(parseInt(e.target.value, 10))}
+                          />
+                        </div>
+                      </div>
                     </div>
                   }
                   className={`border-t-4 ${isCurrent ? 'border-t-jci-blue bg-blue-50/10' : 'border-t-slate-200'}`}
@@ -1678,7 +1680,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                       <p className="text-slate-500 text-sm mt-1 max-w-sm mx-auto">No members have birthdays in {monthName} matching the active dues status filter or search query.</p>
                     </div>
                   )}
-                  
+
                   <div className="px-6 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
                     <span>Total Members: {monthMembers.length}</span>
                     <span>Selected Month: {monthName}</span>
