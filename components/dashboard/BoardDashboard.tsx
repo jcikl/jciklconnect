@@ -26,7 +26,7 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 
-type MemberWithDues = Member & { duesStatus: string; duesYear: number; duesPaidDate?: string };
+type MemberWithDues = Member & { duesStatus: string; duesYear: number; duesPaidDate?: string; latestPaidYear?: string | null };
 
 interface BoardDashboardProps {
   onNavigate?: (view: any, memberId?: string | null) => void;
@@ -67,11 +67,23 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
       const isPaid = record?.status === 'paid' || record?.status === 'over paid';
       const isOverdue = record?.status === 'overdue';
 
+      // Find the latest paid year in membership history
+      let latestPaidYear: string | null = null;
+      if (m.membership) {
+        const paidYears = Object.entries(m.membership)
+          .filter(([_, rec]) => rec.status === 'paid' || rec.status === 'over paid')
+          .map(([year]) => parseInt(year, 10));
+        if (paidYears.length > 0) {
+          latestPaidYear = Math.max(...paidYears).toString();
+        }
+      }
+
       return {
         ...m,
         duesStatus: isPaid ? 'Paid' : isOverdue ? 'Overdue' : 'Pending',
         duesYear: record?.year || currentYear,
-        duesPaidDate: record?.paymentDate
+        duesPaidDate: record?.paymentDate,
+        latestPaidYear
       } as MemberWithDues;
     });
   }, [rawMembers]);
@@ -1754,13 +1766,16 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                         </div>
 
                         {/* Dues Status */}
-                        <div className="col-span-2 flex justify-center">
+                        <div className="col-span-2 flex flex-col items-center justify-center gap-0.5">
                           <Badge
                             variant={m.duesStatus === 'Paid' ? 'success' : m.duesStatus === 'Overdue' ? 'error' : 'warning'}
                             className="text-[10px] px-2 py-0.5"
                           >
                             {m.duesStatus}
                           </Badge>
+                          <span className="text-[9px] text-slate-400 font-medium whitespace-nowrap">
+                            {m.latestPaidYear ? `Paid: ${m.latestPaidYear}` : 'Never Paid'}
+                          </span>
                         </div>
 
                         {/* WhatsApp Status */}
