@@ -44,6 +44,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [isDevMode, setIsDevMode] = useState(false);
   const [simulatedRole, setSimulatedRole] = useState<UserRole | null>(null);
+  const [originalRole, setOriginalRole] = useState<UserRole | null>(null);
 
   // Load persisted auth state on mount (runs first, before Firebase listener)
   useEffect(() => {
@@ -396,6 +397,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signOut = async () => {
+    setSimulatedRole(null);
+    setOriginalRole(null);
     if (isDevMode) {
       setIsDevMode(false);
       setDevMode(false);
@@ -449,23 +452,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const simulateRole = (role: UserRole | null) => {
-    if (!isDevMode || !member) return;
+    if (!member) return;
+
+    let currentOriginal = originalRole;
+    if (!currentOriginal) {
+      currentOriginal = member.role;
+      setOriginalRole(member.role);
+    }
+
+    // Only allow if in dev mode OR original role is ADMIN
+    if (!isDevMode && currentOriginal !== UserRole.ADMIN) {
+      return;
+    }
 
     setSimulatedRole(role);
 
     // Update member with simulated role
-    if (role) {
-      setMember({
-        ...member,
-        role: role,
-      });
-    } else {
-      // Reset to original admin role
-      setMember({
-        ...member,
-        role: UserRole.ADMIN,
-      });
-    }
+    setMember({
+      ...member,
+      role: role || UserRole.ADMIN,
+    });
   };
 
   return (

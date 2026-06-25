@@ -7,7 +7,8 @@ import { User, Shield, Crown, UserCheck } from 'lucide-react';
 export const RoleSimulator: React.FC = () => {
   const { isDevMode, simulatedRole, simulateRole, member } = useAuth();
 
-  if (!isDevMode || !member) return null;
+  const isAllowedToSimulate = isDevMode || member?.role === UserRole.ADMIN || simulatedRole !== null;
+  if (!isAllowedToSimulate || !member) return null;
 
   const roles = [
     { value: null, label: 'Developer', icon: Shield, color: 'bg-purple-100 text-purple-700' },

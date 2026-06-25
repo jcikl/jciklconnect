@@ -175,8 +175,8 @@ export const usePermissions = () => {
   const devMode = isDevMode() || isDevModeFromAuth;
 
   const permissions = useMemo(() => {
-    // If role is being simulated in dev mode, use that role's permissions
-    if (devMode && simulatedRole) {
+    // If role is being simulated, use that role's permissions
+    if (simulatedRole) {
       return ROLE_PERMISSIONS[simulatedRole] || ROLE_PERMISSIONS[UserRole.MEMBER];
     }
 
@@ -216,7 +216,7 @@ export const usePermissions = () => {
 
   const hasPermission = (permission: keyof Permission): boolean => {
     // If role is being simulated, use that role's permissions
-    if (devMode && simulatedRole) {
+    if (simulatedRole) {
       return permissions[permission];
     }
     // Developer mode without simulation: always return true
@@ -228,7 +228,7 @@ export const usePermissions = () => {
 
   const hasAnyPermission = (...perms: (keyof Permission)[]): boolean => {
     // If role is being simulated, use that role's permissions
-    if (devMode && simulatedRole) {
+    if (simulatedRole) {
       return perms.some(perm => permissions[perm]);
     }
     // Developer mode without simulation: always return true
@@ -240,7 +240,7 @@ export const usePermissions = () => {
 
   const hasAllPermissions = (...perms: (keyof Permission)[]): boolean => {
     // If role is being simulated, use that role's permissions
-    if (devMode && simulatedRole) {
+    if (simulatedRole) {
       return perms.every(perm => permissions[perm]);
     }
     // Developer mode without simulation: always return true
@@ -251,7 +251,7 @@ export const usePermissions = () => {
   };
 
   // Determine effective role (simulated role in dev mode, or actual member role)
-  const effectiveRole = devMode && simulatedRole ? simulatedRole : (member?.role || UserRole.GUEST);
+  const effectiveRole = simulatedRole ? simulatedRole : (member?.role || UserRole.GUEST);
 
   const isCurrentBoardMember = isMemberCurrentBoard(member);
   const isLegacyBoardRole = effectiveRole === UserRole.BOARD;

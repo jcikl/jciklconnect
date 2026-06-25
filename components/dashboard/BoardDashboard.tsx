@@ -47,7 +47,7 @@ interface BoardDashboardProps {
 }
 
 export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOpenNotifications, onOpenSearch, searchQuery, onSearchChange, scrollRef }) => {
-  const { member, signOut } = useAuth();
+  const { member, signOut, isDevMode, simulatedRole, simulateRole } = useAuth();
 
   // Header Scroll Animations
   const { scrollY } = useScroll({ container: scrollRef });
@@ -525,6 +525,27 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
           </div>
 
           <div className="flex items-center space-x-1">
+            {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
+              <div className="flex items-center bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-2 py-1 transition-all mr-2">
+                <Shield size={13} className="text-purple-300 mr-1.5 shrink-0" />
+                <select
+                  value={simulatedRole || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    simulateRole(val ? val as UserRole : null);
+                    showToast(val ? `Simulating ${val} role` : 'Reset to Admin role', 'info');
+                  }}
+                  className="bg-transparent text-white text-[11px] font-bold focus:outline-none cursor-pointer pr-1 leading-none border-0 p-0"
+                  title="Simulate Role"
+                >
+                  <option value="" className="text-slate-800 font-bold bg-white">Dev/Admin</option>
+                  <option value={UserRole.ADMIN} className="text-slate-800 font-bold bg-white">Admin</option>
+                  <option value={UserRole.MEMBER} className="text-slate-800 font-bold bg-white">Member</option>
+                  <option value={UserRole.GUEST} className="text-slate-800 font-bold bg-white">Guest</option>
+                </select>
+              </div>
+            )}
+
             <button
               onClick={onOpenSearch}
               className="p-0 text-white/70 hover:text-white transition-all group"
