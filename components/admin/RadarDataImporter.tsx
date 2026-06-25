@@ -1592,7 +1592,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
+      <Card noPadding className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative w-full sm:max-w-xs">
           <input
             type="text"
@@ -1641,11 +1641,11 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
               <SortHeader field="name" label="Member" />
               <SortHeader field="points" label="Total Points" />
               <th className="py-3.5 px-4 font-bold text-slate-600 bg-slate-50 border-b border-slate-200">Tier</th>
-              <SortHeader field="leadership" label="Leadership 🏆" />
-              <SortHeader field="training" label="Training 📚" />
-              <SortHeader field="recruitment" label="Recruitment 🤝" />
-              <SortHeader field="sponsorship" label="Sponsorship 💰" />
-              <SortHeader field="events" label="Events 📅" />
+              <SortHeader field="leadership" label="Leadership" />
+              <SortHeader field="training" label="Training" />
+              <SortHeader field="recruitment" label="Recruitment" />
+              <SortHeader field="sponsorship" label="Sponsorship" />
+              <SortHeader field="events" label="Events" />
               <th className="py-3.5 px-4 font-bold text-slate-600 bg-slate-50 border-b border-slate-200 text-center">Action</th>
             </tr>
           </thead>
