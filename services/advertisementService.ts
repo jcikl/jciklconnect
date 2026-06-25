@@ -316,8 +316,8 @@ export class AdvertisementService {
       if (memberId) conditions.push(where('memberId', '==', memberId));
       
       const q = conditions.length > 0 
-        ? query(collection(db, 'benefit_usages'), ...conditions, orderBy('usedAt', 'desc'))
-        : query(collection(db, 'benefit_usages'), orderBy('usedAt', 'desc'));
+        ? query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), ...conditions, orderBy('usedAt', 'desc'))
+        : query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), orderBy('usedAt', 'desc'));
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
