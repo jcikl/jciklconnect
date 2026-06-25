@@ -714,6 +714,24 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
 
+    // Radar Contributions collection
+    match /RadarContributions/{contributionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+
+    // Sponsorships collection
+    match /sponsorships/{sponsorshipId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+
+    // System config collection (e.g. radar_mappings)
+    match /system/{systemId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

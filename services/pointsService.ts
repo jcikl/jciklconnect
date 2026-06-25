@@ -20,7 +20,6 @@ import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants
 import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress, RadarPointsConfig } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
-import { MOCK_MEMBERS, CURRENT_USER, MOCK_DEV_ADMIN } from './mockData';
 
 export interface PointTransaction {
   id?: string;
@@ -1413,39 +1412,6 @@ export class PointsService {
   static async recalculateMemberRadarStats(memberId: string): Promise<void> {
     if (isDevMode()) {
       console.log(`[DEV MODE] Recalculating radar stats for member ${memberId}`);
-      const mIdx = MOCK_MEMBERS.findIndex(m => m.id === memberId);
-      if (mIdx !== -1) {
-        const current = MOCK_MEMBERS[mIdx];
-        const stats = { ...(current.radarStats || { leadership: 0, training: 0, recruitment: 0, sponsorship: 0, events: 0 }) };
-        
-        if (stats.leadership === 0 && stats.training === 0 && stats.recruitment === 0 && stats.sponsorship === 0 && stats.events === 0) {
-          stats.leadership = Math.floor(Math.random() * 30) + 10;
-          stats.training = Math.floor(Math.random() * 25) + 5;
-          stats.recruitment = Math.floor(Math.random() * 6) * 10;
-          stats.sponsorship = Math.floor(Math.random() * 8) * 10;
-          stats.events = Math.floor(Math.random() * 50) + 15;
-        } else {
-          stats.leadership += 2;
-          stats.events += 3;
-        }
-
-        const totalPoints = stats.leadership + stats.training + stats.recruitment + stats.sponsorship + stats.events;
-        const tier = this.calculateTier(totalPoints);
-
-        MOCK_MEMBERS[mIdx] = {
-          ...current,
-          radarStats: stats,
-          points: totalPoints,
-          tier
-        };
-
-        if (CURRENT_USER.id === memberId) {
-          Object.assign(CURRENT_USER, { radarStats: stats, points: totalPoints, tier });
-        }
-        if (MOCK_DEV_ADMIN.id === memberId) {
-          Object.assign(MOCK_DEV_ADMIN, { radarStats: stats, points: totalPoints, tier });
-        }
-      }
       return;
     }
 
