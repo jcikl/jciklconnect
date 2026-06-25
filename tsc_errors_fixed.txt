@@ -1,0 +1,19 @@
+﻿components/modules/Finance/BankTransactionImportModal-Original.tsx(602,13): error TS2322: Type '{ children: string; onClick: () => Promise<void>; disabled: boolean; loading: boolean; className: string; }' is not assignable to type 'IntrinsicAttributes & ButtonProps'.
+  Property 'loading' does not exist on type 'IntrinsicAttributes & ButtonProps'. Did you mean 'isLoading'?
+temp.tsx(4,70): error TS2307: Cannot find module '../ui/Common' or its corresponding type declarations.
+temp.tsx(5,31): error TS2307: Cannot find module '../ui/Form' or its corresponding type declarations.
+temp.tsx(6,28): error TS2307: Cannot find module '../../hooks/useMembers' or its corresponding type declarations.
+temp.tsx(7,27): error TS2307: Cannot find module '../../hooks/useEvents' or its corresponding type declarations.
+temp.tsx(8,29): error TS2307: Cannot find module '../../hooks/useProjects' or its corresponding type declarations.
+temp.tsx(9,27): error TS2307: Cannot find module '../../hooks/usePoints' or its corresponding type declarations.
+temp.tsx(10,30): error TS2307: Cannot find module '../../hooks/useInventory' or its corresponding type declarations.
+temp.tsx(11,31): error TS2307: Cannot find module '../../hooks/useHobbyClubs' or its corresponding type declarations.
+temp.tsx(12,38): error TS2307: Cannot find module '../../hooks/useBusinessDirectory' or its corresponding type declarations.
+temp.tsx(13,32): error TS2307: Cannot find module '../../services/financeService' or its corresponding type declarations.
+temp.tsx(14,46): error TS2307: Cannot find module '../../services/reportService' or its corresponding type declarations.
+temp.tsx(15,37): error TS2307: Cannot find module '../../services/aiPredictionService' or its corresponding type declarations.
+temp.tsx(16,32): error TS2307: Cannot find module '../../utils/formatUtils' or its corresponding type declarations.
+temp.tsx(17,34): error TS2307: Cannot find module '../../types' or its corresponding type declarations.
+temp.tsx(18,25): error TS2307: Cannot find module '../../hooks/useAuth' or its corresponding type declarations.
+temp.tsx(19,34): error TS2307: Cannot find module '../../hooks/useCommunication' or its corresponding type declarations.
+temp.tsx(20,60): error TS2307: Cannot find module './Analytics' or its corresponding type declarations.

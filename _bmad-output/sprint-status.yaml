@@ -1,0 +1,90 @@
+# Sprint Status - JCI LO 管理应用
+# generated: 2025-02-16
+# project: JCI LO 管理应用
+# project_key: jci-lo-app
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: When first story is started
+#   - in-progress → done: When all stories reach 'done'
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' when first story is started
+# - Stories can be worked in parallel if capacity allows
+# - SM typically creates next story after previous one is 'done'
+# - Dev moves story to 'review', then runs code-review
+
+generated: "2025-02-16"
+project: JCI LO 管理应用
+project_key: jci-lo-app
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: 会员主档与访问控制（MVP）
+  epic-1: done
+  epic-1-retrospective: optional
+
+  # Epic 2: 付款申请与审批（MVP）
+  epic-2: done
+  2-1-payment-requests-collection-rules: done
+  2-2-submit-payment-request: done
+  2-3-payment-request-list-dedup: done
+  2-4-applicant-query-status: done
+  2-5-approve-reject-status: done
+  epic-2-retrospective: optional
+
+  # Epic 3: 主档带出（选会员即带出）（MVP）
+  epic-3: done
+  epic-3-retrospective: optional
+
+  # Epic 4: 唯一参考编号与对账（MVP）
+  epic-4: done
+  4-1-transactions-reference-number: done
+  4-2-reconciliation-by-reference: done
+  epic-4-retrospective: optional
+
+  # Epic 5: 新流程说明与引导（MVP）
+  epic-5: done
+  5-1-help-onboarding-entry: done
+  epic-5-retrospective: optional
+
+  # Epic 6: 主档导出与数据迁移（Growth）
+  epic-6: done
+  6-1-export-migration-support: done
+  epic-6-retrospective: optional
+
+  # Epic 7: 流水分类与多户口（Growth）
+  epic-7: done
+  7-1-classification-multi-account: done
+  epic-7-retrospective: optional
+
+  # Epic 8: 活动参与与会费状态（Growth）
+  epic-8: done
+  8-1-participation-dues-display: done
+  epic-8-retrospective: optional
+
+  # Epic 9: 非会员留资与活动推荐（Vision）
+  epic-9: done
+  9-1-nonmember-leads-recommendation-handover: done
+  epic-9-retrospective: optional

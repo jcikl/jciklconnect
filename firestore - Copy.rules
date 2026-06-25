@@ -1,0 +1,589 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserRole() {
+      return exists(/databases/$(database)/documents/members/$(request.auth.uid)) ? 
+             get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role : 
+             null;
+    }
+    
+    function isMember() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             getUserRole() != null &&
+             getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+    }
+    
+    function isBoard() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             getUserRole() != null &&
+             getUserRole() in ['BOARD', 'ADMIN'];
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             getUserRole() != null &&
+             getUserRole() == 'ADMIN';
+    }
+    
+    // Roles that can read members at org/LO level (组织财政、活动财政、管理员、组织秘书、BOARD)
+    function canReadOrgMembers() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             getUserRole() != null &&
+             getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'];
+    }
+    
+    function getMyLoId() {
+      return exists(/databases/$(database)/documents/members/$(request.auth.uid)) ? 
+             get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get('loId', null) : null;
+    }
+    
+    // Same LO or legacy doc (no loId) for org-level readers
+    function resourceInMyLo(resourceData) {
+      let myLo = getMyLoId();
+      return myLo != null && (resourceData.get('loId', null) == myLo || resourceData.get('loId', null) == null);
+    }
+    
+    // Members collection: 组织财政/活动财政/会员 boundary; multi-LO: read by same loId or self.
+    // Any logged-in user with a member doc (MEMBER/BOARD/ADMIN) can read all members (for directory, leaderboard).
+    match /members/{memberId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == memberId || 
+         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+          (getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'] ||
+           (canReadOrgMembers() && (resource == null || resourceInMyLo(resource.data))))));
+      
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == memberId &&
+                       request.resource.data.name is string &&
+                       request.resource.data.email is string &&
+                       request.resource.data.role is string;
+      
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == memberId || 
+         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'ORGANIZATION_SECRETARY'] &&
+          (resource == null || resourceInMyLo(resource.data))));
+      
+      allow delete: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'ADMIN' &&
+                       (resource == null || resourceInMyLo(resource.data));
+    }
+    
+    // Communication/Posts collection
+    match /communication/{postId} {
+      // Allow read: authenticated users (including those without member doc yet)
+      allow read: if isAuthenticated();
+      
+      // Allow create: authenticated users (simplified - don't require member doc)
+      allow create: if isAuthenticated();
+      
+      // Allow update: post author or board/admin (if member doc exists)
+      allow update: if isAuthenticated() && 
+                       (request.resource.data.author.id == request.auth.uid || 
+                        (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      
+      // Allow delete: post author or board/admin (if member doc exists)
+      allow delete: if isAuthenticated() && 
+                       (resource.data.author.id == request.auth.uid || 
+                        (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Projects collection
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      // Allow create/update/delete for authenticated users (will be restricted by app logic)
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Project tasks collection (Kanban, Gantt)
+    match /tasks/{taskId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+    
+    // Finance roles: org-level and activity-level (Story 1.4)
+    function canAccessFinance() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             getUserRole() != null &&
+             getUserRole() in ['BOARD', 'ADMIN', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'];
+    }
+    
+    // Transactions: 组织财政/活动财政/BOARD/ADMIN 可读写；多 LO 时按 loId 限制（文档无 loId 时兼容）
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && 
+        (getUserRole() in ['BOARD', 'ADMIN'] || 
+         (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
+      allow create, update, delete: if canAccessFinance();
+    }
+
+    // Transaction Splits: same rules as transactions - finance roles can create/read/update/delete
+    match /transactionSplits/{splitId} {
+      allow read: if isAuthenticated() && 
+        (getUserRole() in ['BOARD', 'ADMIN'] || 
+         (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
+      allow create, update, delete: if canAccessFinance();
+    }
+
+    // Project Transactions (Story 4.1): Project-specific financials
+    // Allow read/write for authenticated users involved in the project (simplified for now to match project tasks)
+    match /projectTrx/{transactionId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+    
+    // Dues Renewals: 会费续费记录；组织财政/活动财政/BOARD/ADMIN 可读写
+    match /duesRenewals/{renewalId} {
+      allow read, create, update, delete: if canAccessFinance();
+    }
+    
+    // Bank Accounts: 组织财政/活动财政/BOARD/ADMIN；读/改/删仅本 LO
+    match /bankAccounts/{accountId} {
+      allow read, update, delete: if canAccessFinance() &&
+        (resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId());
+      allow create: if canAccessFinance();
+    }
+    
+    // Payment Requests (Story 2.1): applicantId, amount, purpose, activityRef, referenceNumber, status, loId, 审计; 活动财政仅本活动
+    function paymentRequestInMyScope() {
+      let myLo = getMyLoId();
+      let docLo = resource.data.get('loId', null);
+      // 财政可见：同 LO，或文档无 loId（兼容旧数据），或本人无 loId 视为单 LO 可见全部
+      let loMatch = docLo == myLo || docLo == null || myLo == null;
+      let activityOk = getUserRole() != 'ACTIVITY_FINANCE' ||
+        resource.data.get('activityRef', null) == get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get('activityFinanceActivityId', null);
+      return loMatch && activityOk;
+    }
+    match /paymentRequests/{requestId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.get('applicantId', null) == request.auth.uid || 
+         (canAccessFinance() && paymentRequestInMyScope()));
+      allow create: if isAuthenticated() && 
+        request.resource.data.get('applicantId', null) == request.auth.uid &&
+        request.resource.data.get('loId', null) is string &&
+        request.resource.data.get('referenceNumber', null) is string &&
+        request.resource.data.get('status', null) is string;
+      allow update: if isAuthenticated() && 
+        (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' || canAccessFinance() && paymentRequestInMyScope());
+      allow delete: if isAuthenticated() && resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft';
+    }
+
+    // Story 9.1: 非会员留资
+    match /nonMemberLeads/{leadId} {
+      allow read: if isAuthenticated() && canReadOrgMembers();
+      allow create: if true;
+      allow update, delete: if isAuthenticated() && canReadOrgMembers();
+    }
+
+    // Story 8.1: 报名/缴费/签到统一名单
+    match /eventRegistrations/{regId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+      allow create: if isAuthenticated() && 
+        request.resource.data.get('memberId', null) is string &&
+        request.resource.data.get('eventId', null) is string &&
+        (request.resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+      allow update: if isAuthenticated() && 
+        (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+      allow delete: if isAuthenticated() && 
+        (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+    }
+    
+    // Points collection
+    match /points/{pointId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Point Rules collection
+    match /pointRules/{ruleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && 
+                     (resource.data.memberId == request.auth.uid || 
+                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      
+      // System can create notifications
+      allow create: if isAuthenticated();
+      
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated() && 
+                       (resource.data.memberId == request.auth.uid || 
+                        (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      
+      allow delete: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Documents collection
+    match /documents/{documentId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+    
+    // Surveys collection
+    match /surveys/{surveyId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Survey Responses collection
+    match /surveyResponses/{responseId} {
+      // Users can read their own responses
+      allow read: if isAuthenticated() && 
+                     (resource.data.memberId == request.auth.uid || 
+                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      
+      // Users can create their own responses
+      allow create: if isAuthenticated() && 
+                       request.resource.data.memberId == request.auth.uid;
+      
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Elections collection
+    match /elections/{electionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Proposals collection
+    match /proposals/{proposalId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Workflows collection
+    match /workflows/{workflowId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Workflow Executions collection
+    match /workflow_executions/{executionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Automation Rules collection
+    match /automationRules/{ruleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Inventory collection
+    match /inventory/{itemId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Hobby Clubs collection
+    match /hobbyClubs/{clubId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+    
+    // Business Profiles collection
+    match /businessProfiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && 
+                               (request.resource.data.memberId == request.auth.uid || 
+                                (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                 get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      allow delete: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Badges collection
+    match /badges/{badgeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Badge Awards collection
+    match /badgeAwards/{awardId} {
+      allow read: if isAuthenticated();
+      allow create: if isBoard();
+      allow update, delete: if isBoard();
+    }
+    
+    // Achievements collection
+    match /achievements/{achievementId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Achievement Awards collection
+    match /achievementAwards/{awardId} {
+      allow read: if isAuthenticated();
+      allow create: if isBoard();
+      allow update, delete: if isBoard();
+    }
+    
+    // Advertisements collection
+    match /advertisements/{adId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Promotion Packages collection
+    match /promotionPackages/{packageId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Activity Plans collection
+    match /activityPlans/{planId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+    
+    // Templates collection
+    match /templates/{templateId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Member Benefits collection
+    match /memberBenefits/{benefitId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Benefit Usage collection
+    match /benefitUsage/{usageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Conversations collection
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid in resource.data.participants || 
+                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Messages collection
+    match /messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Webhooks collection
+    match /webhooks/{webhookId} {
+      allow read, create, update, delete: if isAuthenticated() && 
+                                             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                             get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Webhook Logs collection
+    match /webhook_logs/{logId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+    
+    // Reconciliations collection
+    match /reconciliations/{reconciliationId} {
+      allow read, create, update, delete: if isAuthenticated() && 
+                                             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                             get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Event Budgets collection
+    match /eventBudgets/{budgetId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && 
+                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Event Feedback collection
+    match /eventFeedback/{feedbackId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+    }
+    
+    // Project Reports collection
+    match /projectReports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+    
+    // Guest Registrations collection
+    match /guestRegistrations/{registrationId} {
+      allow read: if isBoard();
+      allow create: if true; // Allow guests to register
+      allow update, delete: if isBoard();
+    }
+    
+    // Board of Directors: boardMembers, boardTransitions (Member Directory — Board of Directors tab)
+    match /boardMembers/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    match /boardTransitions/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Mentorship: mentorMatches, mentorshipFeedback (Mentor Matching / stats)
+    match /mentorMatches/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     (getUserRole() in ['BOARD', 'ADMIN'] ||
+                      request.resource.data.mentorId == request.auth.uid ||
+                      request.resource.data.menteeId == request.auth.uid);
+      allow update, delete: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     (getUserRole() in ['BOARD', 'ADMIN'] ||
+                      resource.data.mentorId == request.auth.uid ||
+                      resource.data.menteeId == request.auth.uid);
+    }
+    match /mentorshipFeedback/{docId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     getUserRole() in ['BOARD', 'ADMIN'];
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && getUserRole() in ['BOARD', 'ADMIN'];
+    }
+    
+    // Knowledge / Learning: training modules, learning paths, progress, certificates
+    match /trainingModules/{docId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow create, update, delete: if isBoard();
+    }
+    match /learningPaths/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    match /learningProgress/{docId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     (getUserRole() in ['BOARD', 'ADMIN'] ||
+                      resource.data.memberId == request.auth.uid);
+      allow create: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     request.resource.data.memberId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     (getUserRole() in ['BOARD', 'ADMIN'] ||
+                      resource.data.memberId == request.auth.uid);
+    }
+    match /certificates/{docId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     (getUserRole() in ['MEMBER', 'BOARD', 'ADMIN']);
+      allow create: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     (getUserRole() in ['BOARD', 'ADMIN'] ||
+                      request.resource.data.memberId == request.auth.uid);
+      allow update, delete: if isBoard();
+    }
+    
+    // Inventory: maintenance schedules, inventory alerts (InventoryView)
+    match /maintenance_schedules/{docId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow create, update, delete: if isBoard();
+    }
+    match /inventory_alerts/{docId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Behavioral nudging: nudge rules (Gamification — Behavioral Nudging config)
+    match /nudgeRules/{docId} {
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Default: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

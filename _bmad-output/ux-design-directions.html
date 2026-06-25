@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JCI LO 管理应用 - 设计方向展示</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            jci: {
+              blue: '#0097D7',
+              lightblue: '#6EC4E8',
+              navy: '#1C3F94',
+              teal: '#00B5B5',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-6xl mx-auto p-8">
+    <h1 class="text-2xl font-bold text-jci-navy mb-2">JCI LO 管理应用 — 设计方向</h1>
+    <p class="text-gray-600 mb-8">基于 UX 规格的视觉与交互方向示意（棕地延续 + 新功能增强）</p>
+
+    <!-- Direction 1: 付款申请列表 -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-jci-navy mb-4">方向 A：付款申请列表（组织财政视图）</h2>
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+          <div class="flex gap-2">
+            <input type="text" placeholder="搜索编号..." class="border rounded px-3 py-2 text-sm w-48" />
+            <select class="border rounded px-3 py-2 text-sm">
+              <option>全部状态</option>
+              <option>待审</option>
+              <option>已批</option>
+              <option>已拒</option>
+            </select>
+          </div>
+          <span class="text-sm text-gray-500">共 12 条</span>
+        </div>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b text-left text-gray-600">
+              <th class="py-2">编号</th>
+              <th class="py-2">申请人</th>
+              <th class="py-2">金额</th>
+              <th class="py-2">用途</th>
+              <th class="py-2">状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b hover:bg-gray-50">
+              <td class="py-3 font-mono text-jci-blue">ACT-2025-02-001-M</td>
+              <td class="py-3">小琳</td>
+              <td class="py-3">¥500</td>
+              <td class="py-3">2025 迎新活动费</td>
+              <td class="py-3"><span class="px-2 py-1 rounded text-xs bg-amber-100 text-amber-800">待审</span></td>
+            </tr>
+            <tr class="border-b hover:bg-gray-50">
+              <td class="py-3 font-mono text-jci-blue">ACT-2025-02-002-M</td>
+              <td class="py-3">阿明</td>
+              <td class="py-3">¥200</td>
+              <td class="py-3">活动场地押金</td>
+              <td class="py-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">已批</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-2 text-sm text-gray-500">清单式布局 + 编号搜索 + 状态筛选 + 状态标签（文字+颜色）</p>
+    </section>
+
+    <!-- Direction 2: 选会员即带出 -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-jci-navy mb-4">方向 B：付款申请表单（选会员即带出）</h2>
+      <div class="bg-white rounded-lg shadow p-6 max-w-xl">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">选择会员</label>
+          <input type="text" placeholder="搜索姓名或届别..." class="w-full border rounded px-3 py-2" value="小琳" />
+          <p class="text-xs text-jci-teal mt-1">✓ 已从主档带出</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-500 mb-0.5">姓名</label>
+            <p class="font-medium">小琳</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-500 mb-0.5">届别</label>
+            <p class="font-medium">2024</p>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-500 mb-0.5">联络方式</label>
+            <p class="font-medium">+60 12-xxx xxxx</p>
+          </div>
+        </div>
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">金额</label>
+          <input type="number" class="border rounded px-3 py-2 w-32" placeholder="0" />
+        </div>
+      </div>
+      <p class="mt-2 text-sm text-gray-500">会员选择器 → 选中即带出姓名、届别、联络方式</p>
+    </section>
+
+    <!-- Direction 3: 角色入口示意 -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-jci-navy mb-4">方向 C：角色驱动导航示意</h2>
+      <div class="flex gap-4">
+        <div class="bg-white rounded-lg shadow p-4 flex-1 text-center">
+          <div class="w-12 h-12 rounded-full bg-jci-blue/20 mx-auto mb-2 flex items-center justify-center text-jci-blue text-xl">💰</div>
+          <p class="font-medium">组织财政</p>
+          <p class="text-xs text-gray-500 mt-1">付款申请 · 对账 · 流水</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 flex-1 text-center">
+          <div class="w-12 h-12 rounded-full bg-jci-teal/20 mx-auto mb-2 flex items-center justify-center text-jci-teal text-xl">📋</div>
+          <p class="font-medium">活动财政</p>
+          <p class="text-xs text-gray-500 mt-1">本活动财务 · 报名</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 flex-1 text-center">
+          <div class="w-12 h-12 rounded-full bg-jci-navy/20 mx-auto mb-2 flex items-center justify-center text-jci-navy text-xl">👤</div>
+          <p class="font-medium">会员</p>
+          <p class="text-xs text-gray-500 mt-1">我的主档 · 状态</p>
+        </div>
+      </div>
+      <p class="mt-2 text-sm text-gray-500">按角色展示入口，减少无关信息</p>
+    </section>
+
+    <hr class="my-8" />
+    <p class="text-sm text-gray-500">本展示基于 UX 规格中的视觉基础与核心交互定义，供设计方向决策参考。实际实现沿用现有 Tailwind + Common 组件体系。</p>
+  </div>
+</body>
+</html>

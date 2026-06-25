@@ -1,0 +1,101 @@
+# BMM 工作流进度跟踪
+# JCI LO 管理应用 - BMad 方法（棕地）
+# 发现阶段：头脑风暴 + 调研 已纳入
+
+generated: "2025-02-15"
+project: "JCI LO 管理应用"
+project_type: "brownfield"
+selected_track: "bmad-method"
+field_type: "brownfield"
+workflow_path: "_bmad/bmm/workflows/workflow-status/paths/method-brownfield.yaml"
+
+workflow_status:
+  # 前置：棕地建议先做项目文档化
+  - prerequisite: true
+    name: "Documentation"
+    note: "棕地项目建议先运行 document-project 理解现有代码"
+    workflows:
+      - id: "document-project"
+        status: "_bmad-output/index.md"
+        agent: "analyst"
+        command: "document-project"
+        required: true
+
+  # 阶段 0：发现（已选：头脑风暴、调研）
+  - phase: 0
+    name: "Discovery (Optional)"
+    workflows:
+      - id: "brainstorm-project"
+        status: "_bmad-output/analysis/brainstorming-session-2025-02-15.md"
+        agent: "analyst"
+        command: "brainstorm-project"
+        included: true
+      - id: "research"
+        status: "pending"
+        agent: "analyst"
+        command: "research"
+        included: true
+      - id: "product-brief"
+        status: "skipped"
+        included: false
+
+  # 阶段 1：规划
+  - phase: 1
+    name: "Planning"
+    workflows:
+      - id: "prd"
+        status: "_bmad-output/prd.md"
+        agent: "pm"
+        command: "prd"
+        required: true
+        completed_at: "2025-02-16"
+      - id: "create-ux-design"
+        status: "pending"
+        agent: "ux-designer"
+        command: "create-ux-design"
+        conditional: "if_has_ui"
+
+  # 阶段 2：方案设计
+  - phase: 2
+    name: "Solutioning"
+    workflows:
+      - id: "create-architecture"
+        status: "_bmad-output/architecture.md"
+        agent: "architect"
+        command: "create-architecture"
+        recommended: true
+        completed_at: "2025-02-16"
+      - id: "create-epics-and-stories"
+        status: "_bmad-output/epics.md"
+        agent: "pm"
+        command: "create-epics-and-stories"
+        required: true
+        completed_at: "2025-02-16"
+      - id: "test-design"
+        status: "_bmad-output/test-design-system.md"
+        agent: "tea"
+        command: "test-design"
+        recommended: true
+        completed_at: "2025-02-16"
+      - id: "validate-architecture"
+        status: "pending"
+        agent: "architect"
+        command: "validate-architecture"
+        optional: true
+      - id: "implementation-readiness"
+        status: "_bmad-output/implementation-readiness-report-2025-02-16.md"
+        agent: "architect"
+        command: "implementation-readiness"
+        required: true
+        completed_at: "2025-02-16"
+
+  # 阶段 3：实施
+  - phase: 3
+    name: "Implementation"
+    workflows:
+      - id: "sprint-planning"
+        status: "_bmad-output/sprint-status.yaml"
+        agent: "sm"
+        command: "sprint-planning"
+        required: true
+        completed_at: "2025-02-16"
