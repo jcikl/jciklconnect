@@ -1,5 +1,4 @@
-// Authentication Storage Utilities
-// Handles localStorage persistence for authentication state
+import { Member } from '../types';
 
 const AUTH_STORAGE_KEY = 'jci_auth_state';
 const DEV_MODE_KEY = 'jci_dev_mode';
@@ -11,21 +10,7 @@ export interface StoredAuthState {
     email: string;
     displayName: string;
   };
-  member: {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    tier: string;
-    points: number;
-    joinDate: string;
-    avatar: string;
-    skills: string[];
-    churnRisk: string;
-    attendanceRate: number;
-    duesStatus: string;
-    badges: any[];
-  };
+  member: Member;
 }
 
 /**

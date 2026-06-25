@@ -456,8 +456,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     let currentOriginal = originalRole;
     if (!currentOriginal) {
-      currentOriginal = member.role;
-      setOriginalRole(member.role);
+      currentOriginal = (member.role as UserRole) || UserRole.MEMBER;
+      setOriginalRole(currentOriginal);
     }
 
     // Only allow if in dev mode OR original role is ADMIN

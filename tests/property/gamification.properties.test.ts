@@ -105,7 +105,7 @@ describe('Gamification Properties', () => {
             );
             
             // The actual calculation should match our expected calculation
-            const actualProgressPercentage = calculateAchievementProgress(achievement, currentProgress);
+            const actualProgressPercentage = calculateAchievementProgress(achievement as any, currentProgress);
             
             expect(actualProgressPercentage).toBe(expectedProgressPercentage);
             expect(actualProgressPercentage).toBeGreaterThanOrEqual(0);

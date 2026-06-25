@@ -357,6 +357,10 @@ describe('Member Management Properties', () => {
               'id', 'name', 'email', 'phone', 'dateOfBirth', 'membershipType',
               'status', 'joinDate', 'address', 'emergencyContact', 'ssn', 'bankAccount'
             ],
+            [UserRole.SUPER_ADMIN]: [
+              'id', 'name', 'email', 'phone', 'dateOfBirth', 'membershipType',
+              'status', 'joinDate', 'address', 'emergencyContact', 'ssn', 'bankAccount'
+            ],
             [UserRole.BOARD]: [
               'id', 'name', 'email', 'phone', 'membershipType',
               'status', 'joinDate', 'address'
@@ -364,10 +368,13 @@ describe('Member Management Properties', () => {
             [UserRole.MEMBER]: [
               'id', 'name', 'email', 'membershipType', 'status'
             ],
-            [UserRole.PROBATION_MEMBER]: [
+            [UserRole.PROBATION]: [
               'id', 'name', 'email', 'membershipType', 'status'
             ],
             [UserRole.GUEST]: [
+              'id', 'name', 'membershipType'
+            ],
+            [UserRole.INACTIVE]: [
               'id', 'name', 'membershipType'
             ],
             [UserRole.ORGANIZATION_SECRETARY]: [

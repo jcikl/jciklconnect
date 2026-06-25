@@ -100,46 +100,6 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageSettings: true,
     canApproveClaims: true,
   },
-  // Deprecated special roles - all map to MEMBER level (actual fine-grained access via Dynamic Assignment)
-  [UserRole.ORGANIZATION_SECRETARY]: {
-    canViewMembers: true,
-    canEditMembers: false,
-    canViewFinance: false,
-    canEditFinance: false,
-    canManageProjects: false,
-    canManageEvents: true,
-    canManageInventory: false,
-    canManageAutomation: false,
-    canViewReports: false,
-    canManageSettings: false,
-    canApproveClaims: false,
-  },
-  [UserRole.ORGANIZATION_FINANCE]: {
-    canViewMembers: true,
-    canEditMembers: false,
-    canViewFinance: false,
-    canEditFinance: false,
-    canManageProjects: false,
-    canManageEvents: true,
-    canManageInventory: false,
-    canManageAutomation: false,
-    canViewReports: false,
-    canManageSettings: false,
-    canApproveClaims: false,
-  },
-  [UserRole.ACTIVITY_FINANCE]: {
-    canViewMembers: true,
-    canEditMembers: false,
-    canViewFinance: false,
-    canEditFinance: false,
-    canManageProjects: false,
-    canManageEvents: true,
-    canManageInventory: false,
-    canManageAutomation: false,
-    canViewReports: false,
-    canManageSettings: false,
-    canApproveClaims: false,
-  },
   [UserRole.INACTIVE]: {
     canViewMembers: false,
     canEditMembers: false,
@@ -188,9 +148,9 @@ export const usePermissions = () => {
     if (!member) {
       return ROLE_PERMISSIONS[UserRole.GUEST];
     }
-    
+
     let basePermissions = ROLE_PERMISSIONS[member.role] || ROLE_PERMISSIONS[UserRole.MEMBER];
-    
+
     // SECONDARY ACCESS: current calendar-year board (synced from boardMembers → member doc)
     const isCurrentBoardMember = isMemberCurrentBoard(member);
 
@@ -210,7 +170,7 @@ export const usePermissions = () => {
         canApproveClaims: true,
       };
     }
-    
+
     return basePermissions;
   }, [member, devMode, simulatedRole]);
 
@@ -264,10 +224,7 @@ export const usePermissions = () => {
     effectiveRole !== UserRole.GUEST &&
     (isBoardUser ||
       effectiveRole === UserRole.ADMIN ||
-      effectiveRole === UserRole.SUPER_ADMIN ||
-      effectiveRole === UserRole.ORGANIZATION_SECRETARY ||
-      effectiveRole === UserRole.ORGANIZATION_FINANCE ||
-      effectiveRole === UserRole.ACTIVITY_FINANCE);
+      effectiveRole === UserRole.SUPER_ADMIN);
 
   return {
     permissions,
