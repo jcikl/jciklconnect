@@ -124,6 +124,16 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
               {ad.description || 'No description available for this partnership.'}
             </p>
           </div>
+
+          {/* Terms & Conditions */}
+          {ad.termsAndConditions && (
+            <div className="space-y-2 pt-6 border-t border-slate-100 mt-6">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Terms & Conditions</h3>
+              <p className="text-slate-500 text-xs leading-relaxed whitespace-pre-wrap">
+                {ad.termsAndConditions}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </Modal>

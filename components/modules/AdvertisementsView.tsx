@@ -54,7 +54,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       setSelectedPlacements(Array.isArray(selectedAd.placement) ? selectedAd.placement : [selectedAd.placement]);
       setFormImage(null);
     } else {
-      setSelectedPlacements([]);
+      setSelectedPlacements(['Homepage']);
       setFormImage(null);
     }
   }, [selectedAd, isModalOpen]);
@@ -110,17 +110,11 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         return;
       }
 
-      if (selectedPlacements.length === 0) {
-        showToast('Please select at least one placement.', 'error');
-        setIsUploading(false);
-        return;
-      }
-
       const adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'> = {
         title: formData.get('title') as string,
         description: formData.get('description') as string,
-        type: formData.get('type') as any,
-        placement: selectedPlacements as any,
+        type: 'Banner',
+        placement: ['Homepage'],
         targetAudience: formData.get('targetAudience') as any || 'All Members',
         imageUrl: imageUrl,
         linkUrl: formData.get('linkUrl') as string || undefined,
@@ -129,6 +123,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         status: (formData.get('status') as any) || 'Active',
         priority: parseInt(formData.get('priority') as string) || 0,
         budget: formData.get('budget') ? parseFloat(formData.get('budget') as string) : undefined,
+        termsAndConditions: formData.get('termsAndConditions') as string || undefined,
       };
 
       if (selectedAd) {
@@ -251,12 +246,14 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                       </div>
 
                       <div className="space-y-2 text-xs text-slate-500">
-                        <div className="flex items-center gap-2">
-                          <Megaphone size={12} />
-                          <span className="capitalize">{ad.type}</span>
-                          <span>•</span>
-                          <span className="capitalize">{Array.isArray(ad.placement) ? ad.placement.join(', ') : ad.placement}</span>
-                        </div>
+                        {ad.termsAndConditions ? (
+                          <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                            <span className="text-slate-700">T&C:</span>
+                            <span className="line-clamp-1 italic">{ad.termsAndConditions}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">No terms and conditions set</span>
+                        )}
                         <div className="flex items-center gap-2">
                           <Calendar size={12} />
                           <span>{formatDate(toDate(ad.startDate).toISOString())}</span>
@@ -404,42 +401,13 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
             required
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
-              name="type"
-              label="Type"
-              defaultValue={selectedAd?.type}
-              options={[
-                { label: 'Banner', value: 'Banner' },
-                { label: 'Newsletter', value: 'Newsletter' },
-                { label: 'Event Sponsorship', value: 'Event Sponsorship' },
-                { label: 'Social Media', value: 'Social Media' },
-                { label: 'Website', value: 'Website' },
-              ]}
-              required
-            />
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Placements</label>
-              <div className="flex flex-wrap gap-2">
-                {['Homepage', 'Events Page', 'Newsletter Header', 'Newsletter Footer', 'Sidebar', 'Popup'].map(place => (
-                  <label key={place} className="flex items-center gap-2 text-sm bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
-                    <input
-                      type="checkbox"
-                      name="placement"
-                      value={place}
-                      defaultChecked={selectedPlacements.includes(place)}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedPlacements(prev => [...prev, place]);
-                        else setSelectedPlacements(prev => prev.filter(p => p !== place));
-                      }}
-                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
-                    />
-                    {place}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
+          <Textarea
+            name="termsAndConditions"
+            label="Terms & Conditions (Optional)"
+            placeholder="Partnership terms and conditions..."
+            defaultValue={selectedAd?.termsAndConditions}
+            rows={3}
+          />
 
           <Select
             name="targetAudience"
@@ -695,7 +663,7 @@ const AdvertisementAnalyticsTab: React.FC<AdvertisementAnalyticsTabProps> = ({
                     <td className="py-3 px-4">
                       <div>
                         <p className="font-medium text-slate-900">{ad.title}</p>
-                        <p className="text-xs text-slate-500">{ad.type} • {ad.placement}</p>
+                        <p className="text-xs text-slate-500">{ad.termsAndConditions ? 'T&C Configured' : 'No T&C'}</p>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-slate-600">{formatNumber(ad.impressions)}</td>
@@ -838,14 +806,14 @@ const AdvertisementAnalyticsModal: React.FC<AdvertisementAnalyticsModalProps> = 
         <Card>
           <h4 className="font-semibold text-slate-900 mb-4">Advertisement Details</h4>
           <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-slate-600">Type:</span>
-              <span className="text-sm font-medium text-slate-900">{advertisement.type}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-slate-600">Placement:</span>
-              <span className="text-sm font-medium text-slate-900">{advertisement.placement}</span>
-            </div>
+            {advertisement.termsAndConditions && (
+              <div className="flex flex-col gap-1 border-t border-slate-100 pt-3">
+                <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Terms & Conditions:</span>
+                <span className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
+                  {advertisement.termsAndConditions}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-sm text-slate-600">Status:</span>
               <Badge variant={advertisement.status === 'Active' ? 'success' : 'neutral'}>
