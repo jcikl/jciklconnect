@@ -1917,7 +1917,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
   // Load projects for IntroducerSelector
   useEffect(() => {
-    ProjectsService.getAllProjects().then(setAllProjects).catch(() => {});
+    ProjectsService.getAllProjects().then(setAllProjects).catch(() => { });
   }, []);
 
   // Load activities log data
@@ -2401,1321 +2401,1321 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <>
                 <Card
                   title="Basic Information"
-            action={
-              (canEditMembers || isSelfView) && activeInlineEditCard !== 'basic' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                  onClick={() => startInlineEdit('basic')}
-                  title="Edit Basic Info"
+                  action={
+                    (canEditMembers || isSelfView) && activeInlineEditCard !== 'basic' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                        onClick={() => startInlineEdit('basic')}
+                        title="Edit Basic Info"
+                      >
+                        <Edit size={14} />
+                      </Button>
+                    )
+                  }
                 >
-                  <Edit size={14} />
-                </Button>
-              )
-            }
-          >
-            {activeInlineEditCard === 'basic' && inlineValues ? (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name (Short)<span className="text-red-500 ml-1">*</span></label>
-                    <input
-                      type="text"
-                      value={inlineValues.name}
-                      onChange={e => setInlineValues({ ...inlineValues, name: e.target.value })}
-                      required
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name (ID)</label>
-                    <input
-                      type="text"
-                      value={inlineValues.fullName}
-                      onChange={e => setInlineValues({ ...inlineValues, fullName: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
-                    <input
-                      type="text"
-                      value={inlineValues.idNumber}
-                      onChange={e => setInlineValues({ ...inlineValues, idNumber: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
-                    <input
-                      type="date"
-                      value={inlineValues.dateOfBirth}
-                      onChange={e => setInlineValues({ ...inlineValues, dateOfBirth: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
-                    <select
-                      value={inlineValues.gender}
-                      onChange={e => setInlineValues({ ...inlineValues, gender: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ethnicity</label>
-                    <select
-                      value={inlineValues.ethnicity}
-                      onChange={e => setInlineValues({ ...inlineValues, ethnicity: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
-                    >
-                      <option value="">Select Ethnicity</option>
-                      <option value="Chinese">Chinese</option>
-                      <option value="Malay">Malay</option>
-                      <option value="Indian">Indian</option>
-                      <option value="Others">Others</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
-                    <input
-                      type="text"
-                      value={inlineValues.nationality}
-                      onChange={e => setInlineValues({ ...inlineValues, nationality: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
-                    <IntroducerSelector
-                      value={inlineValues.introducer || ''}
-                      onChange={val => setInlineValues({ ...inlineValues, introducer: val })}
-                      members={members}
-                      projects={allProjects}
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t pt-3">
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
-                  <textarea
-                    value={inlineValues.bio}
-                    onChange={e => setInlineValues({ ...inlineValues, bio: e.target.value })}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y"
-                  />
-                </div>
-
-                <div className="border-t pt-3">
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Hobbies</label>
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 border border-slate-200 rounded-lg bg-slate-50">
-                    {HOBBY_OPTIONS.map(opt => {
-                      const isChecked = inlineValues.hobbies.includes(opt);
-                      return (
-                        <label key={opt} className="cursor-pointer">
+                  {activeInlineEditCard === 'basic' && inlineValues ? (
+                    <div className="space-y-4 text-sm">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name (Short)<span className="text-red-500 ml-1">*</span></label>
                           <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={e => {
-                              const newHobbies = e.target.checked
-                                ? [...inlineValues.hobbies, opt]
-                                : inlineValues.hobbies.filter((h: string) => h !== opt);
-                              setInlineValues({ ...inlineValues, hobbies: newHobbies });
-                            }}
-                            className="hidden"
+                            type="text"
+                            value={inlineValues.name}
+                            onChange={e => setInlineValues({ ...inlineValues, name: e.target.value })}
+                            required
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
                           />
-                          <span className={`inline-block px-2 py-1 rounded text-[10px] font-semibold border ${isChecked
-                            ? 'bg-jci-blue text-white border-jci-blue'
-                            : 'bg-white text-slate-600 border-slate-300 hover:border-jci-blue'
-                            }`}>
-                            {opt}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name (ID)</label>
+                          <input
+                            type="text"
+                            value={inlineValues.fullName}
+                            onChange={e => setInlineValues({ ...inlineValues, fullName: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
+                          <input
+                            type="text"
+                            value={inlineValues.idNumber}
+                            onChange={e => setInlineValues({ ...inlineValues, idNumber: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
+                          <input
+                            type="date"
+                            value={inlineValues.dateOfBirth}
+                            onChange={e => setInlineValues({ ...inlineValues, dateOfBirth: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
+                          <select
+                            value={inlineValues.gender}
+                            onChange={e => setInlineValues({ ...inlineValues, gender: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                          >
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ethnicity</label>
+                          <select
+                            value={inlineValues.ethnicity}
+                            onChange={e => setInlineValues({ ...inlineValues, ethnicity: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                          >
+                            <option value="">Select Ethnicity</option>
+                            <option value="Chinese">Chinese</option>
+                            <option value="Malay">Malay</option>
+                            <option value="Indian">Indian</option>
+                            <option value="Others">Others</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
+                          <input
+                            type="text"
+                            value={inlineValues.nationality}
+                            onChange={e => setInlineValues({ ...inlineValues, nationality: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
+                          <IntroducerSelector
+                            value={inlineValues.introducer || ''}
+                            onChange={val => setInlineValues({ ...inlineValues, introducer: val })}
+                            members={members}
+                            projects={allProjects}
+                          />
+                        </div>
+                      </div>
 
-                <div className="border-t pt-3">
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Skills</label>
-                  <input
-                    type="text"
-                    value={inlineValues.skills}
-                    onChange={e => setInlineValues({ ...inlineValues, skills: e.target.value })}
-                    placeholder="e.g. Public Speaking, Event Management (comma separated)"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                  />
-                </div>
+                      <div className="border-t pt-3">
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
+                        <textarea
+                          value={inlineValues.bio}
+                          onChange={e => setInlineValues({ ...inlineValues, bio: e.target.value })}
+                          rows={2}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y"
+                        />
+                      </div>
 
-                <div className="flex justify-end gap-2 pt-3 border-t">
-                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                  <Button variant="primary" size="sm" onClick={() => {
-                    const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-                    handleInlineSave('basic', {
-                      name: inlineValues.name,
-                      fullName: inlineValues.fullName,
-                      idNumber: inlineValues.idNumber,
-                      dateOfBirth: inlineValues.dateOfBirth,
-                      gender: inlineValues.gender,
-                      ethnicity: inlineValues.ethnicity,
-                      nationality: inlineValues.nationality,
-                      introducer: inlineValues.introducer,
-                      bio: inlineValues.bio,
-                      hobbies: inlineValues.hobbies,
-                      skills: skillsArr,
-                    });
-                  }}>Save</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-slate-500 block text-xs uppercase font-medium">Full Name (ID)</span>
-                    <p className="font-medium text-slate-900">{member.fullName || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-xs uppercase font-medium">ID Number</span>
-                    <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-xs uppercase font-medium">Gender</span>
-                    <p className="font-medium text-slate-900">{member.gender || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
-                    <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
-                    <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
-                    <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
-                  </div>
-                </div>
+                      <div className="border-t pt-3">
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Hobbies</label>
+                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 border border-slate-200 rounded-lg bg-slate-50">
+                          {HOBBY_OPTIONS.map(opt => {
+                            const isChecked = inlineValues.hobbies.includes(opt);
+                            return (
+                              <label key={opt} className="cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={e => {
+                                    const newHobbies = e.target.checked
+                                      ? [...inlineValues.hobbies, opt]
+                                      : inlineValues.hobbies.filter((h: string) => h !== opt);
+                                    setInlineValues({ ...inlineValues, hobbies: newHobbies });
+                                  }}
+                                  className="hidden"
+                                />
+                                <span className={`inline-block px-2 py-1 rounded text-[10px] font-semibold border ${isChecked
+                                  ? 'bg-jci-blue text-white border-jci-blue'
+                                  : 'bg-white text-slate-600 border-slate-300 hover:border-jci-blue'
+                                  }`}>
+                                  {opt}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                <div className="border-t pt-3">
-                  <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
-                  <p className="text-sm font-medium text-slate-900">{resolveIntroducerDisplay(member.introducer)}</p>
-                </div>
+                      <div className="border-t pt-3">
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Skills</label>
+                        <input
+                          type="text"
+                          value={inlineValues.skills}
+                          onChange={e => setInlineValues({ ...inlineValues, skills: e.target.value })}
+                          placeholder="e.g. Public Speaking, Event Management (comma separated)"
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                        />
+                      </div>
 
-                <div className="border-t pt-3">
-                  <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</span>
-                  <p className="text-sm text-slate-600 line-clamp-4 italic">
-                    {member.bio || 'No biography provided.'}
-                  </p>
-                </div>
+                      <div className="flex justify-end gap-2 pt-3 border-t">
+                        <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                        <Button variant="primary" size="sm" onClick={() => {
+                          const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+                          handleInlineSave('basic', {
+                            name: inlineValues.name,
+                            fullName: inlineValues.fullName,
+                            idNumber: inlineValues.idNumber,
+                            dateOfBirth: inlineValues.dateOfBirth,
+                            gender: inlineValues.gender,
+                            ethnicity: inlineValues.ethnicity,
+                            nationality: inlineValues.nationality,
+                            introducer: inlineValues.introducer,
+                            bio: inlineValues.bio,
+                            hobbies: inlineValues.hobbies,
+                            skills: skillsArr,
+                          });
+                        }}>Save</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-slate-500 block text-xs uppercase font-medium">Full Name (ID)</span>
+                          <p className="font-medium text-slate-900">{member.fullName || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-xs uppercase font-medium">ID Number</span>
+                          <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-xs uppercase font-medium">Gender</span>
+                          <p className="font-medium text-slate-900">{member.gender || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
+                          <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
+                          <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
+                          <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
+                        </div>
+                      </div>
 
-                <div className="border-t pt-3">
-                  <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Hobbies</span>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.isArray(member.hobbies) && member.hobbies.length > 0 ? (
-                      member.hobbies.map(hobby => (
-                        <Badge key={hobby} variant="neutral" className="text-[10px]">{hobby}</Badge>
-                      ))
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">No hobbies listed</span>
-                    )}
-                  </div>
-                </div>
+                      <div className="border-t pt-3">
+                        <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
+                        <p className="text-sm font-medium text-slate-900">{resolveIntroducerDisplay(member.introducer)}</p>
+                      </div>
 
-                <div className="border-t pt-3">
-                  <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Skills</span>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.isArray(member.skills) && member.skills.length > 0 ? (
-                      member.skills.map(skill => (
-                        <Badge key={skill} variant="neutral" className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100">{skill}</Badge>
-                      ))
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">No skills listed</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </Card>
+                      <div className="border-t pt-3">
+                        <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</span>
+                        <p className="text-sm text-slate-600 line-clamp-4 italic">
+                          {member.bio || 'No biography provided.'}
+                        </p>
+                      </div>
 
-          <Card title="Quick Stats">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-slate-50 rounded-lg text-center">
-                <span className="block text-2xl font-bold text-slate-900">{member.points}</span>
-                <span className="text-xs text-slate-500 uppercase">Points</span>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg text-center">
-                <span className="block text-2xl font-bold text-slate-900">{member.attendanceRate}%</span>
-                <span className="text-xs text-slate-500 uppercase">Attendance</span>
-              </div>
-            </div>
-            <div className="mt-4">
-              <Button variant="outline" size="sm" className="w-full" onClick={handleAnalyzeChurn} isLoading={loadingChurnPrediction}>
-                <Sparkles size={14} className="mr-2" /> Analyze Churn Risk
-              </Button>
-            </div>
-          </Card>
-          </>
-          )}
+                      <div className="border-t pt-3">
+                        <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Hobbies</span>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.isArray(member.hobbies) && member.hobbies.length > 0 ? (
+                            member.hobbies.map(hobby => (
+                              <Badge key={hobby} variant="neutral" className="text-[10px]">{hobby}</Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">No hobbies listed</span>
+                          )}
+                        </div>
+                      </div>
 
-          {activeDetailTab === 'career' && (
-            <Card title="Mentorship & Growth">
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
-                {mentor ? (
-                  <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                    <img src={mentor.avatar || undefined} className="w-10 h-10 rounded-full" alt="" />
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{mentor.name}</p>
-                      <p className="text-xs text-slate-500">{mentor.role}</p>
+                      <div className="border-t pt-3">
+                        <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Skills</span>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.isArray(member.skills) && member.skills.length > 0 ? (
+                            member.skills.map(skill => (
+                              <Badge key={skill} variant="neutral" className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100">{skill}</Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">No skills listed</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+
+                <Card title="Quick Stats">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-slate-50 rounded-lg text-center">
+                      <span className="block text-2xl font-bold text-slate-900">{member.points}</span>
+                      <span className="text-xs text-slate-500 uppercase">Points</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg text-center">
+                      <span className="block text-2xl font-bold text-slate-900">{member.attendanceRate}%</span>
+                      <span className="text-xs text-slate-500 uppercase">Attendance</span>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
-                    <p className="text-sm text-slate-500 mb-2">No mentor assigned</p>
-                    <Button size="sm" variant="outline" onClick={handleFindMentors} isLoading={loadingMatches}>
-                      <Zap size={14} className="mr-2" /> Find Mentor
+                  <div className="mt-4">
+                    <Button variant="outline" size="sm" className="w-full" onClick={handleAnalyzeChurn} isLoading={loadingChurnPrediction}>
+                      <Sparkles size={14} className="mr-2" /> Analyze Churn Risk
                     </Button>
                   </div>
-                )}
-              </div>
+                </Card>
+              </>
+            )}
 
-              {mentees.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Mentees</h4>
+            {activeDetailTab === 'career' && (
+              <Card title="Mentorship & Growth">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
+                    {mentor ? (
+                      <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
+                        <img src={mentor.avatar || undefined} className="w-10 h-10 rounded-full" alt="" />
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{mentor.name}</p>
+                          <p className="text-xs text-slate-500">{mentor.role}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
+                        <p className="text-sm text-slate-500 mb-2">No mentor assigned</p>
+                        <Button size="sm" variant="outline" onClick={handleFindMentors} isLoading={loadingMatches}>
+                          <Zap size={14} className="mr-2" /> Find Mentor
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {mentees.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Mentees</h4>
+                      <div className="space-y-2">
+                        {mentees.map(m => (
+                          <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
+                            <img src={m.avatar || undefined} className="w-8 h-8 rounded-full" alt="" />
+                            <span className="text-sm font-medium">{m.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {activeDetailTab === 'basic' && (
+              <Card title="Hobby Clubs">
+                {loadingClubs ? (
+                  <div className="text-center py-4 text-slate-400 text-sm">Loading clubs...</div>
+                ) : memberClubs.length > 0 ? (
                   <div className="space-y-2">
-                    {mentees.map(m => (
-                      <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
-                        <img src={m.avatar || undefined} className="w-8 h-8 rounded-full" alt="" />
-                        <span className="text-sm font-medium">{m.name}</span>
+                    {memberClubs.map(club => (
+                      <div key={club.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900">{club.name}</p>
+                          <p className="text-xs text-slate-500">{club.category}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-          </Card>
-          )}
-
-          {activeDetailTab === 'basic' && (
-            <Card title="Hobby Clubs">
-            {loadingClubs ? (
-              <div className="text-center py-4 text-slate-400 text-sm">Loading clubs...</div>
-            ) : memberClubs.length > 0 ? (
-              <div className="space-y-2">
-                {memberClubs.map(club => (
-                  <div key={club.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{club.name}</p>
-                      <p className="text-xs text-slate-500">{club.category}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-4 text-slate-400 text-sm">Not a member of any clubs</div>
+                ) : (
+                  <div className="text-center py-4 text-slate-400 text-sm">Not a member of any clubs</div>
+                )}
+              </Card>
             )}
-          </Card>
-          )}
 
-          {activeDetailTab === 'career' && (
-            <Card title="Membership & Dues"
-              action={
-                (canEditMembers) && activeInlineEditCard !== 'career' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                    onClick={() => startInlineEdit('career')}
-                    title="Edit Membership & Senatorship"
-                  >
-                    <Edit size={14} />
-                  </Button>
-                )
-              }
-            >
-            {activeInlineEditCard === 'career' && inlineValues ? (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Senatorship Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 12345"
-                      value={inlineValues.senatorshipId}
-                      onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    />
-                  </div>
-                  <div className="flex items-center gap-4 py-1">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={inlineValues.senatorCertified}
-                        onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
-                        className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                      />
-                      <span className="text-sm font-medium text-slate-700">Senator Certified</span>
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-4 py-1">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={inlineValues.senatorshipBoardValidated}
-                        onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
-                        className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                      />
-                      <span className="text-sm font-medium text-slate-700">Board Validated</span>
-                    </label>
-                  </div>
-                  {inlineValues.senatorshipBoardValidated && (
-                    <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+            {activeDetailTab === 'career' && (
+              <Card title="Membership & Dues"
+                action={
+                  (canEditMembers) && activeInlineEditCard !== 'career' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                      onClick={() => startInlineEdit('career')}
+                      title="Edit Membership & Senatorship"
+                    >
+                      <Edit size={14} />
+                    </Button>
+                  )
+                }
+              >
+                {activeInlineEditCard === 'career' && inlineValues ? (
+                  <div className="space-y-4 text-sm">
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
-                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Senatorship Number</label>
                         <input
                           type="text"
-                          value={inlineValues.senatorshipValidatedBy}
-                          onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
+                          placeholder="e.g. 12345"
+                          value={inlineValues.senatorshipId}
+                          onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        />
+                      </div>
+                      <div className="flex items-center gap-4 py-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={inlineValues.senatorCertified}
+                            onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                          />
+                          <span className="text-sm font-medium text-slate-700">Senator Certified</span>
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-4 py-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={inlineValues.senatorshipBoardValidated}
+                            onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                          />
+                          <span className="text-sm font-medium text-slate-700">Board Validated</span>
+                        </label>
+                      </div>
+                      {inlineValues.senatorshipBoardValidated && (
+                        <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
+                            <input
+                              type="text"
+                              value={inlineValues.senatorshipValidatedBy}
+                              onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
+                            <input
+                              type="date"
+                              value={inlineValues.senatorshipValidatedAt}
+                              onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex justify-end gap-2 pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                      <Button variant="primary" size="sm" onClick={() => {
+                        handleInlineSave('career', {
+                          senatorshipId: inlineValues.senatorshipId || undefined,
+                          senatorCertified: inlineValues.senatorCertified,
+                          senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
+                          senatorshipValidatedBy: inlineValues.senatorshipValidatedBy || undefined,
+                          senatorshipValidatedAt: inlineValues.senatorshipValidatedAt || undefined,
+                        });
+                      }}>Save</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div>
+                        <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
+                        <MembershipTypeDisplay
+                          member={{
+                            nationality: member.nationality,
+                            dateOfBirth: member.dateOfBirth,
+                            senatorCertified: member.senatorCertified,
+                            senatorshipId: member.senatorshipId,
+                            role: member.role,
+                            membershipType: member.membershipType,
+                          }}
+                        />
+                      </div>
+                      {member.senatorCertified && (
+                        <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
+                        <Badge
+                          variant={
+                            (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
+                              member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
+                              member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+                          }
+                          className="capitalize"
+                        >
+                          {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-500">Last Payment Amount:</span>
+                        <span className="font-bold">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-500">Last Payment Date:</span>
+                        <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowPaymentHistoryModal(true)}
+                        className="mt-2 w-full font-bold text-slate-700 hover:text-jci-blue border-slate-200 hover:border-jci-blue flex items-center justify-center gap-1.5"
+                      >
+                        <Clock size={12} /> View Payment History
+                      </Button>
+                    </div>
+
+                    {/* Senator Details Section */}
+                    <div className="border-t pt-4 space-y-3">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Senatorship Details</h4>
+                      <div className="grid grid-cols-1 gap-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Certified Senator:</span>
+                          <Badge variant={member.senatorCertified ? 'success' : 'neutral'}>
+                            {member.senatorCertified ? 'Yes' : 'No'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Senator Number:</span>
+                          <span className="font-semibold text-slate-900">{member.senatorshipId || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Board Validated:</span>
+                          <Badge variant={member.senatorshipBoardValidated ? 'success' : 'neutral'}>
+                            {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
+                          </Badge>
+                        </div>
+                        {member.senatorshipBoardValidated && member.senatorshipValidatedBy && (
+                          <div className="flex items-center justify-between text-xs text-slate-500">
+                            <span>Validated By:</span>
+                            <span className="font-medium">{member.senatorshipValidatedBy}</span>
+                          </div>
+                        )}
+                        {member.senatorshipBoardValidated && member.senatorshipValidatedAt && (
+                          <div className="flex items-center justify-between text-xs text-slate-500">
+                            <span>Validated At:</span>
+                            <span className="font-medium">{formatDateToDDMMMYYYY(member.senatorshipValidatedAt)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+
+          <div className="lg:col-span-2 space-y-6">
+            {activeDetailTab === 'professional' && (
+              <Card
+                title="Professional & Business"
+                action={
+                  (canEditMembers || isSelfView) && activeInlineEditCard !== 'professional' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                      onClick={() => startInlineEdit('professional')}
+                      title="Edit Professional Info"
+                    >
+                      <Edit size={14} />
+                    </Button>
+                  )
+                }
+              >
+                {activeInlineEditCard === 'professional' && inlineValues ? (
+                  <div className="space-y-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Name</label>
+                        <input
+                          type="text"
+                          value={inlineValues.companyName}
+                          onChange={e => setInlineValues({ ...inlineValues, companyName: e.target.value })}
                           className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                         />
                       </div>
                       <div>
-                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Website</label>
                         <input
-                          type="date"
-                          value={inlineValues.senatorshipValidatedAt}
-                          onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
+                          type="text"
+                          value={inlineValues.companyWebsite}
+                          onChange={e => setInlineValues({ ...inlineValues, companyWebsite: e.target.value })}
                           className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                         />
                       </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position / Title</label>
+                        <input
+                          type="text"
+                          value={inlineValues.departmentAndPosition}
+                          onChange={e => setInlineValues({ ...inlineValues, departmentAndPosition: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Level of Mgmt</label>
+                        <select
+                          value={inlineValues.levelOfManagement}
+                          onChange={e => setInlineValues({ ...inlineValues, levelOfManagement: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                        >
+                          <option value="">Select Level</option>
+                          <option value="Top">Top</option>
+                          <option value="Middle">Middle</option>
+                          <option value="Frontline">Frontline</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Industry</label>
+                        <select
+                          value={inlineValues.industry}
+                          onChange={e => setInlineValues({ ...inlineValues, industry: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                        >
+                          <option value="">Select Industry</option>
+                          {INDUSTRY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Intl. Business Engagement</label>
+                        <select
+                          value={inlineValues.acceptInternationalBusiness}
+                          onChange={e => setInlineValues({ ...inlineValues, acceptInternationalBusiness: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                        >
+                          <option value="">Select Option</option>
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                          <option value="Willing to Explore">Willing to Explore</option>
+                        </select>
+                      </div>
                     </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-2 pt-3 border-t">
-                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                  <Button variant="primary" size="sm" onClick={() => {
-                    handleInlineSave('career', {
-                      senatorshipId: inlineValues.senatorshipId || undefined,
-                      senatorCertified: inlineValues.senatorCertified,
-                      senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
-                      senatorshipValidatedBy: inlineValues.senatorshipValidatedBy || undefined,
-                      senatorshipValidatedAt: inlineValues.senatorshipValidatedAt || undefined,
-                    });
-                  }}>Save</Button>
-                </div>
-              </div>
-            ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div>
-                  <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
-                  <MembershipTypeDisplay
-                    member={{
-                      nationality: member.nationality,
-                      dateOfBirth: member.dateOfBirth,
-                      senatorCertified: member.senatorCertified,
-                      senatorshipId: member.senatorshipId,
-                      role: member.role,
-                      membershipType: member.membershipType,
-                    }}
-                  />
-                </div>
-                {member.senatorCertified && (
-                  <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
-                )}
-              </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
-                  <Badge
-                    variant={
-                      (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
-                        member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
-                        member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
-                    }
-                    className="capitalize"
-                  >
-                    {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Last Payment Amount:</span>
-                  <span className="font-bold">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Last Payment Date:</span>
-                  <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowPaymentHistoryModal(true)}
-                  className="mt-2 w-full font-bold text-slate-700 hover:text-jci-blue border-slate-200 hover:border-jci-blue flex items-center justify-center gap-1.5"
-                >
-                  <Clock size={12} /> View Payment History
-                </Button>
-              </div>
-
-              {/* Senator Details Section */}
-              <div className="border-t pt-4 space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Senatorship Details</h4>
-                <div className="grid grid-cols-1 gap-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Certified Senator:</span>
-                    <Badge variant={member.senatorCertified ? 'success' : 'neutral'}>
-                      {member.senatorCertified ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Senator Number:</span>
-                    <span className="font-semibold text-slate-900">{member.senatorshipId || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Board Validated:</span>
-                    <Badge variant={member.senatorshipBoardValidated ? 'success' : 'neutral'}>
-                      {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
-                    </Badge>
-                  </div>
-                  {member.senatorshipBoardValidated && member.senatorshipValidatedBy && (
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Validated By:</span>
-                      <span className="font-medium">{member.senatorshipValidatedBy}</span>
+                    <div className="border-t pt-3">
+                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
+                      <textarea
+                        value={inlineValues.companyDescription}
+                        onChange={e => setInlineValues({ ...inlineValues, companyDescription: e.target.value })}
+                        rows={2}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
+                      />
                     </div>
-                  )}
-                  {member.senatorshipBoardValidated && member.senatorshipValidatedAt && (
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Validated At:</span>
-                      <span className="font-medium">{formatDateToDDMMMYYYY(member.senatorshipValidatedAt)}</span>
+
+                    <div className="grid grid-cols-2 gap-4 border-t pt-3">
+                      <div className="col-span-2">
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
+                        <MultiSelectDropdown
+                          options={BUSINESS_CATEGORIES_OPTIONS}
+                          selected={inlineValues.businessCategory}
+                          onChange={selected => setInlineValues({ ...inlineValues, businessCategory: selected })}
+                          placeholder="Select categories..."
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral Industry</label>
+                        <MultiSelectDropdown
+                          options={INDUSTRY_OPTIONS}
+                          selected={inlineValues.idealReferralIndustry ? inlineValues.idealReferralIndustry.split(', ').filter(Boolean) : []}
+                          onChange={selected => setInlineValues({ ...inlineValues, idealReferralIndustry: selected.join(', ') })}
+                          placeholder="Select industries..."
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral</label>
+                        <MultiSelectDropdown
+                          options={IDEAL_REFERRAL_OPTIONS.map(opt => opt.label)}
+                          selected={inlineValues.idealReferral ? inlineValues.idealReferral.split(', ').filter(Boolean) : []}
+                          onChange={selected => setInlineValues({ ...inlineValues, idealReferral: selected.join(', ') })}
+                          placeholder="Select referrals..."
+                        />
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            )}
-          </Card>
-          )}
-        </div>
 
-        <div className="lg:col-span-2 space-y-6">
-          {activeDetailTab === 'professional' && (
-            <Card
-              title="Professional & Business"
-            action={
-              (canEditMembers || isSelfView) && activeInlineEditCard !== 'professional' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                  onClick={() => startInlineEdit('professional')}
-                  title="Edit Professional Info"
-                >
-                  <Edit size={14} />
-                </Button>
-              )
-            }
-          >
-            {activeInlineEditCard === 'professional' && inlineValues ? (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Name</label>
-                    <input
-                      type="text"
-                      value={inlineValues.companyName}
-                      onChange={e => setInlineValues({ ...inlineValues, companyName: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Website</label>
-                    <input
-                      type="text"
-                      value={inlineValues.companyWebsite}
-                      onChange={e => setInlineValues({ ...inlineValues, companyWebsite: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position / Title</label>
-                    <input
-                      type="text"
-                      value={inlineValues.departmentAndPosition}
-                      onChange={e => setInlineValues({ ...inlineValues, departmentAndPosition: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Level of Mgmt</label>
-                    <select
-                      value={inlineValues.levelOfManagement}
-                      onChange={e => setInlineValues({ ...inlineValues, levelOfManagement: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="">Select Level</option>
-                      <option value="Top">Top</option>
-                      <option value="Middle">Middle</option>
-                      <option value="Frontline">Frontline</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Industry</label>
-                    <select
-                      value={inlineValues.industry}
-                      onChange={e => setInlineValues({ ...inlineValues, industry: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="">Select Industry</option>
-                      {INDUSTRY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Intl. Business Engagement</label>
-                    <select
-                      value={inlineValues.acceptInternationalBusiness}
-                      onChange={e => setInlineValues({ ...inlineValues, acceptInternationalBusiness: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="">Select Option</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                      <option value="Willing to Explore">Willing to Explore</option>
-                    </select>
-                  </div>
-                </div>
+                    <div className="border-t pt-3">
+                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Special Member Offer</label>
+                      <input
+                        type="text"
+                        value={inlineValues.specialOffer}
+                        onChange={e => setInlineValues({ ...inlineValues, specialOffer: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                    </div>
 
-                <div className="border-t pt-3">
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
-                  <textarea
-                    value={inlineValues.companyDescription}
-                    onChange={e => setInlineValues({ ...inlineValues, companyDescription: e.target.value })}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 border-t pt-3">
-                  <div className="col-span-2">
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
-                    <MultiSelectDropdown
-                      options={BUSINESS_CATEGORIES_OPTIONS}
-                      selected={inlineValues.businessCategory}
-                      onChange={selected => setInlineValues({ ...inlineValues, businessCategory: selected })}
-                      placeholder="Select categories..."
-                    />
+                    <div className="flex justify-end gap-2 pt-3 border-t">
+                      <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                      <Button variant="primary" size="sm" onClick={() => handleInlineSave('professional', {
+                        companyName: inlineValues.companyName,
+                        companyWebsite: inlineValues.companyWebsite,
+                        departmentAndPosition: inlineValues.departmentAndPosition,
+                        industry: inlineValues.industry,
+                        acceptInternationalBusiness: inlineValues.acceptInternationalBusiness,
+                        businessCategory: inlineValues.businessCategory,
+                        levelOfManagement: inlineValues.levelOfManagement,
+                        idealReferralIndustry: inlineValues.idealReferralIndustry,
+                        idealReferral: inlineValues.idealReferral,
+                        companyDescription: inlineValues.companyDescription,
+                        specialOffer: inlineValues.specialOffer,
+                      })}>Save</Button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral Industry</label>
-                    <MultiSelectDropdown
-                      options={INDUSTRY_OPTIONS}
-                      selected={inlineValues.idealReferralIndustry ? inlineValues.idealReferralIndustry.split(', ').filter(Boolean) : []}
-                      onChange={selected => setInlineValues({ ...inlineValues, idealReferralIndustry: selected.join(', ') })}
-                      placeholder="Select industries..."
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral</label>
-                    <MultiSelectDropdown
-                      options={IDEAL_REFERRAL_OPTIONS.map(opt => opt.label)}
-                      selected={inlineValues.idealReferral ? inlineValues.idealReferral.split(', ').filter(Boolean) : []}
-                      onChange={selected => setInlineValues({ ...inlineValues, idealReferral: selected.join(', ') })}
-                      placeholder="Select referrals..."
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t pt-3">
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Special Member Offer</label>
-                  <input
-                    type="text"
-                    value={inlineValues.specialOffer}
-                    onChange={e => setInlineValues({ ...inlineValues, specialOffer: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-3 border-t">
-                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                  <Button variant="primary" size="sm" onClick={() => handleInlineSave('professional', {
-                    companyName: inlineValues.companyName,
-                    companyWebsite: inlineValues.companyWebsite,
-                    departmentAndPosition: inlineValues.departmentAndPosition,
-                    industry: inlineValues.industry,
-                    acceptInternationalBusiness: inlineValues.acceptInternationalBusiness,
-                    businessCategory: inlineValues.businessCategory,
-                    levelOfManagement: inlineValues.levelOfManagement,
-                    idealReferralIndustry: inlineValues.idealReferralIndustry,
-                    idealReferral: inlineValues.idealReferral,
-                    companyDescription: inlineValues.companyDescription,
-                    specialOffer: inlineValues.specialOffer,
-                  })}>Save</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="text-sm">
-                  <p className="font-bold text-slate-900 leading-tight">{member.companyName || 'Freelance / Not Provided'}</p>
-                  {member.companyWebsite && (
-                    <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline">
-                      Visit Website
-                    </a>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                    <p className="font-medium text-slate-900">{member.departmentAndPosition || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
-                    <p className="font-medium text-slate-900">{member.levelOfManagement || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
-                    <p className="font-medium text-slate-900">{member.industry || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
-                    <p className="font-medium text-slate-900">{member.acceptInternationalBusiness || 'Unknown'}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
-                        member.businessCategory.map((cat, idx) => (
-                          <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
-                        ))
-                      ) : (
-                        <span className="text-slate-400 italic">None</span>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="text-sm">
+                      <p className="font-bold text-slate-900 leading-tight">{member.companyName || 'Freelance / Not Provided'}</p>
+                      {member.companyWebsite && (
+                        <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline">
+                          Visit Website
+                        </a>
                       )}
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
-                    <div className="mt-1 text-slate-700">
-                      {member.idealReferralIndustry ? (
-                        <span className="text-sm">{member.idealReferralIndustry}</span>
-                      ) : (
-                        <span className="text-slate-400 italic">None</span>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {Array.isArray(member.idealReferrals) && member.idealReferrals.length > 0 ? (
-                        member.idealReferrals.map((type, idx) => (
-                          <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
-                        ))
-                      ) : member.idealReferral ? (
-                        <span className="text-sm text-slate-700">{member.idealReferral}</span>
-                      ) : (
-                        <span className="text-slate-400 italic">None</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
-                {member.companyDescription && (
-                  <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
-                    <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
-                    <p className="text-xs text-slate-600 leading-relaxed">{member.companyDescription}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                      <div>
+                        <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
+                        <p className="font-medium text-slate-900">{member.departmentAndPosition || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
+                        <p className="font-medium text-slate-900">{member.levelOfManagement || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
+                        <p className="font-medium text-slate-900">{member.industry || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
+                        <p className="font-medium text-slate-900">{member.acceptInternationalBusiness || 'Unknown'}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                      <div>
+                        <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
+                            member.businessCategory.map((cat, idx) => (
+                              <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
+                            ))
+                          ) : (
+                            <span className="text-slate-400 italic">None</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
+                        <div className="mt-1 text-slate-700">
+                          {member.idealReferralIndustry ? (
+                            <span className="text-sm">{member.idealReferralIndustry}</span>
+                          ) : (
+                            <span className="text-slate-400 italic">None</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Array.isArray(member.idealReferrals) && member.idealReferrals.length > 0 ? (
+                            member.idealReferrals.map((type, idx) => (
+                              <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
+                            ))
+                          ) : member.idealReferral ? (
+                            <span className="text-sm text-slate-700">{member.idealReferral}</span>
+                          ) : (
+                            <span className="text-slate-400 italic">None</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {member.companyDescription && (
+                      <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
+                        <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
+                        <p className="text-xs text-slate-600 leading-relaxed">{member.companyDescription}</p>
+                      </div>
+                    )}
+
+                    {member.specialOffer && (
+                      <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
+                        <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
+                        <p className="text-sm font-medium text-slate-800">{member.specialOffer}</p>
+                      </div>
+                    )}
                   </div>
                 )}
-
-                {member.specialOffer && (
-                  <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
-                    <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
-                    <p className="text-sm font-medium text-slate-800">{member.specialOffer}</p>
-                  </div>
-                )}
-              </div>
+              </Card>
             )}
-          </Card>
-          )}
 
-          {activeDetailTab === 'basic' && (
-            <>
-              <Card
-                title="Contact Information"
-            action={
-              (canEditMembers || isSelfView) && activeInlineEditCard !== 'contact' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                  onClick={() => startInlineEdit('contact')}
-                  title="Edit Contact Info"
-                >
-                  <Edit size={14} />
-                </Button>
-              )
-            }
-          >
-            {activeInlineEditCard === 'contact' && inlineValues ? (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Primary Phone</label>
-                    <input
-                      type="text"
-                      value={inlineValues.phone}
-                      onChange={e => setInlineValues({ ...inlineValues, phone: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Alternate Phone</label>
-                    <input
-                      type="text"
-                      value={inlineValues.alternatePhone}
-                      onChange={e => setInlineValues({ ...inlineValues, alternatePhone: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={inlineValues.email}
-                      onChange={e => setInlineValues({ ...inlineValues, email: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WhatsApp Group Added</label>
-                    <select
-                      value={inlineValues.whatsappGroup ? 'Yes' : 'No'}
-                      onChange={e => setInlineValues({ ...inlineValues, whatsappGroup: e.target.value === 'Yes' })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
-                    <textarea
-                      value={inlineValues.address}
-                      onChange={e => setInlineValues({ ...inlineValues, address: e.target.value })}
-                      rows={2}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
-                    />
-                  </div>
-                </div>
-
-                <div className="border-t pt-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Emergency Contact</h4>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name</label>
-                      <input
-                        type="text"
-                        value={inlineValues.emergencyContactName}
-                        onChange={e => setInlineValues({ ...inlineValues, emergencyContactName: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Relationship</label>
-                      <input
-                        type="text"
-                        value={inlineValues.emergencyContactRelationship}
-                        onChange={e => setInlineValues({ ...inlineValues, emergencyContactRelationship: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
-                      <input
-                        type="text"
-                        value={inlineValues.emergencyContactPhone}
-                        onChange={e => setInlineValues({ ...inlineValues, emergencyContactPhone: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t pt-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Social Media Links</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-slate-500 block text-xs font-medium mb-1">LinkedIn</label>
-                      <input
-                        type="text"
-                        value={inlineValues.linkedin}
-                        onChange={e => setInlineValues({ ...inlineValues, linkedin: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-slate-500 block text-xs font-medium mb-1">Facebook</label>
-                      <input
-                        type="text"
-                        value={inlineValues.facebook}
-                        onChange={e => setInlineValues({ ...inlineValues, facebook: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-slate-500 block text-xs font-medium mb-1">Instagram</label>
-                      <input
-                        type="text"
-                        value={inlineValues.instagram}
-                        onChange={e => setInlineValues({ ...inlineValues, instagram: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-slate-500 block text-xs font-medium mb-1">WeChat ID</label>
-                      <input
-                        type="text"
-                        value={inlineValues.wechat}
-                        onChange={e => setInlineValues({ ...inlineValues, wechat: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-3 border-t">
-                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                  <Button variant="primary" size="sm" onClick={() => handleInlineSave('contact', {
-                    phone: inlineValues.phone,
-                    alternatePhone: inlineValues.alternatePhone,
-                    email: inlineValues.email,
-                    whatsappGroup: inlineValues.whatsappGroup,
-                    address: inlineValues.address,
-                    emergencyContactName: inlineValues.emergencyContactName,
-                    emergencyContactRelationship: inlineValues.emergencyContactRelationship,
-                    emergencyContactPhone: inlineValues.emergencyContactPhone,
-                    linkedin: inlineValues.linkedin,
-                    facebook: inlineValues.facebook,
-                    instagram: inlineValues.instagram,
-                    wechat: inlineValues.wechat,
-                  })}>Save</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                      <Phone size={16} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
-                      <p className="text-sm font-bold">{member.phone || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                      <Phone size={16} className="rotate-90" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
-                      <p className="text-sm font-bold">{member.alternatePhone || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-jci-blue">
-                      <MessageCircle size={16} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-medium">WhatsApp Group</p>
-                      <p className="text-sm font-bold">{member.whatsappGroup ? 'Yes' : 'Not Added'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                      <MapPin size={16} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-medium">Address</p>
-                      <p className="text-sm text-slate-700">{member.address || 'No address on file'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1">Emergency Contact</h4>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{member.emergencyContactName || 'None Listed'}</p>
-                    <p className="text-xs text-slate-500">{member.emergencyContactRelationship} • {member.emergencyContactPhone}</p>
-                  </div>
-
-                  <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
-                  <div className="flex gap-4">
-                    {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Linkedin size={20} /></a>}
-                    {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Facebook size={20} /></a>}
-                    {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Instagram size={20} /></a>}
-                    {member.wechat && <div className="text-slate-400 flex items-center gap-1"><MessageCircle size={20} /><span className="text-xs font-medium">{member.wechat}</span></div>}
-                  </div>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card
-            title="Apparel & Items"
-            action={
-              (canEditMembers || isSelfView) && activeInlineEditCard !== 'apparel' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                  onClick={() => startInlineEdit('apparel')}
-                  title="Edit Apparel Size"
-                >
-                  <Edit size={14} />
-                </Button>
-              )
-            }
-          >
-            {activeInlineEditCard === 'apparel' && inlineValues ? (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Cut Style</label>
-                    <select
-                      value={inlineValues.cutStyle}
-                      onChange={e => setInlineValues({ ...inlineValues, cutStyle: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="">Select Cut</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">T-Shirt Size</label>
-                    <select
-                      value={inlineValues.tshirtSize}
-                      onChange={e => setInlineValues({ ...inlineValues, tshirtSize: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="">Select Size</option>
-                      {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Jacket Size</label>
-                    <select
-                      value={inlineValues.jacketSize}
-                      onChange={e => setInlineValues({ ...inlineValues, jacketSize: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="">Select Size</option>
-                      {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Logo Status</label>
-                    <select
-                      value={inlineValues.tshirtStatus}
-                      onChange={e => setInlineValues({ ...inlineValues, tshirtStatus: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                    >
-                      <option value="NA">NA</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Received">Received</option>
-                      <option value="Delivered">Delivered</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="border-t pt-3">
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Embroidered Name</label>
-                  <input
-                    type="text"
-                    value={inlineValues.embroideredName}
-                    onChange={e => setInlineValues({ ...inlineValues, embroideredName: e.target.value })}
-                    placeholder="Embroidered Name on Jacket"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-3 border-t">
-                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                  <Button variant="primary" size="sm" onClick={() => handleInlineSave('apparel', {
-                    cutStyle: inlineValues.cutStyle,
-                    tshirtSize: inlineValues.tshirtSize,
-                    jacketSize: inlineValues.jacketSize,
-                    tshirtStatus: inlineValues.tshirtStatus,
-                    embroideredName: inlineValues.embroideredName,
-                  })}>Save</Button>
-                </div>
-              </div>
-            ) : (
+            {activeDetailTab === 'basic' && (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-3 border rounded-lg text-center">
-                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Cut Style</span>
-                    <p className="font-bold text-slate-900">{member.cutStyle || 'N/A'}</p>
-                  </div>
-                  <div className="p-3 border rounded-lg text-center">
-                    <span className="text-slate-500 block text-[10px] uppercase font-bold">T-Shirt</span>
-                    <p className="font-bold text-slate-900">{member.tshirtSize || 'N/A'}</p>
-                  </div>
-                  <div className="p-3 border rounded-lg text-center">
-                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Jacket</span>
-                    <p className="font-bold text-slate-900">{member.jacketSize || 'N/A'}</p>
-                  </div>
-                  <div className="p-3 border rounded-lg text-center">
-                    <span className="text-slate-500 block text-[10px] uppercase font-bold">Logo Status</span>
-                    <Badge variant={member.tshirtStatus === 'Received' || member.tshirtStatus === 'Delivered' ? 'success' : 'warning'}>
-                      {member.tshirtStatus || 'N/A'}
-                    </Badge>
-                  </div>
-                </div>
-                {member.embroideredName && (
-                  <div className="mt-4 p-2 bg-slate-50 rounded text-center border-t border-slate-200">
-                    <span className="text-xs text-slate-500">Embroidered Name: </span>
-                    <span className="text-sm font-bold text-slate-900 italic">"{member.embroideredName}"</span>
-                  </div>
-                )}
+                <Card
+                  title="Contact Information"
+                  action={
+                    (canEditMembers || isSelfView) && activeInlineEditCard !== 'contact' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                        onClick={() => startInlineEdit('contact')}
+                        title="Edit Contact Info"
+                      >
+                        <Edit size={14} />
+                      </Button>
+                    )
+                  }
+                >
+                  {activeInlineEditCard === 'contact' && inlineValues ? (
+                    <div className="space-y-4 text-sm">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Primary Phone</label>
+                          <input
+                            type="text"
+                            value={inlineValues.phone}
+                            onChange={e => setInlineValues({ ...inlineValues, phone: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Alternate Phone</label>
+                          <input
+                            type="text"
+                            value={inlineValues.alternatePhone}
+                            onChange={e => setInlineValues({ ...inlineValues, alternatePhone: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Email</label>
+                          <input
+                            type="email"
+                            value={inlineValues.email}
+                            onChange={e => setInlineValues({ ...inlineValues, email: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WhatsApp Group Added</label>
+                          <select
+                            value={inlineValues.whatsappGroup ? 'Yes' : 'No'}
+                            onChange={e => setInlineValues({ ...inlineValues, whatsappGroup: e.target.value === 'Yes' })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                          >
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                          </select>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
+                          <textarea
+                            value={inlineValues.address}
+                            onChange={e => setInlineValues({ ...inlineValues, address: e.target.value })}
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-3">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Emergency Contact</h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name</label>
+                            <input
+                              type="text"
+                              value={inlineValues.emergencyContactName}
+                              onChange={e => setInlineValues({ ...inlineValues, emergencyContactName: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Relationship</label>
+                            <input
+                              type="text"
+                              value={inlineValues.emergencyContactRelationship}
+                              onChange={e => setInlineValues({ ...inlineValues, emergencyContactRelationship: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
+                            <input
+                              type="text"
+                              value={inlineValues.emergencyContactPhone}
+                              onChange={e => setInlineValues({ ...inlineValues, emergencyContactPhone: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-3">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Social Media Links</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-slate-500 block text-xs font-medium mb-1">LinkedIn</label>
+                            <input
+                              type="text"
+                              value={inlineValues.linkedin}
+                              onChange={e => setInlineValues({ ...inlineValues, linkedin: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs font-medium mb-1">Facebook</label>
+                            <input
+                              type="text"
+                              value={inlineValues.facebook}
+                              onChange={e => setInlineValues({ ...inlineValues, facebook: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs font-medium mb-1">Instagram</label>
+                            <input
+                              type="text"
+                              value={inlineValues.instagram}
+                              onChange={e => setInlineValues({ ...inlineValues, instagram: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs font-medium mb-1">WeChat ID</label>
+                            <input
+                              type="text"
+                              value={inlineValues.wechat}
+                              onChange={e => setInlineValues({ ...inlineValues, wechat: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-3 border-t">
+                        <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                        <Button variant="primary" size="sm" onClick={() => handleInlineSave('contact', {
+                          phone: inlineValues.phone,
+                          alternatePhone: inlineValues.alternatePhone,
+                          email: inlineValues.email,
+                          whatsappGroup: inlineValues.whatsappGroup,
+                          address: inlineValues.address,
+                          emergencyContactName: inlineValues.emergencyContactName,
+                          emergencyContactRelationship: inlineValues.emergencyContactRelationship,
+                          emergencyContactPhone: inlineValues.emergencyContactPhone,
+                          linkedin: inlineValues.linkedin,
+                          facebook: inlineValues.facebook,
+                          instagram: inlineValues.instagram,
+                          wechat: inlineValues.wechat,
+                        })}>Save</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                            <Phone size={16} />
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
+                            <p className="text-sm font-bold">{member.phone || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                            <Phone size={16} className="rotate-90" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
+                            <p className="text-sm font-bold">{member.alternatePhone || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-jci-blue">
+                            <MessageCircle size={16} />
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase font-medium">WhatsApp Group</p>
+                            <p className="text-sm font-bold">{member.whatsappGroup ? 'Yes' : 'Not Added'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                            <MapPin size={16} />
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase font-medium">Address</p>
+                            <p className="text-sm text-slate-700">{member.address || 'No address on file'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1">Emergency Contact</h4>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{member.emergencyContactName || 'None Listed'}</p>
+                          <p className="text-xs text-slate-500">{member.emergencyContactRelationship} • {member.emergencyContactPhone}</p>
+                        </div>
+
+                        <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
+                        <div className="flex gap-4">
+                          {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Linkedin size={20} /></a>}
+                          {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Facebook size={20} /></a>}
+                          {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Instagram size={20} /></a>}
+                          {member.wechat && <div className="text-slate-400 flex items-center gap-1"><MessageCircle size={20} /><span className="text-xs font-medium">{member.wechat}</span></div>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+
+                <Card
+                  title="Apparel & Items"
+                  action={
+                    (canEditMembers || isSelfView) && activeInlineEditCard !== 'apparel' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                        onClick={() => startInlineEdit('apparel')}
+                        title="Edit Apparel Size"
+                      >
+                        <Edit size={14} />
+                      </Button>
+                    )
+                  }
+                >
+                  {activeInlineEditCard === 'apparel' && inlineValues ? (
+                    <div className="space-y-4 text-sm">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Cut Style</label>
+                          <select
+                            value={inlineValues.cutStyle}
+                            onChange={e => setInlineValues({ ...inlineValues, cutStyle: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                          >
+                            <option value="">Select Cut</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">T-Shirt Size</label>
+                          <select
+                            value={inlineValues.tshirtSize}
+                            onChange={e => setInlineValues({ ...inlineValues, tshirtSize: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                          >
+                            <option value="">Select Size</option>
+                            {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Jacket Size</label>
+                          <select
+                            value={inlineValues.jacketSize}
+                            onChange={e => setInlineValues({ ...inlineValues, jacketSize: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                          >
+                            <option value="">Select Size</option>
+                            {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'].map(sz => <option key={sz} value={sz}>{sz}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Logo Status</label>
+                          <select
+                            value={inlineValues.tshirtStatus}
+                            onChange={e => setInlineValues({ ...inlineValues, tshirtStatus: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                          >
+                            <option value="NA">NA</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Received">Received</option>
+                            <option value="Delivered">Delivered</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-3">
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Embroidered Name</label>
+                        <input
+                          type="text"
+                          value={inlineValues.embroideredName}
+                          onChange={e => setInlineValues({ ...inlineValues, embroideredName: e.target.value })}
+                          placeholder="Embroidered Name on Jacket"
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-3 border-t">
+                        <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                        <Button variant="primary" size="sm" onClick={() => handleInlineSave('apparel', {
+                          cutStyle: inlineValues.cutStyle,
+                          tshirtSize: inlineValues.tshirtSize,
+                          jacketSize: inlineValues.jacketSize,
+                          tshirtStatus: inlineValues.tshirtStatus,
+                          embroideredName: inlineValues.embroideredName,
+                        })}>Save</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-3 border rounded-lg text-center">
+                          <span className="text-slate-500 block text-[10px] uppercase font-bold">Cut Style</span>
+                          <p className="font-bold text-slate-900">{member.cutStyle || 'N/A'}</p>
+                        </div>
+                        <div className="p-3 border rounded-lg text-center">
+                          <span className="text-slate-500 block text-[10px] uppercase font-bold">T-Shirt</span>
+                          <p className="font-bold text-slate-900">{member.tshirtSize || 'N/A'}</p>
+                        </div>
+                        <div className="p-3 border rounded-lg text-center">
+                          <span className="text-slate-500 block text-[10px] uppercase font-bold">Jacket</span>
+                          <p className="font-bold text-slate-900">{member.jacketSize || 'N/A'}</p>
+                        </div>
+                        <div className="p-3 border rounded-lg text-center">
+                          <span className="text-slate-500 block text-[10px] uppercase font-bold">Logo Status</span>
+                          <Badge variant={member.tshirtStatus === 'Received' || member.tshirtStatus === 'Delivered' ? 'success' : 'warning'}>
+                            {member.tshirtStatus || 'N/A'}
+                          </Badge>
+                        </div>
+                      </div>
+                      {member.embroideredName && (
+                        <div className="mt-4 p-2 bg-slate-50 rounded text-center border-t border-slate-200">
+                          <span className="text-xs text-slate-500">Embroidered Name: </span>
+                          <span className="text-sm font-bold text-slate-900 italic">"{member.embroideredName}"</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Card>
               </>
             )}
-          </Card>
-          </>
-          )}
 
-          {activeDetailTab === 'career' && (
-            <>
-              <div className="grid lg:grid-cols-2 gap-6 items-start">
-            <Card title="JCI Career Path">
-              <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-                {/* Join milestone */}
-                <div className="relative">
-                  <div className="absolute -left-8 bg-green-100 text-green-600 p-1 rounded-full border-4 border-white">
-                    <UserPlus size={14} />
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono mb-1 block">{member.joinDate}</span>
-                  <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
-                </div>
-
-                {/* Merged & sorted: careerHistory + board positions + commission director roles from Firestore */}
-                {(() => {
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-
-                  // Date-based status helper
-                  const getBodStatus = (bp: BoardMember): 'former' | 'current' | 'elected' => {
-                    const start = bp.startDate ? new Date(bp.startDate) : null;
-                    const end = bp.endDate ? new Date(bp.endDate) : null;
-                    if (end && today > end) return 'former';
-                    if (start && today < start) return 'elected';
-                    return 'current';
-                  };
-
-                  type TimelineItem = {
-                    sortKey: string; type: 'career' | 'board' | 'commission';
-                    year: string; title: string; subtitle?: string;
-                    bodStatus?: 'former' | 'current' | 'elected';
-                  };
-                  const items: TimelineItem[] = [];
-
-                  // Career history from member profile
-                  if (Array.isArray(member.careerHistory)) {
-                    member.careerHistory.forEach(m => {
-                      items.push({ sortKey: String(m.year), type: 'career', year: String(m.year), title: m.role, subtitle: m.description });
-                    });
-                  }
-
-                  // Board positions from Firestore boardMembers collection
-                  boardPositions.forEach(bp => {
-                    items.push({
-                      sortKey: bp.term,
-                      type: 'board',
-                      year: bp.term,
-                      title: bp.position,
-                      subtitle: `Board of Directors – ${bp.term}`,
-                      bodStatus: getBodStatus(bp),
-                    });
-                  });
-
-                  // Commission Director records from Board of Directors assignments
-                  commissionDirectorPositions.forEach(bp => {
-                    items.push({
-                      sortKey: bp.term,
-                      type: 'commission',
-                      year: bp.term,
-                      title: 'Commission Director',
-                      subtitle: `Under ${bp.position} - ${bp.term}`,
-                      bodStatus: getBodStatus(bp),
-                    });
-                  });
-
-                  // Sort chronologically
-                  items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-
-                  return items.map((item, idx) => {
-                    if (item.type === 'board') {
-                      const statusConfig = {
-                        current: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700', label: '现任', icon: 'text-amber-500' },
-                        elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
-                        former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: '历届', icon: 'text-slate-400' },
-                      };
-                      const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
-                      return (
-                        <div key={`board-${idx}`} className="relative">
-                          <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
-                            <Award size={14} />
-                          </div>
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-xs text-slate-400 font-mono">{item.year}</span>
-                            <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
-                          </div>
-                          <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Shield size={10} className={cfg.icon} />
-                            <p className={`text-xs font-medium ${cfg.icon}`}>Board of Directors</p>
-                          </div>
-                        </div>
-                      );
-                    }
-                    if (item.type === 'commission') {
-                      const statusConfig = {
-                        current: { dot: 'bg-sky-100 text-sky-600', badge: 'bg-sky-100 text-sky-700', label: 'Current', icon: 'text-sky-500' },
-                        elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
-                        former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Former', icon: 'text-slate-400' },
-                      };
-                      const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
-                      return (
-                        <div key={`commission-${idx}`} className="relative">
-                          <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
-                            <UserCog size={14} />
-                          </div>
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-xs text-slate-400 font-mono">{item.year}</span>
-                            <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
-                          </div>
-                          <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <UserCog size={10} className={cfg.icon} />
-                            <p className={`text-xs font-medium ${cfg.icon}`}>{item.subtitle}</p>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div key={`career-${idx}`} className="relative">
-                        <div className="absolute -left-8 bg-blue-100 text-jci-blue p-1 rounded-full border-4 border-white">
-                          <Briefcase size={14} />
-                        </div>
-                        <span className="text-xs text-slate-400 font-mono mb-1 block">{item.year}</span>
-                        <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                        {item.subtitle && <p className="text-sm text-slate-600">{item.subtitle}</p>}
-                      </div>
-                    );
-                  });
-                })()}
-
-                {/* Empty state */}
-                {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
-                  <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
-                )}
-              </div>
-            </Card>
-
-            <Card title="JCI Trainer Pathway">
-              <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-                {[
-                  {
-                    label: 'Level 1',
-                    title: 'JCI Certified Trainer',
-                    description: 'Pre-requisites: Graduate from JCI Discover',
-                    status: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'Completed' : 'Upcoming',
-                    tone: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'green' : 'slate',
-                    icon: GraduationCap,
-                  },
-                  {
-                    label: 'Level 2',
-                    title: 'JCIM Intermediate Trainer',
-                    description: 'Pre-requisites: Graduate from JCI Presenter/ JCI Facilitator, JCIM Inspire, JCIM Empower',
-                    status: (member.skills?.includes('JCI Presenter') || member.skills?.includes('JCI Facilitator') || member.points >= 400) ? 'Completed' : (member.points >= 150 ? 'In Progress' : 'Upcoming'),
-                    tone: (member.skills?.includes('JCI Presenter') || member.skills?.includes('JCI Facilitator') || member.points >= 400) ? 'green' : (member.points >= 150 ? 'blue' : 'slate'),
-                    icon: UserCheck,
-                  },
-                  {
-                    label: 'Level 3',
-                    title: 'JCIM Certified Trainer',
-                    description: 'Pre-requisites: Accumulate 10 training hours, graduate from JCIM TTT 1',
-                    status: (member.skills?.includes('JCIM TTT 1') || member.points >= 800) ? 'Completed' : (member.points >= 400 ? 'In Progress' : 'Upcoming'),
-                    tone: (member.skills?.includes('JCIM TTT 1') || member.points >= 800) ? 'green' : (member.points >= 400 ? 'blue' : 'slate'),
-                    icon: Award,
-                  },
-                  {
-                    label: 'Level 4',
-                    title: 'JCIM Principal Trainer',
-                    description: 'Pre-requisites: Accumulate 25 training hours, Head trainer of JCIM Empower or JCIM Inspire, graduate from JCIM TTT 2',
-                    status: (member.skills?.includes('JCIM TTT 2') || member.points >= 1500) ? 'Completed' : (member.points >= 800 ? 'In Progress' : 'Upcoming'),
-                    tone: (member.skills?.includes('JCIM TTT 2') || member.points >= 1500) ? 'green' : (member.points >= 800 ? 'blue' : 'slate'),
-                    icon: Shield,
-                  },
-                  {
-                    label: 'Level 5',
-                    title: 'JCIM Master Trainer',
-                    description: 'Pre-requisites: Accumulate 30 training hours, assistant trainer to area academy',
-                    status: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'Completed' : (member.points >= 1500 ? 'In Progress' : 'Upcoming'),
-                    tone: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'green' : (member.points >= 1500 ? 'blue' : 'slate'),
-                    icon: Zap,
-                  },
-                ].map((step) => {
-                  const Icon = step.icon;
-                  const toneClass = {
-                    green: { dot: 'bg-green-100 text-green-600', badge: 'bg-green-100 text-green-700 font-bold border border-green-200' },
-                    blue: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700 font-bold border border-blue-200' },
-                    amber: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700 font-bold border border-amber-200' },
-                    slate: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600 font-bold border border-slate-200' },
-                  }[step.tone];
-
-                  return (
-                    <div key={step.title} className="relative">
-                      <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${toneClass.dot}`}>
-                        <Icon size={14} />
-                      </div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs text-slate-400 font-mono">{step.label}</span>
-                        <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-full ${toneClass.badge}`}>{step.status}</span>
-                      </div>
-                      <h4 className="text-sm font-bold text-slate-900">{step.title}</h4>
-                      <p className="text-xs text-slate-600 leading-normal">{step.description}</p>
+            {activeDetailTab === 'career' && (
+              <><Card title="Recent Badges">
+                <div className="flex gap-4">
+                  {Array.isArray(member.badges) && member.badges.map(b => (
+                    <div key={b.id} className="text-center">
+                      <div className="text-3xl mb-1">{b.icon}</div>
+                      <div className="text-xs font-medium text-slate-900">{b.name}</div>
                     </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </div>
-
-          <Card title="Recent Badges">
-            <div className="flex gap-4">
-              {Array.isArray(member.badges) && member.badges.map(b => (
-                <div key={b.id} className="text-center">
-                  <div className="text-3xl mb-1">{b.icon}</div>
-                  <div className="text-xs font-medium text-slate-900">{b.name}</div>
+                  ))}
+                  {(!member.badges || member.badges.length === 0) && (
+                    <p className="text-sm text-slate-400 italic">No badges earned yet</p>
+                  )}
                 </div>
-              ))}
-              {(!member.badges || member.badges.length === 0) && (
-                <p className="text-sm text-slate-400 italic">No badges earned yet</p>
-              )}
-            </div>
-          </Card>
-          </>
-          )}
+              </Card>
+                <div className="grid lg:grid-cols-2 gap-6 items-start">
+                  <Card title="JCI Career Path">
+                    <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                      {/* Join milestone */}
+                      <div className="relative">
+                        <div className="absolute -left-8 bg-green-100 text-green-600 p-1 rounded-full border-4 border-white">
+                          <UserPlus size={14} />
+                        </div>
+                        <span className="text-xs text-slate-400 font-mono mb-1 block">{member.joinDate}</span>
+                        <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
+                      </div>
+
+                      {/* Merged & sorted: careerHistory + board positions + commission director roles from Firestore */}
+                      {(() => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        // Date-based status helper
+                        const getBodStatus = (bp: BoardMember): 'former' | 'current' | 'elected' => {
+                          const start = bp.startDate ? new Date(bp.startDate) : null;
+                          const end = bp.endDate ? new Date(bp.endDate) : null;
+                          if (end && today > end) return 'former';
+                          if (start && today < start) return 'elected';
+                          return 'current';
+                        };
+
+                        type TimelineItem = {
+                          sortKey: string; type: 'career' | 'board' | 'commission';
+                          year: string; title: string; subtitle?: string;
+                          bodStatus?: 'former' | 'current' | 'elected';
+                        };
+                        const items: TimelineItem[] = [];
+
+                        // Career history from member profile
+                        if (Array.isArray(member.careerHistory)) {
+                          member.careerHistory.forEach(m => {
+                            items.push({ sortKey: String(m.year), type: 'career', year: String(m.year), title: m.role, subtitle: m.description });
+                          });
+                        }
+
+                        // Board positions from Firestore boardMembers collection
+                        boardPositions.forEach(bp => {
+                          items.push({
+                            sortKey: bp.term,
+                            type: 'board',
+                            year: bp.term,
+                            title: bp.position,
+                            subtitle: `Board of Directors – ${bp.term}`,
+                            bodStatus: getBodStatus(bp),
+                          });
+                        });
+
+                        // Commission Director records from Board of Directors assignments
+                        commissionDirectorPositions.forEach(bp => {
+                          items.push({
+                            sortKey: bp.term,
+                            type: 'commission',
+                            year: bp.term,
+                            title: 'Commission Director',
+                            subtitle: `Under ${bp.position} - ${bp.term}`,
+                            bodStatus: getBodStatus(bp),
+                          });
+                        });
+
+                        // Sort chronologically
+                        items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+                        return items.map((item, idx) => {
+                          if (item.type === 'board') {
+                            const statusConfig = {
+                              current: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700', label: '现任', icon: 'text-amber-500' },
+                              elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
+                              former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: '历届', icon: 'text-slate-400' },
+                            };
+                            const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
+                            return (
+                              <div key={`board-${idx}`} className="relative">
+                                <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
+                                  <Award size={14} />
+                                </div>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <span className="text-xs text-slate-400 font-mono">{item.year}</span>
+                                  <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                                </div>
+                                <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <Shield size={10} className={cfg.icon} />
+                                  <p className={`text-xs font-medium ${cfg.icon}`}>Board of Directors</p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          if (item.type === 'commission') {
+                            const statusConfig = {
+                              current: { dot: 'bg-sky-100 text-sky-600', badge: 'bg-sky-100 text-sky-700', label: 'Current', icon: 'text-sky-500' },
+                              elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
+                              former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Former', icon: 'text-slate-400' },
+                            };
+                            const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
+                            return (
+                              <div key={`commission-${idx}`} className="relative">
+                                <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${cfg.dot}`}>
+                                  <UserCog size={14} />
+                                </div>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <span className="text-xs text-slate-400 font-mono">{item.year}</span>
+                                  <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                                </div>
+                                <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <UserCog size={10} className={cfg.icon} />
+                                  <p className={`text-xs font-medium ${cfg.icon}`}>{item.subtitle}</p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={`career-${idx}`} className="relative">
+                              <div className="absolute -left-8 bg-blue-100 text-jci-blue p-1 rounded-full border-4 border-white">
+                                <Briefcase size={14} />
+                              </div>
+                              <span className="text-xs text-slate-400 font-mono mb-1 block">{item.year}</span>
+                              <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
+                              {item.subtitle && <p className="text-sm text-slate-600">{item.subtitle}</p>}
+                            </div>
+                          );
+                        });
+                      })()}
+
+                      {/* Empty state */}
+                      {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
+                        <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
+                      )}
+                    </div>
+                  </Card>
+
+                  <Card title="JCI Trainer Pathway">
+                    <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                      {[
+                        {
+                          label: 'Level 1',
+                          title: 'JCI Certified Trainer',
+                          description: 'Pre-requisites: Graduate from JCI Discover',
+                          status: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'Completed' : 'Upcoming',
+                          tone: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'green' : 'slate',
+                          icon: GraduationCap,
+                        },
+                        {
+                          label: 'Level 2',
+                          title: 'JCIM Intermediate Trainer',
+                          description: 'Pre-requisites: Graduate from JCI Presenter/ JCI Facilitator, JCIM Inspire, JCIM Empower',
+                          status: (member.skills?.includes('JCI Presenter') || member.skills?.includes('JCI Facilitator') || member.points >= 400) ? 'Completed' : (member.points >= 150 ? 'In Progress' : 'Upcoming'),
+                          tone: (member.skills?.includes('JCI Presenter') || member.skills?.includes('JCI Facilitator') || member.points >= 400) ? 'green' : (member.points >= 150 ? 'blue' : 'slate'),
+                          icon: UserCheck,
+                        },
+                        {
+                          label: 'Level 3',
+                          title: 'JCIM Certified Trainer',
+                          description: 'Pre-requisites: Accumulate 10 training hours, graduate from JCIM TTT 1',
+                          status: (member.skills?.includes('JCIM TTT 1') || member.points >= 800) ? 'Completed' : (member.points >= 400 ? 'In Progress' : 'Upcoming'),
+                          tone: (member.skills?.includes('JCIM TTT 1') || member.points >= 800) ? 'green' : (member.points >= 400 ? 'blue' : 'slate'),
+                          icon: Award,
+                        },
+                        {
+                          label: 'Level 4',
+                          title: 'JCIM Principal Trainer',
+                          description: 'Pre-requisites: Accumulate 25 training hours, Head trainer of JCIM Empower or JCIM Inspire, graduate from JCIM TTT 2',
+                          status: (member.skills?.includes('JCIM TTT 2') || member.points >= 1500) ? 'Completed' : (member.points >= 800 ? 'In Progress' : 'Upcoming'),
+                          tone: (member.skills?.includes('JCIM TTT 2') || member.points >= 1500) ? 'green' : (member.points >= 800 ? 'blue' : 'slate'),
+                          icon: Shield,
+                        },
+                        {
+                          label: 'Level 5',
+                          title: 'JCIM Master Trainer',
+                          description: 'Pre-requisites: Accumulate 30 training hours, assistant trainer to area academy',
+                          status: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'Completed' : (member.points >= 1500 ? 'In Progress' : 'Upcoming'),
+                          tone: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'green' : (member.points >= 1500 ? 'blue' : 'slate'),
+                          icon: Zap,
+                        },
+                      ].map((step) => {
+                        const Icon = step.icon;
+                        const toneClass = {
+                          green: { dot: 'bg-green-100 text-green-600', badge: 'bg-green-100 text-green-700 font-bold border border-green-200' },
+                          blue: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700 font-bold border border-blue-200' },
+                          amber: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700 font-bold border border-amber-200' },
+                          slate: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600 font-bold border border-slate-200' },
+                        }[step.tone];
+
+                        return (
+                          <div key={step.title} className="relative">
+                            <div className={`absolute -left-8 p-1 rounded-full border-4 border-white ${toneClass.dot}`}>
+                              <Icon size={14} />
+                            </div>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs text-slate-400 font-mono">{step.label}</span>
+                              <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-full ${toneClass.badge}`}>{step.status}</span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900">{step.title}</h4>
+                            <p className="text-xs text-slate-600 leading-normal">{step.description}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                </div>
+
+
+              </>
+            )}
+          </div>
         </div>
-      </div>
       )}
 
       {/* Activities Log Tab content */}

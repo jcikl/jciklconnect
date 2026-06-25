@@ -18,6 +18,7 @@ interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> 
   action?: React.ReactNode;
   noPadding?: boolean;
   noHeaderPadding?: boolean;
+  description?: React.ReactNode;
 }
 
 interface BadgeProps {
@@ -148,12 +149,17 @@ export const Button: React.FC<ButtonProps> = ({
 };
 
 // Fix: Destructure ...props and spread them onto the underlying div element.
-export const Card: React.FC<CardProps> = ({ children, className = '', title, action, noPadding = false, noHeaderPadding = false, ...props }) => {
+export const Card: React.FC<CardProps> = ({ children, className = '', title, action, noPadding = false, noHeaderPadding = false, description, ...props }) => {
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${props.onClick ? 'cursor-pointer hover:shadow-md transition-all active:scale-[0.98]' : ''} ${className}`} {...props}>
-      {(title || action) && (
+      {(title || action || description) && (
         <div className={`border-b border-slate-100 flex justify-between items-center bg-slate-50/50 ${noHeaderPadding ? '' : 'px-4 py-4'}`}>
-          {title && <h3 className="font-semibold text-slate-800 text-base">{title}</h3>}
+          {title && (
+            <div>
+              <h3 className="font-semibold text-slate-800 text-base">{title}</h3>
+              {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+            </div>
+          )}
           {action && <div className="flex items-center gap-2">{action}</div>}
         </div>
       )}
