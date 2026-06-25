@@ -56,6 +56,7 @@ import { ProjectsService } from '../../services/projectsService';
 import { PromotionTracking } from './MemberManagement/PromotionTracking';
 import { SenatorshipManagement } from './MemberManagement/SenatorshipManagement';
 import { BoardOfDirectorsSection } from './MemberManagement/BoardOfDirectorsSection';
+import { IntroducerManagement } from './MemberManagement/IntroducerManagement';
 import { MemberBatchImportModal } from './Members/MemberBatchImportModal';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { useBatchMode } from '../../contexts/BatchModeContext';
@@ -232,7 +233,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeTab, setActiveTab] = useState<
-    'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'mentorship' | 'promotion-tracking' | 'senatorship'
+    'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'mentorship' | 'promotion-tracking' | 'senatorship' | 'introducer'
   >('directory');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -663,14 +664,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             <div>
               <Tabs
                 variant="button"
-                tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking', 'Senatorship']}
+                tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking', 'Senatorship', 'Introducer']}
                 activeTab={
                   activeTab === 'directory' ? 'Directory' :
                     activeTab === 'guest' ? 'Guest' :
                       activeTab === 'statistics' ? 'Statistics' :
                         activeTab === 'board-of-directors' ? 'Board of Directors' :
                           activeTab === 'mentorship' ? 'Mentorship' :
-                            activeTab === 'senatorship' ? 'Senatorship' : 'Promotion Tracking'
+                            activeTab === 'senatorship' ? 'Senatorship' :
+                              activeTab === 'introducer' ? 'Introducer' : 'Promotion Tracking'
                 }
                 onTabChange={(tab) => {
                   if (tab === 'Directory') setActiveTab('directory');
@@ -679,6 +681,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   else if (tab === 'Board of Directors') setActiveTab('board-of-directors');
                   else if (tab === 'Mentorship') setActiveTab('mentorship');
                   else if (tab === 'Senatorship') setActiveTab('senatorship');
+                  else if (tab === 'Introducer') setActiveTab('introducer');
                   else setActiveTab('promotion-tracking');
                 }}
               />
@@ -743,6 +746,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   canValidate={canManageMembers}
                   searchQuery={searchQuery}
                   onMembersChanged={loadMembers}
+                />
+              )}
+
+              {activeTab === 'introducer' && (
+                <IntroducerManagement
+                  members={members}
+                  allProjects={allProjects}
+                  onUpdateMember={updateMember}
+                  onBatchUpdateMembers={batchUpdateMembers}
                 />
               )}
             </div>
@@ -1730,7 +1742,14 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const resolveIntroducerDisplay = (introVal?: string) => {
     if (!introVal) return 'Direct Join';
     const foundMember = members.find(m => m.id === introVal);
-    if (foundMember) return `JCI KL Member: ${foundMember.name || foundMember.fullName || 'Unnamed'}`;
+    if (foundMember) {
+      const shortName = foundMember.name || '';
+      const fullName = foundMember.fullName || '';
+      if (shortName && fullName && shortName !== fullName) {
+        return `JCI KL Member: ${shortName} (${fullName})`;
+      }
+      return `JCI KL Member: ${shortName || fullName || 'Unnamed'}`;
+    }
     return introVal;
   };
 
@@ -2396,7 +2415,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
       {activeDetailTab !== 'activities' && (
         <div className="grid lg:grid-cols-3 gap-6">
-          <div className="space-y-6">
+          {activeDetailTab !== 'professional' && (
+            <div className="space-y-6">
             {activeDetailTab === 'basic' && (
               <>
                 <Card
@@ -2901,9 +2921,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 )}
               </Card>
             )}
-          </div>
+            </div>
+          )}
 
-          <div className="lg:col-span-2 space-y-6">
+          <div className={`${activeDetailTab === 'professional' ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-6`}>
             {activeDetailTab === 'professional' && (
               <Card
                 title="Professional & Business"
@@ -3059,86 +3080,92 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <div className="text-sm">
-                      <p className="font-bold text-slate-900 leading-tight">{member.companyName || 'Freelance / Not Provided'}</p>
-                      {member.companyWebsite && (
-                        <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline">
-                          Visit Website
-                        </a>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                        <p className="font-medium text-slate-900">{member.departmentAndPosition || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
-                        <p className="font-medium text-slate-900">{member.levelOfManagement || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
-                        <p className="font-medium text-slate-900">{member.industry || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
-                        <p className="font-medium text-slate-900">{member.acceptInternationalBusiness || 'Unknown'}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
-                            member.businessCategory.map((cat, idx) => (
-                              <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
-                            ))
-                          ) : (
-                            <span className="text-slate-400 italic">None</span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Col 1 */}
+                      <div className="space-y-4 text-sm md:border-r md:border-slate-100 md:pr-6">
+                        <div>
+                          <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
+                          <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
+                          {member.companyWebsite && (
+                            <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
+                              {member.companyWebsite}
+                            </a>
                           )}
                         </div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
-                        <div className="mt-1 text-slate-700">
-                          {member.idealReferralIndustry ? (
-                            <span className="text-sm">{member.idealReferralIndustry}</span>
-                          ) : (
-                            <span className="text-slate-400 italic">None</span>
-                          )}
+                        <div>
+                          <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
+                          <p className="font-medium text-slate-900 mt-0.5">{member.departmentAndPosition || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
+                          <p className="font-medium text-slate-900 mt-0.5">{member.levelOfManagement || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
+                          <p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
+                          <p className="font-medium text-slate-900 mt-0.5">{member.acceptInternationalBusiness || 'Unknown'}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
+                              member.businessCategory.map((cat, idx) => (
+                                <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
+                              ))
+                            ) : (
+                              <span className="text-slate-400 italic">None</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {Array.isArray(member.idealReferrals) && member.idealReferrals.length > 0 ? (
-                            member.idealReferrals.map((type, idx) => (
-                              <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
-                            ))
-                          ) : member.idealReferral ? (
-                            <span className="text-sm text-slate-700">{member.idealReferral}</span>
-                          ) : (
-                            <span className="text-slate-400 italic">None</span>
-                          )}
+
+                      {/* Col 2-3 */}
+                      <div className="md:col-span-2 space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                          <div>
+                            <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
+                            <div className="mt-1 text-slate-700 font-medium">
+                              {member.idealReferralIndustry ? (
+                                <span>{member.idealReferralIndustry}</span>
+                              ) : (
+                                <span className="text-slate-400 italic font-normal">None</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Array.isArray(member.idealReferrals) && member.idealReferrals.length > 0 ? (
+                                member.idealReferrals.map((type, idx) => (
+                                  <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
+                                ))
+                              ) : member.idealReferral ? (
+                                <span className="text-sm text-slate-700 font-medium">{member.idealReferral}</span>
+                              ) : (
+                                <span className="text-slate-400 italic font-normal">None</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
+
+                        {member.companyDescription && (
+                          <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
+                            <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
+                            <p className="text-xs text-slate-600 leading-relaxed">{member.companyDescription}</p>
+                          </div>
+                        )}
+
+                        {member.specialOffer && (
+                          <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
+                            <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
+                            <p className="text-sm font-medium text-slate-800">{member.specialOffer}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    {member.companyDescription && (
-                      <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
-                        <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
-                        <p className="text-xs text-slate-600 leading-relaxed">{member.companyDescription}</p>
-                      </div>
-                    )}
-
-                    {member.specialOffer && (
-                      <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
-                        <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
-                        <p className="text-sm font-medium text-slate-800">{member.specialOffer}</p>
-                      </div>
-                    )}
                   </div>
                 )}
               </Card>
