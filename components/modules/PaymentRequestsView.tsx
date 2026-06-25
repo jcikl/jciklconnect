@@ -819,46 +819,40 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         </Card>
       )}
       {/* Stats Summary Panel */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100/30 border-amber-200 p-4 hover:shadow-md transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Pending Approval</p>
-              <h3 className="text-2xl font-bold text-amber-900 mt-1">{formatCurrency(stats.pendingAmount)}</h3>
-              <p className="text-xs text-amber-600 mt-1">{stats.pendingCount} active request{stats.pendingCount === 1 ? '' : 's'}</p>
+      <Card className="bg-slate-50 border-slate-200/80 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 text-center sm:text-left gap-4 sm:gap-0">
+          <div className="pb-3 sm:pb-0 sm:pr-6 flex items-center justify-between sm:justify-start gap-4">
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pending Approval</p>
+              <h3 className="text-xl font-bold text-amber-600 mt-1">{formatCurrency(stats.pendingAmount)}</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">{stats.pendingCount} active request{stats.pendingCount === 1 ? '' : 's'}</p>
             </div>
-            <div className="bg-amber-500/10 p-2.5 rounded-xl text-amber-600">
-              <Clock size={20} />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/30 border-emerald-200 p-4 hover:shadow-md transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Total Approved</p>
-              <h3 className="text-2xl font-bold text-emerald-900 mt-1">{formatCurrency(stats.approvedAmount)}</h3>
-              <p className="text-xs text-emerald-600 mt-1">{stats.approvedCount} completed request{stats.approvedCount === 1 ? '' : 's'}</p>
-            </div>
-            <div className="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-600">
-              <CheckCircle size={20} />
+            <div className="bg-amber-500/10 p-2 rounded-lg text-amber-600 shrink-0">
+              <Clock size={16} />
             </div>
           </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-slate-50 to-slate-105 border-slate-200 p-4 hover:shadow-md transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">Rejected / Cancelled</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.rejectedCount}</h3>
-              <p className="text-xs text-slate-600 mt-1">Requires adjustment / cancelled</p>
+          <div className="py-3 sm:py-0 sm:px-6 flex items-center justify-between sm:justify-start gap-4">
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Approved</p>
+              <h3 className="text-xl font-bold text-emerald-600 mt-1">{formatCurrency(stats.approvedAmount)}</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">{stats.approvedCount} completed request{stats.approvedCount === 1 ? '' : 's'}</p>
             </div>
-            <div className="bg-slate-500/10 p-2.5 rounded-xl text-slate-600">
-              <XCircle size={20} />
+            <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-600 shrink-0">
+              <CheckCircle size={16} />
             </div>
           </div>
-        </Card>
-      </div>
+          <div className="pt-3 sm:pt-0 sm:pl-6 flex items-center justify-between sm:justify-start gap-4">
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Rejected / Cancelled</p>
+              <h3 className="text-xl font-bold text-slate-600 mt-1">{stats.rejectedCount}</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">Requires adjustment / cancelled</p>
+            </div>
+            <div className="bg-slate-500/10 p-2 rounded-lg text-slate-500 shrink-0">
+              <XCircle size={16} />
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card noPadding>
         <div className="p-4">
