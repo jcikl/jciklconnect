@@ -1583,8 +1583,8 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
       </div>
 
       {/* Filter and Search Bar */}
-      <Card noPadding className="p-4 flex flex-row gap-4 items-center justify-between">
-        <div className="relative w-64 sm:w-80">
+      <Card noPadding className="p-4 flex flex-row items-center justify-between gap-3 w-full flex-wrap sm:flex-nowrap">
+        <div className="relative flex-1 max-w-xs min-w-[150px]">
           <input
             type="text"
             value={searchQuery}
@@ -1597,7 +1597,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
           </div>
         </div>
 
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-center flex-shrink-0">
           <select
             value={selectedTier}
             onChange={(e) => setSelectedTier(e.target.value)}
