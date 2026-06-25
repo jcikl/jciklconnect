@@ -50,7 +50,16 @@ interface ToastContextType {
 }
 
 // --- Context ---
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
+const ToastContext = (() => {
+  const globalKey = '__JCI_TOAST_CONTEXT__';
+  if (typeof window !== 'undefined') {
+    if (!(window as any)[globalKey]) {
+      (window as any)[globalKey] = createContext<ToastContextType | undefined>(undefined);
+    }
+    return (window as any)[globalKey];
+  }
+  return createContext<ToastContextType | undefined>(undefined);
+})();
 
 export const useToast = () => {
   const context = useContext(ToastContext);
