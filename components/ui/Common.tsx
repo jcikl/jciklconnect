@@ -33,6 +33,7 @@ interface TabsProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   className?: string;
+  variant?: 'underline' | 'button';
 }
 
 interface DrawerProps {
@@ -223,7 +224,7 @@ export const StatCardsContainer: React.FC<{ children: React.ReactNode; className
   </div>
 );
 
-export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '' }) => {
+export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '', variant = 'underline' }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
@@ -261,6 +262,63 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
       scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
     }
   };
+
+  if (variant === 'button') {
+    return (
+      <div className={`relative ${className}`}>
+        {showLeftArrow && (
+          <button
+            onClick={scrollLeft}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        )}
+
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="overflow-x-auto no-scrollbar scroll-smooth py-1"
+        >
+          <nav className="flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl max-w-max" aria-label="Tabs">
+            {tabs.map((tab) => {
+              const id = typeof tab === 'string' ? tab : tab.id;
+              const label = typeof tab === 'string' ? tab : tab.label;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onTabChange(id);
+                  }}
+                  className={`
+                    whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex-shrink-0
+                    ${activeTab === id
+                      ? 'bg-white text-jci-blue shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}
+                  `}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {showRightArrow && (
+          <button
+            onClick={scrollRight}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100"
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={16} />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`relative border-b border-slate-200 ${className}`}>

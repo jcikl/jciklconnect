@@ -651,6 +651,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             <div>
               <Tabs
                 tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking', 'Senatorship']}
+                variant="button"
                 activeTab={
                   activeTab === 'directory' ? 'Directory' :
                     activeTab === 'guest' ? 'Guest' :
