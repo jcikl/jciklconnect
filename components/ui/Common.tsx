@@ -50,7 +50,7 @@ interface ToastContextType {
 }
 
 // --- Context ---
-const ToastContext = (() => {
+const ToastContext: React.Context<ToastContextType | undefined> = (() => {
   const globalKey = '__JCI_TOAST_CONTEXT__';
   if (typeof window !== 'undefined') {
     if (!(window as any)[globalKey]) {
