@@ -1545,30 +1545,24 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Overview stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4 flex items-center justify-between">
+        <Card className="flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Members</span>
             <h3 className="text-2xl font-black text-slate-800 mt-1">{members.length}</h3>
           </div>
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-          </div>
         </Card>
-        <Card className="p-4 flex items-center justify-between">
+        <Card className="flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Contributors</span>
             <h3 className="text-2xl font-black text-emerald-600 mt-1">
               {activeMembersCount} <span className="text-xs font-medium text-slate-400">({Math.round((activeMembersCount / (members.length || 1)) * 100)}%)</span>
             </h3>
           </div>
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          </div>
         </Card>
-        <Card className="p-4 flex items-center justify-between">
+        <Card className="flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Top Contributor</span>
             <h3 className="text-base font-black text-slate-800 mt-1.5 truncate max-w-[150px]">
@@ -1576,11 +1570,8 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
             </h3>
             <span className="text-xs font-bold text-jci-blue">{topScore > 0 ? `${topScore} pts` : '—'}</span>
           </div>
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-          </div>
         </Card>
-        <Card className="p-4 flex flex-col justify-center">
+        <Card className="flex flex-col justify-center">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tier Breakdown</span>
           <div className="flex gap-2 text-[10px] font-bold">
             <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">P:{tierCounts.Platinum}</span>
@@ -1592,8 +1583,8 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
       </div>
 
       {/* Filter and Search Bar */}
-      <Card noPadding className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full sm:max-w-xs">
+      <Card noPadding className="p-4 flex flex-row gap-4 items-center justify-between">
+        <div className="relative w-64 sm:w-80">
           <input
             type="text"
             value={searchQuery}
@@ -1606,7 +1597,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
           </div>
         </div>
 
-        <div className="flex gap-3 items-center w-full sm:w-auto">
+        <div className="flex gap-3 items-center">
           <select
             value={selectedTier}
             onChange={(e) => setSelectedTier(e.target.value)}
