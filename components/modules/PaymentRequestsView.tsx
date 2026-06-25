@@ -1,6 +1,6 @@
 // Payment Requests – submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Trash2, Eye } from 'lucide-react';
+import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Trash2, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User } from 'lucide-react';
 import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -32,9 +32,69 @@ const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-jci-blue bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-all border-none"
+      title="Copy to clipboard"
+    >
+      {copied ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
+      {copied ? 'Copied' : (label || 'Copy')}
+    </button>
+  );
+};
+
 function StatusBadge({ status }: { status: PaymentRequestStatus }) {
-  const variant = status === 'approved' ? 'success' : status === 'rejected' ? 'error' : status === 'cancelled' ? 'neutral' : status === 'submitted' ? 'warning' : 'neutral';
-  return <Badge variant={variant}>{STATUS_LABEL[status]}</Badge>;
+  let bg = '';
+  let text = '';
+  let icon = null;
+
+  switch (status) {
+    case 'approved':
+      bg = 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+      text = 'Approved';
+      icon = <CheckCircle size={12} className="inline mr-1 shrink-0" />;
+      break;
+    case 'rejected':
+      bg = 'bg-rose-50 text-rose-700 border border-rose-200';
+      text = 'Rejected';
+      icon = <XCircle size={12} className="inline mr-1 shrink-0" />;
+      break;
+    case 'cancelled':
+      bg = 'bg-slate-100 text-slate-600 border border-slate-200';
+      text = 'Cancelled';
+      icon = <X size={12} className="inline mr-1 shrink-0" />;
+      break;
+    case 'submitted':
+      bg = 'bg-amber-50 text-amber-700 border border-amber-200';
+      text = 'Pending';
+      icon = <Clock size={12} className="inline mr-1 shrink-0" />;
+      break;
+    default:
+      bg = 'bg-slate-100 text-slate-600 border border-slate-200';
+      text = 'Draft';
+      icon = <FileText size={12} className="inline mr-1 shrink-0" />;
+  }
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold leading-5 ${bg}`}>
+      {icon}
+      <span>{text}</span>
+    </span>
+  );
 }
 
 export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
@@ -102,12 +162,23 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     if (member) loadSelectData();
   }, [member]);
 
-  // Pre-fill applicant details
+  // Pre-fill applicant details and load saved bank details from localStorage
   useEffect(() => {
     if (submitModalOpen && (user || member)) {
       setFormApplicantName(member?.name || user?.displayName || '');
       setFormApplicantEmail(user?.email || '');
-      // Try to find current position if any
+      
+      const savedBankName = localStorage.getItem('pr_bank_name');
+      const savedAccountHolder = localStorage.getItem('pr_account_holder');
+      const savedAccountNumber = localStorage.getItem('pr_account_number');
+      const savedClaimFromBankAccountId = localStorage.getItem('pr_claim_from_bank_account_id');
+      const savedPosition = localStorage.getItem('pr_applicant_position');
+
+      if (savedBankName) setFormBankName(savedBankName);
+      if (savedAccountHolder) setFormAccountHolder(savedAccountHolder);
+      if (savedAccountNumber) setFormAccountNumber(savedAccountNumber);
+      if (savedClaimFromBankAccountId) setFormClaimFromBankAccountId(savedClaimFromBankAccountId);
+      if (savedPosition) setFormApplicantPosition(savedPosition);
     }
   }, [submitModalOpen, user, member]);
 
@@ -211,6 +282,24 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       );
     });
   }, [financeList, searchQuery, projects, bankAccounts]);
+
+  const stats = useMemo(() => {
+    const listToUse = activeTab === 'my' ? filteredMyList : filteredFinanceList;
+    const pending = listToUse.filter(r => r.status === 'submitted');
+    const approved = listToUse.filter(r => r.status === 'approved');
+    const rejected = listToUse.filter(r => r.status === 'rejected');
+
+    const totalPendingAmount = pending.reduce((sum, r) => sum + (r.totalAmount || r.amount || 0), 0);
+    const totalApprovedAmount = approved.reduce((sum, r) => sum + (r.totalAmount || r.amount || 0), 0);
+
+    return {
+      pendingCount: pending.length,
+      pendingAmount: totalPendingAmount,
+      approvedCount: approved.length,
+      approvedAmount: totalApprovedAmount,
+      rejectedCount: rejected.length + listToUse.filter(r => r.status === 'cancelled').length,
+    };
+  }, [activeTab, filteredMyList, filteredFinanceList]);
 
   const handleApproveReject = async (id: string, status: 'approved' | 'rejected') => {
     if (!user?.uid) return;
@@ -659,6 +748,13 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         attachmentUrls
       }, user.uid);
 
+      // Save details to localStorage for future requests
+      localStorage.setItem('pr_bank_name', formBankName);
+      localStorage.setItem('pr_account_holder', formAccountHolder);
+      localStorage.setItem('pr_account_number', formAccountNumber);
+      localStorage.setItem('pr_claim_from_bank_account_id', formClaimFromBankAccountId || '');
+      localStorage.setItem('pr_applicant_position', formApplicantPosition);
+
       setSuccessRef(referenceNumber);
       setSubmitModalOpen(false);
 
@@ -722,35 +818,81 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           <p className="text-green-600 text-xs mt-1 italic">Please include this reference in your bank transfer memo for faster reconciliation.</p>
         </Card>
       )}
+      {/* Stats Summary Panel */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100/30 border-amber-200 p-4 hover:shadow-md transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Pending Approval</p>
+              <h3 className="text-2xl font-bold text-amber-900 mt-1">{formatCurrency(stats.pendingAmount)}</h3>
+              <p className="text-xs text-amber-600 mt-1">{stats.pendingCount} active request{stats.pendingCount === 1 ? '' : 's'}</p>
+            </div>
+            <div className="bg-amber-500/10 p-2.5 rounded-xl text-amber-600">
+              <Clock size={20} />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/30 border-emerald-200 p-4 hover:shadow-md transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Total Approved</p>
+              <h3 className="text-2xl font-bold text-emerald-900 mt-1">{formatCurrency(stats.approvedAmount)}</h3>
+              <p className="text-xs text-emerald-600 mt-1">{stats.approvedCount} completed request{stats.approvedCount === 1 ? '' : 's'}</p>
+            </div>
+            <div className="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-600">
+              <CheckCircle size={20} />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-slate-50 to-slate-105 border-slate-200 p-4 hover:shadow-md transition-all duration-300">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">Rejected / Cancelled</p>
+              <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.rejectedCount}</h3>
+              <p className="text-xs text-slate-600 mt-1">Requires adjustment / cancelled</p>
+            </div>
+            <div className="bg-slate-500/10 p-2.5 rounded-xl text-slate-600">
+              <XCircle size={20} />
+            </div>
+          </div>
+        </Card>
+      </div>
 
       <Card noPadding>
         <div className="p-4">
-          <Tabs
-            tabs={[
-              { id: 'my', label: 'My Applications' },
-              ...(canViewFinance ? [{ id: 'all', label: 'All Applications (Finance)' }] : []),
-            ]}
-            activeTab={activeTab}
-            onTabChange={(id) => setActiveTab(id as 'my' | 'all')}
-          />
-
-          {activeTab === 'all' && (
-            <div className="flex-1 flex gap-2 w-full">
-              <div className="w-40 shrink-0">
-                <Select
-                  label=""
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
-                  options={[
-                    { value: '', label: 'All Statuses' },
-                    { value: 'submitted', label: 'Pending' },
-                    { value: 'approved', label: 'Approved' },
-                    { value: 'rejected', label: 'Rejected' },
-                  ]}
-                />
-              </div>
+          <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 border-b border-slate-100 pb-3 mb-4">
+            <div className="flex-1">
+              <Tabs
+                tabs={[
+                  { id: 'my', label: 'My Applications' },
+                  ...(canViewFinance ? [{ id: 'all', label: 'All Applications (Finance)' }] : []),
+                ]}
+                activeTab={activeTab}
+                onTabChange={(id) => setActiveTab(id as 'my' | 'all')}
+              />
             </div>
-          )}
+
+            {activeTab === 'all' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Filter Status:</span>
+                <div className="w-40">
+                  <Select
+                    label=""
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
+                    options={[
+                      { value: '', label: 'All Statuses' },
+                      { value: 'submitted', label: 'Pending' },
+                      { value: 'approved', label: 'Approved' },
+                      { value: 'rejected', label: 'Rejected' },
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="mt-4">
             {activeTab === 'my' ? (
@@ -764,23 +906,61 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                 ) : (
                   <div className="grid gap-4">
                     {filteredMyList.map((pr) => (
-                      <Card key={pr.id} noPadding className="border-slate-100 p-4 hover:border-jci-blue/30 transition-colors">
+                      <Card key={pr.id} noPadding className="border border-slate-150 p-4 hover:border-jci-blue/30 hover:shadow-sm transition-all duration-300 bg-white">
                         <div className="flex flex-col md:flex-row justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1 justify-between">
-                              <span className="text-sm font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded leading-none">{pr.referenceNumber}</span>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2 justify-between">
+                              <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors">{pr.referenceNumber}</span>
                               <StatusBadge status={pr.status} />
                             </div>
-                            <h4 className="font-bold text-slate-800">{pr.purpose}</h4>
-                            <p className="text-xs text-slate-500 mt-1">
-                              {pr.category === 'administrative'
-                                ? `Admin Account: ${pr.activityId || 'N/A'}`
-                                : 'Project: ' + (projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || 'N/A')}
-                            </p>
-                            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">Requested on {new Date(pr.createdAt).toLocaleDateString()}</p>
+                            <div>
+                              <h4 className="font-bold text-slate-800 text-base">{pr.purpose}</h4>
+                              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                                {pr.category === 'administrative' ? (
+                                  <>
+                                    <Building2 size={13} className="text-slate-400" />
+                                    <span>Admin Account: <strong className="text-slate-700">{pr.activityId || 'N/A'}</strong></span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles size={13} className="text-orange-400" />
+                                    <span>Project: <strong className="text-slate-700">{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || 'N/A'}</strong></span>
+                                  </>
+                                )}
+                              </p>
+                              {pr.bankName && (
+                                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                  <Landmark size={12} className="text-slate-400" />
+                                  <span>Remit: {pr.bankName} ({pr.accountHolder}) - {pr.accountNumber}</span>
+                                </p>
+                              )}
+                              {pr.items && pr.items.length > 0 && (
+                                <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg mt-2 space-y-1 border border-slate-100">
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Items Summary:</span>
+                                  {pr.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between">
+                                      <span className="truncate max-w-[200px] sm:max-w-xs">{item.purpose}</span>
+                                      <span className="font-medium text-slate-700">{formatCurrency(item.amount)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider pt-1">
+                              <span>Requested on {new Date(pr.createdAt).toLocaleDateString()}</span>
+                              {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
+                                <span className="flex items-center gap-0.5 text-jci-blue bg-sky-50 px-1.5 py-0.5 rounded">
+                                  <Paperclip size={10} />
+                                  {pr.attachmentUrls.length} Attachment{pr.attachmentUrls.length === 1 ? '' : 's'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex flex-row md:flex-col items-end justify-between md:justify-center gap-2 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
-                            <span className="text-xl font-bold text-jci-blue">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
+                            <div className="text-right">
+                              <span className="block text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Amount</span>
+                              <span className="text-2xl font-bold text-jci-blue">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                            </div>
                             <div className="flex gap-2">
                               <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)}>
                                 <Eye size={14} className="mr-1" /> View PDF
@@ -810,26 +990,100 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                 ) : (
                   <div className="grid gap-3">
                     {filteredFinanceList.map((pr) => (
-                      <Card key={pr.id} noPadding className="p-4 border-slate-100 hover:border-slate-200">
-                        <div className="flex flex-col md:flex-row justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 justify-between flex-wrap mb-1">
-                              <span className="font-mono font-bold text-xs">{pr.referenceNumber}</span>
+                      <Card key={pr.id} noPadding className="p-4 border border-slate-150 hover:border-slate-305 hover:shadow-sm transition-all duration-300 bg-white">
+                        <div className="flex flex-col md:flex-row justify-between gap-4">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex items-center gap-2 justify-between flex-wrap">
+                              <span className="font-mono font-bold text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
                               <StatusBadge status={pr.status} />
                             </div>
-                            <h5 className="font-semibold text-slate-800 truncate">{pr.purpose}</h5>
-                            <p className="text-xs text-slate-500">{pr.category === 'administrative' ? `Admin Account: ${pr.activityId || 'N/A'}` : 'Project'}</p>
-                            <p className="text-xs text-slate-400">Applicant: {pr.applicantName || 'Unknown'}</p>
+                            <div>
+                              <h5 className="font-bold text-slate-800 text-base">{pr.purpose}</h5>
+                              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                                {pr.category === 'administrative' ? (
+                                  <>
+                                    <Building2 size={13} className="text-slate-400" />
+                                    <span>Admin Account: <strong className="text-slate-700">{pr.activityId || 'N/A'}</strong></span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles size={13} className="text-orange-400" />
+                                    <span>Project: <strong className="text-slate-700">{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || 'N/A'}</strong></span>
+                                  </>
+                                )}
+                              </p>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1.5">
+                                <User size={13} className="text-slate-400" />
+                                <span>Applicant: <strong className="text-slate-700">{pr.applicantName || 'Unknown'}</strong> ({pr.applicantPosition || 'N/A'})</span>
+                              </div>
+                            </div>
 
+                            {/* Bank Details section for easy copying */}
+                            {pr.bankName && (
+                              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60 mt-2 space-y-1.5">
+                                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider border-b border-slate-150 pb-1">
+                                  <span>Remittance Bank Details</span>
+                                  <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All Info" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                  <div>
+                                    <span className="text-slate-400">Bank:</span>{' '}
+                                    <span className="font-medium text-slate-700">{pr.bankName}</span>
+                                    <span className="ml-1"><CopyButton text={pr.bankName || ''} /></span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">Claim From Account:</span>{' '}
+                                    <span className="font-medium text-slate-700">
+                                      {bankAccounts.find(a => a.id === pr.claimFromBankAccountId)?.name || 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">Holder:</span>{' '}
+                                    <span className="font-medium text-slate-700">{pr.accountHolder}</span>
+                                    <span className="ml-1"><CopyButton text={pr.accountHolder || ''} /></span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">A/C No:</span>{' '}
+                                    <span className="font-mono font-bold text-slate-700">{pr.accountNumber}</span>
+                                    <span className="ml-1"><CopyButton text={pr.accountNumber || ''} /></span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {pr.items && pr.items.length > 0 && (
+                              <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg mt-2 space-y-1 border border-slate-100">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Items Summary:</span>
+                                {pr.items.map((item, idx) => (
+                                  <div key={idx} className="flex justify-between">
+                                    <span className="truncate max-w-[200px] sm:max-w-xs">{item.purpose}</span>
+                                    <span className="font-medium text-slate-700">{formatCurrency(item.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider pt-1">
+                              <span>Requested on {new Date(pr.createdAt).toLocaleDateString()}</span>
+                              {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
+                                <span className="flex items-center gap-0.5 text-jci-blue bg-sky-50 px-1.5 py-0.5 rounded">
+                                  <Paperclip size={10} />
+                                  {pr.attachmentUrls.length} Attachment{pr.attachmentUrls.length === 1 ? '' : 's'}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4 border-t md:border-t-0 pt-2 md:pt-0">
-                            <span className="font-bold text-slate-900">{formatCurrency(pr.totalAmount || pr.amount)}</span>
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => handlePreviewPDF(pr)} title="View PDF">
-                                <Eye size={16} />
+                          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
+                            <div className="text-right">
+                              <span className="block text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Amount</span>
+                              <span className="text-2xl font-bold text-jci-blue">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)} title="View PDF">
+                                <Eye size={14} className="mr-1" /> PDF
                               </Button>
                               {pr.status === 'submitted' && (
-                                <div className="flex gap-1 ml-2">
+                                <div className="flex gap-1.5">
                                   <Button size="sm" variant="success" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null}>Approve</Button>
                                   <Button size="sm" variant="danger" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null}>Reject</Button>
                                 </div>
@@ -874,11 +1128,15 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           </div>
         }
       >
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
-          <p className="text-sm text-blue-800">Please provide detailed itemization. You can upload multiple receipts as PDF or image files. For mileage claims, please consult the treasurer for the standard rate.</p>
+        <div className="bg-sky-50 p-4 rounded-xl border border-sky-100 mb-6 flex items-start gap-3">
+          <Sparkles className="text-jci-blue mt-0.5 shrink-0" size={18} />
+          <div>
+            <p className="text-sm font-semibold text-sky-900">Tips for Faster Reimbursement</p>
+            <p className="text-xs text-sky-700/90 mt-0.5">Please provide detailed itemization. You can upload multiple receipts as PDF or image files. For mileage claims, please consult the treasurer for the standard rate.</p>
+          </div>
         </div>
 
-        <form id="payment-request-form" onSubmit={handleSubmit} className="space-y-4">
+        <form id="payment-request-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="grid md:grid-cols-2 gap-4">
             <MemberSelector
               label="Applicant"
@@ -962,21 +1220,21 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
               </Button>
             </div>
 
-            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
               {formItems.map((item, idx) => (
-                <div key={idx} className="flex gap-3 items-end">
-                  <div className="flex-1">
+                <div key={idx} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white p-3 rounded-lg border border-slate-100 shadow-sm w-full">
+                  <div className="flex-1 w-full">
                     <Input
-                      label={idx === 0 ? "Description / Purpose" : ""}
+                      label={`Item #${idx + 1} Description`}
                       value={item.purpose}
                       onChange={(e) => updateItem(idx, { purpose: e.target.value })}
-                      placeholder="e.g. Venue rental"
+                      placeholder="e.g. Venue rental, printing, materials..."
                       required
                     />
                   </div>
-                  <div className="w-32">
+                  <div className="w-full sm:w-36">
                     <Input
-                      label={idx === 0 ? "Amount" : ""}
+                      label="Amount (RM)"
                       type="number"
                       min="0.01"
                       step="0.01"
@@ -987,22 +1245,29 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                     />
                   </div>
                   {formItems.length > 1 && (
-                    <Button type="button" variant="ghost" className="text-red-500 mb-[4px] p-2" onClick={() => removeItem(idx)}>
-                      <Trash2 size={18} />
+                    <Button type="button" variant="ghost" className="text-red-500 self-end sm:self-center p-2 hover:bg-red-50 rounded-lg mt-4 sm:mt-5" onClick={() => removeItem(idx)}>
+                      <Trash2 size={16} />
                     </Button>
                   )}
                 </div>
               ))}
               <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
-                <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Claim Amount</span>
-                <span className="text-lg font-bold text-jci-blue">{formatCurrency(totalAmount)}</span>
+                <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Claim Amount</span>
+                <span className="text-xl font-bold text-jci-blue">{formatCurrency(totalAmount)}</span>
               </div>
             </div>
           </div>
 
           <div className="space-y-4 border-t pt-4">
-            <h4 className="font-bold text-slate-900">Attachments (Receipts / Invoices)</h4>
-            <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+            <div className="flex justify-between items-center">
+              <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Paperclip size={18} className="text-slate-500" />
+                <span>Attachments (Receipts / Invoices)</span>
+              </h4>
+              <span className="text-xs text-slate-400">Images or PDF only</span>
+            </div>
+            
+            <div className="p-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 hover:border-jci-blue hover:bg-blue-50/20 transition-all cursor-pointer relative">
               <input
                 type="file"
                 multiple
@@ -1012,69 +1277,81 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                     setFormAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
                   }
                 }}
-                className="hidden"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 id="file-upload"
               />
-              <label htmlFor="file-upload" className="flex flex-col items-center cursor-pointer">
-                <Plus size={24} className="text-slate-400 mb-2" />
-                <span className="text-sm font-medium text-slate-600">Click to upload images or PDF</span>
-                <span className="text-xs text-slate-400 mt-1">Maximum 5MB per file</span>
-              </label>
+              <div className="flex flex-col items-center justify-center text-center">
+                <Paperclip size={28} className="text-slate-400 mb-2" />
+                <span className="text-sm font-semibold text-slate-700">Drag files here or click to upload</span>
+                <span className="text-xs text-slate-400 mt-1">Images or PDFs up to 5MB</span>
+              </div>
+            </div>
 
-              {formAttachments.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {formAttachments.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-white p-2 rounded border border-slate-100">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        {file.type.includes('pdf') ? <FileText size={16} className="text-red-500" /> : <Eye size={16} className="text-blue-500" />}
-                        <span className="text-xs text-slate-700 truncate">{file.name}</span>
-                      </div>
+            {formAttachments.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {formAttachments.map((file, idx) => {
+                  const isImage = file.type.startsWith('image/');
+                  const fileUrl = isImage ? URL.createObjectURL(file) : null;
+                  return (
+                    <div key={idx} className="relative group bg-white p-2 rounded-lg border border-slate-200 flex flex-col items-center shadow-sm">
+                      {isImage && fileUrl ? (
+                        <img src={fileUrl} className="w-full h-20 object-cover rounded" alt={file.name} onLoad={() => URL.revokeObjectURL(fileUrl)} />
+                      ) : (
+                        <div className="w-full h-20 bg-slate-100 flex items-center justify-center rounded">
+                          <FileText size={32} className="text-red-500" />
+                        </div>
+                      )}
+                      <span className="text-[10px] text-slate-600 truncate w-full text-center mt-1.5 font-medium px-1">{file.name}</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                       <button
                         type="button"
                         onClick={() => setFormAttachments(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-slate-400 hover:text-red-500 transition-colors"
+                        className="absolute -top-1.5 -right-1.5 bg-red-100 text-red-600 hover:bg-red-200 p-1 rounded-full shadow-md transition-colors"
                       >
-                        <X size={14} />
+                        <X size={12} />
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4 border-t pt-4">
-            <h4 className="font-bold text-slate-900">Payment Details (Remit to)</h4>
-            <div className="grid md:grid-cols-2 gap-4">
+            <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+              <Landmark size={18} className="text-slate-500" />
+              <span>Payment Details (Remit to)</span>
+            </h4>
+            <div className="grid md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
               <Select
-                label="Claim From Account"
+                label="Claim From JCI Account"
                 value={formClaimFromBankAccountId}
                 onChange={(e) => setFormClaimFromBankAccountId(e.target.value)}
                 options={[
-                  { value: '', label: 'Select Bank Account...' },
+                  { value: '', label: 'Select JCI Account...' },
                   ...bankAccounts.map(a => ({ value: a.id, label: a.name })),
                 ]}
                 required
               />
               <Input
-                label="Recipient Bank Name"
+                label="Your Recipient Bank Name"
                 value={formBankName}
                 onChange={(e) => setFormBankName(e.target.value)}
-                placeholder="e.g. Maybank / Public Bank"
+                placeholder="e.g. Maybank, CIMB, Public Bank"
                 required
               />
               <Input
-                label="Account Holder Name"
+                label="Your Account Holder Name"
                 value={formAccountHolder}
                 onChange={(e) => setFormAccountHolder(e.target.value)}
-                placeholder="Receiver name"
+                placeholder="Must match bank record"
                 required
               />
               <Input
-                label="Account Number"
+                label="Your Bank Account Number"
                 value={formAccountNumber}
                 onChange={(e) => setFormAccountNumber(e.target.value.replace(/\D/g, ''))}
-                placeholder="Number only"
+                placeholder="Number only (no dashes)"
                 inputMode="numeric"
                 required
               />
