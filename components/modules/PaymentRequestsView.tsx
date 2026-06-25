@@ -167,7 +167,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     if (submitModalOpen && (user || member)) {
       setFormApplicantName(member?.name || user?.displayName || '');
       setFormApplicantEmail(user?.email || '');
-      
+
       const savedBankName = localStorage.getItem('pr_bank_name');
       const savedAccountHolder = localStorage.getItem('pr_account_holder');
       const savedAccountNumber = localStorage.getItem('pr_account_number');
@@ -819,8 +819,8 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         </Card>
       )}
       {/* Stats Summary Panel */}
-      <Card className="bg-slate-50 border-slate-200/80 p-3 sm:p-4">
-        <div className="grid grid-cols-3 divide-x divide-slate-200 text-center">
+      <Card noPadding className="bg-slate-50 border-slate-200/80">
+        <div className="grid grid-cols-3 divide-x divide-slate-200 text-center py-3">
           <div className="px-1 sm:px-4">
             <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Pending</p>
             <h3 className="text-sm sm:text-lg md:text-xl font-bold text-amber-600 mt-1 truncate">{formatCurrency(stats.pendingAmount)}</h3>
@@ -1245,7 +1245,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
               </h4>
               <span className="text-xs text-slate-400">Images or PDF only</span>
             </div>
-            
+
             <div className="p-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 hover:border-jci-blue hover:bg-blue-50/20 transition-all cursor-pointer relative">
               <input
                 type="file"
