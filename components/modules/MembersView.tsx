@@ -13,6 +13,7 @@ import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs } f
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { MemberEditForm } from './MemberEditForm';
+import { IntroducerSelector } from '../ui/IntroducerSelector';
 import { LoadingState } from '../ui/Loading';
 import { useMembers, type UseMembersResult } from '../../hooks/useMembers';
 import { useAuth } from '../../hooks/useAuth';
@@ -27,6 +28,7 @@ import {
   ProbationTask,
   MembershipDues,
   BoardMember,
+  Project,
 } from '../../types';
 import {
   DEFAULT_MEMBERSHIP_RULES,
@@ -48,6 +50,9 @@ import type { Event } from '../../types';
 import { BoardManagementService } from '../../services/boardManagementService';
 import { AIPredictionService, MemberChurnPrediction } from '../../services/aiPredictionService';
 import { MentorMatching } from './MemberManagement/MentorMatching';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { ProjectsService } from '../../services/projectsService';
 import { PromotionTracking } from './MemberManagement/PromotionTracking';
 import { SenatorshipManagement } from './MemberManagement/SenatorshipManagement';
 import { BoardOfDirectorsSection } from './MemberManagement/BoardOfDirectorsSection';
@@ -242,6 +247,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [lastImportResult, setLastImportResult] = useState<any | null>(null);
   const [addModalHobbies, setAddModalHobbies] = useState<string[]>([]);
   const [addModalInterestedIndustries, setAddModalInterestedIndustries] = useState<string[]>([]);
+  const [addModalIntroducer, setAddModalIntroducer] = useState('');
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
   const [roleFilters, setRoleFilters] = useState<UserRole[]>([]);
   const [membershipTypeFilters, setMembershipTypeFilters] = useState<MembershipType[]>([]);
@@ -290,6 +297,10 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
   useEffect(() => {
     MembershipConfigService.getRules().then(setMembershipRules).catch(() => { });
+  }, []);
+
+  useEffect(() => {
+    ProjectsService.getAllProjects().then(setAllProjects).catch(err => console.error('Failed to load projects:', err));
   }, []);
 
   const getMemberDisplayMembershipType = (member: Member): MembershipType =>
@@ -520,6 +531,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     setAddModalOpen(false);
     setAddModalHobbies([]);
     setAddModalInterestedIndustries([]);
+    setAddModalIntroducer('');
   };
 
   const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -915,7 +927,16 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   <p className="col-span-2 text-xs text-slate-500 -mt-2">
                     Membership type is computed from profile. Senatorship numbers are validated under the Senatorship tab.
                   </p>
-                  <Input name="introducer" label="Introducer Name" placeholder="Who brought them in?" />
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Introducer</label>
+                    <IntroducerSelector
+                      value={addModalIntroducer}
+                      onChange={setAddModalIntroducer}
+                      members={members}
+                      projects={allProjects}
+                    />
+                    <input type="hidden" name="introducer" value={addModalIntroducer} />
+                  </div>
                   <Input name="senatorshipId" label="Senatorship Number (optional)" placeholder="e.g. 12345" />
                 </div>
               </section>
@@ -1687,8 +1708,15 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [savingAssessment, setSavingAssessment] = useState(false);
   const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
 
-  const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | null>(null);
+  const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'career' | null>(null);
   const [inlineValues, setInlineValues] = useState<any>(null);
+  const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'professional' | 'career' | 'activities'>('basic');
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [projectRoles, setProjectRoles] = useState<any[]>([]);
+  const [sponsorshipRecords, setSponsorshipRecords] = useState<any[]>([]);
+  const [radarContributions, setRadarContributions] = useState<any[]>([]);
+  const [recruitedMembers, setRecruitedMembers] = useState<any[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
 
   const HOBBY_OPTIONS = [
     "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
@@ -1699,7 +1727,14 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
   ];
 
-  const startInlineEdit = (card: 'basic' | 'professional' | 'contact' | 'apparel') => {
+  const resolveIntroducerDisplay = (introVal?: string) => {
+    if (!introVal) return 'Direct Join';
+    const foundMember = members.find(m => m.id === introVal);
+    if (foundMember) return `JCI KL Member: ${foundMember.name || foundMember.fullName || 'Unnamed'}`;
+    return introVal;
+  };
+
+  const startInlineEdit = (card: 'basic' | 'professional' | 'contact' | 'apparel' | 'career') => {
     setInlineValues({
       name: member.name || '',
       fullName: member.fullName || '',
@@ -1744,11 +1779,17 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       jacketSize: member.jacketSize || '',
       embroideredName: member.embroideredName || '',
       tshirtStatus: member.tshirtStatus || 'NA',
+
+      senatorCertified: !!member.senatorCertified,
+      senatorshipId: member.senatorshipId || '',
+      senatorshipBoardValidated: !!member.senatorshipBoardValidated,
+      senatorshipValidatedBy: member.senatorshipValidatedBy || '',
+      senatorshipValidatedAt: member.senatorshipValidatedAt || '',
     });
     setActiveInlineEditCard(card);
   };
 
-  const handleInlineSave = async (card: 'basic' | 'professional' | 'contact' | 'apparel', updates: Partial<Member>) => {
+  const handleInlineSave = async (card: 'basic' | 'professional' | 'contact' | 'apparel' | 'career', updates: Partial<Member>) => {
     try {
       await updateMember(member.id, updates);
       setActiveInlineEditCard(null);
@@ -1873,6 +1914,132 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     };
     loadBoardPositions();
   }, [member.id]);
+
+  // Load projects for IntroducerSelector
+  useEffect(() => {
+    ProjectsService.getAllProjects().then(setAllProjects).catch(() => {});
+  }, []);
+
+  // Load activities log data
+  useEffect(() => {
+    if (activeDetailTab !== 'activities') return;
+
+    let cancelled = false;
+    const fetchActivitiesData = async () => {
+      setActivitiesLoading(true);
+      try {
+        // Fetch all needed collections in parallel
+        const [projects, sponsorshipsSnap, contributionsSnap, allMembers] = await Promise.all([
+          ProjectsService.getAllProjects(),
+          getDocs(query(collection(db, 'sponsorships'), where('memberId', '==', member.id))),
+          getDocs(query(collection(db, 'RadarContributions'), where('memberId', '==', member.id))),
+          MembersService.getAllMembers()
+        ]);
+
+        if (cancelled) return;
+
+        // 1. Process Project Roles (Committee & Trainers)
+        const roles: any[] = [];
+        projects.forEach((proj: any) => {
+          // Check committee
+          if (proj.committee && Array.isArray(proj.committee)) {
+            proj.committee.forEach((c: any) => {
+              if (c.memberId === member.id) {
+                roles.push({
+                  id: `comm-${proj.id}`,
+                  projectName: proj.name || 'Unnamed Project',
+                  role: c.role || 'Committee Member',
+                  type: 'Committee',
+                  date: proj.startDate || proj.proposedDate || proj.eventStartDate || '',
+                });
+              }
+            });
+          }
+
+          // Check trainers
+          if (proj.trainers && Array.isArray(proj.trainers)) {
+            proj.trainers.forEach((t: any) => {
+              if (t.memberId === member.id) {
+                roles.push({
+                  id: `trainer-${proj.id}`,
+                  projectName: proj.name || 'Unnamed Project',
+                  role: 'Trainer',
+                  type: 'Trainer',
+                  hours: parseFloat(t.durationHours) || 0,
+                  date: proj.startDate || proj.proposedDate || proj.eventStartDate || '',
+                });
+              }
+            });
+          }
+        });
+        setProjectRoles(roles.sort((a, b) => b.date.localeCompare(a.date)));
+
+        // 2. Process Sponsorships
+        const sponsorList: any[] = [];
+        sponsorshipsSnap.forEach((doc) => {
+          const data = doc.data();
+          const amt = parseFloat(data.amount) || 0;
+          sponsorList.push({
+            id: doc.id,
+            projectName: data.projectName || 'General Sponsorship',
+            amount: amt,
+            points: Math.floor(amt / 100) * 2, // 2 points per RM100 sponsor
+            date: data.createdAt?.toDate?.() || data.createdAt || '',
+          });
+        });
+        setSponsorshipRecords(sponsorList);
+
+        // 3. Process Radar Contributions
+        const contribList: any[] = [];
+        contributionsSnap.forEach((doc) => {
+          const data = doc.data();
+          contribList.push({
+            id: doc.id,
+            description: data.description || 'Imported Radar Score',
+            points: parseFloat(data.points) || 0,
+            type: data.type || 'Event',
+            date: data.createdAt?.toDate?.() || data.createdAt || '',
+          });
+        });
+        setRadarContributions(contribList);
+
+        // 4. Process Recruited Members
+        const recruitList: any[] = [];
+        const memberName = member.name || '';
+        const memberFullName = member.fullName || member.general?.name || '';
+        allMembers.forEach((m: any) => {
+          const intro = (m.introducer || '').trim().toLowerCase();
+          if (intro) {
+            if (
+              intro === member.id.toLowerCase() ||
+              (memberName && intro === memberName.trim().toLowerCase()) ||
+              (memberFullName && intro === memberFullName.trim().toLowerCase())
+            ) {
+              recruitList.push({
+                id: m.id,
+                name: m.name,
+                email: m.email,
+                joinDate: m.joinDate,
+                avatar: m.avatar
+              });
+            }
+          }
+        });
+        setRecruitedMembers(recruitList);
+
+      } catch (err) {
+        console.error('Error fetching activities logs:', err);
+      } finally {
+        if (!cancelled) setActivitiesLoading(false);
+      }
+    };
+
+    fetchActivitiesData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDetailTab, member.id]);
 
   const handleFindMentors = async () => {
     setLoadingMatches(true);
@@ -2065,7 +2232,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 {member.introducer && (
                   <span className="flex items-center gap-2 px-2 py-1 bg-blue-50 text-jci-blue rounded-lg border border-blue-100">
                     <UserPlus size={14} />
-                    Introduced by: {member.introducer}
+                    Introduced by: {resolveIntroducerDisplay(member.introducer)}
                   </span>
                 )}
               </div>
@@ -2212,10 +2379,28 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="space-y-6">
-          <Card
-            title="Basic Information"
+      {/* Tab Selector */}
+      <div className="border-b border-slate-200 mb-6">
+        <Tabs
+          tabs={[
+            { id: 'basic', label: 'Basic Information' },
+            { id: 'professional', label: 'Professional & Business' },
+            { id: 'career', label: 'JCI Career' },
+            { id: 'activities', label: 'Activities Log' }
+          ]}
+          activeTab={activeDetailTab}
+          onTabChange={(tabId) => setActiveDetailTab(tabId as any)}
+          variant="underline"
+        />
+      </div>
+
+      {activeDetailTab !== 'activities' && (
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
+            {activeDetailTab === 'basic' && (
+              <>
+                <Card
+                  title="Basic Information"
             action={
               (canEditMembers || isSelfView) && activeInlineEditCard !== 'basic' && (
                 <Button
@@ -2307,11 +2492,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   </div>
                   <div>
                     <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
-                    <input
-                      type="text"
-                      value={inlineValues.introducer}
-                      onChange={e => setInlineValues({ ...inlineValues, introducer: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    <IntroducerSelector
+                      value={inlineValues.introducer || ''}
+                      onChange={val => setInlineValues({ ...inlineValues, introducer: val })}
+                      members={members}
+                      projects={allProjects}
                     />
                   </div>
                 </div>
@@ -2418,7 +2603,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
                 <div className="border-t pt-3">
                   <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
-                  <p className="text-sm font-medium text-slate-900">{member.introducer || 'Direct Join'}</p>
+                  <p className="text-sm font-medium text-slate-900">{resolveIntroducerDisplay(member.introducer)}</p>
                 </div>
 
                 <div className="border-t pt-3">
@@ -2474,8 +2659,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               </Button>
             </div>
           </Card>
+          </>
+          )}
 
-          <Card title="Mentorship & Growth">
+          {activeDetailTab === 'career' && (
+            <Card title="Mentorship & Growth">
             <div className="space-y-4">
               <div>
                 <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
@@ -2512,9 +2700,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               )}
             </div>
           </Card>
+          )}
 
-
-          <Card title="Hobby Clubs">
+          {activeDetailTab === 'basic' && (
+            <Card title="Hobby Clubs">
             {loadingClubs ? (
               <div className="text-center py-4 text-slate-400 text-sm">Loading clubs...</div>
             ) : memberClubs.length > 0 ? (
@@ -2532,8 +2721,96 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <div className="text-center py-4 text-slate-400 text-sm">Not a member of any clubs</div>
             )}
           </Card>
+          )}
 
-          <Card title="Membership & Dues">
+          {activeDetailTab === 'career' && (
+            <Card title="Membership & Dues"
+              action={
+                (canEditMembers) && activeInlineEditCard !== 'career' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                    onClick={() => startInlineEdit('career')}
+                    title="Edit Membership & Senatorship"
+                  >
+                    <Edit size={14} />
+                  </Button>
+                )
+              }
+            >
+            {activeInlineEditCard === 'career' && inlineValues ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Senatorship Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 12345"
+                      value={inlineValues.senatorshipId}
+                      onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    />
+                  </div>
+                  <div className="flex items-center gap-4 py-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={inlineValues.senatorCertified}
+                        onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                      />
+                      <span className="text-sm font-medium text-slate-700">Senator Certified</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-4 py-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={inlineValues.senatorshipBoardValidated}
+                        onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                      />
+                      <span className="text-sm font-medium text-slate-700">Board Validated</span>
+                    </label>
+                  </div>
+                  {inlineValues.senatorshipBoardValidated && (
+                    <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
+                        <input
+                          type="text"
+                          value={inlineValues.senatorshipValidatedBy}
+                          onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
+                        <input
+                          type="date"
+                          value={inlineValues.senatorshipValidatedAt}
+                          onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 pt-3 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={() => {
+                    handleInlineSave('career', {
+                      senatorshipId: inlineValues.senatorshipId || undefined,
+                      senatorCertified: inlineValues.senatorCertified,
+                      senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
+                      senatorshipValidatedBy: inlineValues.senatorshipValidatedBy || undefined,
+                      senatorshipValidatedAt: inlineValues.senatorshipValidatedAt || undefined,
+                    });
+                  }}>Save</Button>
+                </div>
+              </div>
+            ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                 <div>
@@ -2585,13 +2862,51 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   <Clock size={12} /> View Payment History
                 </Button>
               </div>
+
+              {/* Senator Details Section */}
+              <div className="border-t pt-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Senatorship Details</h4>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Certified Senator:</span>
+                    <Badge variant={member.senatorCertified ? 'success' : 'neutral'}>
+                      {member.senatorCertified ? 'Yes' : 'No'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Senator Number:</span>
+                    <span className="font-semibold text-slate-900">{member.senatorshipId || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Board Validated:</span>
+                    <Badge variant={member.senatorshipBoardValidated ? 'success' : 'neutral'}>
+                      {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
+                    </Badge>
+                  </div>
+                  {member.senatorshipBoardValidated && member.senatorshipValidatedBy && (
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Validated By:</span>
+                      <span className="font-medium">{member.senatorshipValidatedBy}</span>
+                    </div>
+                  )}
+                  {member.senatorshipBoardValidated && member.senatorshipValidatedAt && (
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Validated At:</span>
+                      <span className="font-medium">{formatDateToDDMMMYYYY(member.senatorshipValidatedAt)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+            )}
           </Card>
+          )}
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <Card
-            title="Professional & Business"
+          {activeDetailTab === 'professional' && (
+            <Card
+              title="Professional & Business"
             action={
               (canEditMembers || isSelfView) && activeInlineEditCard !== 'professional' && (
                 <Button
@@ -2827,9 +3142,12 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               </div>
             )}
           </Card>
+          )}
 
-          <Card
-            title="Contact Information"
+          {activeDetailTab === 'basic' && (
+            <>
+              <Card
+                title="Contact Information"
             action={
               (canEditMembers || isSelfView) && activeInlineEditCard !== 'contact' && (
                 <Button
@@ -3170,8 +3488,12 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               </>
             )}
           </Card>
+          </>
+          )}
 
-          <div className="grid xl:grid-cols-2 gap-6 items-start">
+          {activeDetailTab === 'career' && (
+            <>
+              <div className="grid lg:grid-cols-2 gap-6 items-start">
             <Card title="JCI Career Path">
               <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                 {/* Join milestone */}
@@ -3390,8 +3712,178 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               )}
             </div>
           </Card>
+          </>
+          )}
         </div>
       </div>
+      )}
+
+      {/* Activities Log Tab content */}
+      {activeDetailTab === 'activities' && (
+        <div className="grid lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+          <div className="lg:col-span-2 space-y-6">
+            {/* Radar Contributions / Events Log */}
+            <Card title="Radar Contribution History" description="Historical points imported from JCI Radar system">
+              {activitiesLoading ? (
+                <div className="py-8 text-center text-slate-400">Loading contribution logs...</div>
+              ) : radarContributions.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left text-slate-500">
+                    <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-2 text-slate-600 font-bold">Date</th>
+                        <th className="px-4 py-2 text-slate-600 font-bold">Category / Description</th>
+                        <th className="px-4 py-2 text-right text-slate-600 font-bold">Points</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {radarContributions.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/50">
+                          <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">
+                            {formatDateToDDMMMYYYY(log.date)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-slate-900 block">{log.description}</span>
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">{log.type}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-black text-green-600">
+                            +{log.points} pts
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-400 italic text-sm">No radar contribution history recorded.</div>
+              )}
+            </Card>
+
+            {/* Sponsorship Records */}
+            <Card title="Sponsorship Records" description="Sponsorships obtained and converted to Radar points">
+              {activitiesLoading ? (
+                <div className="py-8 text-center text-slate-400">Loading sponsorships...</div>
+              ) : sponsorshipRecords.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left text-slate-500">
+                    <thead className="text-xs text-slate-700 uppercase bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-2 text-slate-600 font-bold">Date</th>
+                        <th className="px-4 py-2 text-slate-600 font-bold">Project Name</th>
+                        <th className="px-4 py-2 text-slate-600 font-bold">Sponsorship Amount</th>
+                        <th className="px-4 py-2 text-right text-slate-600 font-bold">Points</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sponsorshipRecords.map((s) => (
+                        <tr key={s.id} className="hover:bg-slate-50/50">
+                          <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">
+                            {formatDateToDDMMMYYYY(s.date)}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900">
+                            {s.projectName}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-700">
+                            RM {s.amount.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-right font-black text-green-600">
+                            +{s.points} pts
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-400 italic text-sm">No sponsorship records found.</div>
+              )}
+            </Card>
+
+            {/* Project Roles Timeline */}
+            <Card title="Project Committee & Trainer Roles" description="Positions held in chapter projects and events">
+              {activitiesLoading ? (
+                <div className="py-8 text-center text-slate-400">Loading project roles...</div>
+              ) : projectRoles.length > 0 ? (
+                <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                  {projectRoles.map((role) => (
+                    <div key={role.id} className="relative">
+                      <div className={`absolute -left-[30px] p-1 rounded-full border-4 border-white ${role.type === 'Trainer' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-jci-blue'}`}>
+                        {role.type === 'Trainer' ? <GraduationCap size={12} /> : <Award size={12} />}
+                      </div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs text-slate-400 font-mono">{formatDateToDDMMMYYYY(role.date)}</span>
+                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${role.type === 'Trainer' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                          {role.type}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900">{role.projectName}</h4>
+                      <p className="text-xs text-slate-500">
+                        {role.type === 'Trainer' ? `Trainer session duration: ${role.hours} hours` : `Role: ${role.role}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-400 italic text-sm">No project or trainer roles recorded.</div>
+              )}
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            {/* Recruited Members (Introductions) */}
+            <Card title="Introduced Members" description="LO Members recruited by this member">
+              {activitiesLoading ? (
+                <div className="py-4 text-center text-slate-400 text-sm">Loading recruited members...</div>
+              ) : recruitedMembers.length > 0 ? (
+                <div className="space-y-3">
+                  {recruitedMembers.map((m) => (
+                    <div key={m.id} className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                      <img src={m.avatar || undefined} className="w-10 h-10 rounded-full object-cover bg-slate-200 border border-slate-100 shrink-0" alt="" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900 truncate">{m.name}</p>
+                        <p className="text-[10px] text-slate-400">Joined: {formatDateToDDMMMYYYY(m.joinDate)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-4 text-center text-slate-400 italic text-sm">No introductions recorded.</div>
+              )}
+            </Card>
+
+            {/* Config Overview Card */}
+            <Card title="Points Standard Reference" className="bg-slate-50/50">
+              <div className="text-xs space-y-3 text-slate-600">
+                <p className="font-semibold text-slate-800 border-b pb-1.5 mb-2">How points are credited:</p>
+                <div className="flex justify-between items-center">
+                  <span>Organising Chairman Role</span>
+                  <span className="font-bold text-slate-900">5 pts</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Committee Member Role</span>
+                  <span className="font-bold text-slate-900">3 pts</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Ex-Officio Role</span>
+                  <span className="font-bold text-slate-900">2 pts</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Certified Training</span>
+                  <span className="font-bold text-slate-900">1 pt / hr</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Member Recruitment</span>
+                  <span className="font-bold text-slate-900">10 pts / pax</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Sponsorship Obtained</span>
+                  <span className="font-bold text-slate-900">2 pts / RM100</span>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {showAssessmentModal && (
         <Modal

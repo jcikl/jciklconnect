@@ -1583,21 +1583,21 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
       </div>
 
       {/* Filter and Search Bar */}
-      <Card noPadding className="p-4 flex flex-row items-center justify-between gap-3 w-full flex-wrap sm:flex-nowrap">
-        <div className="relative flex-1 max-w-xs min-w-[150px]">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search member name or email..."
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
-          />
-          <div className="absolute left-3 top-2.5 text-slate-400">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+      <Card noPadding className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="flex gap-3 items-center w-full sm:w-auto">
+          <div className="relative w-full sm:max-w-xs">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search member name or email..."
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+            />
+            <div className="absolute left-3 top-2.5 text-slate-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </div>
           </div>
-        </div>
 
-        <div className="flex gap-3 items-center flex-shrink-0">
           <select
             value={selectedTier}
             onChange={(e) => setSelectedTier(e.target.value)}
