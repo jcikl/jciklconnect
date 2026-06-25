@@ -25,6 +25,7 @@ import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
+import { PartnershipDetailModal } from './PartnershipDetailModal';
 
 type MemberWithDues = Member & { duesStatus: string; duesYear: number; duesPaidDate?: string; latestPaidYear?: string | null };
 
@@ -48,6 +49,7 @@ interface BoardDashboardProps {
 
 export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOpenNotifications, onOpenSearch, searchQuery, onSearchChange, scrollRef }) => {
   const { member, signOut, isDevMode, simulatedRole, simulateRole } = useAuth();
+  const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
 
   // Header Scroll Animations
   const { scrollY } = useScroll({ container: scrollRef });
@@ -656,7 +658,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                   className="h-36 sm:h-40 w-full rounded-2xl overflow-hidden relative shadow-md cursor-pointer group transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
                   onClick={() => {
                     if (ad.id) AdvertisementService.recordClick(ad.id);
-                    if (ad.linkUrl) window.open(ad.linkUrl, '_blank');
+                    setSelectedAdForDetail(ad);
                   }}
                 >
                   <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
@@ -2122,6 +2124,14 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
 
         </div>
       </Modal>
+
+      {/* Partnership Detail Modal */}
+      {selectedAdForDetail && (
+        <PartnershipDetailModal
+          ad={selectedAdForDetail}
+          onClose={() => setSelectedAdForDetail(null)}
+        />
+      )}
 
     </div>
   );

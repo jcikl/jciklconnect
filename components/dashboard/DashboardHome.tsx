@@ -29,6 +29,7 @@ import type { Event, MemberPromotionProgress } from '../../types';
 import { UserRole } from '../../types';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
+import { PartnershipDetailModal } from './PartnershipDetailModal';
 import { useState, useEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
@@ -170,6 +171,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [promoLoading, setPromoLoading] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
+  const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
 
   const PROMO_FIELD_MAP: Record<string, 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted'> = {
     'bod_meeting_attendance': 'bodMeetingAttended',
@@ -536,7 +538,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   className="h-36 sm:h-40 w-full rounded-2xl overflow-hidden relative shadow-md cursor-pointer group transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
                   onClick={() => {
                     if (ad.id) AdvertisementService.recordClick(ad.id);
-                    if (ad.linkUrl) window.open(ad.linkUrl, '_blank');
+                    setSelectedAdForDetail(ad);
                   }}
                 >
                   <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
@@ -943,6 +945,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           }}
           member={member}
           members={members}
+        />
+      )}
+
+      {/* Partnership Detail Modal */}
+      {selectedAdForDetail && (
+        <PartnershipDetailModal
+          ad={selectedAdForDetail}
+          onClose={() => setSelectedAdForDetail(null)}
         />
       )}
     </div>
