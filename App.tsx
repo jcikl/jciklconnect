@@ -3134,16 +3134,18 @@ const App: React.FC = () => {
             }}
           >
             <AuthProvider>
-              <ErrorBoundary
-                onError={(error, errorInfo) => {
-                  errorLoggingService.logError(error, {
-                    component: 'JCIKLApp',
-                    action: 'main_app_render'
-                  }, errorInfo);
-                }}
-              >
-                <JCIKLApp />
-              </ErrorBoundary>
+              <ToastProvider>
+                <ErrorBoundary
+                  onError={(error, errorInfo) => {
+                    errorLoggingService.logError(error, {
+                      component: 'JCIKLApp',
+                      action: 'main_app_render'
+                    }, errorInfo);
+                  }}
+                >
+                  <JCIKLApp />
+                </ErrorBoundary>
+              </ToastProvider>
             </AuthProvider>
           </AsyncErrorBoundary>
         </BrowserRouter>
