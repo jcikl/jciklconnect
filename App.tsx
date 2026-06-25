@@ -2892,7 +2892,7 @@ export const JCIKLApp: React.FC = () => {
           )}
 
           {/* Scrollable Area */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-4 px-5 sm:px-8 ">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-32 md:pb-4 px-5 sm:px-8 ">
               {renderCurrentView(scrollContainerRef)}
           </div>
         </main>

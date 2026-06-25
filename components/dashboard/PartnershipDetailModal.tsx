@@ -102,14 +102,6 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
         <div className="relative bg-white rounded-t-[32px] -mt-10 px-6 pt-8 pb-10 min-h-[300px]">
           {/* Header Info */}
           <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="jci" className="bg-blue-50 text-jci-blue border-none px-3 py-1 text-[11px] font-bold">
-                {ad.type || 'Partnership'}
-              </Badge>
-              <Badge variant="success" className="bg-green-50 text-green-700 border-none px-3 py-1 text-[11px] font-bold">
-                Active Offer
-              </Badge>
-            </div>
             <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight mb-2">
               {ad.title}
             </h2>
