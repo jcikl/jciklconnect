@@ -52,7 +52,7 @@ import { PromotionTracking } from './MemberManagement/PromotionTracking';
 import { SenatorshipManagement } from './MemberManagement/SenatorshipManagement';
 import { BoardOfDirectorsSection } from './MemberManagement/BoardOfDirectorsSection';
 import { MemberBatchImportModal } from './Members/MemberBatchImportModal';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { useBatchMode } from '../../contexts/BatchModeContext';
 import { formatDateToDDMMMYYYY } from '../../utils/dateUtils';
 import { MembershipTypeDisplay } from '../shared/MembershipTypeDisplay';
@@ -1912,6 +1912,32 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     return { individual, business, community, international, dominant };
   }, [member]);
 
+  // Elite Leaderboard Radar Data
+  const radarData = useMemo(() => {
+    const stats = member.radarStats || {
+      training: 0,
+      leadership: 0,
+      events: 0,
+      recruitment: 0,
+      sponsorship: 0
+    };
+    return [
+      { subject: 'Training', value: stats.training || 0 },
+      { subject: 'Leadership', value: stats.leadership || 0 },
+      { subject: 'Events', value: stats.events || 0 },
+      { subject: 'Recruitment', value: stats.recruitment || 0 },
+      { subject: 'Sponsorship', value: stats.sponsorship || 0 }
+    ].map(item => ({
+      ...item,
+      displaySubject: `${item.subject}: ${item.value}`
+    }));
+  }, [member.radarStats]);
+
+  const maxRadarVal = useMemo(() => {
+    const vals = radarData.map(d => d.value);
+    return Math.max(10, ...vals);
+  }, [radarData]);
+
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300">
       {!isSelfView && (
@@ -2076,34 +2102,29 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
         </Card>
 
-        <Card className="bg-white border-2 border-slate-900 border-b-8 border-r-8 hover:translate-x-1 hover:translate-y-1 transition-all">
-          <div className="p-2">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Coins size={16} className="text-amber-500" /> Ambition & Resources
+        <Card className="bg-white border-2 border-slate-900 border-b-8 border-r-8 hover:translate-x-1 hover:translate-y-1 transition-all flex flex-col justify-between">
+          <div className="p-2 h-full flex flex-col justify-between">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <Target size={16} className="text-jci-blue animate-pulse" /> Elite Leaderboard Radar
             </h3>
-            <div className="space-y-4">
-              <div>
-                <span className="text-[10px] font-black text-slate-400 uppercase leading-none">Wants (From Assessment)</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {Array.isArray(member.interestedIndustries) && member.interestedIndustries.map(ind => (
-                    <Badge key={ind} className="bg-slate-100 text-slate-900 border-none font-bold italic">{ind}</Badge>
-                  ))}
-                  {(!member.interestedIndustries || member.interestedIndustries.length === 0) && <span className="text-xs text-slate-400 italic">No explicit wants on file.</span>}
-                </div>
-              </div>
-              <div className="pt-3 border-t border-slate-100">
-                <span className="text-[10px] font-black text-slate-400 uppercase leading-none">Needs (Matchable Capital)</span>
-                <div className="mt-2 p-3 bg-amber-50 rounded-xl border border-amber-100 relative group">
-                  <div className="flex items-center gap-2 text-amber-900 font-black text-sm">
-                    <Zap size={14} className="fill-amber-500" />
-                    {member.specialOffer || 'Ready for Strategic Partnership'}
-                  </div>
-                  <p className="text-[10px] text-amber-700 mt-1 uppercase font-bold">Available as Bounty Reward</p>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ArrowUpRight size={16} className="text-amber-600" />
-                  </div>
-                </div>
-              </div>
+            <div className="flex-1 min-h-[220px] w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis 
+                    dataKey="displaySubject" 
+                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 'bold' }} 
+                  />
+                  <PolarRadiusAxis angle={30} domain={[0, maxRadarVal]} tick={false} axisLine={false} />
+                  <Radar
+                    name="Points"
+                    dataKey="value"
+                    stroke="#0097D7"
+                    fill="#0097D7"
+                    fillOpacity={0.4}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </Card>
