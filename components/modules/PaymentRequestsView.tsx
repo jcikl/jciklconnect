@@ -819,37 +819,22 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         </Card>
       )}
       {/* Stats Summary Panel */}
-      <Card className="bg-slate-50 border-slate-200/80 p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 text-center sm:text-left gap-4 sm:gap-0">
-          <div className="pb-3 sm:pb-0 sm:pr-6 flex items-center justify-between sm:justify-start gap-4">
-            <div className="flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pending Approval</p>
-              <h3 className="text-xl font-bold text-amber-600 mt-1">{formatCurrency(stats.pendingAmount)}</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">{stats.pendingCount} active request{stats.pendingCount === 1 ? '' : 's'}</p>
-            </div>
-            <div className="bg-amber-500/10 p-2 rounded-lg text-amber-600 shrink-0">
-              <Clock size={16} />
-            </div>
+      <Card className="bg-slate-50 border-slate-200/80 p-3 sm:p-4">
+        <div className="grid grid-cols-3 divide-x divide-slate-200 text-center">
+          <div className="px-1 sm:px-4">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Pending</p>
+            <h3 className="text-sm sm:text-lg md:text-xl font-bold text-amber-600 mt-1 truncate">{formatCurrency(stats.pendingAmount)}</h3>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{stats.pendingCount} active</p>
           </div>
-          <div className="py-3 sm:py-0 sm:px-6 flex items-center justify-between sm:justify-start gap-4">
-            <div className="flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Approved</p>
-              <h3 className="text-xl font-bold text-emerald-600 mt-1">{formatCurrency(stats.approvedAmount)}</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">{stats.approvedCount} completed request{stats.approvedCount === 1 ? '' : 's'}</p>
-            </div>
-            <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-600 shrink-0">
-              <CheckCircle size={16} />
-            </div>
+          <div className="px-1 sm:px-4">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Approved</p>
+            <h3 className="text-sm sm:text-lg md:text-xl font-bold text-emerald-600 mt-1 truncate">{formatCurrency(stats.approvedAmount)}</h3>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{stats.approvedCount} completed</p>
           </div>
-          <div className="pt-3 sm:pt-0 sm:pl-6 flex items-center justify-between sm:justify-start gap-4">
-            <div className="flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Rejected / Cancelled</p>
-              <h3 className="text-xl font-bold text-slate-600 mt-1">{stats.rejectedCount}</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">Requires adjustment / cancelled</p>
-            </div>
-            <div className="bg-slate-500/10 p-2 rounded-lg text-slate-500 shrink-0">
-              <XCircle size={16} />
-            </div>
+          <div className="px-1 sm:px-4">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Rejected</p>
+            <h3 className="text-sm sm:text-lg md:text-xl font-bold text-slate-600 mt-1 truncate">{stats.rejectedCount}</h3>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">Needs revision</p>
           </div>
         </div>
       </Card>
