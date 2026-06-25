@@ -2492,9 +2492,11 @@ export const JCIKLApp: React.FC = () => {
           />
         )}
 
-        {/* Sidebar - Desktop Only */}
+        {/* Sidebar - Responsive (Desktop & Mobile Drawer) */}
         <aside className={`
-        hidden md:flex flex-col flex-shrink-0 bg-white border-r border-slate-200 transition-all duration-300 ease-in-out z-30
+        fixed inset-y-0 left-0 z-50 flex flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0 md:relative md:flex
         ${isSidebarCollapsed ? 'w-40' : 'w-64'}
       `}>
           <div className="h-full flex flex-col min-h-0">
