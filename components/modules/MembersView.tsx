@@ -709,7 +709,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               )}
 
               {activeTab === 'statistics' && (
-                <MemberStatisticsView statistics={statistics} loading={loadingStats} />
+                <MemberStatisticsView statistics={statistics} loading={loadingStats} members={members} />
               )}
 
               {activeTab === 'board-of-directors' && (
@@ -1123,7 +1123,11 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 };
 
 // Member Statistics View Component
-const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; loading: boolean }> = ({ statistics, loading }) => {
+const MemberStatisticsView: React.FC<{ 
+  statistics: MemberStatistics | null; 
+  loading: boolean;
+  members: Member[];
+}> = ({ statistics, loading, members = [] }) => {
   const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
@@ -1133,6 +1137,86 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const calculateAge = (dobString?: string) => {
+    if (!dobString) return null;
+    const birthDate = new Date(dobString);
+    if (isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const ageData = React.useMemo(() => {
+    let range18_25 = 0;
+    let range26_30 = 0;
+    let range31_40 = 0;
+    let other = 0;
+
+    members.forEach(m => {
+      const dobStr = m.general?.dob || m.dob || m.dateOfBirth;
+      if (!dobStr) {
+        other++;
+        return;
+      }
+      const age = calculateAge(dobStr);
+      if (age === null) {
+        other++;
+      } else if (age >= 18 && age <= 25) {
+        range18_25++;
+      } else if (age >= 26 && age <= 30) {
+        range26_30++;
+      } else if (age >= 31 && age <= 40) {
+        range31_40++;
+      } else {
+        other++;
+      }
+    });
+
+    const data = [
+      { name: '18 - 25', value: range18_25 },
+      { name: '26 - 30', value: range26_30 },
+      { name: '31 - 40', value: range31_40 }
+    ];
+
+    if (other > 0) {
+      data.push({ name: 'Other / Unknown', value: other });
+    }
+
+    return data.filter(item => item.value > 0);
+  }, [members]);
+
+  const genderData = React.useMemo(() => {
+    let male = 0;
+    let female = 0;
+    let unknown = 0;
+
+    members.forEach(m => {
+      const g = (m.general?.gender || m.gender || '').toLowerCase().trim();
+      if (g === 'male') {
+        male++;
+      } else if (g === 'female') {
+        female++;
+      } else {
+        unknown++;
+      }
+    });
+
+    const data = [
+      { name: 'Male', value: male },
+      { name: 'Female', value: female }
+    ];
+
+    if (unknown > 0) {
+      data.push({ name: 'Unknown', value: unknown });
+    }
+
+    return data.filter(item => item.value > 0);
+  }, [members]);
+
   if (loading) {
     return <div className="text-center py-8 text-slate-400">Loading statistics...</div>;
   }
@@ -1141,8 +1225,6 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
     return <div className="text-center py-8 text-slate-400">No statistics available</div>;
   }
 
-  const tierData = Object.entries(statistics.membersByTier).map(([tier, count]) => ({ name: tier, value: count }));
-  const roleData = Object.entries(statistics.membersByRole).map(([role, count]) => ({ name: role, value: count }));
   const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5', '#A5B4FC', '#F472B6'];
 
   return (
@@ -1190,11 +1272,11 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card title="Members by Tier">
+        <Card title="Age Demographics">
           <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
             <PieChart>
               <Pie
-                data={tierData}
+                data={ageData}
                 cx="50%"
                 cy="50%"
                 labelLine={!isMobile}
@@ -1203,7 +1285,7 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
                 fill="#8884d8"
                 dataKey="value"
               >
-                {tierData.map((entry, index) => (
+                {ageData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
@@ -1213,11 +1295,11 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
           </ResponsiveContainer>
         </Card>
 
-        <Card title="Members by Role">
+        <Card title="Gender Demographics">
           <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
             <PieChart>
               <Pie
-                data={roleData}
+                data={genderData}
                 cx="50%"
                 cy="50%"
                 labelLine={!isMobile}
@@ -1226,7 +1308,7 @@ const MemberStatisticsView: React.FC<{ statistics: MemberStatistics | null; load
                 fill="#8884d8"
                 dataKey="value"
               >
-                {roleData.map((entry, index) => (
+                {genderData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
                 ))}
               </Pie>
