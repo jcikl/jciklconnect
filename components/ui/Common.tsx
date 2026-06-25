@@ -296,7 +296,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
                   className={`
                     whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex-shrink-0
                     ${activeTab === id
-                      ? 'bg-white text-jci-blue shadow-sm'
+                      ? 'bg-white text-jci-blue shadow-sm border border-slate-200/20'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}
                   `}
                 >
