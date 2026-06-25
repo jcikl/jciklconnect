@@ -12,6 +12,7 @@ export const COLLECTIONS = {
   INVENTORY: 'inventory',
   POINTS: 'points',
   POINT_RULES: 'pointRules',
+  SPONSORSHIPS: 'sponsorships',
   AUTOMATION_RULES: 'automationRules',
   WORKFLOWS: 'workflows',
   WORKFLOW_EXECUTIONS: 'workflow_executions',

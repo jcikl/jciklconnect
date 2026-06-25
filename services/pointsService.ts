@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   query,
   where,
@@ -16,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
-import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress } from '../types';
+import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress, RadarPointsConfig } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 
@@ -323,7 +324,7 @@ export class PointsService {
     visibility: 'public' | 'members_only' | 'private' = 'public',
     requestingMemberId?: string
   ): Promise<Member[]> {
-    if (isDevMode()) {
+    try {
       const members = await MembersService.getAllMembers();
       return members
         .filter(m => {
@@ -333,47 +334,11 @@ export class PointsService {
           if (visibility === 'members_only') {
             return m.leaderboardVisibility === 'members_only' || m.leaderboardVisibility === 'public';
           }
-          return m.leaderboardVisibility === 'public' || !m.leaderboardVisibility;
+          // For public view, display anyone unless they explicitly opted out to 'private'
+          return m.leaderboardVisibility !== 'private';
         })
         .sort((a, b) => (b.points || 0) - (a.points || 0))
         .slice(0, limitCount);
-    }
-
-    try {
-      let q = query(
-        collection(db, COLLECTIONS.MEMBERS),
-        orderBy('points', 'desc'),
-        limit(limitCount)
-      );
-
-      // Apply visibility filter
-      if (visibility === 'private') {
-        // Only show requesting member's own rank
-        if (requestingMemberId) {
-          q = query(
-            collection(db, COLLECTIONS.MEMBERS),
-            where('id', '==', requestingMemberId),
-            orderBy('points', 'desc')
-          );
-        } else {
-          return [];
-        }
-      } else if (visibility === 'members_only') {
-        // Only show members who opted in to leaderboard
-        q = query(
-          collection(db, COLLECTIONS.MEMBERS),
-          where('leaderboardVisibility', 'in', ['public', 'members_only']),
-          orderBy('points', 'desc'),
-          limit(limitCount)
-        );
-      }
-      // 'public' - show all members (no filter)
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      } as Member));
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       throw error;
@@ -1375,6 +1340,199 @@ export class PointsService {
     } catch (error) {
       console.error('Error fetching LO star progress:', error);
       throw error;
+    }
+  }
+
+  // Get Radar configuration
+  static async getRadarPointsConfig(): Promise<RadarPointsConfig> {
+    const DEFAULT_CONFIG: RadarPointsConfig = {
+      leadership: { exOfficio: 2, organisingChairman: 5, committee: 3 },
+      training: { pointsPerHour: 1 },
+      recruitment: { pointsPerPax: 10 },
+      sponsorship: { pointsPer100: 2 }
+    };
+
+    if (isDevMode()) {
+      try {
+        const localData = localStorage.getItem('radar_points_config');
+        return localData ? JSON.parse(localData) : DEFAULT_CONFIG;
+      } catch {
+        return DEFAULT_CONFIG;
+      }
+    }
+
+    try {
+      const docRef = doc(db, 'system', 'radar_points_config');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        return {
+          leadership: {
+            exOfficio: data.leadership?.exOfficio ?? DEFAULT_CONFIG.leadership.exOfficio,
+            organisingChairman: data.leadership?.organisingChairman ?? DEFAULT_CONFIG.leadership.organisingChairman,
+            committee: data.leadership?.committee ?? DEFAULT_CONFIG.leadership.committee,
+          },
+          training: {
+            pointsPerHour: data.training?.pointsPerHour ?? DEFAULT_CONFIG.training.pointsPerHour,
+          },
+          recruitment: {
+            pointsPerPax: data.recruitment?.pointsPerPax ?? DEFAULT_CONFIG.recruitment.pointsPerPax,
+          },
+          sponsorship: {
+            pointsPer100: data.sponsorship?.pointsPer100 ?? DEFAULT_CONFIG.sponsorship.pointsPer100,
+          }
+        };
+      }
+      return DEFAULT_CONFIG;
+    } catch (error) {
+      console.error('Error fetching radar points config:', error);
+      return DEFAULT_CONFIG;
+    }
+  }
+
+  // Save Radar configuration
+  static async saveRadarPointsConfig(config: RadarPointsConfig): Promise<void> {
+    if (isDevMode()) {
+      localStorage.setItem('radar_points_config', JSON.stringify(config));
+      console.log('[DEV MODE] Saved radar points config to localStorage:', config);
+      return;
+    }
+
+    try {
+      const docRef = doc(db, 'system', 'radar_points_config');
+      await setDoc(docRef, config);
+      console.log('Saved radar points config to cloud:', config);
+    } catch (error) {
+      console.error('Error saving radar points config:', error);
+      throw error;
+    }
+  }
+
+  // Recalculate Member Radar Stats and update member doc
+  static async recalculateMemberRadarStats(memberId: string): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Recalculating radar stats for member ${memberId}`);
+      return;
+    }
+
+    try {
+      const config = await this.getRadarPointsConfig();
+      const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+      const memberSnap = await getDoc(memberRef);
+
+      if (!memberSnap.exists()) {
+        console.warn(`Member ${memberId} not found, skipping recalculation`);
+        return;
+      }
+
+      const member = memberSnap.data() as Member;
+      const memberName = member.name || '';
+      const memberFullName = member.fullName || member.general?.name || '';
+
+      // 1. Calculate Leadership & Training Points from Projects
+      let leadership = 0;
+      let training = 0;
+
+      const projectsSnap = await getDocs(collection(db, COLLECTIONS.PROJECTS));
+      projectsSnap.forEach(pDoc => {
+        const proj = pDoc.data();
+        
+        // Event Committee Roles Check
+        if (proj.committee && Array.isArray(proj.committee)) {
+          proj.committee.forEach((c: any) => {
+            if (c.memberId === memberId) {
+              const role = (c.role || '').trim().toLowerCase();
+              if (role === 'ex-officio') {
+                leadership += config.leadership.exOfficio;
+              } else if (role === 'organising chairperson' || role === 'organising chairman') {
+                leadership += config.leadership.organisingChairman;
+              } else {
+                leadership += config.leadership.committee;
+              }
+            }
+          });
+        }
+
+        // Event Trainer Duration Check
+        if (proj.trainers && Array.isArray(proj.trainers)) {
+          proj.trainers.forEach((t: any) => {
+            if (t.memberId === memberId) {
+              const hrs = parseFloat(t.durationHours) || 0;
+              training += hrs * config.training.pointsPerHour;
+            }
+          });
+        }
+      });
+
+      // 2. Calculate Recruitment Points
+      let recruitment = 0;
+      const membersSnap = await getDocs(collection(db, COLLECTIONS.MEMBERS));
+      let referCount = 0;
+      membersSnap.forEach(mDoc => {
+        const m = mDoc.data() as Member;
+        const intro = (m.introducer || '').trim().toLowerCase();
+        if (intro) {
+          if (
+            intro === memberId.toLowerCase() ||
+            (memberName && intro === memberName.trim().toLowerCase()) ||
+            (memberFullName && intro === memberFullName.trim().toLowerCase())
+          ) {
+            referCount++;
+          }
+        }
+      });
+      recruitment = referCount * config.recruitment.pointsPerPax;
+
+      // 3. Calculate Sponsorship Points
+      let sponsorship = 0;
+      const sponsorshipsSnap = await getDocs(
+        query(collection(db, COLLECTIONS.SPONSORSHIPS || 'sponsorships'), where('memberId', '==', memberId))
+      );
+      sponsorshipsSnap.forEach(sDoc => {
+        const s = sDoc.data();
+        const amt = parseFloat(s.amount) || 0;
+        sponsorship += Math.floor(amt / 100) * config.sponsorship.pointsPer100;
+      });
+
+      // 4. Calculate Events Points (from RadarContributions)
+      let events = 0;
+      const contributionsSnap = await getDocs(
+        query(collection(db, 'RadarContributions'), where('memberId', '==', memberId))
+      );
+      contributionsSnap.forEach(cDoc => {
+        const c = cDoc.data();
+        events += parseFloat(c.points) || 0;
+      });
+
+      // 5. Total Points and Tier Calculation
+      const totalPoints = leadership + training + recruitment + sponsorship + events;
+      const tier = this.calculateTier(totalPoints);
+
+      // 6. Update Member doc
+      await updateDoc(memberRef, {
+        radarStats: {
+          leadership,
+          training,
+          recruitment,
+          sponsorship,
+          events
+        },
+        points: totalPoints,
+        tier,
+        updatedAt: Timestamp.now()
+      });
+
+      console.log(`Recalculated member ${memberId}:`, {
+        leadership,
+        training,
+        recruitment,
+        sponsorship,
+        events,
+        totalPoints,
+        tier
+      });
+    } catch (err) {
+      console.error(`Error recalculating radar stats for member ${memberId}:`, err);
     }
   }
 }

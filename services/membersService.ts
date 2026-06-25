@@ -116,6 +116,46 @@ export class MembersService {
     }
   }
 
+  // Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency)
+  static async recalculateIntroducerStats(introducerVal?: string) {
+    if (!introducerVal || introducerVal.trim() === '' || isDevMode()) return;
+    try {
+      const trimmed = introducerVal.trim();
+      const { PointsService } = await import('./pointsService');
+
+      // 1. Check if the introducer matches a member ID
+      const docRef = doc(db, COLLECTIONS.MEMBERS, trimmed);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        await PointsService.recalculateMemberRadarStats(docSnap.id);
+        return;
+      }
+
+      // 2. Otherwise, check if it matches a member name
+      const q = query(collection(db, COLLECTIONS.MEMBERS), where('name', '==', trimmed));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        await PointsService.recalculateMemberRadarStats(d.id);
+      }
+
+      // 3. Also check general.name
+      const q2 = query(collection(db, COLLECTIONS.MEMBERS), where('general.name', '==', trimmed));
+      const snap2 = await getDocs(q2);
+      for (const d of snap2.docs) {
+        await PointsService.recalculateMemberRadarStats(d.id);
+      }
+
+      // 4. Also check top-level fullName
+      const q3 = query(collection(db, COLLECTIONS.MEMBERS), where('fullName', '==', trimmed));
+      const snap3 = await getDocs(q3);
+      for (const d of snap3.docs) {
+        await PointsService.recalculateMemberRadarStats(d.id);
+      }
+    } catch (e) {
+      console.error('Error recalculating introducer stats:', e);
+    }
+  }
+
   /** Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). */
   static async createMember(memberData: MemberCreateInput, createdBy?: string): Promise<string> {
     if (isDevMode()) {
@@ -144,6 +184,11 @@ export class MembersService {
       if (cleanMemberData.loId == null || cleanMemberData.loId === '') cleanMemberData.loId = DEFAULT_LO_ID;
 
       const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), cleanMemberData);
+      
+      if (cleanMemberData.introducer) {
+        this.recalculateIntroducerStats(cleanMemberData.introducer).catch(console.error);
+      }
+
       return docRef.id;
     } catch (error) {
       console.error('Error creating member:', error);
@@ -224,6 +269,16 @@ export class MembersService {
       });
 
       await updateDoc(memberRef, cleanUpdates);
+
+      // Trigger introducer recalculation if introducer changes
+      if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {
+        if (currentData?.introducer) {
+          this.recalculateIntroducerStats(currentData.introducer).catch(console.error);
+        }
+        if (cleanUpdates.introducer) {
+          this.recalculateIntroducerStats(cleanUpdates.introducer).catch(console.error);
+        }
+      }
     } catch (error) {
       console.error('Error updating member:', error);
       throw error;

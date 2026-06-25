@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button } from '../ui/Common';
+import { Card, Button, Modal, useToast } from '../ui/Common';
 import { MembersService } from '../../services/membersService';
-import { Member } from '../../types';
+import { PointsService } from '../../services/pointsService';
+import { SponsorshipsService } from '../../services/sponsorshipService';
+import { Member, SponsorshipRecord, RadarPointsConfig } from '../../types';
 import { db } from '../../config/firebase';
 import { collection, addDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, where, orderBy, limit, startAfter, deleteDoc } from 'firebase/firestore';
 // import { RadarEventManager } from './RadarEventManager';
@@ -78,10 +80,9 @@ event\t41\tOther Event\tLinguistic Competitions\t10
 event\t42\tConvention & Conference\tSenate Conference\t15`;
 
 export const RadarDataImporter: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'import' | 'ledger' | 'events'>('import');
+  const [viewMode, setViewMode] = useState<'import' | 'ledger' | 'sponsorships' | 'config'>('import');
   const [pastedData, setPastedData] = useState(Array(10).fill('\t\t\t\t\t\t\t\t').join('\n'));
   const [mappingFunctionStr, setMappingFunctionStr] = useState(defaultMappingStr);
-  const [showMappingEditor, setShowMappingEditor] = useState(false);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [filterMode, setFilterMode] = useState<'all' | 'valid' | 'missing' | 'ignored'>('all');
 
@@ -125,55 +126,9 @@ export const RadarDataImporter: React.FC = () => {
     setPastedData(lines.join('\n'));
   };
 
-  const handleMappingCellChange = (rIdx: number, cIdx: number, val: string) => {
-    const lines = mappingFunctionStr.split('\n');
-    // Account for header row (+1)
-    const lineIndex = rIdx + 1;
-    if (lineIndex < lines.length) {
-      const cols = lines[lineIndex].split('\t');
-      cols[cIdx] = val;
-      lines[lineIndex] = cols.join('\t');
-      setMappingFunctionStr(lines.join('\n'));
-    }
-  };
-
-  const handleMappingGridPaste = (e: React.ClipboardEvent<HTMLInputElement>, rIdx: number, cIdx: number) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    if (!text) return;
-
-    const lines = mappingFunctionStr.split('\n');
-    const pastedLines = text.split(/\r?\n/);
-    const numCols = lines[0].split('\t').length;
-
-    pastedLines.forEach((pLine, i) => {
-      if (!pLine.trim() && i === pastedLines.length - 1) return;
-
-      const targetRIdx = rIdx + 1 + i;
-      while (lines.length <= targetRIdx) {
-        lines.push(Array(numCols).fill('').join('\t'));
-      }
-
-      const cols = lines[targetRIdx].split('\t');
-      while (cols.length < numCols) cols.push('');
-
-      const pCols = pLine.split('\t');
-      pCols.forEach((pCol, j) => {
-        const targetCIdx = cIdx + j;
-        if (targetCIdx < numCols) {
-          cols[targetCIdx] = pCol.trim();
-        }
-      });
-
-      lines[targetRIdx] = cols.join('\t');
-    });
-
-    setMappingFunctionStr(lines.join('\n'));
-  };
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
   const [committing, setCommitting] = useState(false);
-  const [savingMapping, setSavingMapping] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
@@ -194,20 +149,7 @@ export const RadarDataImporter: React.FC = () => {
     fetchInitialData();
   }, []);
 
-  const saveMappingRules = async () => {
-    setSavingMapping(true);
-    try {
-      const docRef = doc(db, 'system', 'radar_mappings');
-      await setDoc(docRef, { tsvStr: mappingFunctionStr, updatedAt: new Date().toISOString() }, { merge: true });
-      setFeedback('Mapping rules saved successfully!');
-      setTimeout(() => setFeedback(null), 3000);
-    } catch (e: any) {
-      console.error('Failed to save mapping rules', e);
-      setFeedback('Error saving mapping rules: ' + e.message);
-    } finally {
-      setSavingMapping(false);
-    }
-  };
+  // Mapping rules are now edited under the Config tab
 
   const resolveEventMapping = (generalType: string, catIdStr: string) => {
     try {
@@ -472,8 +414,8 @@ export const RadarDataImporter: React.FC = () => {
           memberCache[row.matchedMemberId] = snap.docs.map(d => d.data());
         }
 
-        const isDuplicate = memberCache[row.matchedMemberId].some(d => 
-          d.eventTitle === finalEventTitle && 
+        const isDuplicate = memberCache[row.matchedMemberId].some(d =>
+          d.eventTitle === finalEventTitle &&
           (d.eventDate || '') === (row.eventDate || '')
         );
 
@@ -509,7 +451,7 @@ export const RadarDataImporter: React.FC = () => {
           memberUpdates[row.matchedMemberId] = { total: {}, byYear: {} };
         }
         memberUpdates[row.matchedMemberId].total[radarKey] = (memberUpdates[row.matchedMemberId].total[radarKey] || 0) + points;
-        
+
         if (!memberUpdates[row.matchedMemberId].byYear[year]) {
           memberUpdates[row.matchedMemberId].byYear[year] = {};
         }
@@ -518,38 +460,9 @@ export const RadarDataImporter: React.FC = () => {
         successCount++;
       }
 
-      // Apply updates to member documents
-      for (const [memberId, updates] of Object.entries(memberUpdates)) {
-        const memberRef = doc(db, 'members', memberId);
-        const memberDoc = await getDoc(memberRef);
-
-        if (memberDoc.exists()) {
-          const data = memberDoc.data();
-          const currentStats = data.radarStats || {
-            training: 0, leadership: 0, events: 0, recruitment: 0, sponsorship: 0
-          };
-          const currentStatsByYear = data.radarStatsByYear || {};
-
-          const newStats = { ...currentStats };
-          for (const [key, pts] of Object.entries(updates.total)) {
-            newStats[key as keyof typeof newStats] += pts as number;
-          }
-
-          const newStatsByYear = { ...currentStatsByYear };
-          for (const [year, yearStats] of Object.entries(updates.byYear)) {
-            if (!newStatsByYear[year]) {
-              newStatsByYear[year] = { training: 0, leadership: 0, events: 0, recruitment: 0, sponsorship: 0 };
-            }
-            for (const [key, pts] of Object.entries(yearStats)) {
-              newStatsByYear[year][key as keyof typeof newStatsByYear[string]] += pts as number;
-            }
-          }
-
-          await updateDoc(memberRef, {
-            radarStats: newStats,
-            radarStatsByYear: newStatsByYear
-          });
-        }
+      // Recalculate member radar stats using centralized PointsService
+      for (const memberId of Object.keys(memberUpdates)) {
+        await PointsService.recalculateMemberRadarStats(memberId);
       }
       setViewMode('ledger');
       setFeedback(`Successfully imported ${successCount} records. ${skippedCount > 0 ? `Skipped ${skippedCount} duplicate records.` : ''}`);
@@ -570,32 +483,44 @@ export const RadarDataImporter: React.FC = () => {
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Radar Contribution System</h1>
           <p className="text-sm text-slate-500 mt-1">Import tabular data or manage existing contribution records.</p>
         </div>
-        <div className="flex bg-slate-100/80 p-1.5 rounded-2xl ring-1 ring-slate-200/50">
+        <div className="flex bg-slate-100/80 p-1.5 rounded-2xl ring-1 ring-slate-200/50 flex-wrap gap-1">
           <Button
             onClick={() => setViewMode('import')}
-            className={`px-6 py-2 text-sm font-black rounded-xl transition-all ${viewMode === 'import' ? 'bg-gradient-to-r from-jci-blue to-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
+            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'import' ? 'bg-gradient-to-r from-jci-blue to-blue-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
           >
             Data Importer
           </Button>
           <Button
             onClick={() => setViewMode('ledger')}
-            className={`px-6 py-2 text-sm font-black rounded-xl transition-all ${viewMode === 'ledger' ? 'bg-gradient-to-r from-jci-blue to-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
+            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'ledger' ? 'bg-gradient-to-r from-jci-blue to-blue-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
           >
             Contribution Ledger
           </Button>
           <Button
-            onClick={() => setViewMode('events')}
-            className={`px-6 py-2 text-sm font-black rounded-xl transition-all ${viewMode === 'events' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
+            onClick={() => setViewMode('sponsorships')}
+            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'sponsorships' ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
           >
-            Event Roles Manager
+            Sponsorships
+          </Button>
+          <Button
+            onClick={() => setViewMode('config')}
+            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'config' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
+          >
+            Points Config
           </Button>
         </div>
       </div>
 
       {viewMode === 'ledger' ? (
         <RadarLedgerView />
-      ) : viewMode === 'events' ? (
-        <div>Radar Event Manager is disabled</div>
+      ) : viewMode === 'sponsorships' ? (
+        <RadarSponsorshipManager members={members} />
+      ) : viewMode === 'config' ? (
+        <RadarPointsConfigManager
+          members={members}
+          mappingFunctionStr={mappingFunctionStr}
+          setMappingFunctionStr={setMappingFunctionStr}
+        />
       ) : (
         <>
           <div className="space-y-4">
@@ -607,58 +532,9 @@ export const RadarDataImporter: React.FC = () => {
                 </h3>
                 <p className="text-sm text-slate-500 mt-1">Paste directly from Excel to auto-fill. Invalid records are greyed out.</p>
               </div>
-              <Button onClick={() => setShowMappingEditor(!showMappingEditor)} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg whitespace-nowrap rounded-xl font-bold px-5 py-2.5 transition-all">
-                {showMappingEditor ? 'Close Mapping Rules' : 'Configure Rules'}
-              </Button>
             </div>
 
-            {showMappingEditor && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-lg mb-4 animate-in fade-in slide-in-from-top-4">
-                <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-lg">Mapping Rules Engine</h3>
-                    <p className="text-sm text-slate-500">Map <code className="text-xs font-bold text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded">Type</code> and <code className="text-xs font-bold text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded">Cat</code> combinations to Radar Points</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button onClick={saveMappingRules} disabled={savingMapping} className="bg-gradient-to-r from-jci-blue to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-md text-xs py-1.5 px-4 rounded-lg font-bold transition-all">
-                      {savingMapping ? 'Saving...' : 'Save Config to Cloud'}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                  <table className="w-full text-xs text-left whitespace-nowrap">
-                    <thead className="sticky top-0 bg-slate-100 shadow-sm z-10">
-                      <tr>
-                        {mappingFunctionStr.trim().split('\n')[0]?.split('\t').map((header, i) => (
-                          <th key={i} className="py-2 px-3 font-bold text-slate-600 border-b border-slate-200">{header}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mappingFunctionStr.trim().split('\n').slice(1).map((line, rIdx) => {
-                        const cols = line.split('\t');
-                        return (
-                          <tr key={rIdx} className="border-b border-slate-100 hover:bg-blue-50/50">
-                            {cols.map((col, cIdx) => (
-                              <td key={cIdx} className="p-0 border-r border-slate-100 last:border-0">
-                                <input
-                                  type="text"
-                                  value={col}
-                                  onChange={(e) => handleMappingCellChange(rIdx, cIdx, e.target.value)}
-                                  onPaste={(e) => handleMappingGridPaste(e, rIdx, cIdx)}
-                                  className="w-full bg-transparent px-3 py-2 text-xs text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-jci-blue"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* Mapping editor moved to Config tab */}
 
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto border border-slate-200 rounded-2xl shadow-md bg-white">
               <table className="w-full text-xs text-left whitespace-nowrap">
@@ -837,13 +713,13 @@ const RadarLedgerView = () => {
       }
       const snap = await getDocs(q);
       const newLogs = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-      
+
       if (isLoadMore) {
         setLogs(prev => [...prev, ...newLogs]);
       } else {
         setLogs(newLogs);
       }
-      
+
       if (snap.docs.length < 100) {
         setHasMore(false);
       } else {
@@ -887,45 +763,16 @@ const RadarLedgerView = () => {
       for (const log of logsToDelete) {
         if (!memberDeductions[log.memberId]) memberDeductions[log.memberId] = { total: {}, byYear: {} };
         memberDeductions[log.memberId].total[log.radarKey] = (memberDeductions[log.memberId].total[log.radarKey] || 0) + log.points;
-        
+
         if (log.year) {
           if (!memberDeductions[log.memberId].byYear[log.year]) memberDeductions[log.memberId].byYear[log.year] = {};
           memberDeductions[log.memberId].byYear[log.year][log.radarKey] = (memberDeductions[log.memberId].byYear[log.year][log.radarKey] || 0) + log.points;
         }
       }
 
-      // Process member updates
-      for (const [memberId, deductions] of Object.entries(memberDeductions)) {
-        const memberRef = doc(db, 'members', memberId);
-        const memberDoc = await getDoc(memberRef);
-        if (memberDoc.exists()) {
-          const data = memberDoc.data();
-          const currentStats = data.radarStats || {};
-          const currentStatsByYear = data.radarStatsByYear || {};
-          
-          const newStats = { ...currentStats };
-          for (const [radarKey, pointsToDeduct] of Object.entries(deductions.total)) {
-            if (newStats[radarKey] !== undefined) {
-              newStats[radarKey] = Math.max(0, newStats[radarKey] - (pointsToDeduct as number));
-            }
-          }
-
-          const newStatsByYear = { ...currentStatsByYear };
-          for (const [year, yearStats] of Object.entries(deductions.byYear)) {
-            if (newStatsByYear[year]) {
-              for (const [radarKey, pointsToDeduct] of Object.entries(yearStats)) {
-                if (newStatsByYear[year][radarKey] !== undefined) {
-                  newStatsByYear[year][radarKey] = Math.max(0, newStatsByYear[year][radarKey] - (pointsToDeduct as number));
-                }
-              }
-            }
-          }
-
-          await updateDoc(memberRef, { 
-            radarStats: newStats,
-            radarStatsByYear: newStatsByYear
-          });
-        }
+      // Recalculate member radar stats using centralized PointsService
+      for (const memberId of Object.keys(memberDeductions)) {
+        await PointsService.recalculateMemberRadarStats(memberId);
       }
 
       // Process ledger record deletions
@@ -946,28 +793,7 @@ const RadarLedgerView = () => {
     if (!window.confirm(`Are you sure you want to delete this record?\n\nThis will deduct ${points} points from the member's ${radarKey} radar.`)) return;
     try {
       await deleteDoc(doc(db, 'RadarContributions', logId));
-      const memberRef = doc(db, 'members', memberId);
-      const memberDoc = await getDoc(memberRef);
-      if (memberDoc.exists()) {
-        const data = memberDoc.data();
-        const currentStats = data.radarStats || {};
-        const currentStatsByYear = data.radarStatsByYear || {};
-        
-        const newStats = { ...currentStats };
-        if (newStats[radarKey] !== undefined) {
-          newStats[radarKey] = Math.max(0, newStats[radarKey] - points);
-        }
-
-        const newStatsByYear = { ...currentStatsByYear };
-        if (year && newStatsByYear[year] && newStatsByYear[year][radarKey] !== undefined) {
-          newStatsByYear[year][radarKey] = Math.max(0, newStatsByYear[year][radarKey] - points);
-        }
-
-        await updateDoc(memberRef, { 
-          radarStats: newStats,
-          radarStatsByYear: newStatsByYear
-        });
-      }
+      await PointsService.recalculateMemberRadarStats(memberId);
       fetchLogs();
     } catch (e) {
       alert('Error deleting record: ' + e);
@@ -1044,8 +870,8 @@ const RadarLedgerView = () => {
         </table>
         {hasMore && logs.length > 0 && (
           <div className="p-4 flex justify-center bg-slate-50 border-t border-slate-100">
-            <Button 
-              onClick={() => fetchLogs(true)} 
+            <Button
+              onClick={() => fetchLogs(true)}
               disabled={loadingMore}
               className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 px-6 py-2 text-sm font-bold rounded-lg transition-all"
             >
@@ -1055,5 +881,507 @@ const RadarLedgerView = () => {
         )}
       </div>
     </Card>
+  );
+};
+
+// ─── Sponsorship Management Tab ─────────────────────────────────────────────
+const RadarSponsorshipManager: React.FC<{ members: Member[] }> = ({ members }) => {
+  const [sponsorships, setSponsorships] = useState<SponsorshipRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<SponsorshipRecord | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [sponsorName, setSponsorName] = useState('');
+  const [amount, setAmount] = useState<number>(0);
+  const [date, setDate] = useState('');
+  const [description, setDescription] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const { showToast } = useToast();
+
+  const loadSponsorships = async () => {
+    setLoading(true);
+    try {
+      const list = await SponsorshipsService.getAllSponsorships();
+      setSponsorships(list);
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to load sponsorships', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadSponsorships(); }, []);
+
+  const openAddModal = () => {
+    setEditingRecord(null);
+    setSelectedMemberId('');
+    setSponsorName('');
+    setAmount(0);
+    setDate(new Date().toISOString().split('T')[0]);
+    setDescription('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (record: SponsorshipRecord) => {
+    setEditingRecord(record);
+    setSelectedMemberId(record.memberId);
+    setSponsorName(record.sponsorName);
+    setAmount(record.amount);
+    setDate(record.date);
+    setDescription(record.description || '');
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMemberId || !sponsorName || amount <= 0 || !date) {
+      showToast('Please fill all required fields', 'error');
+      return;
+    }
+    setSubmitting(true);
+    const matchedMember = members.find(m => m.id === selectedMemberId);
+    const memberName = matchedMember ? (matchedMember.fullName || matchedMember.general?.name || matchedMember.name || '') : '';
+
+    const payload = { memberId: selectedMemberId, memberName, sponsorName, amount, date, description };
+
+    try {
+      if (editingRecord) {
+        await SponsorshipsService.updateSponsorship(editingRecord.id, payload, editingRecord.memberId);
+        showToast('Sponsorship updated', 'success');
+      } else {
+        await SponsorshipsService.createSponsorship(payload);
+        showToast('Sponsorship created', 'success');
+      }
+      setIsModalOpen(false);
+      loadSponsorships();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save sponsorship', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (record: SponsorshipRecord) => {
+    if (!window.confirm(`Delete sponsorship from "${record.sponsorName}"?\n\nThis will deduct points from the member.`)) return;
+    try {
+      await SponsorshipsService.deleteSponsorship(record.id, record.memberId);
+      showToast('Sponsorship deleted', 'success');
+      loadSponsorships();
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete sponsorship', 'error');
+    }
+  };
+
+  const filtered = sponsorships.filter(s => {
+    if (!searchTerm) return true;
+    const t = searchTerm.toLowerCase();
+    return s.sponsorName.toLowerCase().includes(t)
+      || (s.memberName || '').toLowerCase().includes(t)
+      || (s.description || '').toLowerCase().includes(t);
+  });
+
+  const totalAmount = filtered.reduce((sum, s) => sum + s.amount, 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <div className="relative w-full md:w-80">
+            <input
+              type="text"
+              placeholder="Search by sponsor, member, or description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue transition-all"
+            />
+          </div>
+          <div className="hidden md:flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2">
+            <span className="text-xs font-bold text-emerald-600 uppercase">Total</span>
+            <span className="font-black text-emerald-700">RM {totalAmount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+        <Button onClick={openAddModal} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-bold px-5 py-2.5 shadow-md hover:shadow-lg transition-all">
+          + New Sponsorship
+        </Button>
+      </div>
+
+      {/* Table */}
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <table className="w-full text-xs text-left whitespace-nowrap">
+            <thead className="bg-slate-50 sticky top-0 shadow-sm z-10">
+              <tr>
+                <th className="py-3 px-4 font-bold text-slate-600 border-b">Date</th>
+                <th className="py-3 px-4 font-bold text-slate-600 border-b">Sponsor Name</th>
+                <th className="py-3 px-4 font-bold text-slate-600 border-b">Secured By</th>
+                <th className="py-3 px-4 font-bold text-slate-600 border-b text-right">Amount (RM)</th>
+                <th className="py-3 px-4 font-bold text-slate-600 border-b">Description</th>
+                <th className="py-3 px-4 font-bold text-slate-600 border-b text-center">Est. Points</th>
+                <th className="py-3 px-4 font-bold text-slate-600 border-b text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="py-8 text-center text-slate-500 font-bold">Loading sponsorships...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={7} className="py-8 text-center text-slate-400">No sponsorship records found.</td></tr>
+              ) : filtered.map(s => (
+                <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="py-2.5 px-4 text-slate-500">{s.date}</td>
+                  <td className="py-2.5 px-4 font-bold text-slate-800">{s.sponsorName}</td>
+                  <td className="py-2.5 px-4 text-slate-700">{s.memberName || 'Unknown'}</td>
+                  <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">RM {s.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</td>
+                  <td className="py-2.5 px-4 text-slate-500 truncate max-w-[200px]" title={s.description}>{s.description || '—'}</td>
+                  <td className="py-2.5 px-4 text-center">
+                    <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-black">
+                      +{Math.floor(s.amount / 100) * 2} pts
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => openEditModal(s)} className="text-jci-blue hover:bg-blue-50 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Edit</button>
+                      <button onClick={() => handleDelete(s)} className="text-slate-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Add/Edit Modal */}
+      {isModalOpen && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingRecord ? 'Edit Sponsorship' : 'New Sponsorship Record'}>
+          <form onSubmit={handleSave} className="space-y-4 p-1">
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Secured By Member <span className="text-red-400">*</span></label>
+              <select
+                value={selectedMemberId}
+                onChange={(e) => setSelectedMemberId(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue bg-white transition-all"
+                required
+              >
+                <option value="">— Select Member —</option>
+                {members
+                  .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                  .map(m => (
+                    <option key={m.id} value={m.id}>{m.fullName || m.general?.name || m.name || m.email || m.id}</option>
+                  ))
+                }
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Sponsor / Company Name <span className="text-red-400">*</span></label>
+              <input type="text" value={sponsorName} onChange={(e) => setSponsorName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jci-blue/30" required placeholder="e.g. Tech Corp Sdn Bhd" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Amount (RM) <span className="text-red-400">*</span></label>
+                <input type="number" value={amount || ''} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jci-blue/30" min="0.01" step="0.01" required />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Date <span className="text-red-400">*</span></label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jci-blue/30" required />
+              </div>
+            </div>
+            {amount > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3">
+                <span className="text-amber-600 text-lg font-black">⚡</span>
+                <div>
+                  <p className="text-xs font-bold text-amber-800">Estimated Radar Points</p>
+                  <p className="text-sm text-amber-700">RM {amount.toFixed(0)} → <strong>{Math.floor(amount / 100) * 2} points</strong> (2 pts per RM 100)</p>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Description</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jci-blue/30" rows={3} placeholder="Optional notes about the sponsorship..." />
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button type="button" onClick={() => setIsModalOpen(false)} className="bg-white border border-slate-200 text-slate-600 font-bold px-5 py-2 rounded-xl hover:bg-slate-50 transition-all">Cancel</Button>
+              <Button type="submit" disabled={submitting} className="bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold px-6 py-2 rounded-xl shadow-md hover:shadow-lg transition-all">
+                {submitting ? 'Saving...' : editingRecord ? 'Update' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+interface RadarPointsConfigManagerProps {
+  members: Member[];
+  mappingFunctionStr: string;
+  setMappingFunctionStr: React.Dispatch<React.SetStateAction<string>>;
+}
+
+const RadarPointsConfigManager: React.FC<RadarPointsConfigManagerProps> = ({
+  members,
+  mappingFunctionStr,
+  setMappingFunctionStr
+}) => {
+  const [config, setConfig] = useState<RadarPointsConfig | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savingMapping, setSavingMapping] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalcProgress, setRecalcProgress] = useState({ current: 0, total: 0 });
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    setLoading(true);
+    PointsService.getRadarPointsConfig()
+      .then(data => setConfig(data))
+      .catch(e => { console.error(e); showToast('Failed to load config', 'error'); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleMappingCellChange = (rIdx: number, cIdx: number, val: string) => {
+    const lines = mappingFunctionStr.split('\n');
+    const lineIndex = rIdx + 1; // Account for header row
+    if (lineIndex < lines.length) {
+      const cols = lines[lineIndex].split('\t');
+      cols[cIdx] = val;
+      lines[lineIndex] = cols.join('\t');
+      setMappingFunctionStr(lines.join('\n'));
+    }
+  };
+
+  const handleMappingGridPaste = (e: React.ClipboardEvent<HTMLInputElement>, rIdx: number, cIdx: number) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    if (!text) return;
+
+    const lines = mappingFunctionStr.split('\n');
+    const pastedLines = text.split(/\r?\n/);
+    const numCols = lines[0].split('\t').length;
+
+    pastedLines.forEach((pLine, i) => {
+      if (!pLine.trim() && i === pastedLines.length - 1) return;
+
+      const targetRIdx = rIdx + 1 + i;
+      while (lines.length <= targetRIdx) {
+        lines.push(Array(numCols).fill('').join('\t'));
+      }
+
+      const cols = lines[targetRIdx].split('\t');
+      while (cols.length < numCols) cols.push('');
+
+      const pCols = pLine.split('\t');
+      pCols.forEach((pCol, j) => {
+        const targetCIdx = cIdx + j;
+        if (targetCIdx < numCols) {
+          cols[targetCIdx] = pCol.trim();
+        }
+      });
+
+      lines[targetRIdx] = cols.join('\t');
+    });
+
+    setMappingFunctionStr(lines.join('\n'));
+  };
+
+  const saveMappingRules = async () => {
+    setSavingMapping(true);
+    try {
+      const docRef = doc(db, 'system', 'radar_mappings');
+      await setDoc(docRef, { tsvStr: mappingFunctionStr, updatedAt: new Date().toISOString() }, { merge: true });
+      showToast('Mapping rules saved successfully!', 'success');
+    } catch (e: any) {
+      console.error('Failed to save mapping rules', e);
+      showToast('Error saving mapping rules: ' + e.message, 'error');
+    } finally {
+      setSavingMapping(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!config) return;
+    setSaving(true);
+    try {
+      await PointsService.saveRadarPointsConfig(config);
+      showToast('Configuration saved successfully', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save configuration', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRecalculateAll = async () => {
+    if (!config) return;
+    if (!window.confirm(`Save configuration and recalculate radar stats for ALL ${members.length} members?\n\nThis will update every member's leaderboard standings.`)) return;
+
+    setRecalculating(true);
+    setRecalcProgress({ current: 0, total: members.length });
+
+    try {
+      await PointsService.saveRadarPointsConfig(config);
+      let idx = 0;
+      for (const member of members) {
+        await PointsService.recalculateMemberRadarStats(member.id);
+        idx++;
+        setRecalcProgress({ current: idx, total: members.length });
+      }
+      showToast(`Recalculated radar stats for all ${members.length} members!`, 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('An error occurred during recalculation', 'error');
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
+  if (loading || !config) {
+    return <Card><div className="p-8 text-center text-slate-500 font-bold">Loading configuration...</div></Card>;
+  }
+
+  const configSections = [
+    {
+      title: '🏆 Leadership Point Multipliers',
+      subtitle: 'Points awarded for project committee roles',
+      fields: [
+        { label: 'Ex-Officio', value: config.leadership.exOfficio, onChange: (v: number) => setConfig({ ...config, leadership: { ...config.leadership, exOfficio: v } }) },
+        { label: 'Organising Chairman/Chairperson', value: config.leadership.organisingChairman, onChange: (v: number) => setConfig({ ...config, leadership: { ...config.leadership, organisingChairman: v } }) },
+        { label: 'Committee Member', value: config.leadership.committee, onChange: (v: number) => setConfig({ ...config, leadership: { ...config.leadership, committee: v } }) },
+      ]
+    },
+    {
+      title: '📚 Training & Education',
+      subtitle: 'Points awarded for training delivery',
+      fields: [
+        { label: 'Points Per Trainer Hour', value: config.training.pointsPerHour, onChange: (v: number) => setConfig({ ...config, training: { ...config.training, pointsPerHour: v } }), step: 0.5 },
+      ]
+    },
+    {
+      title: '🤝 Recruitment & Growth',
+      subtitle: 'Points awarded for introducing new members',
+      fields: [
+        { label: 'Points Per Member Introduced', value: config.recruitment.pointsPerPax, onChange: (v: number) => setConfig({ ...config, recruitment: { ...config.recruitment, pointsPerPax: v } }) },
+      ]
+    },
+    {
+      title: '💰 Sponsorship & Resources',
+      subtitle: 'Points awarded for securing external sponsorships',
+      fields: [
+        { label: 'Points Per RM 100 Sponsorship', value: config.sponsorship.pointsPer100, onChange: (v: number) => setConfig({ ...config, sponsorship: { ...config.sponsorship, pointsPer100: v } }) },
+      ]
+    },
+  ];
+
+  return (
+    <div className="mx-auto space-y-6">
+      <form onSubmit={handleSave} className="space-y-5">
+        {configSections.map((section, sIdx) => (
+          <Card key={sIdx} className="p-5">
+            <h3 className="text-base font-black text-slate-900 mb-0.5">{section.title}</h3>
+            <p className="text-xs text-slate-500 mb-4">{section.subtitle}</p>
+            <div className={`grid gap-4 ${section.fields.length >= 3 ? 'grid-cols-3' : section.fields.length === 2 ? 'grid-cols-2' : 'grid-cols-1 max-w-xs'}`}>
+              {section.fields.map((field, fIdx) => (
+                <div key={fIdx}>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">{field.label}</label>
+                  <input
+                    type="number"
+                    value={field.value}
+                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue transition-all"
+                    min="0"
+                    step={field.step || 1}
+                  />
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+
+        {/* Action Buttons */}
+        <Card className="p-5 bg-gradient-to-br from-slate-50 to-blue-50/30">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 justify-end">
+              <Button type="submit" disabled={saving || recalculating} className="bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl hover:bg-slate-700 transition-all">
+                {saving ? 'Saving...' : '💾 Save Configuration'}
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRecalculateAll}
+                disabled={saving || recalculating}
+                className="bg-gradient-to-r from-jci-blue to-blue-600 text-white font-bold px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all"
+              >
+                {recalculating ? `⏳ Recalculating (${recalcProgress.current}/${recalcProgress.total})...` : `🔄 Save & Recalculate All (${members.length} Members)`}
+              </Button>
+            </div>
+            {recalculating && (
+              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-jci-blue to-blue-500 h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${recalcProgress.total > 0 ? (recalcProgress.current / recalcProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+            )}
+            <p className="text-[10px] text-slate-400 text-right">
+              "Save & Recalculate" will apply the new multipliers to all member scores immediately.
+            </p>
+          </div>
+        </Card>
+      </form>
+
+      {/* Mapping Rules Engine */}
+      <Card className="p-5 overflow-hidden">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="text-base font-black text-slate-900 mb-0.5">⚙️ Mapping Rules Engine</h3>
+            <p className="text-xs text-slate-500">Map Type and Cat combinations to Radar Points</p>
+          </div>
+          <Button
+            onClick={saveMappingRules}
+            disabled={savingMapping}
+            className="bg-gradient-to-r from-jci-blue to-blue-600 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-md hover:shadow-lg transition-all"
+          >
+            {savingMapping ? 'Saving...' : 'Save Mapping Rules'}
+          </Button>
+        </div>
+
+        <div className="overflow-x-auto max-h-[400px] overflow-y-auto border border-slate-200 rounded-2xl">
+          <table className="w-full text-xs text-left whitespace-nowrap">
+            <thead className="sticky top-0 bg-slate-100 shadow-sm z-10">
+              <tr>
+                {mappingFunctionStr.trim().split('\n')[0]?.split('\t').map((header, i) => (
+                  <th key={i} className="py-2.5 px-3 font-bold text-slate-600 border-b border-slate-200">{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {mappingFunctionStr.trim().split('\n').slice(1).map((line, rIdx) => {
+                const cols = line.split('\t');
+                return (
+                  <tr key={rIdx} className="border-b border-slate-100 hover:bg-blue-50/50 transition-colors">
+                    {cols.map((col, cIdx) => (
+                      <td key={cIdx} className="p-0 border-r border-slate-100 last:border-0">
+                        <input
+                          type="text"
+                          value={col}
+                          onChange={(e) => handleMappingCellChange(rIdx, cIdx, e.target.value)}
+                          onPaste={(e) => handleMappingGridPaste(e, rIdx, cIdx)}
+                          className="w-full bg-transparent px-3 py-2 text-xs text-slate-700 focus:outline-none focus:bg-white focus:ring-1 focus:ring-jci-blue"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
   );
 };

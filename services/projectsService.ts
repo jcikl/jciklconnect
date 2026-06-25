@@ -109,8 +109,43 @@ export class ProjectsService {
 
   // Update project
   static async updateProject(projectId: string, updates: Partial<Project>): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Simulating update of project ${projectId}`);
+      return;
+    }
     try {
       const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+      
+      // Determine members to recalculate if committee or trainers change
+      const memberIdsToRecalculate = new Set<string>();
+      if (updates.committee !== undefined || updates.trainers !== undefined) {
+        const oldSnap = await getDoc(projectRef);
+        if (oldSnap.exists()) {
+          const oldData = oldSnap.data() as Project;
+          if (oldData.committee && Array.isArray(oldData.committee)) {
+            oldData.committee.forEach((c: any) => {
+              if (c.memberId) memberIdsToRecalculate.add(c.memberId);
+            });
+          }
+          if (oldData.trainers && Array.isArray(oldData.trainers)) {
+            oldData.trainers.forEach((t: any) => {
+              if (t.memberId) memberIdsToRecalculate.add(t.memberId);
+            });
+          }
+        }
+        
+        if (updates.committee && Array.isArray(updates.committee)) {
+          updates.committee.forEach((c: any) => {
+            if (c.memberId) memberIdsToRecalculate.add(c.memberId);
+          });
+        }
+        if (updates.trainers && Array.isArray(updates.trainers)) {
+          updates.trainers.forEach((t: any) => {
+            if (t.memberId) memberIdsToRecalculate.add(t.memberId);
+          });
+        }
+      }
+
       // Strip out undefined values to avoid Firestore errors
       const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() };
       Object.entries(updates).forEach(([key, value]) => {
@@ -119,6 +154,13 @@ export class ProjectsService {
         }
       });
       await updateDoc(projectRef, updateData);
+
+      // Recalculate radar stats for affected members
+      if (memberIdsToRecalculate.size > 0) {
+        for (const memberId of memberIdsToRecalculate) {
+          await PointsService.recalculateMemberRadarStats(memberId);
+        }
+      }
     } catch (error) {
       console.error('Error updating project:', error);
       throw error;
@@ -127,8 +169,36 @@ export class ProjectsService {
 
   // Delete project
   static async deleteProject(projectId: string): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Simulating deletion of project ${projectId}`);
+      return;
+    }
     try {
-      await deleteDoc(doc(db, COLLECTIONS.PROJECTS, projectId));
+      const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+      const oldSnap = await getDoc(projectRef);
+      const memberIdsToRecalculate = new Set<string>();
+      if (oldSnap.exists()) {
+        const oldData = oldSnap.data() as Project;
+        if (oldData.committee && Array.isArray(oldData.committee)) {
+          oldData.committee.forEach((c: any) => {
+            if (c.memberId) memberIdsToRecalculate.add(c.memberId);
+          });
+        }
+        if (oldData.trainers && Array.isArray(oldData.trainers)) {
+          oldData.trainers.forEach((t: any) => {
+            if (t.memberId) memberIdsToRecalculate.add(t.memberId);
+          });
+        }
+      }
+
+      await deleteDoc(projectRef);
+
+      // Recalculate radar stats for affected members (revocation)
+      if (memberIdsToRecalculate.size > 0) {
+        for (const memberId of memberIdsToRecalculate) {
+          await PointsService.recalculateMemberRadarStats(memberId);
+        }
+      }
     } catch (error) {
       console.error('Error deleting project:', error);
       throw error;

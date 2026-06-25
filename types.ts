@@ -1949,3 +1949,33 @@ export interface Partnership {
   createdAt?: any;
   updatedAt?: any;
 }
+
+export interface SponsorshipRecord {
+  id?: string;
+  memberId: string;
+  memberName: string;
+  sponsorName: string;
+  amount: number;
+  date: string;
+  description?: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface RadarPointsConfig {
+  leadership: {
+    exOfficio: number;
+    organisingChairman: number;
+    committee: number;
+  };
+  training: {
+    pointsPerHour: number;
+  };
+  recruitment: {
+    pointsPerPax: number;
+  };
+  sponsorship: {
+    pointsPer100: number;
+  };
+}
+

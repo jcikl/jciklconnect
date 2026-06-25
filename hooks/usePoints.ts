@@ -47,8 +47,8 @@ export const usePoints = () => {
   };
 
   useEffect(() => {
-    const isFullMember = member && ['MEMBER', 'BOARD', 'ADMIN'].includes(member.role);
-    if (isFullMember) {
+    const isEligibleMember = member && member.role !== 'GUEST' && member.role !== 'INACTIVE';
+    if (isEligibleMember) {
       loadPointHistory();
       loadLeaderboard();
     }

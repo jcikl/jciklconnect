@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Cell, 
@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { Card } from '../ui/Common';
 import { Member } from '../../types';
-import { PointTransaction } from '../../services/pointsService';
+import { PointTransaction, PointsService } from '../../services/pointsService';
 
 const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5', '#94A3B8'];
 
@@ -123,25 +123,73 @@ interface PointsSourceRadarChartProps {
   className?: string;
 }
 
+// Map point transaction categories to radar chart dimensions
+const CATEGORY_TO_DIMENSION: Record<string, string> = {
+  'Leadership_Contribution': 'Leadership',
+  'leadership': 'Leadership',
+  'Board_Meeting': 'Leadership',
+  'role_assignment': 'Leadership',
+  'Event_Attendance': 'Events',
+  'event_attendance': 'Events',
+  'Event_Organizing': 'Events',
+  'event_organizing': 'Events',
+  'Member_Referral': 'Recruitment',
+  'member_referral': 'Recruitment',
+  'Recruitment': 'Recruitment',
+  'recruitment': 'Recruitment',
+  'Sponsorship': 'Sponsorship',
+  'sponsorship': 'Sponsorship',
+  'sponsor_secured': 'Sponsorship',
+  'Training_Completion': 'Training',
+  'training': 'Training',
+  'Training': 'Training',
+  'jci_inspire': 'Training',
+};
+
+const RADAR_DIMENSIONS = ['Leadership', 'Events', 'Recruitment', 'Sponsorship', 'Training'];
+
 export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ memberId, className }) => {
-  // Mock data for the radar chart
-  const data = useMemo(() => {
-    // Generate slightly different data based on memberId for visual variety
-    const seed = memberId ? memberId.length : 10;
-    const rawData = [
-      { subject: 'Leadership', A: 60 + (seed % 40), fullMark: 150 },
-      { subject: 'Events', A: 70 + ((seed * 2) % 60), fullMark: 150 },
-      { subject: 'Recruitment', A: 40 + ((seed * 3) % 80), fullMark: 150 },
-      { subject: 'Sponsorship', A: 30 + ((seed * 4) % 100), fullMark: 150 },
-      { subject: 'Training', A: 50 + ((seed * 5) % 70), fullMark: 150 },
-    ];
-    
-    // Append score to subject name for direct display on the axis
-    return rawData.map(item => ({
-      ...item,
-      displaySubject: `${item.subject}: ${item.A}`
-    }));
+  const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+
+  useEffect(() => {
+    if (!memberId) {
+      setTransactions([]);
+      return;
+    }
+    let cancelled = false;
+    PointsService.getMemberPointHistory(memberId).then((history) => {
+      if (!cancelled) setTransactions(history);
+    }).catch(() => {
+      if (!cancelled) setTransactions([]);
+    });
+    return () => { cancelled = true; };
   }, [memberId]);
+
+  const data = useMemo(() => {
+    // Accumulate points per radar dimension
+    const totals: Record<string, number> = {};
+    RADAR_DIMENSIONS.forEach(d => { totals[d] = 0; });
+
+    transactions.forEach(tx => {
+      const dim = CATEGORY_TO_DIMENSION[tx.category] || CATEGORY_TO_DIMENSION[tx.category?.toLowerCase()] || null;
+      if (dim) {
+        totals[dim] += Math.abs(tx.points || tx.amount || 0);
+      } else {
+        // Fallback: distribute uncategorised points to "Events"
+        totals['Events'] += Math.abs(tx.points || tx.amount || 0);
+      }
+    });
+
+    // Find max for fullMark normalisation (minimum 100 so the chart looks decent)
+    const maxVal = Math.max(100, ...Object.values(totals));
+
+    return RADAR_DIMENSIONS.map(dim => ({
+      subject: dim,
+      A: totals[dim],
+      displaySubject: `${dim}: ${totals[dim]}`,
+      fullMark: maxVal,
+    }));
+  }, [transactions]);
 
   return (
     <div className={`w-full h-full min-h-[220px] ${className}`}>
@@ -152,7 +200,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
             dataKey="displaySubject" 
             tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 'bold' }} 
           />
-          <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
+          <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
           <Radar
             name="Points"
             dataKey="A"
