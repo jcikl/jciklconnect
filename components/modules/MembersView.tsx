@@ -1124,8 +1124,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 };
 
 // Member Statistics View Component
-const MemberStatisticsView: React.FC<{ 
-  statistics: MemberStatistics | null; 
+const MemberStatisticsView: React.FC<{
+  statistics: MemberStatistics | null;
   loading: boolean;
   members: Member[];
 }> = ({ statistics, loading, members = [] }) => {
@@ -1234,19 +1234,19 @@ const MemberStatisticsView: React.FC<{
         {/* Mobile: Combined Card for all 4 stats (Single Row) */}
         <Card className="md:hidden">
           <div className="grid grid-cols-4 divide-x divide-slate-100 -m-4">
-            <div className="py-4 px-1 text-center">
+            <div className="p-1 text-center">
               <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Total</div>
               <div className="text-sm font-bold text-slate-900">{statistics.totalMembers}</div>
             </div>
-            <div className="py-4 px-1 text-center">
+            <div className="p-1 text-center">
               <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Active</div>
               <div className="text-sm font-bold text-green-600">{statistics.activeMembers}</div>
             </div>
-            <div className="py-4 px-1 text-center">
+            <div className="p-1 text-center">
               <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">New</div>
               <div className="text-sm font-bold text-blue-600">{statistics.newMembersThisMonth}</div>
             </div>
-            <div className="py-4 px-1 text-center">
+            <div className="p-1 text-center">
               <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Avg Pts</div>
               <div className="text-sm font-bold text-amber-600">{statistics.averagePoints}</div>
             </div>
@@ -1574,14 +1574,13 @@ const MemberTable: React.FC<{
           {members.map(member => {
             const displayType = getDisplayMembershipType(member);
             const isBoard = member.role === UserRole.BOARD;
-            
+
             return (
               <div
                 key={member.id}
                 onClick={() => onSelect(member.id)}
-                className={`p-4 hover:bg-slate-50/50 transition-colors cursor-pointer relative flex flex-col gap-3 ${
-                  selectedIds.has(member.id) ? 'bg-blue-50/40' : ''
-                }`}
+                className={`p-4 hover:bg-slate-50/50 transition-colors cursor-pointer relative flex flex-col gap-3 ${selectedIds.has(member.id) ? 'bg-blue-50/40' : ''
+                  }`}
               >
                 {/* Top Row: Checkbox, Avatar, Name Info, and Role/Status Badges */}
                 <div className="flex items-start justify-between gap-3">
@@ -1592,10 +1591,10 @@ const MemberTable: React.FC<{
                       checked={selectedIds.has(member.id)}
                       onChange={() => onToggleSelection(member.id)}
                     />
-                    <img 
-                      src={member.avatar || undefined} 
-                      alt={member.name} 
-                      className="w-11 h-11 rounded-xl object-cover bg-slate-200 border border-slate-100 shrink-0" 
+                    <img
+                      src={member.avatar || undefined}
+                      alt={member.name}
+                      className="w-11 h-11 rounded-xl object-cover bg-slate-200 border border-slate-100 shrink-0"
                     />
                     <div className="min-w-0">
                       <div className="font-bold text-slate-800 text-sm leading-snug truncate flex items-center gap-1.5">
@@ -2194,9 +2193,9 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                   <PolarGrid stroke="#e2e8f0" />
-                  <PolarAngleAxis 
-                    dataKey="displaySubject" 
-                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 'bold' }} 
+                  <PolarAngleAxis
+                    dataKey="displaySubject"
+                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 'bold' }}
                   />
                   <PolarRadiusAxis angle={30} domain={[0, maxRadarVal]} tick={false} axisLine={false} />
                   <Radar

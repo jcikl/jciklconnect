@@ -444,137 +444,137 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
 
       {activeView === 'promotion' && (
         <>
-      {/* Statistics Overview */}
-      {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Mobile: Combined Card (Single Row) */}
-          <Card className="md:hidden">
-            <div className="grid grid-cols-4 divide-x divide-slate-100 -m-4">
-              <div className="py-4 px-1 text-center">
-                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Probation</div>
-                <div className="text-sm font-bold text-slate-900">{statistics.totalProbationMembers}</div>
-              </div>
-              <div className="py-4 px-1 text-center">
-                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Eligible</div>
-                <div className="text-sm font-bold text-green-600">{statistics.eligibleForPromotion}</div>
-              </div>
-              <div className="py-4 px-1 text-center">
-                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Promoted</div>
-                <div className="text-sm font-bold text-purple-600">{statistics.promotedThisYear}</div>
-              </div>
-              <div className="py-4 px-1 text-center">
-                <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Avg Time</div>
-                <div className="text-sm font-bold text-amber-600">{statistics.averageTimeToPromotion}d</div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Desktop: Separate Cards */}
-          <Card className="hidden md:block">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-500 mb-1">Probation Members</div>
-                <div className="text-2xl font-bold text-slate-900">{statistics.totalProbationMembers}</div>
-              </div>
-              <Users className="text-blue-600" size={32} />
-            </div>
-          </Card>
-
-          <Card className="hidden md:block">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-500 mb-1">Eligible for Promotion</div>
-                <div className="text-2xl font-bold text-green-600">{statistics.eligibleForPromotion}</div>
-              </div>
-              <CheckCircle className="text-green-600" size={32} />
-            </div>
-          </Card>
-
-          <Card className="hidden md:block">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-500 mb-1">Promoted This Year</div>
-                <div className="text-2xl font-bold text-purple-600">{statistics.promotedThisYear}</div>
-              </div>
-              <TrendingUp className="text-purple-600" size={32} />
-            </div>
-          </Card>
-
-          <Card className="hidden md:block">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-slate-500 mb-1">Avg. Time to Promotion</div>
-                <div className="text-2xl font-bold text-amber-600">{statistics.averageTimeToPromotion} days</div>
-              </div>
-              <Clock className="text-amber-600" size={32} />
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Requirement Completion Rates */}
-      {statistics && (
-        <Card title="Requirement Completion Rates">
-          <div className="space-y-4">
-            {Object.entries(statistics.requirementCompletionRates).map(([type, rate]: [string, any]) => (
-              <div key={type}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-slate-700">
-                    {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-900">{rate.toFixed(1)}%</span>
-                </div>
-                <ProgressBar progress={rate} color="bg-blue-600" />
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Probation Members List */}
-      <Card title="Probation Members">
-        <div className="space-y-3">
-          {filteredProbationMembers.map(member => (
-            <div
-              key={member.id}
-              className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-                  {member.name.split(' ').map((n: string) => n[0]).join('')}
-                </div>
-                <div>
-                  {member.fullName && (
-                    <div className="font-medium text-slate-900">{member.fullName}</div>
-                  )}
-                  <div className={member.fullName ? "text-sm text-slate-600" : "font-medium text-slate-900"}>{member.name}</div>
-                  <div className="text-xs text-slate-500">Joined: {member.joinDate}</div>
-                  <div className="mt-1">
-                    <MembershipTypeDisplay
-                      member={{
-                        nationality: member.nationality,
-                        dateOfBirth: member.dateOfBirth,
-                        senatorCertified: member.senatorCertified,
-                        senatorshipId: member.senatorshipId,
-                        role: member.role,
-                        membershipType: member.membershipType as any,
-                      }}
-                      showDetails={false}
-                    />
+          {/* Statistics Overview */}
+          {statistics && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Mobile: Combined Card (Single Row) */}
+              <Card className="md:hidden">
+                <div className="grid grid-cols-4 divide-x divide-slate-100 -m-4">
+                  <div className="p-1 text-center">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Probation</div>
+                    <div className="text-sm font-bold text-slate-900">{statistics.totalProbationMembers}</div>
+                  </div>
+                  <div className="p-1 text-center">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Eligible</div>
+                    <div className="text-sm font-bold text-green-600">{statistics.eligibleForPromotion}</div>
+                  </div>
+                  <div className="p-1 text-center">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Promoted</div>
+                    <div className="text-sm font-bold text-purple-600">{statistics.promotedThisYear}</div>
+                  </div>
+                  <div className="p-1 text-center">
+                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Avg Time</div>
+                    <div className="text-sm font-bold text-amber-600">{statistics.averageTimeToPromotion}d</div>
                   </div>
                 </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleViewProgress(member.id, member)}
-              >
-                View Progress
-              </Button>
+              </Card>
+
+              {/* Desktop: Separate Cards */}
+              <Card className="hidden md:block">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-slate-500 mb-1">Probation Members</div>
+                    <div className="text-2xl font-bold text-slate-900">{statistics.totalProbationMembers}</div>
+                  </div>
+                  <Users className="text-blue-600" size={32} />
+                </div>
+              </Card>
+
+              <Card className="hidden md:block">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-slate-500 mb-1">Eligible for Promotion</div>
+                    <div className="text-2xl font-bold text-green-600">{statistics.eligibleForPromotion}</div>
+                  </div>
+                  <CheckCircle className="text-green-600" size={32} />
+                </div>
+              </Card>
+
+              <Card className="hidden md:block">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-slate-500 mb-1">Promoted This Year</div>
+                    <div className="text-2xl font-bold text-purple-600">{statistics.promotedThisYear}</div>
+                  </div>
+                  <TrendingUp className="text-purple-600" size={32} />
+                </div>
+              </Card>
+
+              <Card className="hidden md:block">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-slate-500 mb-1">Avg. Time to Promotion</div>
+                    <div className="text-2xl font-bold text-amber-600">{statistics.averageTimeToPromotion} days</div>
+                  </div>
+                  <Clock className="text-amber-600" size={32} />
+                </div>
+              </Card>
             </div>
-          ))}
-        </div>
-      </Card>
+          )}
+
+          {/* Requirement Completion Rates */}
+          {statistics && (
+            <Card title="Requirement Completion Rates">
+              <div className="space-y-4">
+                {Object.entries(statistics.requirementCompletionRates).map(([type, rate]: [string, any]) => (
+                  <div key={type}>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-slate-700">
+                        {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">{rate.toFixed(1)}%</span>
+                    </div>
+                    <ProgressBar progress={rate} color="bg-blue-600" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Probation Members List */}
+          <Card title="Probation Members">
+            <div className="space-y-3">
+              {filteredProbationMembers.map(member => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                      {member.name.split(' ').map((n: string) => n[0]).join('')}
+                    </div>
+                    <div>
+                      {member.fullName && (
+                        <div className="font-medium text-slate-900">{member.fullName}</div>
+                      )}
+                      <div className={member.fullName ? "text-sm text-slate-600" : "font-medium text-slate-900"}>{member.name}</div>
+                      <div className="text-xs text-slate-500">Joined: {member.joinDate}</div>
+                      <div className="mt-1">
+                        <MembershipTypeDisplay
+                          member={{
+                            nationality: member.nationality,
+                            dateOfBirth: member.dateOfBirth,
+                            senatorCertified: member.senatorCertified,
+                            senatorshipId: member.senatorshipId,
+                            role: member.role,
+                            membershipType: member.membershipType as any,
+                          }}
+                          showDetails={false}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewProgress(member.id, member)}
+                  >
+                    View Progress
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
         </>
       )}
 
