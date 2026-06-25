@@ -3,7 +3,7 @@ import { Card, Button, Modal, useToast } from '../ui/Common';
 import { MembersService } from '../../services/membersService';
 import { PointsService } from '../../services/pointsService';
 import { SponsorshipsService } from '../../services/sponsorshipService';
-import { Member, SponsorshipRecord, RadarPointsConfig } from '../../types';
+import { Member, SponsorshipRecord, RadarPointsConfig, MemberTier } from '../../types';
 import { db } from '../../config/firebase';
 import { collection, addDoc, doc, updateDoc, getDoc, setDoc, getDocs, query, where, orderBy, limit, startAfter, deleteDoc } from 'firebase/firestore';
 // import { RadarEventManager } from './RadarEventManager';
@@ -80,7 +80,7 @@ event\t41\tOther Event\tLinguistic Competitions\t10
 event\t42\tConvention & Conference\tSenate Conference\t15`;
 
 export const RadarDataImporter: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'import' | 'ledger' | 'sponsorships' | 'config'>('import');
+  const [viewMode, setViewMode] = useState<'import' | 'ledger' | 'sponsorships' | 'config' | 'scores'>('import');
   const [pastedData, setPastedData] = useState(Array(10).fill('\t\t\t\t\t\t\t\t').join('\n'));
   const [mappingFunctionStr, setMappingFunctionStr] = useState(defaultMappingStr);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
@@ -497,6 +497,12 @@ export const RadarDataImporter: React.FC = () => {
             Contribution Ledger
           </Button>
           <Button
+            onClick={() => setViewMode('scores')}
+            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'scores' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
+          >
+            Member Scores
+          </Button>
+          <Button
             onClick={() => setViewMode('sponsorships')}
             className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'sponsorships' ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
           >
@@ -521,6 +527,8 @@ export const RadarDataImporter: React.FC = () => {
           mappingFunctionStr={mappingFunctionStr}
           setMappingFunctionStr={setMappingFunctionStr}
         />
+      ) : viewMode === 'scores' ? (
+        <RadarMemberScoresView members={members} setMembers={setMembers} />
       ) : (
         <>
           <div className="space-y-4">
@@ -1385,3 +1393,390 @@ const RadarPointsConfigManager: React.FC<RadarPointsConfigManagerProps> = ({
     </div>
   );
 };
+
+// ─── Member Scores View Tab ──────────────────────────────────────────────────
+interface RadarMemberScoresViewProps {
+  members: Member[];
+  setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
+}
+
+const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, setMembers }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTier, setSelectedTier] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'points' | 'leadership' | 'training' | 'recruitment' | 'sponsorship' | 'events'>('points');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
+  const [recalculatingId, setRecalculatingId] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  const getMemberName = (m: Member) => m.fullName || m.general?.name || m.name || '';
+  const getInitials = (name: string) => name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
+
+  const handleRecalculateSingle = async (memberId: string) => {
+    try {
+      setRecalculatingId(memberId);
+      await PointsService.recalculateMemberRadarStats(memberId);
+      const updatedMember = await MembersService.getMemberById(memberId);
+      if (updatedMember) {
+        setMembers(prev => prev.map(m => m.id === memberId ? updatedMember : m));
+        showToast('Points recalculated successfully!', 'success');
+      } else {
+        // Fallback: fetch all members if single fetch fails
+        const ms = await MembersService.getAllMembers();
+        setMembers(ms);
+        showToast('Points recalculated and list refreshed!', 'success');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to recalculate points', 'error');
+    } finally {
+      setRecalculatingId(null);
+    }
+  };
+
+  // 1. Calculate Stats
+  const totalPointsAll = members.reduce((sum, m) => sum + (m.points || m.jciCareer?.points || 0), 0);
+  const activeMembersCount = members.filter(m => (m.points || m.jciCareer?.points || 0) > 0).length;
+
+  let topMember: Member | null = null;
+  let topScore = -1;
+  members.forEach(m => {
+    const score = m.points || m.jciCareer?.points || 0;
+    if (score > topScore) {
+      topScore = score;
+      topMember = m;
+    }
+  });
+
+  const tierCounts = { Platinum: 0, Gold: 0, Silver: 0, Bronze: 0, None: 0 };
+  members.forEach(m => {
+    const t = m.tier || '';
+    if (t.toLowerCase().includes('platinum')) tierCounts.Platinum++;
+    else if (t.toLowerCase().includes('gold')) tierCounts.Gold++;
+    else if (t.toLowerCase().includes('silver')) tierCounts.Silver++;
+    else if (t.toLowerCase().includes('bronze')) tierCounts.Bronze++;
+    else tierCounts.None++;
+  });
+
+  // 2. Filter & Sort
+  const filtered = members.filter(m => {
+    const name = getMemberName(m).toLowerCase();
+    const email = (m.contact?.email || m.email || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = name.includes(query) || email.includes(query);
+
+    const mTier = m.tier || '';
+    const matchesTier = !selectedTier || selectedTier === 'All' || mTier.toLowerCase() === selectedTier.toLowerCase();
+
+    return matchesSearch && matchesTier;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    let aVal: any = 0;
+    let bVal: any = 0;
+
+    if (sortBy === 'name') {
+      aVal = getMemberName(a);
+      bVal = getMemberName(b);
+      return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    } else if (sortBy === 'points') {
+      aVal = a.points ?? a.jciCareer?.points ?? 0;
+      bVal = b.points ?? b.jciCareer?.points ?? 0;
+    } else {
+      aVal = a.radarStats?.[sortBy] ?? 0;
+      bVal = b.radarStats?.[sortBy] ?? 0;
+    }
+
+    if (aVal === bVal) {
+      return getMemberName(a).localeCompare(getMemberName(b));
+    }
+    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+  });
+
+  // 3. Pagination
+  const totalPages = Math.ceil(sorted.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedItems = sorted.slice(startIndex, startIndex + itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTier, sortBy, sortDirection]);
+
+  const handleSort = (field: typeof sortBy) => {
+    if (sortBy === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const getTierBadgeClass = (tier?: string | MemberTier) => {
+    const tStr = String(tier || '').toLowerCase();
+    if (tStr.includes('platinum')) return 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-300 shadow-sm';
+    if (tStr.includes('gold')) return 'bg-gradient-to-r from-amber-500 to-yellow-600 text-white border-amber-300 shadow-sm';
+    if (tStr.includes('silver')) return 'bg-gradient-to-r from-slate-400 to-slate-500 text-white border-slate-300 shadow-sm';
+    if (tStr.includes('bronze')) return 'bg-gradient-to-r from-orange-500 to-amber-700 text-white border-orange-300 shadow-sm';
+    return 'bg-slate-100 text-slate-500 border-slate-200';
+  };
+
+  const SortHeader = ({ field, label }: { field: typeof sortBy, label: string }) => {
+    const isActive = sortBy === field;
+    return (
+      <th
+        onClick={() => handleSort(field)}
+        className="py-3.5 px-4 font-bold text-slate-600 bg-slate-50 border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none"
+      >
+        <div className="flex items-center gap-1">
+          <span>{label}</span>
+          {isActive ? (
+            sortDirection === 'asc' ? (
+              <svg className="w-3.5 h-3.5 text-jci-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-jci-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+            )
+          ) : (
+            <svg className="w-3.5 h-3.5 text-slate-300 hover:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
+          )}
+        </div>
+      </th>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Overview stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Members</span>
+            <h3 className="text-2xl font-black text-slate-800 mt-1">{members.length}</h3>
+          </div>
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+          </div>
+        </Card>
+        <Card className="p-4 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Contributors</span>
+            <h3 className="text-2xl font-black text-emerald-600 mt-1">
+              {activeMembersCount} <span className="text-xs font-medium text-slate-400">({Math.round((activeMembersCount / (members.length || 1)) * 100)}%)</span>
+            </h3>
+          </div>
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+        </Card>
+        <Card className="p-4 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Top Contributor</span>
+            <h3 className="text-base font-black text-slate-800 mt-1.5 truncate max-w-[150px]">
+              {topMember ? getMemberName(topMember) : '—'}
+            </h3>
+            <span className="text-xs font-bold text-jci-blue">{topScore > 0 ? `${topScore} pts` : '—'}</span>
+          </div>
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+          </div>
+        </Card>
+        <Card className="p-4 flex flex-col justify-center">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tier Breakdown</span>
+          <div className="flex gap-2 text-[10px] font-bold">
+            <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">P:{tierCounts.Platinum}</span>
+            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">G:{tierCounts.Gold}</span>
+            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">S:{tierCounts.Silver}</span>
+            <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">B:{tierCounts.Bronze}</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <Card className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full sm:max-w-xs">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search member name or email..."
+            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+          />
+          <div className="absolute left-3 top-2.5 text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          </div>
+        </div>
+
+        <div className="flex gap-3 items-center w-full sm:w-auto">
+          <select
+            value={selectedTier}
+            onChange={(e) => setSelectedTier(e.target.value)}
+            className="border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
+          >
+            <option value="">All Tiers</option>
+            <option value="Platinum">Platinum</option>
+            <option value="Gold">Gold</option>
+            <option value="Silver">Silver</option>
+            <option value="Bronze">Bronze</option>
+            <option value="None">No Tier</option>
+          </select>
+
+          <select
+            value={itemsPerPage}
+            onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+            className="border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
+          >
+            <option value={10}>10 per page</option>
+            <option value={15}>15 per page</option>
+            <option value={25}>25 per page</option>
+            <option value={50}>50 per page</option>
+          </select>
+        </div>
+      </Card>
+
+      {/* Main Table */}
+      <div className="overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-sm">
+        <table className="w-full text-xs text-left whitespace-nowrap">
+          <thead>
+            <tr>
+              <SortHeader field="name" label="Member" />
+              <SortHeader field="points" label="Total Points" />
+              <th className="py-3.5 px-4 font-bold text-slate-600 bg-slate-50 border-b border-slate-200">Tier</th>
+              <SortHeader field="leadership" label="Leadership 🏆" />
+              <SortHeader field="training" label="Training 📚" />
+              <SortHeader field="recruitment" label="Recruitment 🤝" />
+              <SortHeader field="sponsorship" label="Sponsorship 💰" />
+              <SortHeader field="events" label="Events 📅" />
+              <th className="py-3.5 px-4 font-bold text-slate-600 bg-slate-50 border-b border-slate-200 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {paginatedItems.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="py-8 text-center text-slate-400 font-bold">No members found matching filter criteria</td>
+              </tr>
+            ) : (
+              paginatedItems.map(m => {
+                const totalPoints = m.points || m.jciCareer?.points || 0;
+                const stats = m.radarStats || { leadership: 0, training: 0, recruitment: 0, sponsorship: 0, events: 0 };
+                const name = getMemberName(m);
+                const isRecalculating = recalculatingId === m.id;
+
+                return (
+                  <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
+                    {/* Member Profile */}
+                    <td className="py-3 px-4 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-500 text-[10px] uppercase shadow-inner">
+                        {m.general?.avatarUrl ? (
+                          <img src={m.general.avatarUrl} alt={name} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          getInitials(name)
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                          {name}
+                          {m.general?.chineseName && (
+                            <span className="text-[10px] text-slate-400 font-normal">({m.general.chineseName})</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400">{m.contact?.email || m.email || '—'}</div>
+                      </div>
+                    </td>
+
+                    {/* Total Points */}
+                    <td className="py-3 px-4 font-black text-slate-900 text-sm">
+                      {totalPoints}
+                    </td>
+
+                    {/* Tier badge */}
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getTierBadgeClass(m.tier)}`}>
+                        {m.tier || 'None'}
+                      </span>
+                    </td>
+
+                    {/* Radar scores */}
+                    <td className={`py-3 px-4 font-bold ${stats.leadership > 0 ? 'text-slate-800' : 'text-slate-300 font-normal'}`}>
+                      {stats.leadership || '0'}
+                    </td>
+                    <td className={`py-3 px-4 font-bold ${stats.training > 0 ? 'text-slate-800' : 'text-slate-300 font-normal'}`}>
+                      {stats.training || '0'}
+                    </td>
+                    <td className={`py-3 px-4 font-bold ${stats.recruitment > 0 ? 'text-slate-800' : 'text-slate-300 font-normal'}`}>
+                      {stats.recruitment || '0'}
+                    </td>
+                    <td className={`py-3 px-4 font-bold ${stats.sponsorship > 0 ? 'text-slate-800' : 'text-slate-300 font-normal'}`}>
+                      {stats.sponsorship || '0'}
+                    </td>
+                    <td className={`py-3 px-4 font-bold ${stats.events > 0 ? 'text-slate-800' : 'text-slate-300 font-normal'}`}>
+                      {stats.events || '0'}
+                    </td>
+
+                    {/* Quick Recalculate Action */}
+                    <td className="py-3 px-4 text-center">
+                      <Button
+                        onClick={() => handleRecalculateSingle(m.id)}
+                        disabled={isRecalculating}
+                        className="p-1.5 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-lg transition-all"
+                        title="Recalculate points for this member"
+                      >
+                        {isRecalculating ? (
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.2" /></svg>
+                        )}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination controls */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2">
+        <span className="text-[11px] text-slate-500 font-bold">
+          Showing {sorted.length === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, sorted.length)} of {sorted.length} entries
+        </span>
+
+        <div className="flex items-center gap-1.5">
+          <Button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1.5 text-[11px] border border-slate-200 rounded-xl hover:bg-slate-50 font-bold transition-all disabled:opacity-50"
+          >
+            Previous
+          </Button>
+
+          {Array.from({ length: totalPages }).map((_, idx) => {
+            const pageNum = idx + 1;
+            const isCurrent = currentPage === pageNum;
+            return (
+              <Button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded-xl transition-all ${isCurrent ? 'bg-slate-800 text-white shadow-sm' : 'border border-slate-200 hover:bg-slate-50 text-slate-700'}`}
+              >
+                {pageNum}
+              </Button>
+            );
+          })}
+
+          <Button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1.5 text-[11px] border border-slate-200 rounded-xl hover:bg-slate-50 font-bold transition-all disabled:opacity-50"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
