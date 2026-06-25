@@ -1555,7 +1555,7 @@ const MemberTable: React.FC<{
         </div>
 
         {/* Mobile View */}
-        <div className="md:hidden border-b border-slate-100 px-4 py-3 flex flex-wrap gap-4 bg-slate-50/50">
+        <div className="md:hidden border-b border-slate-100 px-4 py-3 flex gap-2 overflow-x-auto bg-slate-50/50">
           <ColumnFilterHeader
             label="Role"
             options={ROLE_FILTER_OPTIONS}
@@ -1570,79 +1570,79 @@ const MemberTable: React.FC<{
           />
         </div>
         <div className="md:hidden divide-y divide-slate-100">
-          {members.map(member => (
-            <div
-              key={member.id}
-              className={`p-4 transition-colors ${selectedIds.has(member.id) ? 'bg-blue-50/50' : ''}`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className="pr-1">
+          {members.map(member => {
+            const displayType = getDisplayMembershipType(member);
+            const isBoard = member.role === UserRole.BOARD;
+            
+            return (
+              <div
+                key={member.id}
+                onClick={() => onSelect(member.id)}
+                className={`p-4 hover:bg-slate-50/50 transition-colors cursor-pointer relative flex flex-col gap-3 ${
+                  selectedIds.has(member.id) ? 'bg-blue-50/40' : ''
+                }`}
+              >
+                {/* Top Row: Checkbox, Avatar, Name Info, and Role/Status Badges */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
-                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
+                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue w-4 h-4 shrink-0"
                       checked={selectedIds.has(member.id)}
                       onChange={() => onToggleSelection(member.id)}
                     />
+                    <img 
+                      src={member.avatar || undefined} 
+                      alt={member.name} 
+                      className="w-11 h-11 rounded-xl object-cover bg-slate-200 border border-slate-100 shrink-0" 
+                    />
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-800 text-sm leading-snug truncate flex items-center gap-1.5">
+                        {member.name}
+                        {isBoard && (
+                          <span className="bg-blue-50 text-blue-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-100 shrink-0">
+                            BOD
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-400 truncate leading-normal">{member.email}</div>
+                    </div>
                   </div>
-                  <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200" />
-                  <div>
-                    <div className="font-bold text-slate-900">{member.name}</div>
-                    <div className="text-xs text-slate-500">{member.email}</div>
-                  </div>
-                </div>
-                <Badge variant={member.role === UserRole.BOARD ? 'info' : 'neutral'}>{member.role}</Badge>
-              </div>
 
-              <div className="mb-3">
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Membership Type</span>
-                <Badge variant={membershipTypeBadgeVariant(getDisplayMembershipType(member))}>
-                  {getDisplayMembershipType(member)}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Tier / Points</span>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-sm font-bold ${member.tier === 'Platinum' ? 'text-purple-600' : member.tier === 'Gold' ? 'text-amber-600' : 'text-slate-600'}`}>
-                      {member.tier}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <Badge variant={membershipTypeBadgeVariant(displayType)} className="px-1.5 py-0.5 text-[10px]">
+                      {displayType}
+                    </Badge>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      {member.points} pts
                     </span>
-                    <span className="text-xs text-slate-500">{member.points} pts</span>
                   </div>
                 </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block mb-0.5">Status</span>
-                  <div>
-                    {member.churnRisk === 'High' && <Badge variant="error">At Risk</Badge>}
-                    {member.churnRisk === 'Low' && <Badge variant="success">Stable</Badge>}
-                    {member.churnRisk === 'Medium' && <Badge variant="warning">Monitor</Badge>}
-                  </div>
-                </div>
-              </div>
 
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400">Engagement</span>
-                  <span className="text-xs font-bold text-slate-700">{member.attendanceRate}%</span>
+                {/* Bottom Info Row: Attendance Progress & Risk Indicator */}
+                <div className="flex items-center justify-between gap-4 bg-slate-50/50 border border-slate-100/50 rounded-xl px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">Attendance</span>
+                    <div className="flex items-center gap-2 flex-1">
+                      <ProgressBar
+                        progress={member.attendanceRate}
+                        color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'}
+                      />
+                      <span className="font-bold text-slate-700 shrink-0 text-[10px]">{member.attendanceRate}%</span>
+                    </div>
+                  </div>
+
+                  {member.churnRisk && member.churnRisk !== 'Low' && (
+                    <div className="shrink-0 flex items-center gap-1">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk</span>
+                      {member.churnRisk === 'High' && <Badge variant="error" className="px-1 py-0.5 text-[9px]">High</Badge>}
+                      {member.churnRisk === 'Medium' && <Badge variant="warning" className="px-1 py-0.5 text-[9px]">Medium</Badge>}
+                    </div>
+                  )}
                 </div>
-                <ProgressBar
-                  progress={member.attendanceRate}
-                  color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'}
-                />
               </div>
-              <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={() => onSelect(member.id)}
-                >
-                  View Profile
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
     );
