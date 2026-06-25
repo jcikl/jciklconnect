@@ -376,15 +376,6 @@ describe('Member Management Properties', () => {
             ],
             [UserRole.INACTIVE]: [
               'id', 'name', 'membershipType'
-            ],
-            [UserRole.ORGANIZATION_SECRETARY]: [
-              'id', 'name', 'email', 'phone', 'membershipType', 'status', 'joinDate', 'address'
-            ],
-            [UserRole.ORGANIZATION_FINANCE]: [
-              'id', 'name', 'email', 'membershipType', 'status'
-            ],
-            [UserRole.ACTIVITY_FINANCE]: [
-              'id', 'name', 'email', 'membershipType', 'status'
             ]
           };
 

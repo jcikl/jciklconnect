@@ -2,7 +2,8 @@ import * as React from 'react';
 import { useState } from 'react';
 import { ArrowLeft, Share2, Building2, ExternalLink } from 'lucide-react';
 import { Modal, Button, Badge } from '../ui/Common';
-import { Advertisement } from '../../services/advertisementService';
+import { Advertisement, AdvertisementService } from '../../services/advertisementService';
+import { formatDate, toDate } from '../../utils/dateUtils';
 
 interface PartnershipDetailModalProps {
   ad: Advertisement;
@@ -43,6 +44,9 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
             <Button
               className="flex-1 max-w-[220px] h-14 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100"
               onClick={() => {
+                if (ad.id) {
+                  AdvertisementService.recordClick(ad.id).catch(console.error);
+                }
                 if (ad.linkUrl) window.open(ad.linkUrl, '_blank');
               }}
             >
@@ -127,7 +131,7 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
 
           {/* Terms & Conditions */}
           {ad.termsAndConditions && (
-            <div className="space-y-2 pt-6 border-t border-slate-100 mt-6">
+            <div className="space-y-2 border-t border-slate-100 mt-6">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Terms & Conditions</h3>
               <p className="text-slate-500 text-xs leading-relaxed whitespace-pre-wrap">
                 {ad.termsAndConditions}
