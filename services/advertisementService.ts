@@ -76,8 +76,30 @@ export interface PromotionPackage {
 }
 
 export class AdvertisementService {
+  private static adsCache: Advertisement[] | null = null;
+  private static adsPromise: Promise<Advertisement[]> | null = null;
+  private static activeAdsCache: Record<string, { data: Advertisement[]; timestamp: number }> = {};
+  private static activeAdsPromise: Record<string, Promise<Advertisement[]>> = {};
+  private static CACHE_DURATION_MS = 30000; // 30 seconds cache
+
+  // Clear cache
+  static clearCache() {
+    this.adsCache = null;
+    this.adsPromise = null;
+    this.activeAdsCache = {};
+    this.activeAdsPromise = {};
+  }
+
   // Get all advertisements
   static async getAllAdvertisements(): Promise<Advertisement[]> {
+    if (this.adsCache) {
+      return this.adsCache;
+    }
+
+    if (this.adsPromise) {
+      return this.adsPromise;
+    }
+
     if (isDevMode()) {
       return [
         {
@@ -101,59 +123,125 @@ export class AdvertisementService {
       ];
     }
 
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'))
-      );
-      const ads = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
-        endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      })) as Advertisement[];
-      
-      // Sort in memory to avoid requiring a composite index
-      return ads.sort((a, b) => {
-        if (a.priority !== b.priority) {
-          return (b.priority || 0) - (a.priority || 0);
-        }
-        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date();
-        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date();
-        return bDate.getTime() - aDate.getTime();
-      });
-    } catch (error) {
-      console.error('Error fetching advertisements:', error);
-      throw error;
-    }
+    this.adsPromise = (async () => {
+      try {
+        const snapshot = await getDocs(
+          query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'))
+        );
+        const ads = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
+          endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        })) as Advertisement[];
+        
+        // Sort in memory to avoid requiring a composite index
+        const sortedAds = ads.sort((a, b) => {
+          if (a.priority !== b.priority) {
+            return (b.priority || 0) - (a.priority || 0);
+          }
+          const aDate = a.createdAt instanceof Date ? a.createdAt : new Date();
+          const bDate = b.createdAt instanceof Date ? b.createdAt : new Date();
+          return bDate.getTime() - aDate.getTime();
+        });
+
+        this.adsCache = sortedAds;
+        return sortedAds;
+      } catch (error) {
+        console.error('Error fetching advertisements:', error);
+        throw error;
+      } finally {
+        this.adsPromise = null;
+      }
+    })();
+
+    return this.adsPromise;
   }
 
   // Get active advertisements for placement
   static async getActiveAdvertisements(placement: string): Promise<Advertisement[]> {
-    try {
-      const now = new Date();
-      const allAds = await this.getAllAdvertisements();
-
-      return allAds.filter(ad => {
-        const placements = Array.isArray(ad.placement) ? ad.placement : [ad.placement];
-        if (!placements.includes(placement as any)) return false;
-        if (ad.status !== 'Active') return false;
-
-        const startDate = toDate(ad.startDate);
-        if (startDate > now) return false;
-
-        if (ad.endDate) {
-          const endDate = toDate(ad.endDate);
-          if (endDate < now) return false;
-        }
-
-        return true;
-      }).sort((a, b) => b.priority - a.priority);
-    } catch (error) {
-      console.error('Error fetching active advertisements:', error);
-      throw error;
+    const nowTime = Date.now();
+    const cached = this.activeAdsCache[placement];
+    if (cached && nowTime - cached.timestamp < this.CACHE_DURATION_MS) {
+      return cached.data;
     }
+
+    if (this.activeAdsPromise[placement]) {
+      return this.activeAdsPromise[placement];
+    }
+
+    if (isDevMode()) {
+      return [
+        {
+          id: 'ad1',
+          title: 'Tech Solutions Inc.',
+          description: 'Premium IT services for JCI members',
+          type: 'Banner',
+          placement: ['Homepage'],
+          targetAudience: 'All Members',
+          imageUrl: 'https://via.placeholder.com/728x90',
+          linkUrl: 'https://example.com',
+          startDate: new Date('2024-01-01'),
+          endDate: new Date('2024-12-31'),
+          status: 'Active',
+          impressions: 1250,
+          clicks: 45,
+          priority: 5,
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-01'),
+        },
+      ];
+    }
+
+    this.activeAdsPromise[placement] = (async () => {
+      try {
+        const now = new Date();
+        const q = query(
+          collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'),
+          where('status', '==', 'Active')
+        );
+        
+        const snapshot = await getDocs(q);
+        const ads = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
+          endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        })) as Advertisement[];
+
+        const activeAds = ads.filter(ad => {
+          const placements = Array.isArray(ad.placement) ? ad.placement : [ad.placement];
+          if (!placements.includes(placement as any)) return false;
+
+          const startDate = toDate(ad.startDate);
+          if (startDate > now) return false;
+
+          if (ad.endDate) {
+            const endDate = toDate(ad.endDate);
+            if (endDate < now) return false;
+          }
+
+          return true;
+        }).sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+        this.activeAdsCache[placement] = {
+          data: activeAds,
+          timestamp: Date.now()
+        };
+        return activeAds;
+      } catch (error) {
+        console.error('Error fetching active advertisements:', error);
+        throw error;
+      } finally {
+        delete this.activeAdsPromise[placement];
+      }
+    })();
+
+    return this.activeAdsPromise[placement];
   }
 
   // Record advertisement impression
@@ -196,6 +284,7 @@ export class AdvertisementService {
 
   // Create advertisement
   static async createAdvertisement(adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'>): Promise<string> {
+    this.clearCache();
     if (isDevMode()) {
       const mockId = `mock-ad-${Date.now()}`;
       console.log(`[DEV MODE] Simulating creation of advertisement with ID: ${mockId}`);
@@ -233,6 +322,7 @@ export class AdvertisementService {
 
   // Update advertisement
   static async updateAdvertisement(adId: string, updates: Partial<Advertisement>): Promise<void> {
+    this.clearCache();
     if (isDevMode()) {
       console.log(`[DEV MODE] Simulating update of advertisement ${adId} with updates:`, updates);
       return;
@@ -271,6 +361,7 @@ export class AdvertisementService {
 
   // Delete advertisement
   static async deleteAdvertisement(adId: string): Promise<void> {
+    this.clearCache();
     if (isDevMode()) {
       console.log(`[DEV MODE] Simulating deletion of advertisement ${adId}`);
       return;
