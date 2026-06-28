@@ -156,6 +156,158 @@ export class MembersService {
     }
   }
 
+  /** Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency. */
+  static normalizeMemberData(data: Record<string, any>, existing?: Member | null): Record<string, any> {
+    const result = { ...data };
+
+    // 1. General
+    const general = {
+      ...(existing?.general || {}),
+    } as any;
+    if (data.name !== undefined) general.name = data.name;
+    if (data.fullName !== undefined) general.fullName = data.fullName;
+    if (data.chineseName !== undefined) general.chineseName = data.chineseName;
+    else if (data.chiName !== undefined) general.chineseName = data.chiName;
+    if (data.idNumber !== undefined) general.idNumber = data.idNumber;
+    else if (data.nationalId !== undefined) general.idNumber = data.nationalId;
+    if (data.dateOfBirth !== undefined) general.dob = data.dateOfBirth;
+    else if (data.dob !== undefined) general.dob = data.dob;
+    if (data.gender !== undefined) general.gender = data.gender;
+    if (data.race !== undefined) general.race = data.race;
+    else if (data.ethnicity !== undefined) general.race = data.ethnicity;
+    if (data.nationality !== undefined) general.nationality = data.nationality;
+    if (data.avatarUrl !== undefined) general.avatarUrl = data.avatarUrl;
+    else if (data.avatar !== undefined) general.avatarUrl = data.avatar;
+
+    if (Object.keys(general).length > 0 || existing?.general) {
+      result.general = general;
+    }
+
+    // 2. Contact
+    const contact = {
+      ...(existing?.contact || {}),
+      socials: { ...(existing?.contact?.socials || {}) },
+      emergency: { ...(existing?.contact?.emergency || {}) }
+    } as any;
+    if (data.email !== undefined) contact.email = data.email;
+    if (data.phone !== undefined) contact.phone = data.phone;
+    if (data.alternatePhone !== undefined) contact.alternatePhone = data.alternatePhone;
+    if (data.address !== undefined) contact.address = data.address;
+    
+    if (data.whatsappJoined !== undefined) contact.whatsappJoined = !!data.whatsappJoined;
+    else if (data.whatsappGroup !== undefined) contact.whatsappJoined = !!data.whatsappGroup;
+    else if (data.whatsappgroup !== undefined) contact.whatsappJoined = !!data.whatsappgroup;
+
+    if (data.linkedin !== undefined) contact.socials.linkedin = data.linkedin;
+    else if (data.linkedIn !== undefined) contact.socials.linkedin = data.linkedIn;
+    if (data.facebook !== undefined) contact.socials.facebook = data.facebook;
+    if (data.instagram !== undefined) contact.socials.instagram = data.instagram;
+    if (data.wechat !== undefined) contact.socials.wechat = data.wechat;
+    else if (data.weChat !== undefined) contact.socials.wechat = data.weChat;
+
+    if (data.emergencyContactName !== undefined) contact.emergency.name = data.emergencyContactName;
+    else if (data.emergencyContact !== undefined) contact.emergency.name = data.emergencyContact;
+    if (data.emergencyContactPhone !== undefined) contact.emergency.phone = data.emergencyContactPhone;
+    if (data.emergencyContactRelationship !== undefined) contact.emergency.relationship = data.emergencyContactRelationship;
+
+    if (Object.keys(contact.socials).length === 0 && !existing?.contact?.socials) delete contact.socials;
+    if (Object.keys(contact.emergency).length === 0 && !existing?.contact?.emergency) delete contact.emergency;
+    
+    if (Object.keys(contact).length > 0 || existing?.contact) {
+      result.contact = contact;
+    }
+
+    // 3. Others
+    const others = {
+      ...(existing?.others || {}),
+    } as any;
+    if (data.bio !== undefined) others.bio = data.bio;
+    if (data.shirtStyle !== undefined) others.shirtStyle = data.shirtStyle;
+    else if (data.cutStyle !== undefined) others.shirtStyle = data.cutStyle;
+    if (data.tshirtSize !== undefined) others.tshirtSize = data.tshirtSize;
+    if (data.jacketSize !== undefined) others.jacketSize = data.jacketSize;
+    if (data.embroideredName !== undefined) others.embroideredName = data.embroideredName;
+    if (data.tshirtStatus !== undefined) others.tshirtStatus = data.tshirtStatus;
+    if (data.hobbies !== undefined) others.hobbies = data.hobbies;
+
+    if (Object.keys(others).length > 0 || existing?.others) {
+      result.others = others;
+    }
+
+    // 4. Business
+    const business = {
+      ...(existing?.business || {}),
+    } as any;
+    if (data.companyName !== undefined) business.companyName = data.companyName;
+    if (data.companyWebsite !== undefined) business.companyWebsite = data.companyWebsite;
+    if (data.companyLogoUrl !== undefined) business.companyLogoUrl = data.companyLogoUrl;
+    if (data.introduction !== undefined) business.introduction = data.introduction;
+    else if (data.companyDescription !== undefined) business.introduction = data.companyDescription;
+    if (data.title !== undefined) business.title = data.title;
+    else if (data.position !== undefined) business.title = data.position;
+    else if (data.departmentAndPosition !== undefined) business.title = data.departmentAndPosition;
+    if (data.industry !== undefined) business.industry = data.industry;
+    if (data.businessCategory !== undefined) business.businessCategory = data.businessCategory;
+    else if (data.category !== undefined) business.businessCategory = data.category;
+    if (data.specialOffer !== undefined) business.specialOffer = data.specialOffer;
+    else if (data.offerToMember !== undefined) business.specialOffer = data.offerToMember;
+    if (data.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.acceptInternationalBusiness;
+    
+    if (data.idealReferrals !== undefined) {
+      business.idealReferrals = data.idealReferrals;
+    } else if (data.idealReferral !== undefined) {
+      business.idealReferrals = typeof data.idealReferral === 'string'
+        ? data.idealReferral.split(', ').filter(Boolean)
+        : data.idealReferral;
+    } else if (data.idealReferralIndustry !== undefined) {
+      business.idealReferrals = typeof data.idealReferralIndustry === 'string'
+        ? data.idealReferralIndustry.split(', ').filter(Boolean)
+        : data.idealReferralIndustry;
+    }
+    if (data.connections !== undefined) business.connections = data.connections;
+
+    if (Object.keys(business).length > 0 || existing?.business) {
+      result.business = business;
+    }
+
+    // 5. JCI Career
+    const jciCareer = {
+      ...(existing?.jciCareer || {}),
+      senatorship: { ...(existing?.jciCareer?.senatorship || {}) }
+    } as any;
+    if (data.membershipType !== undefined) jciCareer.membershipType = data.membershipType;
+    if (data.membershipStatus !== undefined) jciCareer.membershipStatus = data.membershipStatus;
+    if (data.joinDate !== undefined) jciCareer.joinDate = data.joinDate;
+    else if (data.joinedDate !== undefined) jciCareer.joinDate = data.joinedDate;
+    if (data.introducer !== undefined) jciCareer.introducer = data.introducer;
+
+    if (data.senatorshipId !== undefined) jciCareer.senatorship.senatorshipId = data.senatorshipId;
+    if (data.senatorCertified !== undefined) jciCareer.senatorship.senatorCertified = data.senatorCertified;
+    if (data.senatorshipBoardValidated !== undefined) jciCareer.senatorship.senatorshipBoardValidated = data.senatorshipBoardValidated;
+
+    if (data.currentBoardYear !== undefined) jciCareer.currentBoardYear = data.currentBoardYear;
+    if (data.currentBoardPosition !== undefined) jciCareer.currentBoardPosition = data.currentBoardPosition;
+    if (data.isCurrentBoardMember !== undefined) jciCareer.isCurrentBoardMember = data.isCurrentBoardMember;
+    if (data.boardHistory !== undefined) jciCareer.boardHistory = data.boardHistory;
+
+    if (data.points !== undefined) jciCareer.points = data.points;
+    if (data.attendanceRate !== undefined) jciCareer.attendanceRate = data.attendanceRate;
+    if (data.badgesCount !== undefined) jciCareer.badgesCount = data.badgesCount;
+    if (data.projectsCount !== undefined) jciCareer.projectsCount = data.projectsCount;
+    if (data.trainingsCount !== undefined) jciCareer.trainingsCount = data.trainingsCount;
+
+    if (data.probationTasks !== undefined) jciCareer.probationTasks = data.probationTasks;
+    if (data.promotionProgress !== undefined) jciCareer.promotionProgress = data.promotionProgress;
+    if (data.isDuesPaidCurrentYear !== undefined) jciCareer.isDuesPaidCurrentYear = data.isDuesPaidCurrentYear;
+
+    if (Object.keys(jciCareer.senatorship).length === 0 && !existing?.jciCareer?.senatorship) delete jciCareer.senatorship;
+    if (Object.keys(jciCareer).length > 0 || existing?.jciCareer) {
+      result.jciCareer = jciCareer;
+    }
+
+    return result;
+  }
+
   /** Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). */
   static async createMember(memberData: MemberCreateInput, createdBy?: string): Promise<string> {
     if (isDevMode()) {
@@ -183,7 +335,9 @@ export class MembersService {
       if (createdBy != null && createdBy !== '') cleanMemberData.createdBy = createdBy;
       if (cleanMemberData.loId == null || cleanMemberData.loId === '') cleanMemberData.loId = DEFAULT_LO_ID;
 
-      const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), cleanMemberData);
+      const normalizedData = this.normalizeMemberData(cleanMemberData);
+
+      const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), normalizedData);
       
       if (cleanMemberData.introducer) {
         this.recalculateIntroducerStats(cleanMemberData.introducer).catch(console.error);
@@ -268,7 +422,9 @@ export class MembersService {
         }
       });
 
-      await updateDoc(memberRef, cleanUpdates);
+      const normalizedUpdates = this.normalizeMemberData(cleanUpdates, currentData);
+
+      await updateDoc(memberRef, normalizedUpdates);
 
       // Trigger introducer recalculation if introducer changes
       if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {
