@@ -220,11 +220,16 @@ export const IntroducerManagement: React.FC<Props> = ({
   // Filter members list for manual updates
   const filteredMembersForAssignment = useMemo(() => {
     return members.filter(m => {
+      // Resolve the introducer name to allow searching by it
+      const introducerName = resolveIntroducerDisplay(m.introducer);
+
       // 1. Search Query filter
       const matchesSearch = memberSearch.trim() === '' || 
         (m.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
         (m.fullName || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
-        (m.email || '').toLowerCase().includes(memberSearch.toLowerCase());
+        (m.email || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+        introducerName.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (m.introducer || '').toLowerCase().includes(memberSearch.toLowerCase());
 
       if (!matchesSearch) return false;
 
