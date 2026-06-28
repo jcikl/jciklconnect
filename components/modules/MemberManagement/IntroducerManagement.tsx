@@ -394,7 +394,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1.5 max-w-xl">
-                          {intro.invitees.map(inv => {
+                          {intro.invitees.slice(0, 3).map(inv => {
                             const displayName = inv.fullName && inv.fullName !== inv.name
                               ? `${inv.name} (${inv.fullName})`
                               : inv.name;
@@ -412,6 +412,14 @@ export const IntroducerManagement: React.FC<Props> = ({
                               </div>
                             );
                           })}
+                          {intro.invitees.length > 3 && (
+                            <div 
+                              className="inline-flex items-center px-2.5 py-0.5 bg-slate-50 text-slate-500 rounded-md border border-slate-200 text-xs font-bold cursor-help"
+                              title={intro.invitees.slice(3).map(inv => inv.fullName ? `${inv.name} (${inv.fullName})` : inv.name).join(', ')}
+                            >
+                              +{intro.invitees.length - 3} more
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
