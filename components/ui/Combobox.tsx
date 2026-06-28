@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, X, Check } from 'lucide-react';
 
 export interface ComboboxProps {
     options?: string[];
@@ -26,7 +26,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null); // 新增：下拉菜单引用
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const isGrouped = !!groupedOptions;
 
@@ -51,7 +51,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
         if (inputRef.current && open) {
             const rect = inputRef.current.getBoundingClientRect();
             setDropdownPosition({
-                top: rect.bottom,
+                top: rect.bottom + 4,
                 left: rect.left,
                 width: rect.width
             });
@@ -139,7 +139,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
         return createPortal(
             <div 
                 ref={dropdownRef}
-                className="fixed z-[9999] mt-1 rounded-lg border border-slate-200 bg-white shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
+                className="fixed z-[9999] rounded-lg border border-slate-200 bg-white shadow-xl py-1.5 animate-in fade-in slide-in-from-top-2 duration-150 custom-scrollbar"
                 style={{ 
                     top: dropdownPosition.top, 
                     left: dropdownPosition.left,
@@ -149,18 +149,18 @@ export const Combobox: React.FC<ComboboxProps> = ({
                 }}
             >
                 {filteredOptions && filteredOptions.length === 0 ? (
-                    <div className="px-3 py-4 text-center">
+                    <div className="px-4 py-5 text-center">
                         <p className="text-sm text-slate-400 italic">No matches found</p>
                         {inputValue && !flatOptions.includes(inputValue) && (
-                            <p className="text-xs text-slate-300 mt-1 cursor-pointer hover:text-jci-blue" onClick={() => setOpen(false)}>
-                                Using custom value: "{inputValue}"
+                            <p className="text-xs text-jci-blue mt-1.5 cursor-pointer hover:underline" onClick={() => setOpen(false)}>
+                                Use custom value: "{inputValue}"
                             </p>
                         )}
                     </div>
                 ) : isGrouped && filteredOptions && (filteredOptions as { label: string; options: string[] }[]).length > 0 ? (
                     (filteredOptions as { label: string; options: string[] }[]).map((group, groupIndex) => (
                         <div key={groupIndex}>
-                            <div className="px-3 py-1 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                            <div className="px-3.5 py-1.5 text-xs font-bold text-slate-500 bg-slate-50/80 border-y border-slate-100/50 sticky top-0 uppercase tracking-wider select-none">
                                 {group.label}
                             </div>
                             {group.options.map((opt, optIndex) => (
@@ -168,13 +168,14 @@ export const Combobox: React.FC<ComboboxProps> = ({
                                     key={`${groupIndex}-${optIndex}`}
                                     onClick={(e) => handleSelect(e, opt)}
                                     className={`
-                        px-3 py-2 text-sm cursor-pointer transition-colors
-                        ${value === opt
-                                            ? 'bg-jci-blue/10 text-jci-blue font-semibold'
+                                        px-4 py-2.5 text-sm cursor-pointer transition-all flex items-center justify-between
+                                        ${value === opt
+                                            ? 'bg-jci-blue/5 text-jci-blue font-semibold'
                                             : 'text-slate-700 hover:bg-slate-50'}
-                      `}
+                                    `}
                                 >
-                                    {opt}
+                                    <span className="truncate">{opt}</span>
+                                    {value === opt && <Check size={14} className="text-jci-blue stroke-[3] ml-2 shrink-0 animate-in zoom-in-75 duration-100" />}
                                 </div>
                             ))}
                         </div>
@@ -185,13 +186,14 @@ export const Combobox: React.FC<ComboboxProps> = ({
                             key={i}
                             onClick={(e) => handleSelect(e, opt)}
                             className={`
-              px-3 py-2 text-sm cursor-pointer transition-colors
-              ${value === opt
-                                ? 'bg-jci-blue/10 text-jci-blue font-semibold'
-                                : 'text-slate-700 hover:bg-slate-50'}
-            `}
+                                px-4 py-2.5 text-sm cursor-pointer transition-all flex items-center justify-between
+                                ${value === opt
+                                    ? 'bg-jci-blue/5 text-jci-blue font-semibold'
+                                    : 'text-slate-700 hover:bg-slate-50'}
+                            `}
                         >
-                            {opt}
+                            <span className="truncate">{opt}</span>
+                            {value === opt && <Check size={14} className="text-jci-blue stroke-[3] ml-2 shrink-0 animate-in zoom-in-75 duration-100" />}
                         </div>
                     ))
                 )}
@@ -211,26 +213,29 @@ export const Combobox: React.FC<ComboboxProps> = ({
                     onFocus={() => setOpen(true)}
                     placeholder={placeholder}
                     disabled={disabled}
-                    className="block w-full rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-12 text-sm shadow-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                    className={`
+                        block w-full rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 text-sm shadow-sm
+                        focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20
+                        disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
+                        transition-all hover:border-slate-400
+                    `}
                 />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 gap-1.5">
-                    {hasValue && (
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 gap-1">
+                    {hasValue && !disabled && (
                         <button
                             type="button"
                             onClick={handleClear}
                             className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100"
-                            title="Clear selection"
+                            title="Clear"
                         >
                             <X size={14} className="stroke-[2.5]" />
                         </button>
                     )}
                     <button
                         type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setOpen(!open);
-                        }}
-                        className="text-slate-400 hover:text-slate-600 focus:outline-none"
+                        onClick={() => !disabled && setOpen(!open)}
+                        className="text-slate-400 hover:text-slate-600 p-1"
+                        disabled={disabled}
                     >
                         <ChevronDown size={16} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
                     </button>
