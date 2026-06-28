@@ -211,22 +211,28 @@ export const Combobox: React.FC<ComboboxProps> = ({
                     onFocus={() => setOpen(true)}
                     placeholder={placeholder}
                     disabled={disabled}
-                    className={`
-          block w-full rounded-lg border-slate-300 shadow-sm py-2 px-3
-          focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 sm:text-sm
-          disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
-          transition-colors
-          border-slate-300
-          
-          `}
+                    className="block w-full rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-12 text-sm shadow-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
                 />
-                <div className="absolute inset-y-0 right-0 flex items-center">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 gap-1.5">
+                    {hasValue && (
+                        <button
+                            type="button"
+                            onClick={handleClear}
+                            className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-100"
+                            title="Clear selection"
+                        >
+                            <X size={14} className="stroke-[2.5]" />
+                        </button>
+                    )}
                     <button
                         type="button"
-                        onClick={() => setOpen(!open)}
-                        className="text-slate-400 hover:text-slate-600"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(!open);
+                        }}
+                        className="text-slate-400 hover:text-slate-600 focus:outline-none"
                     >
-                        <ChevronDown size={14} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+                        <ChevronDown size={16} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
                     </button>
                 </div>
             </div>

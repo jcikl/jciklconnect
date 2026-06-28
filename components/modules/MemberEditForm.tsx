@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button, Tabs } from '../ui/Common';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
+import { Combobox } from '../ui/Combobox';
 import { Member, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS, nationalityOptionsForValue } from '../../config/constants';
@@ -510,17 +511,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
 
               <div className="flex flex-row items-center gap-3">
                 <label className="w-28 md:w-32 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Level of Mgmt</label>
-                <select
-                  name="levelOfManagement"
-                  value={formValues.levelOfManagement}
-                  onChange={(e) => handleChange('levelOfManagement', e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
-                >
-                  <option value="">Select Level</option>
-                  <option value="Top">Top</option>
-                  <option value="Middle">Middle</option>
-                  <option value="Frontline">Frontline</option>
-                </select>
+                <Combobox
+                  options={['Top', 'Middle', 'Frontline']}
+                  value={formValues.levelOfManagement || ''}
+                  onChange={(val) => handleChange('levelOfManagement', val)}
+                  placeholder="Select Level"
+                  className="flex-1"
+                />
               </div>
 
               <div className="flex flex-col gap-1 mt-2">
