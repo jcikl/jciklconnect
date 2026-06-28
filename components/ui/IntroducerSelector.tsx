@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Member, Project } from '../../types';
 
 interface IntroducerSelectorProps {
@@ -20,6 +21,27 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
   const [detail, setDetail] = useState<string>('');
   const [memberSearch, setMemberSearch] = useState('');
   const [eventSearch, setEventSearch] = useState('');
+  const [memberOpen, setMemberOpen] = useState(false);
+  const [eventOpen, setEventOpen] = useState(false);
+  const [memberHighlight, setMemberHighlight] = useState(0);
+  const [eventHighlight, setEventHighlight] = useState(0);
+
+  const memberContainerRef = useRef<HTMLDivElement>(null);
+  const eventContainerRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (memberContainerRef.current && !memberContainerRef.current.contains(e.target as Node)) {
+        setMemberOpen(false);
+      }
+      if (eventContainerRef.current && !eventContainerRef.current.contains(e.target as Node)) {
+        setEventOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Parse the initial value when it changes externally
   useEffect(() => {
@@ -79,6 +101,8 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
     setType(newType);
     setMemberSearch('');
     setEventSearch('');
+    setMemberOpen(false);
+    setEventOpen(false);
 
     if (newType === 'friend') {
       onChange('Friend');
@@ -132,6 +156,8 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
     (p.name || '').toLowerCase().includes(eventSearch.toLowerCase())
   );
 
+  const selectedMember = members.find(m => m.id === detail);
+
   return (
     <div className={`space-y-3 w-full ${className}`}>
       <select
@@ -157,46 +183,100 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
       )}
 
       {type === 'member' && (
-        <div className="space-y-2 p-2 bg-slate-50 border border-slate-200 rounded-lg animate-in slide-in-from-top-1 duration-150">
-          <input
-            type="text"
-            placeholder="Search JCI KL member..."
-            value={memberSearch}
-            onChange={e => setMemberSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-1 text-xs focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-          />
-          <select
-            value={detail}
-            onChange={(e) => handleDetailChange(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
-          >
-            <option value="">Select Member...</option>
-            {filteredMembers.map(m => (
-              <option key={m.id} value={m.id}>{m.name || m.fullName}</option>
-            ))}
-          </select>
+        <div ref={memberContainerRef} className="relative w-full animate-in slide-in-from-top-1 duration-150">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search JCI KL member..."
+              value={memberOpen ? memberSearch : (selectedMember ? (selectedMember.name || selectedMember.fullName) : '')}
+              onChange={(e) => {
+                setMemberSearch(e.target.value);
+                setMemberOpen(true);
+                setMemberHighlight(0);
+              }}
+              onFocus={() => {
+                setMemberOpen(true);
+                setMemberSearch('');
+              }}
+              className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <ChevronDown size={16} />
+            </div>
+          </div>
+          {memberOpen && (
+            <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+              {filteredMembers.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-slate-500">No members found</li>
+              ) : (
+                filteredMembers.map((m, i) => (
+                  <li
+                    key={m.id}
+                    className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
+                      i === memberHighlight ? 'bg-jci-blue/10 text-jci-navy' : 'text-slate-700 hover:bg-slate-50'
+                    } ${detail === m.id ? 'font-bold' : ''}`}
+                    onMouseEnter={() => setMemberHighlight(i)}
+                    onClick={() => {
+                      handleDetailChange(m.id);
+                      setMemberOpen(false);
+                      setMemberSearch('');
+                    }}
+                  >
+                    {m.name || m.fullName}
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </div>
       )}
 
       {type === 'event' && (
-        <div className="space-y-2 p-2 bg-slate-50 border border-slate-200 rounded-lg animate-in slide-in-from-top-1 duration-150">
-          <input
-            type="text"
-            placeholder="Search event/project..."
-            value={eventSearch}
-            onChange={e => setEventSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-1 text-xs focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-          />
-          <select
-            value={detail}
-            onChange={(e) => handleDetailChange(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
-          >
-            <option value="">Select Project/Event...</option>
-            {filteredProjects.map(p => (
-              <option key={p.id} value={p.name}>{p.name}</option>
-            ))}
-          </select>
+        <div ref={eventContainerRef} className="relative w-full animate-in slide-in-from-top-1 duration-150">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search event/project..."
+              value={eventOpen ? eventSearch : detail}
+              onChange={(e) => {
+                setEventSearch(e.target.value);
+                setEventOpen(true);
+                setEventHighlight(0);
+              }}
+              onFocus={() => {
+                setEventOpen(true);
+                setEventSearch('');
+              }}
+              className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <ChevronDown size={16} />
+            </div>
+          </div>
+          {eventOpen && (
+            <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+              {filteredProjects.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-slate-500">No events found</li>
+              ) : (
+                filteredProjects.map((p, i) => (
+                  <li
+                    key={p.id}
+                    className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
+                      i === eventHighlight ? 'bg-jci-blue/10 text-jci-navy' : 'text-slate-700 hover:bg-slate-50'
+                    } ${detail === p.name ? 'font-bold' : ''}`}
+                    onMouseEnter={() => setEventHighlight(i)}
+                    onClick={() => {
+                      handleDetailChange(p.name);
+                      setEventOpen(false);
+                      setEventSearch('');
+                    }}
+                  >
+                    {p.name}
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </div>
       )}
 
