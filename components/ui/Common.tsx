@@ -296,7 +296,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
           onScroll={handleScroll}
           className="overflow-x-auto no-scrollbar scroll-smooth py-1"
         >
-          <nav className="flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl max-w-max" aria-label="Tabs">
+          <nav className="flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl w-max" aria-label="Tabs">
             {tabs.map((tab) => {
               const id = typeof tab === 'string' ? tab : tab.id;
               const label = typeof tab === 'string' ? tab : tab.label;
@@ -311,7 +311,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
                   className={`
                     whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex-shrink-0
                     ${activeTab === id
-                      ? 'bg-white text-jci-blue shadow-sm border border-slate-200/20'
+                      ? 'bg-jci-blue text-white shadow-sm border border-slate-200/20'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}
                   `}
                 >
