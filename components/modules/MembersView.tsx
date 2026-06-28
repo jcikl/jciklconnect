@@ -664,26 +664,18 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             <div>
               <Tabs
                 variant="button"
-                tabs={['Directory', 'Guest', 'Statistics', 'Board of Directors', 'Mentorship', 'Promotion Tracking', 'Senatorship', 'Introducer']}
-                activeTab={
-                  activeTab === 'directory' ? 'Directory' :
-                    activeTab === 'guest' ? 'Guest' :
-                      activeTab === 'statistics' ? 'Statistics' :
-                        activeTab === 'board-of-directors' ? 'Board of Directors' :
-                          activeTab === 'mentorship' ? 'Mentorship' :
-                            activeTab === 'senatorship' ? 'Senatorship' :
-                              activeTab === 'introducer' ? 'Introducer' : 'Promotion Tracking'
-                }
-                onTabChange={(tab) => {
-                  if (tab === 'Directory') setActiveTab('directory');
-                  else if (tab === 'Guest') setActiveTab('guest');
-                  else if (tab === 'Statistics') setActiveTab('statistics');
-                  else if (tab === 'Board of Directors') setActiveTab('board-of-directors');
-                  else if (tab === 'Mentorship') setActiveTab('mentorship');
-                  else if (tab === 'Senatorship') setActiveTab('senatorship');
-                  else if (tab === 'Introducer') setActiveTab('introducer');
-                  else setActiveTab('promotion-tracking');
-                }}
+                tabs={[
+                  { id: 'directory', label: 'Directory' },
+                  { id: 'guest', label: 'Guest' },
+                  { id: 'statistics', label: 'Statistics' },
+                  { id: 'board-of-directors', label: 'Board of Directors' },
+                  { id: 'mentorship', label: 'Mentorship' },
+                  { id: 'promotion-tracking', label: 'Promotion Tracking' },
+                  { id: 'senatorship', label: 'Senatorship' },
+                  { id: 'introducer', label: 'Introducer' }
+                ]}
+                activeTab={activeTab}
+                onTabChange={(tabId) => setActiveTab(tabId as any)}
               />
             </div>
             <div>
