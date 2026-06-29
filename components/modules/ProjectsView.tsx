@@ -919,6 +919,10 @@ const ProjectGrid: React.FC<{
   projectAccounts = [],
   projectTrackerTransactions = []
 }) => {
+    const { member } = useAuth();
+    const { isBoard, isAdmin, isDeveloper } = usePermissions();
+    const { showToast } = useToast();
+
     const getStatusLabel = (status: Project['status']) => {
       switch (status) {
         case 'Planning':
@@ -965,113 +969,133 @@ const ProjectGrid: React.FC<{
           </div>
 
           {/* Then render all existing projects (if any) */}
-          {projects.map(project => (
-            <Card
-              key={project.id}
-              className={`flex flex-col h-full cursor-pointer transition-all group relative ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
-              onClick={() => onToggleSelection?.(project.id)}
-            >
-              {/* Checkbox for batch selection */}
-              <div
-                className="absolute top-4 right-4 z-10 pointer-events-auto"
-                onClick={(e) => e.stopPropagation()}
+          {projects.map(project => {
+            const isCreator = project.submittedBy === member?.id;
+            const isCommittee = project.committee?.some(c => c.memberId === member?.id);
+            const isBod = isBoard || isAdmin || isDeveloper;
+            const canOpenBoard = isCreator || isCommittee || isBod;
+
+            return (
+              <Card
+                key={project.id}
+                className={`flex flex-col h-full cursor-pointer transition-all group relative ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
+                onClick={() => onToggleSelection?.(project.id)}
               >
-                <Checkbox
-                  checked={selectedIds?.has(project.id)}
-                  onChange={() => onToggleSelection?.(project.id)}
-                />
-              </div>
-
-              {/* Wrapper div to capture click event but stop propagation on buttons if needed */}
-              <div className="pointer-events-none">
-                <div className="flex justify-between items-start">
-                  <Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge>
+                {/* Checkbox for batch selection */}
+                <div
+                  className="absolute top-4 right-4 z-10 pointer-events-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={selectedIds?.has(project.id)}
+                    onChange={() => onToggleSelection?.(project.id)}
+                  />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors line-clamp-2 h-14">{project.name ?? project.title ?? 'Unnamed'}</h3>
-                <div className="space-y-4 flex-1">
-                  <div className="bg-slate-50 p-3 rounded-lg space-y-1.5 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Team Size</span>
-                      <span className="font-semibold text-slate-900">{project.teamSize ?? 0} Members</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Budget Used</span>
-                      <span className="font-semibold text-slate-900">{formatCurrency(project.spent ?? 0)} / {formatCurrency(project.budget ?? 0)}</span>
-                    </div>
+
+                {/* Wrapper div to capture click event but stop propagation on buttons if needed */}
+                <div className="pointer-events-none">
+                  <div className="flex justify-between items-start">
+                    <Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge>
                   </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors line-clamp-2 h-14">{project.name ?? project.title ?? 'Unnamed'}</h3>
+                  <div className="space-y-4 flex-1">
+                    <div className="bg-slate-50 p-3 rounded-lg space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">Team Size</span>
+                        <span className="font-semibold text-slate-900">{project.teamSize ?? 0} Members</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">Budget Used</span>
+                        <span className="font-semibold text-slate-900">{formatCurrency(project.spent ?? 0)} / {formatCurrency(project.budget ?? 0)}</span>
+                      </div>
+                    </div>
 
-                  {/* PT vs Bank Comparison Box */}
-                  {(() => {
-                    const acc = projectAccounts.find(a => a.projectId === project.id);
-                    const bankIncome = acc?.totalIncome || 0;
-                    const bankExpenses = acc?.totalExpenses || 0;
-                    const bankNet = bankIncome - bankExpenses;
+                    {/* PT vs Bank Comparison Box */}
+                    {(() => {
+                      const acc = projectAccounts.find(a => a.projectId === project.id);
+                      const bankIncome = acc?.totalIncome || 0;
+                      const bankExpenses = acc?.totalExpenses || 0;
+                      const bankNet = bankIncome - bankExpenses;
 
-                    const ptData = projectTrackerTransactions.filter(tx => tx.projectId === project.id);
-                    const ptIncome = ptData
-                      .filter(tx => tx.type === 'income')
-                      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
-                    const ptExpenses = ptData
-                      .filter(tx => tx.type === 'expense')
-                      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
-                    const ptNet = ptIncome - ptExpenses;
+                      const ptData = projectTrackerTransactions.filter(tx => tx.projectId === project.id);
+                      const ptIncome = ptData
+                        .filter(tx => tx.type === 'income')
+                        .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                      const ptExpenses = ptData
+                        .filter(tx => tx.type === 'expense')
+                        .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                      const ptNet = ptIncome - ptExpenses;
 
-                    const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
-                    const hasData = ptIncome > 0 || ptExpenses > 0 || bankIncome > 0 || bankExpenses > 0;
+                      const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
+                      const hasData = ptIncome > 0 || ptExpenses > 0 || bankIncome > 0 || bankExpenses > 0;
 
-                    return (
-                      <div className={`p-3 rounded-lg border transition-all ${isMatch
-                        ? 'bg-cyan-50/40 border-cyan-100/70'
-                        : 'bg-slate-50/50 border-slate-100'
-                        }`}>
-                        <div className={`flex justify-between items-center mb-1.5 pb-1.5 border-b ${isMatch ? 'border-cyan-200/60' : 'border-slate-200'
+                      return (
+                        <div className={`p-3 rounded-lg border transition-all ${isMatch
+                          ? 'bg-cyan-50/40 border-cyan-100/70'
+                          : 'bg-slate-50/50 border-slate-100'
                           }`}>
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-xs font-semibold ${isMatch ? 'text-cyan-800' : 'text-slate-700'}`}>
-                              PT vs Bank Stats
-                            </span>
+                          <div className={`flex justify-between items-center mb-1.5 pb-1.5 border-b ${isMatch ? 'border-cyan-200/60' : 'border-slate-200'
+                            }`}>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-xs font-semibold ${isMatch ? 'text-cyan-800' : 'text-slate-700'}`}>
+                                PT vs Bank Stats
+                              </span>
+                              {isMatch && (
+                                <CheckCircle size={12} className="text-cyan-600" />
+                              )}
+                            </div>
                             {isMatch && (
-                              <CheckCircle size={12} className="text-cyan-600" />
+                              <span className="text-[10px] text-cyan-700 bg-cyan-100/80 px-1.5 py-0.5 rounded font-semibold">
+                                Reconciled
+                              </span>
                             )}
                           </div>
-                          {isMatch && (
-                            <span className="text-[10px] text-cyan-700 bg-cyan-100/80 px-1.5 py-0.5 rounded font-semibold">
-                              Reconciled
-                            </span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-[28px_1fr_1fr] gap-y-1 gap-x-2 text-[10px]">
-                          <div></div>
-                          <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>PT</div>
-                          <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>Bank</div>
+                          <div className="grid grid-cols-[28px_1fr_1fr] gap-y-1 gap-x-2 text-[10px]">
+                            <div></div>
+                            <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>PT</div>
+                            <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>Bank</div>
 
-                          <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>In</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptIncome)}</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankIncome)}</div>
+                            <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>In</div>
+                            <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptIncome)}</div>
+                            <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankIncome)}</div>
 
-                          <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>Out</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptExpenses)}</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankExpenses)}</div>
+                            <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>Out</div>
+                            <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptExpenses)}</div>
+                            <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankExpenses)}</div>
 
-                          <div className={`font-bold border-t pt-1 mt-0.5 ${isMatch ? 'text-cyan-955 border-cyan-200/60' : 'text-slate-900 border-slate-200/60'}`}>Net</div>
-                          <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(ptNet)}
-                          </div>
-                          <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(bankNet)}
+                            <div className={`font-bold border-t pt-1 mt-0.5 ${isMatch ? 'text-cyan-955 border-cyan-200/60' : 'text-slate-900 border-slate-200/60'}`}>Net</div>
+                            <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(ptNet)}
+                            </div>
+                            <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(bankNet)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
+                  </div>
                 </div>
-              </div>
 
-              <div className="border-slate-100 pt-4 mt-auto">
-                <Button variant="outline" className="w-full text-sm" onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}>Open Board</Button>
-              </div>
-            </Card>
-          ))}
+                <div className="border-slate-100 pt-4 mt-auto">
+                  <Button
+                    variant={canOpenBoard ? "outline" : "ghost"}
+                    className={`w-full text-sm ${!canOpenBoard ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!canOpenBoard) {
+                        showToast('Only committee members, BOD members, or the event creator are allowed to open this board.', 'error');
+                        return;
+                      }
+                      onSelect(project.id);
+                    }}
+                  >
+                    Open Board
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       </LoadingState>
     );
