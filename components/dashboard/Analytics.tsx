@@ -120,6 +120,7 @@ export const PointsDistributionChart: React.FC<PointsDistributionChartProps> = (
 
 interface PointsSourceRadarChartProps {
   memberId?: string;
+  year?: number;
   className?: string;
 }
 
@@ -148,7 +149,7 @@ const CATEGORY_TO_DIMENSION: Record<string, string> = {
 
 const RADAR_DIMENSIONS = ['Leadership', 'Events', 'Recruitment', 'Sponsorship', 'Training'];
 
-export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ memberId, className }) => {
+export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ memberId, year, className }) => {
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
 
   useEffect(() => {
@@ -170,7 +171,17 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
     const totals: Record<string, number> = {};
     RADAR_DIMENSIONS.forEach(d => { totals[d] = 0; });
 
-    transactions.forEach(tx => {
+    // Filter by year if provided
+    const filtered = year
+      ? transactions.filter(tx => {
+          try {
+            const d = new Date(tx.createdAt as string);
+            return !isNaN(d.getTime()) && d.getFullYear() === year;
+          } catch { return false; }
+        })
+      : transactions;
+
+    filtered.forEach(tx => {
       const dim = CATEGORY_TO_DIMENSION[tx.category] || CATEGORY_TO_DIMENSION[tx.category?.toLowerCase()] || null;
       if (dim) {
         totals[dim] += Math.abs(tx.points || tx.amount || 0);
@@ -189,7 +200,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
       displaySubject: `${dim}: ${totals[dim]}`,
       fullMark: maxVal,
     }));
-  }, [transactions]);
+  }, [transactions, year]);
 
   return (
     <div className={`w-full h-full min-h-[220px] ${className}`}>

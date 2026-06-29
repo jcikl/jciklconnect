@@ -43,6 +43,9 @@ import 'swiper/css/pagination';
 const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ members, currentUser }) => {
   const top3 = members.slice(0, 3);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(top3[0]?.id || null);
+  const currentYear = new Date().getFullYear();
+  const [radarYear, setRadarYear] = useState(currentYear);
+  const availableYears = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   return (
     <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-jci-navy border-none shadow-[0_20px_50px_rgba(8,112,184,0.7)] text-white">
@@ -93,7 +96,24 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
               <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Skill Analysis</p>
             </div>
 
-            <PointsSourceRadarChart memberId={selectedMemberId || undefined} className="mt-4" />
+            {/* Year Selector */}
+            <div className="absolute top-3 right-4 flex items-center gap-1">
+              {availableYears.map(y => (
+                <button
+                  key={y}
+                  onClick={() => setRadarYear(y)}
+                  className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                    y === radarYear
+                      ? 'bg-amber-400/90 text-slate-900 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
+                      : 'bg-white/5 text-slate-500 hover:bg-white/10 hover:text-slate-300'
+                  }`}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
+
+            <PointsSourceRadarChart memberId={selectedMemberId || undefined} year={radarYear} className="mt-4" />
 
             <div className="absolute bottom-4 right-6 text-right">
               <p className="text-[10px] font-black text-amber-400 italic uppercase">Competitive Mode</p>
