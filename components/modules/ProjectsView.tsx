@@ -375,10 +375,12 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               <Button onClick={() => setProposalModalOpen(true)}>
                 <Plus size={16} className="mr-2" /> Start New Project
               </Button>
-              <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-                <Copy size={16} className="mr-2" /> Paste Import
-              </Button>
-              {activeTab === 'templates' && (
+              {(isBoard || isAdmin) && (
+                <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+                  <Copy size={16} className="mr-2" /> Paste Import
+                </Button>
+              )}
+              {activeTab === 'templates' && (isBoard || isAdmin) && (
                 <Button onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}>
                   <Plus size={16} className="mr-2" /> Create Template
                 </Button>
@@ -506,6 +508,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                 onSelect={setSelectedProjectId}
                 onNewProposal={() => setProposalModalOpen(true)}
                 onImport={() => setImportModalOpen(true)}
+                isAdminOrBoard={isBoard || isAdmin}
                 selectedIds={selectedProjectIds}
                 onToggleSelection={(id) => {
                   setSelectedProjectIds(prev => {
@@ -918,6 +921,7 @@ const ProjectGrid: React.FC<{
   onSelect: (id: string) => void;
   onNewProposal: () => void;
   onImport: () => void;
+  isAdminOrBoard?: boolean;
   selectedIds?: Set<string>;
   onToggleSelection?: (id: string) => void;
   onSelectAll?: () => void;
@@ -930,6 +934,7 @@ const ProjectGrid: React.FC<{
   onSelect,
   onNewProposal,
   onImport,
+  isAdminOrBoard = false,
   selectedIds,
   onToggleSelection,
   onSelectAll,
@@ -969,16 +974,18 @@ const ProjectGrid: React.FC<{
             <Zap size={32} className="mb-3" />
             <span className="font-medium">Start New Project</span>
             <span className="text-xs mt-1">or submit an activity plan</span>
-            <div className="mt-4 pt-4 border-t border-slate-200 w-full flex justify-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); onImport(); }}
-                className="text-xs"
-              >
-                <Copy size={14} className="mr-1" /> Paste Import
-              </Button>
-            </div>
+            {isAdminOrBoard && (
+              <div className="mt-4 pt-4 border-t border-slate-200 w-full flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onImport(); }}
+                  className="text-xs"
+                >
+                  <Copy size={14} className="mr-1" /> Paste Import
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Then render all existing projects (if any) */}
