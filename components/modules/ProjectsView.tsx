@@ -2312,13 +2312,20 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
     );
   }
 
+  const isInKindSponsor = (t: any) => {
+    const desc = (t.description || '').toLowerCase();
+    const purp = (t.purpose || '').toLowerCase();
+    return desc.includes('in-kind') || desc.includes('in kind') || desc.includes('inkind') ||
+           purp.includes('in-kind') || purp.includes('in kind') || purp.includes('inkind');
+  };
+
   // Calculate financials from transactions to ensure data consistency with projectTrx collection
   const totalExpenses = transactions
     .filter(t => t.type === 'Expense')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const totalIncome = transactions
-    .filter(t => t.type === 'Income')
+    .filter(t => t.type === 'Income' && !isInKindSponsor(t))
     .reduce((sum, t) => sum + t.amount, 0);
 
   const budgetUtilization = account.budget > 0 ? (totalExpenses / account.budget) * 100 : 0;

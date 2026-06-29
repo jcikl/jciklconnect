@@ -868,8 +868,15 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         const type = (tx.type || '').toLowerCase();
         const amount = Math.abs(tx.amount || 0);
 
+        const desc = (tx.description || '').toLowerCase();
+        const purp = (tx.purpose || '').toLowerCase();
+        const isInKind = desc.includes('in-kind') || desc.includes('in kind') || desc.includes('inkind') ||
+                         purp.includes('in-kind') || purp.includes('in kind') || purp.includes('inkind');
+
         if (type === 'income') {
-          ptSummary[pid].income += amount;
+          if (!isInKind) {
+            ptSummary[pid].income += amount;
+          }
         } else {
           // Fallback: assume expense for any other type or if type is missing but amount exists
           ptSummary[pid].expenses += amount;
@@ -2954,7 +2961,17 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               <div>
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">PT Total Income</span>
                 <p className="text-sm font-bold text-green-600">
-                  {formatCurrency(projectTrxList.filter(t => t.type === 'Income').reduce((sum, t) => sum + (t.amount || 0), 0))}
+                  {formatCurrency(
+                    projectTrxList
+                      .filter(t => {
+                        if (t.type !== 'Income') return false;
+                        const desc = (t.description || '').toLowerCase();
+                        const purp = (t.purpose || '').toLowerCase();
+                        return !(desc.includes('in-kind') || desc.includes('in kind') || desc.includes('inkind') ||
+                                 purp.includes('in-kind') || purp.includes('in kind') || purp.includes('inkind'));
+                      })
+                      .reduce((sum, t) => sum + (t.amount || 0), 0)
+                  )}
                 </p>
               </div>
               <div>
