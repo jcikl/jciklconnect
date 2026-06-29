@@ -2107,6 +2107,17 @@ export const JCIKLApp: React.FC = () => {
     effectiveRole,
     hasPermission,
   } = usePermissions();
+  const { projects } = useProjects();
+  const canViewEventsManagement = React.useMemo(() => {
+    if (!member) return false;
+    if (isAdmin || isBoard || isDeveloper) return true;
+    return projects.some(p => {
+      const isCreator = p.organizerId === member.id || p.submittedBy === member.id;
+      const isCommittee = p.committee?.some(c => c.memberId === member.id) ?? false;
+      return isCreator || isCommittee;
+    });
+  }, [member, isAdmin, isBoard, isDeveloper, projects]);
+
   const canViewLeads = isAdmin || isBoard;
   const [leadList, setLeadList] = useState<{ id: string; name: string; email: string; phone?: string | null; interests?: string[] | null; createdAt: string }[]>([]);
   const [leadListLoading, setLeadListLoading] = useState(false);
@@ -2426,7 +2437,11 @@ export const JCIKLApp: React.FC = () => {
       case 'BOUNTIES': return <BountyMarketplaceView />;
       case 'MEMBERS': return <MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />;
       case 'ACTIVITIES': return <ActivityPlansView searchQuery={searchQuery} />;
-      case 'PROJECTS': return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
+      case 'PROJECTS':
+        if (!canViewEventsManagement) {
+          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+        }
+        return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
       case 'EVENTS': return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
       case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
@@ -2607,7 +2622,7 @@ export const JCIKLApp: React.FC = () => {
                 <div className="pt-4 mt-4 border-t border-slate-100">
                   <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Workspace</p>
 
-                  {canAccessWorkspaceModules && (
+                  {canViewEventsManagement && (
                     <SidebarItem
                       icon={<FolderKanban size={18} />}
                       label="Events Management"
