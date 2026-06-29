@@ -1722,6 +1722,34 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [recruitedMembers, setRecruitedMembers] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
 
+  const groupedRadarContributions = useMemo(() => {
+    const sorted = [...radarContributions].sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      const valA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
+      const valB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
+      return valB - valA;
+    });
+
+    const groups: { [year: string]: any[] } = {};
+    sorted.forEach((log) => {
+      const dateObj = new Date(log.date);
+      const year = isNaN(dateObj.getTime()) ? 'Unknown' : String(dateObj.getFullYear());
+      if (!groups[year]) {
+        groups[year] = [];
+      }
+      groups[year].push(log);
+    });
+
+    const sortedYears = Object.keys(groups).sort((a, b) => {
+      if (a === 'Unknown') return 1;
+      if (b === 'Unknown') return -1;
+      return b.localeCompare(a);
+    });
+
+    return { groups, sortedYears };
+  }, [radarContributions]);
+
   const HOBBY_OPTIONS = [
     "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
     "Cigar", "Cooking", "Cycling", "Dancing", "Diving",
@@ -2004,12 +2032,15 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         const contribList: any[] = [];
         contributionsSnap.forEach((doc) => {
           const data = doc.data();
+          const rawDateVal = typeof data.eventDate === 'string' 
+            ? data.eventDate.trim().substring(0, 11) 
+            : (data.eventDate || data.createdAt?.toDate?.() || data.createdAt || '');
           contribList.push({
             id: doc.id,
-            description: data.description || 'Imported Radar Score',
+            description: data.eventTitle || data.description || 'Imported Radar Score',
             points: parseFloat(data.points) || 0,
-            type: data.type || 'Event',
-            date: data.createdAt?.toDate?.() || data.createdAt || '',
+            type: data.rawCategory || data.type || 'Event',
+            date: rawDateVal,
           });
         });
         setRadarContributions(contribList);
@@ -2813,11 +2844,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
                       <Button variant="primary" size="sm" onClick={() => {
                         handleInlineSave('career', {
-                          senatorshipId: inlineValues.senatorshipId || undefined,
+                          senatorshipId: inlineValues.senatorshipId !== undefined ? inlineValues.senatorshipId.trim() : undefined,
                           senatorCertified: inlineValues.senatorCertified,
                           senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
-                          senatorshipValidatedBy: inlineValues.senatorshipValidatedBy || undefined,
-                          senatorshipValidatedAt: inlineValues.senatorshipValidatedAt || undefined,
+                          senatorshipValidatedBy: inlineValues.senatorshipValidatedBy !== undefined ? inlineValues.senatorshipValidatedBy.trim() : undefined,
+                          senatorshipValidatedAt: inlineValues.senatorshipValidatedAt !== undefined ? inlineValues.senatorshipValidatedAt.trim() : undefined,
                         });
                       }}>Save</Button>
                     </div>
@@ -3752,23 +3783,33 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       <tr>
                         <th className="px-4 py-2 text-slate-600 font-bold">Date</th>
                         <th className="px-4 py-2 text-slate-600 font-bold">Category / Description</th>
-                        <th className="px-4 py-2 text-right text-slate-600 font-bold">Points</th>
+                        <th className="px-4 py-2 text-right text-slate-600 font-bold w-[100px]">Points</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {radarContributions.map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">
-                            {formatDateToDDMMMYYYY(log.date)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="font-bold text-slate-900 block">{log.description}</span>
-                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">{log.type}</span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-black text-green-600">
-                            +{log.points} pts
-                          </td>
-                        </tr>
+                      {groupedRadarContributions.sortedYears.map((year) => (
+                        <React.Fragment key={year}>
+                          {/* Year Segment Header */}
+                          <tr className="bg-slate-100/60 border-y border-slate-200">
+                            <td colSpan={3} className="px-4 py-2 text-xs font-black text-slate-700 tracking-wider bg-slate-50/80 select-none">
+                              {year}
+                            </td>
+                          </tr>
+                          {groupedRadarContributions.groups[year].map((log) => (
+                            <tr key={log.id} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500">
+                                {formatDateToDDMMMYYYY(log.date)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="font-bold text-slate-900 block">{log.description}</span>
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider">{log.type}</span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-black text-green-600 w-[100px]">
+                                +{log.points} pts
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>

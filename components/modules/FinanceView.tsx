@@ -29,6 +29,8 @@ import { ADMINISTRATIVE_PURPOSES } from '../../config/constants';
 import type { Project, MembershipType } from '../../types';
 import { useBatchMode } from '../../contexts/BatchModeContext';
 
+const UNASSIGNED_PROJECT_ID = 'UNASSIGNED_PROJECT'; // Consistent internal ID for uncategorized projects
+
 export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const helpModal = useHelpModal();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -41,6 +43,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const [reportType, setReportType] = useState<'income' | 'expense' | 'balance' | 'cashflow'>('income');
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string | null>(null);
   const [reportYear, setReportYear] = useState<number>(new Date().getFullYear());
+  const [historicalNetFlows, setHistoricalNetFlows] = useState<Record<string, number>>({});
   const [reportMonth, setReportMonth] = useState<number | null>(null);
   const [fiscalYearStart, setFiscalYearStart] = useState<number>(0); // 0 = Calendar Year (Jan), 3 = Fiscal Year (Apr), etc.
   const [summary, setSummary] = useState<{
@@ -49,10 +52,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     netBalance: number;
     byCategory: Record<string, { income: number; expenses: number }>;
   } | null>(null);
-  const [isReconciliationModalOpen, setIsReconciliationModalOpen] = useState(false);
   const [isDuesRenewalModalOpen, setIsDuesRenewalModalOpen] = useState(false);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [renewalYear, setRenewalYear] = useState<number>(new Date().getFullYear());
   const [duesAmount, setDuesAmount] = useState<number>(150);
   const [isRenewing, setIsRenewing] = useState(false);
@@ -98,6 +99,229 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const [editingModalYear, setEditingModalYear] = useState<string>('All');
   const [transactionSplits, setTransactionSplits] = useState<Record<string, TransactionSplit[]>>({});
 
+  // Project Tracker Transactions (Project Trx) Modal states
+  const [isProjectTrxModalOpen, setIsProjectTrxModalOpen] = useState(false);
+  const [projectTrxLoading, setProjectTrxLoading] = useState(false);
+  const [projectTrxList, setProjectTrxList] = useState<Transaction[]>([]);
+  const [projectTrxAddForm, setProjectTrxAddForm] = useState<Partial<Transaction>>({});
+  const [projectTrxEditingId, setProjectTrxEditingId] = useState<string | null>(null);
+  const [projectTrxEditForm, setProjectTrxEditForm] = useState<Partial<Transaction>>({});
+
+  const selectedProjectInfo = useMemo(() => {
+    if (!selectedProjectFilter || selectedProjectFilter === UNASSIGNED_PROJECT_ID) return null;
+    return projects.find(p => p.id === selectedProjectFilter) || null;
+  }, [selectedProjectFilter, projects]);
+
+  const loadProjectTrxList = async (projectId: string) => {
+    setProjectTrxLoading(true);
+    try {
+      const txs = await FinanceService.getProjectTransactions(projectId);
+      setProjectTrxList(txs);
+    } catch (err) {
+      console.error('Failed to load project transactions', err);
+      showToast('Failed to load project tracker transactions', 'error');
+    } finally {
+      setProjectTrxLoading(false);
+    }
+  };
+
+  const handleAddProjectTrx = async () => {
+    if (!selectedProjectFilter) return;
+    const data = projectTrxAddForm;
+    if (!data.amount || !data.description || !data.date) {
+      showToast('Please fill in all required fields (Amount, Description, Date)', 'warning');
+      return;
+    }
+    try {
+      await FinanceService.createProjectTransaction({
+        ...data,
+        projectId: selectedProjectFilter,
+        category: 'Projects & Activities',
+        status: 'Pending',
+      } as any);
+      showToast('Transaction added successfully', 'success');
+      setProjectTrxAddForm({});
+      await loadProjectTrxList(selectedProjectFilter);
+      await loadProjectAccounts();
+    } catch (err) {
+      showToast('Failed to add transaction', 'error');
+    }
+  };
+
+  const handleUpdateProjectTrx = async (id: string) => {
+    if (!selectedProjectFilter) return;
+    const data = projectTrxEditForm;
+    if (!data.amount || !data.description || !data.date) {
+      showToast('Please fill in all required fields (Amount, Description, Date)', 'warning');
+      return;
+    }
+    try {
+      await FinanceService.updateProjectTransaction(id, data);
+      showToast('Transaction updated successfully', 'success');
+      setProjectTrxEditingId(null);
+      setProjectTrxEditForm({});
+      await loadProjectTrxList(selectedProjectFilter);
+      await loadProjectAccounts();
+    } catch (err) {
+      showToast('Failed to update transaction', 'error');
+    }
+  };
+
+  const handleDeleteProjectTrx = async (id: string) => {
+    if (!selectedProjectFilter) return;
+    if (!confirm('Are you sure you want to delete this transaction?')) return;
+    try {
+      await FinanceService.deleteProjectTransaction(id);
+      showToast('Transaction deleted successfully', 'success');
+      await loadProjectTrxList(selectedProjectFilter);
+      await loadProjectAccounts();
+    } catch (err) {
+      showToast('Failed to delete transaction', 'error');
+    }
+  };
+
+  const handleProjectTrxPaste = async (pastedText: string) => {
+    if (!selectedProjectFilter) return;
+    if (!pastedText || !pastedText.includes('\t')) {
+      showToast('Please copy columns from spreadsheet first.', 'warning');
+      return;
+    }
+
+    const rows = pastedText.split(/\r?\n/).filter(r => r.trim());
+    let parsedCount = 0;
+    let dynamicPurpose = '';
+    setProjectTrxLoading(true);
+
+    const parsePastedDate = (dateStr: string): string => {
+      if (!dateStr) return '';
+      const clean = dateStr.trim();
+      const dmyMatch = clean.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+      if (dmyMatch) {
+        return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+      }
+      const ymdMatch = clean.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})$/);
+      if (ymdMatch) {
+        return `${ymdMatch[1]}-${ymdMatch[2].padStart(2, '0')}-${ymdMatch[3].padStart(2, '0')}`;
+      }
+      try {
+        const d = new Date(clean);
+        if (!isNaN(d.getTime())) {
+          return d.toISOString().split('T')[0];
+        }
+      } catch { }
+      return '';
+    };
+
+    try {
+      for (const row of rows) {
+        const cols = row.split('\t');
+        if (cols.length === 0) continue;
+
+        const description = cols[0]?.trim();
+        const remark = cols.length > 1 ? cols[1]?.trim() : '';
+        const incomeStr = cols.length > 2 ? cols[2]?.replace(/[^0-9.-]+/g, '') : '';
+        const expenseStr = cols.length > 3 ? cols[3]?.replace(/[^0-9.-]+/g, '') : '';
+
+        const incomeAmount = parseFloat(incomeStr) || 0;
+        const expenseAmount = parseFloat(expenseStr) || 0;
+
+        // If row has a description but no amount in either column, it's a Purpose header
+        if (description && !incomeStr && !expenseStr) {
+          dynamicPurpose = description;
+          continue;
+        }
+
+        const amount = incomeAmount > 0 ? incomeAmount : expenseAmount;
+        if (!description || !amount) continue;
+
+        let txType: 'Income' | 'Expense' = 'Expense';
+        if (incomeAmount > 0) txType = 'Income';
+        else if (expenseAmount > 0) txType = 'Expense';
+
+        // Check 5th column for date. If empty, dateStr will be '' representing unpaid payment request.
+        const rawDate = cols.length > 4 ? cols[4]?.trim() : '';
+        const dateStr = parsePastedDate(rawDate);
+
+        await FinanceService.createProjectTransaction({
+          projectId: selectedProjectFilter,
+          type: txType,
+          amount: amount,
+          description: description,
+          referenceNumber: remark || undefined,
+          date: dateStr,
+          purpose: dynamicPurpose || undefined,
+          category: 'Projects & Activities',
+          status: 'Pending',
+        } as any);
+        parsedCount++;
+      }
+
+      if (parsedCount > 0) {
+        showToast(`Successfully pasted and added ${parsedCount} transactions`, 'success');
+        await loadProjectTrxList(selectedProjectFilter);
+        await loadProjectAccounts();
+      } else {
+        showToast('Could not parse any valid transactions from clipboard', 'warning');
+      }
+    } catch (err) {
+      console.error('Error pasting transactions:', err);
+      showToast('Error parsing or adding transactions', 'error');
+    } finally {
+      setProjectTrxLoading(false);
+    }
+  };
+
+  const getLinkedBankTxInfo = (projectTxId: string) => {
+    // 1. Search in main transactions
+    const directTx = transactions.find(bt =>
+      (bt.projectTransactionIds && bt.projectTransactionIds.includes(projectTxId)) ||
+      bt.projectTransactionId === projectTxId
+    );
+    if (directTx) {
+      const bankAccountName = accounts.find(a => a.id === directTx.bankAccountId)?.name || 'Bank';
+      return {
+        date: directTx.date,
+        description: directTx.description,
+        amount: directTx.amount,
+        type: directTx.type,
+        bankAccountName,
+        isSplit: false
+      };
+    }
+
+    // 2. Search in splits
+    let matchedSplit: TransactionSplit | undefined;
+    let parentTxId: string | undefined;
+    for (const [pId, splits] of Object.entries(transactionSplits)) {
+      const found = splits.find(s =>
+        (s.projectTransactionIds && s.projectTransactionIds.includes(projectTxId)) ||
+        s.projectTransactionId === projectTxId
+      );
+      if (found) {
+        matchedSplit = found;
+        parentTxId = pId;
+        break;
+      }
+    }
+
+    if (matchedSplit && parentTxId) {
+      const parentTx = transactions.find(t => t.id === parentTxId);
+      const bankAccountName = accounts.find(a => a.id === parentTx?.bankAccountId)?.name || 'Bank';
+      return {
+        date: parentTx?.date || '',
+        description: matchedSplit.description || parentTx?.description || '',
+        amount: matchedSplit.amount,
+        type: parentTx?.type || 'Expense',
+        bankAccountName,
+        isSplit: true
+      };
+    }
+
+    return null;
+  };
+
+
+
   const isTransactionInCategory = (tx: Transaction, category: string): boolean => {
     if (tx.category === category) return true;
     if (tx.isSplit && transactionSplits[tx.id]) {
@@ -107,7 +331,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   };
 
   const [projectPurposes, setProjectPurposes] = useState<string[]>([]);
-  const [projectAccountYearFilter, setProjectAccountYearFilter] = useState<number>(0); // 0 = All Years
+  const [projectAccountYearFilter, setProjectAccountYearFilter] = useState<number>(new Date().getFullYear()); // Default to current year
   const [adminAccountYearFilter, setAdminAccountYearFilter] = useState<number>(new Date().getFullYear());
 
   const adminAccountYearOptions = useMemo(() => {
@@ -136,16 +360,48 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const [isAccountDetailOpen, setIsAccountDetailOpen] = useState(false);
   const [detailAccount, setDetailAccount] = useState<BankAccount | null>(null);
   const [detailYear, setDetailYear] = useState<number>(new Date().getFullYear());
+  const [detailAccountYears, setDetailAccountYears] = useState<number[]>([new Date().getFullYear()]);
+  const [allTransactionYears, setAllTransactionYears] = useState<number[]>([new Date().getFullYear()]);
+  const [selectedProjectTransactions, setSelectedProjectTransactions] = useState<Transaction[]>([]);
+  const [loadingSelectedProjectTransactions, setLoadingSelectedProjectTransactions] = useState<boolean>(false);
+
+  useEffect(() => {
+    const loadSelectedProjectTransactions = async () => {
+      if (!selectedProjectFilter || selectedProjectFilter === UNASSIGNED_PROJECT_ID) {
+        setSelectedProjectTransactions([]);
+        return;
+      }
+      setLoadingSelectedProjectTransactions(true);
+      try {
+        const txs = await FinanceService.getBankTransactionsByProject(selectedProjectFilter);
+        setSelectedProjectTransactions(txs);
+      } catch (err) {
+        console.error('Failed to load transactions for selected project:', err);
+        setSelectedProjectTransactions([]);
+      } finally {
+        setLoadingSelectedProjectTransactions(false);
+      }
+    };
+    loadSelectedProjectTransactions();
+  }, [selectedProjectFilter]);
+
+  useEffect(() => {
+    const loadYears = async () => {
+      if (!detailAccount) return;
+      try {
+        const years = await FinanceService.getTransactionYearsForAccount(detailAccount.id);
+        setDetailAccountYears(years);
+      } catch (err) {
+        console.error('Failed to load transaction years for account', err);
+        setDetailAccountYears([new Date().getFullYear()]);
+      }
+    };
+    loadYears();
+  }, [detailAccount]);
 
   const availableYears = useMemo(() => {
-    if (!detailAccount) return [new Date().getFullYear()];
-    const years = new Set(transactions
-      .filter(t => t.bankAccountId === detailAccount.id)
-      .map(t => new Date(t.date).getFullYear())
-    );
-    years.add(new Date().getFullYear());
-    return Array.from(years).sort((a, b) => b - a);
-  }, [detailAccount, transactions]);
+    return detailAccountYears;
+  }, [detailAccountYears]);
 
   const monthlyAccountSummary = useMemo(() => {
     if (!detailAccount || !transactions.length) return [];
@@ -154,9 +410,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     const accountTxs = transactions.filter(t => t.bankAccountId === detailAccount.id && !t.isSplitChild);
 
     const startOfYear = new Date(detailYear, 0, 1);
+    const prevFlow = historicalNetFlows[detailAccount.id] || 0;
     const balanceBeforeYear = accountTxs
       .filter(t => new Date(t.date) < startOfYear)
-      .reduce((sum, t) => sum + (t.type === 'Income' ? t.amount : -t.amount), detailAccount.initialBalance || 0);
+      .reduce((sum, t) => sum + (t.type === 'Income' ? t.amount : -t.amount), (detailAccount.initialBalance || 0) + prevFlow);
 
     let runningBalance = balanceBeforeYear;
     const months = Array.from({ length: 12 }, (_, i) => i);
@@ -181,13 +438,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         closingBalance
       };
     });
-  }, [detailAccount, detailYear, transactions]);
+  }, [detailAccount, detailYear, transactions, historicalNetFlows]);
 
   const { showToast } = useToast();
   const { hasPermission, isDeveloper } = usePermissions();
   const { user } = useAuth();
 
-  const UNASSIGNED_PROJECT_ID = 'UNASSIGNED_PROJECT'; // Consistent internal ID for uncategorized projects
   const getTransactionAccountLabel = (
     item: Partial<Transaction | TransactionSplit>,
     parent?: Partial<Transaction>
@@ -287,6 +543,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         }
       }
     });
+    // Ensure current year is always an option
+    years.add(new Date().getFullYear());
     return Array.from(years).sort((a, b) => b - a);
   }, [projects]);
 
@@ -298,7 +556,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       const project = projects.find(p => p.id === acc.projectId);
       if (!project) return false;
 
-      const pDate = project.eventStartDate || project.startDate || project.date || project.proposedDate;
+      const pDate = project.eventStartDate || project.startDate || project.date || project.proposedDate || project.createdAt || project.updatedAt;
       if (!pDate) return false;
 
       const pYear = new Date(pDate).getFullYear();
@@ -450,9 +708,13 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     let rb = 0;
     if (bankAccountFilter !== 'All') {
       const selectedAccount = accounts.find(acc => acc.id === bankAccountFilter);
-      rb = selectedAccount?.initialBalance || 0;
+      const initBal = selectedAccount?.initialBalance || 0;
+      const prevFlow = historicalNetFlows[bankAccountFilter] || 0;
+      rb = initBal + prevFlow;
     } else {
-      rb = accounts.reduce((sum, acc) => sum + (acc.initialBalance || 0), 0);
+      const initBal = accounts.reduce((sum, acc) => sum + (acc.initialBalance || 0), 0);
+      const prevFlow = Object.values(historicalNetFlows).reduce((sum, val) => sum + val, 0);
+      rb = initBal + prevFlow;
     }
 
     const withBalance = sorted.map(tx => {
@@ -464,7 +726,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     // 4. Sort Newest -> Oldest for display and Apply limit
     const totalTransactions = [...withBalance].reverse();
     return totalTransactions.slice(0, transactionLimit);
-  }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, accounts, transactionSplits, transactionLimit]);
+  }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, accounts, transactionSplits, transactionLimit, historicalNetFlows]);
 
   const hasMoreTransactions = useMemo(() => {
     // We need to know if there are more than current limit
@@ -581,14 +843,14 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   }, [txSearchTerm]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(reportYear);
+  }, [reportYear]);
 
-  const loadProjectAccounts = async () => {
+  const loadProjectAccounts = async (year: number = projectAccountYearFilter) => {
     setLoadingProjectAccounts(true);
     try {
       const [list, ptTrx] = await Promise.all([
-        projectFinancialService.getAllProjectAccounts(),
+        projectFinancialService.getAllProjectAccounts(year),
         projectFinancialService.getAllProjectTrackerTransactions()
       ]);
       setProjectAccounts(list);
@@ -625,9 +887,13 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
   useEffect(() => {
     if (moduleTab === 'Project Account') {
-      loadProjectAccounts();
+      loadProjectAccounts(projectAccountYearFilter);
     }
-  }, [moduleTab]);
+  }, [moduleTab, projectAccountYearFilter]);
+
+  useEffect(() => {
+    setDetailYear(reportYear);
+  }, [reportYear]);
 
   const loadProjects = async () => {
     try {
@@ -785,17 +1051,19 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     loadAdminPurposes();
   }, [isEditModalOpen, editingTransaction?.category]);
 
-  const loadData = async () => {
+  const loadData = async (targetYear: number = reportYear) => {
     try {
       setLoading(true);
       setError(null);
-      const [txs, accts, summ, inventory, projList, memberList] = await Promise.all([
-        FinanceService.getAllTransactions(),
+      const [txs, accts, summ, inventory, projList, memberList, histFlows, allYears] = await Promise.all([
+        FinanceService.getAllTransactions(targetYear),
         FinanceService.getAllBankAccounts(),
-        FinanceService.getFinancialSummary(reportYear),
+        FinanceService.getFinancialSummary(targetYear),
         InventoryService.getAllItems(),
         ProjectsService.getAllProjects(),
-        MembersService.getAllMembers()
+        MembersService.getAllMembers(),
+        targetYear !== 0 ? FinanceService.getHistoricalNetFlowBeforeYear(targetYear) : Promise.resolve({}),
+        FinanceService.getAllTransactionYears()
       ]);
       setTransactions(txs);
       setAccounts(accts);
@@ -803,8 +1071,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       setInventoryItems(inventory);
       setProjects(projList);
       setAdministrativeProjectIds(getAdministrativeProjectIds());
+      setHistoricalNetFlows(histFlows);
+      setAllTransactionYears(allYears);
       try {
-        const projectAccountList = await projectFinancialService.getAllProjectAccounts();
+        const projectAccountList = await projectFinancialService.getAllProjectAccounts(targetYear);
         setProjectAccounts(projectAccountList);
       } catch (projectAccountError) {
         console.error('Failed to load project account labels', projectAccountError);
@@ -825,15 +1095,27 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       })).sort((a, b) => a.name.localeCompare(b.name));
       setMembers(mappedMembers);
 
-      const allSplits = await FinanceService.getAllTransactionSplits();
+      const allSplits = await FinanceService.getAllTransactionSplits(targetYear);
       const splitsMap: Record<string, TransactionSplit[]> = {};
+      const txIdsSet = new Set(txs.map(t => t.id));
       allSplits.forEach(split => {
-        if (!splitsMap[split.parentTransactionId]) {
-          splitsMap[split.parentTransactionId] = [];
+        if (txIdsSet.has(split.parentTransactionId)) {
+          if (!splitsMap[split.parentTransactionId]) {
+            splitsMap[split.parentTransactionId] = [];
+          }
+          splitsMap[split.parentTransactionId].push(split);
         }
-        splitsMap[split.parentTransactionId].push(split);
       });
       setTransactionSplits(splitsMap);
+
+      if (selectedProjectFilter && selectedProjectFilter !== UNASSIGNED_PROJECT_ID) {
+        try {
+          const txs = await FinanceService.getBankTransactionsByProject(selectedProjectFilter);
+          setSelectedProjectTransactions(txs);
+        } catch (selectedTxErr) {
+          console.error('Failed to reload selected project transactions in loadData', selectedTxErr);
+        }
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load financial data';
       setError(errorMessage);
@@ -1202,15 +1484,26 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
           <p className="text-slate-500">Automated bookkeeping, dues collection, and budgeting.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-28 shrink-0">
+            <Select
+              value={reportYear.toString()}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                setReportYear(val);
+                setProjectAccountYearFilter(val);
+              }}
+              options={[
+                { label: 'All Years', value: '0' },
+                ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
+              ]}
+            />
+          </div>
           <Button variant="outline" onClick={() => setIsReportsModalOpen(true)}>
             <FileText size={16} className="mr-2" /> Reports
           </Button>
           {hasPermission('canEditFinance') && (
             <>
-              <Button variant="outline" onClick={() => setIsReconciliationModalOpen(true)}>
-                <RefreshCw size={16} className="mr-2" /> Reconcile Account
-              </Button>
               <Button variant="outline" onClick={() => setIsDuesRenewalModalOpen(true)}>
                 <Calendar size={16} className="mr-2" /> Renew Dues
               </Button>
@@ -1225,7 +1518,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       <div className="px-4 md:px-6">
         <Tabs
-          tabs={['Dashboard', 'Transactions', 'Project Account', 'Membership', 'Administrative', 'Reconciliation', 'Cross-Account & Errors']}
+          tabs={['Dashboard', 'Transactions', 'Project Account', 'Membership', 'Administrative', 'Reconciliation']}
           activeTab={moduleTab}
           onTabChange={setModuleTab}
         />
@@ -1422,21 +1715,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                           <p className="text-xs text-slate-500 uppercase font-medium">
                             {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
                           </p>
-                          {hasPermission('canEditFinance') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAccount(acc);
-                                setIsReconciliationModalOpen(true);
-                              }}
-                              className="text-xs group-hover:bg-white transition-colors"
-                            >
-                              <RefreshCw size={12} className="mr-1" />
-                              Reconcile
-                            </Button>
-                          )}
+
                         </div>
                         <h3 className="text-xl font-bold text-slate-900 mb-1">{formatCurrency(acc.balance, acc.currency)}</h3>
                         <p className="text-xs text-slate-400 mb-2">Initial: {formatCurrency(acc.initialBalance || 0, acc.currency)}</p>
@@ -1507,7 +1786,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
 
       {moduleTab === 'Administrative' && hasPermission('canViewFinance') && (
-        <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+        <div className="space-y-6">
           {(() => {
             const activeYear = adminAccountYearFilter;
             const adminTransactions = transactions.filter(t => isTransactionInCategory(t, 'Administrative'));
@@ -1537,218 +1816,232 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
             return (
               <>
-                <div className="lg:col-span-2 space-y-6">
-                  <Card title={`Administrative Summary ${activeYear === 0 ? '(All Time)' : `(${activeYear})`}`}>
-                    <div className="mb-4">
-                      <Select
-                        label="Filter by Year"
-                        value={adminAccountYearFilter.toString()}
-                        onChange={(e) => setAdminAccountYearFilter(parseInt(e.target.value, 10))}
-                        options={[
-                          { label: 'All Years', value: '0' },
-                          ...adminAccountYearOptions.map(year => ({
-                            label: year.toString(),
-                            value: year.toString()
-                          }))
-                        ]}
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-500">Income</span>
-                        <span className="font-semibold text-green-600">{formatCurrency(adminIncome)}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-500">Expenses</span>
-                        <span className="font-semibold text-red-600">{formatCurrency(adminExpenses)}</span>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                        <span className="text-sm font-medium text-slate-700">Net</span>
-                        <span className={`font-semibold ${adminNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(adminNet)}</span>
-                      </div>
-                      <p className="text-xs text-slate-400">{adminFiltered.filter(t => t.type === 'Income').length} income / {adminFiltered.filter(t => t.type === 'Expense').length} expense entries</p>
-                    </div>
-                  </Card>
-                  <Card
-                    title="Admin Accounts"
-                    action={hasPermission('canEditFinance') && (
-                      <Button size="sm" onClick={() => setIsAddAdministrativeProjectOpen(true)}>
-                        <Plus size={14} className="mr-1" /> Add Account
-                      </Button>
-                    )}
-                  >
-                    <div className="divide-y divide-slate-100">
-                      {adminByProjectId.length === 0 ? (
-                        <p className="py-4 text-sm text-slate-500">No admin accounts found.</p>
-                      ) : (
-                        adminByProjectId.map(({ projectId, income, expenses, net }) => {
-                          const isActive = adminProjectIdFilter === projectId;
-                          return (
-                            <div
-                              key={projectId}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => setAdminProjectIdFilter(isActive ? null : projectId)}
-                              onKeyDown={(e) => e.key === 'Enter' && setAdminProjectIdFilter(isActive ? null : projectId)}
-                              className={`py-3 px-2 flex justify-between items-center cursor-pointer rounded-lg transition-colors ${isActive ? 'bg-jci-blue/10 ring-1 ring-jci-blue/30' : 'hover:bg-slate-50'}`}
-                            >
-                              <span className={`font-medium ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>{projectId === UNASSIGNED_PROJECT_ID ? 'Unassigned' : projectId}</span>
-                              <div className="text-right text-sm">
-                                <span className="text-green-600">+{formatCurrency(income)}</span>
-                                <span className="text-slate-400 mx-1">/</span>
-                                <span className="text-red-600">-{formatCurrency(expenses)}</span>
-                                <div className={`font-medium ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(net)}</div>
+                {/* Top: Admin Accounts Card (Full Width) */}
+                <Card
+                  title="Admin Accounts"
+                  action={hasPermission('canEditFinance') && (
+                    <Button size="sm" onClick={() => setIsAddAdministrativeProjectOpen(true)}>
+                      <Plus size={14} className="mr-1" /> Add Account
+                    </Button>
+                  )}
+                >
+                  <div className="flex flex-row gap-4 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                    {adminByProjectId.length === 0 ? (
+                      <p className="py-4 text-sm text-slate-500">No admin accounts found.</p>
+                    ) : (
+                      adminByProjectId.map(({ projectId, income, expenses, net }) => {
+                        const isActive = adminProjectIdFilter === projectId;
+                        return (
+                          <div
+                            key={projectId}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setAdminProjectIdFilter(isActive ? null : projectId)}
+                            onKeyDown={(e) => e.key === 'Enter' && setAdminProjectIdFilter(isActive ? null : projectId)}
+                            className={`p-4 cursor-pointer rounded-xl transition-all border shrink-0 min-w-[280px] max-w-[320px] shadow-sm flex flex-col justify-between ${isActive
+                              ? 'bg-jci-blue/5 border-jci-blue ring-1 ring-jci-blue/20 shadow-md shadow-jci-blue/5'
+                              : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow'
+                              }`}
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <Briefcase size={18} className={`text-slate-600 shrink-0 ${isActive ? 'text-jci-blue' : ''}`} />
+                                <span className={`font-medium truncate ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>
+                                  {projectId === UNASSIGNED_PROJECT_ID ? 'Unassigned' : projectId}
+                                </span>
                               </div>
                             </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </Card>
-                </div>
-                <div className="lg:col-span-5">
-                  <Card
-                    title={adminProjectIdFilter === UNASSIGNED_PROJECT_ID ? 'Admin Transactions · Unassigned' : (adminProjectIdFilter ? `Admin Transactions · ${adminProjectIdFilter}` : 'Admin Transactions')}
-                    action={adminProjectIdFilter && (
-                      <Button variant="ghost" size="sm" onClick={() => setAdminProjectIdFilter(null)}>Clear Filter</Button>
+
+                            <div className="bg-slate-50/50 rounded-lg p-2 text-xs border border-slate-100/50">
+                              <div className="flex justify-between py-1 border-b border-slate-200">
+                                <span className="text-slate-500">Incomes</span>
+                                <span className="font-mono text-green-600">+{formatCurrency(income)}</span>
+                              </div>
+                              <div className="flex justify-between py-1">
+                                <span className="text-slate-500">Expenses</span>
+                                <span className="font-mono text-red-600">-{formatCurrency(expenses)}</span>
+                              </div>
+                              <div className="flex justify-between py-1 border-t border-slate-200 mt-1 pt-1 font-medium">
+                                <span className="text-slate-900">Net Flow</span>
+                                <span className={`font-mono ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(net)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
-                  >
-                    {(() => {
-                      const activeYear = adminAccountYearFilter;
-                      const adminTransactionsWithFilter = activeYear === 0
-                        ? adminTransactions
-                        : adminTransactions.filter(t => new Date(t.date).getFullYear() === activeYear);
+                  </div>
+                </Card>
 
-                      const filteredAdminTx = adminProjectIdFilter
-                        ? adminProjectIdFilter === UNASSIGNED_PROJECT_ID
-                          ? adminTransactionsWithFilter.filter(t => !(t.projectId || '').trim())
-                          : adminTransactionsWithFilter.filter(t => (t.projectId || '').trim() === adminProjectIdFilter)
-                        : adminTransactionsWithFilter;
-                      return (
-                        <LoadingState loading={loading} error={error} empty={filteredAdminTx.length === 0} emptyMessage={adminProjectIdFilter ? `No transactions for this account.` : "No admin transactions found. Use 'New Transaction' above to add one."}>
-                          {/* Desktop View */}
-                          <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full table-fixed text-left text-sm">
-                              <thead className="bg-slate-50 text-slate-500">
-                                <tr>
-                                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Date</th>
-                                  <th className="py-3 px-4 font-semibold">Description</th>
-                                  <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">Amount</th>
-                                  <th className="py-3 px-4 font-semibold text-center">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {filteredAdminTx
-                                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                                  .map(tx => (
-                                    <tr key={tx.id} className="hover:bg-slate-50">
-                                      <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
-                                      <td className="py-3 px-4 max-w-0 overflow-hidden">
-                                        <div className="flex items-center gap-2 overflow-hidden">
-                                          {(() => {
-                                            const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                            const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                            if (tx.isSplit) {
-                                              return <Badge variant="info" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Split</Badge>;
-                                            } else if (hasProjectId && hasPurpose) {
-                                              return <Badge variant="success" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Categorized</Badge>;
-                                            } else {
-                                              return <Badge variant="warning" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Uncategorized</Badge>;
-                                            }
-                                          })()}
-                                          <span className="font-medium text-slate-900 truncate min-w-0">{tx.description}</span>
-                                          {tx.referenceNumber && (
-                                            <span className="text-[11px] text-slate-400 font-mono shrink-0">({tx.referenceNumber})</span>
-                                          )}
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                                          <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5 h-4.5 flex items-center">
-                                            {tx.type}
-                                          </Badge>
-                                          <span className="text-xs text-slate-500 font-medium">
-                                            {tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}
-                                          </span>
-                                        </div>
-                                      </td>
-                                      <td className={`py-3 px-4 text-right font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-900'}`}>
-                                        {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
-                                      </td>
-                                      <td className="py-3 px-4 text-center">
-                                        {hasPermission('canEditFinance') && (
-                                          <div className="flex justify-center gap-1">
-                                            <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)}>
-                                              <Edit size={14} />
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)}>
-                                              <Trash2 size={14} />
-                                            </Button>
+                {/* Bottom Section: Summary on Left, Transactions Table on Right */}
+                <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+                  {/* Left Column: Summary */}
+                  <div className="lg:col-span-2">
+                    <Card title={`Administrative Summary ${activeYear === 0 ? '(All Time)' : `(${activeYear})`}`}>
+
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-500">Income</span>
+                          <span className="font-semibold text-green-600">{formatCurrency(adminIncome)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-500">Expenses</span>
+                          <span className="font-semibold text-red-600">{formatCurrency(adminExpenses)}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                          <span className="text-sm font-medium text-slate-700">Net</span>
+                          <span className={`font-semibold ${adminNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(adminNet)}</span>
+                        </div>
+                        <p className="text-xs text-slate-400">{adminFiltered.filter(t => t.type === 'Income').length} income / {adminFiltered.filter(t => t.type === 'Expense').length} expense entries</p>
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Right Column: Admin Transactions Table */}
+                  <div className="lg:col-span-5">
+                    <Card
+                      title={adminProjectIdFilter === UNASSIGNED_PROJECT_ID ? 'Admin Transactions · Unassigned' : (adminProjectIdFilter ? `Admin Transactions · ${adminProjectIdFilter}` : 'Admin Transactions')}
+                      action={adminProjectIdFilter && (
+                        <Button variant="ghost" size="sm" onClick={() => setAdminProjectIdFilter(null)}>Clear Filter</Button>
+                      )}
+                    >
+                      {(() => {
+                        const activeYear = adminAccountYearFilter;
+                        const adminTransactionsWithFilter = activeYear === 0
+                          ? adminTransactions
+                          : adminTransactions.filter(t => new Date(t.date).getFullYear() === activeYear);
+
+                        const filteredAdminTx = adminProjectIdFilter
+                          ? adminProjectIdFilter === UNASSIGNED_PROJECT_ID
+                            ? adminTransactionsWithFilter.filter(t => !(t.projectId || '').trim())
+                            : adminTransactionsWithFilter.filter(t => (t.projectId || '').trim() === adminProjectIdFilter)
+                          : adminTransactionsWithFilter;
+                        return (
+                          <LoadingState loading={loading} error={error} empty={filteredAdminTx.length === 0} emptyMessage={adminProjectIdFilter ? `No transactions for this account.` : "No admin transactions found. Use 'New Transaction' above to add one."}>
+                            {/* Desktop View */}
+                            <div className="hidden md:block overflow-x-auto">
+                              <table className="w-full table-fixed text-left text-sm">
+                                <thead className="bg-slate-50 text-slate-500">
+                                  <tr>
+                                    <th className="py-3 px-4 font-semibold whitespace-nowrap">Date</th>
+                                    <th className="py-3 px-4 font-semibold">Description</th>
+                                    <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">Amount</th>
+                                    <th className="py-3 px-4 font-semibold text-center">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredAdminTx
+                                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                    .map(tx => (
+                                      <tr key={tx.id} className="hover:bg-slate-50">
+                                        <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                                        <td className="py-3 px-4 max-w-0 overflow-hidden">
+                                          <div className="flex items-center gap-2 overflow-hidden">
+                                            {(() => {
+                                              const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                              const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                              if (tx.isSplit) {
+                                                return <Badge variant="info" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Split</Badge>;
+                                              } else if (hasProjectId && hasPurpose) {
+                                                return <Badge variant="success" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Categorized</Badge>;
+                                              } else {
+                                                return <Badge variant="warning" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Uncategorized</Badge>;
+                                              }
+                                            })()}
+                                            <span className="font-medium text-slate-900 truncate min-w-0">{tx.description}</span>
+                                            {tx.referenceNumber && (
+                                              <span className="text-[11px] text-slate-400 font-mono shrink-0">({tx.referenceNumber})</span>
+                                            )}
                                           </div>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                              </tbody>
-                            </table>
-                          </div>
+                                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                                            <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5 h-4.5 flex items-center">
+                                              {tx.type}
+                                            </Badge>
+                                            <span className="text-xs text-slate-500 font-medium">
+                                              {tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className={`py-3 px-4 text-right font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-900'}`}>
+                                          {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                          {hasPermission('canEditFinance') && (
+                                            <div className="flex justify-center gap-1">
+                                              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)}>
+                                                <Edit size={14} />
+                                              </Button>
+                                              <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)}>
+                                                <Trash2 size={14} />
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                </tbody>
+                              </table>
+                            </div>
 
-                          {/* Mobile View */}
-                          <div className="md:hidden space-y-4 p-2">
-                            {filteredAdminTx
-                              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                              .map(tx => (
-                                <div key={tx.id} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
-                                  <div className="flex justify-between items-start mb-3">
-                                    <div className="flex flex-col">
-                                      <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
-                                      <span className="text-sm font-bold text-slate-900 mt-1">{tx.description}</span>
+                            {/* Mobile View */}
+                            <div className="md:hidden space-y-4 p-2">
+                              {filteredAdminTx
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                .map(tx => (
+                                  <div key={tx.id} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                                    <div className="flex justify-between items-start mb-3">
+                                      <div className="flex flex-col">
+                                        <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
+                                        <span className="text-sm font-bold text-slate-900 mt-1">{tx.description}</span>
+                                      </div>
+                                      <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                        {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                      </div>
                                     </div>
-                                    <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                                      {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
-                                    </div>
-                                  </div>
 
-                                  <div className="grid grid-cols-2 gap-2 mb-3">
-                                    <div>
-                                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Account</span>
-                                      <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}</p>
-                                    </div>
-                                    {tx.referenceNumber && (
+                                    <div className="grid grid-cols-2 gap-2 mb-3">
                                       <div>
-                                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
-                                        <p className="text-xs text-slate-700 font-mono truncate">{tx.referenceNumber}</p>
+                                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Account</span>
+                                        <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name ?? tx.projectId) : '—'}</p>
                                       </div>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                                    <div className="flex gap-2">
-                                      <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px]">{tx.type}</Badge>
-                                      {(() => {
-                                        const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                        const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                        if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split</Badge>;
-                                        if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
-                                        return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
-                                      })()}
+                                      {tx.referenceNumber && (
+                                        <div>
+                                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
+                                          <p className="text-xs text-slate-700 font-mono truncate">{tx.referenceNumber}</p>
+                                        </div>
+                                      )}
                                     </div>
-                                    {hasPermission('canEditFinance') && (
-                                      <div className="flex gap-1">
-                                        <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1">
-                                          <Edit size={16} className="text-slate-500" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1">
-                                          <Trash2 size={16} className="text-red-500" />
-                                        </Button>
+
+                                    <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                                      <div className="flex gap-2">
+                                        <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px]">{tx.type}</Badge>
+                                        {(() => {
+                                          const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                          const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                          if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split</Badge>;
+                                          if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
+                                          return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
+                                        })()}
                                       </div>
-                                    )}
+                                      {hasPermission('canEditFinance') && (
+                                        <div className="flex gap-1">
+                                          <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1">
+                                            <Edit size={16} className="text-slate-500" />
+                                          </Button>
+                                          <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1">
+                                            <Trash2 size={16} className="text-red-500" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
-                          </div>
-                        </LoadingState>
-                      );
-                    })()}
-                  </Card>
+                                ))}
+                            </div>
+                          </LoadingState>
+                        );
+                      })()}
+                    </Card>
+                  </div>
                 </div>
               </>
             );
@@ -1826,300 +2119,345 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         </Card>
       )}
 
-      {moduleTab === 'Cross-Account & Errors' && (hasPermission('canViewFinance') || isDeveloper) && (
-        <div className="space-y-6">
-          <Card title="Multi-Account Posting Rules">
-            <p className="text-sm text-slate-500 mb-4">The treasurer can view or configure multi-account posting rules here (by bank account, activity, type, etc.).</p>
-            <ul className="list-disc list-inside text-slate-700 space-y-1 text-sm">
-              <li>Default transactions are posted to the selected bank account; splits can specify a category (Membership / Activity / Administrative / Merchandise).</li>
-              <li>Activity-related income can be linked to an activity and posted to the corresponding project account.</li>
-              <li>Posting rules are maintained by administrators in Settings; this view is read-only.</li>
-            </ul>
-          </Card>
-          <Card title="Misposted Entry Transfer Process & Log">
-            <p className="text-sm text-slate-500 mb-4">When a transaction is posted to the wrong account, follow this process to register and verify the internal transfer.</p>
-            <ol className="list-decimal list-inside text-slate-700 space-y-2 text-sm">
-              <li>Confirm the misposted entry: verify the description, amount, date, and correct account.</li>
-              <li>Add a note in the transaction record (e.g. "Pending Transfer") or use the split/adjustment feature.</li>
-              <li>Execute the internal transfer: post the same amount to the target account (note: "Transferred from XX account") and record a reversal or negative amount in the original account.</li>
-              <li>Update reconciliation status: mark both entries as reconciled and note the cross-account adjustment in the remarks.</li>
-              <li>Log: the treasurer can view "Pending Transfer" or "Transferred" entries here (data connection in a future iteration).</li>
-            </ol>
-            <div className="mt-4 p-3 bg-slate-50 rounded-lg text-slate-600 text-sm">This is currently a process guide and placeholder. The misposted transfer log and automation rules will be connected to data in a future iteration.</div>
-          </Card>
-        </div>
-      )}
+
 
       {moduleTab === 'Project Account' && (
-        <div className="grid lg:grid-cols-7 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card title="Project Statistics">
-              <div className="mb-4">
-                <Select
-                  label="Filter by Year"
-                  value={projectAccountYearFilter.toString()}
-                  onChange={(e) => setProjectAccountYearFilter(parseInt(e.target.value, 10))}
-                  options={[
-                    { label: 'All Years', value: '0' },
-                    ...projectAccountYearOptions.map(year => ({
-                      label: year.toString(),
-                      value: year.toString()
-                    }))
-                  ]}
-                />
-              </div>
-              <p className="text-sm text-slate-500 mb-2">
-                Total Projects: <span className="font-medium text-slate-900">{filteredProjectAccounts.length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Total Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Avg. Balance: <span className="font-medium text-slate-900">{formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Positive Balance: <span className="font-medium text-green-600">{filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Negative Balance: <span className="font-medium text-red-600">{filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}</span>
-              </p>
-              <p className="text-sm text-slate-500 mb-2">
-                Unassigned Transactions: <span className="font-medium text-slate-900">{uncategorizedProjectTxCount}</span>
-              </p>
-            </Card>
-            <Card title="Project Accounts">
-              <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
-                <div className="divide-y divide-slate-100">
-                  {[
-                    ...(uncategorizedProjectTxCount > 0 ? [{
-                      id: 'uncategorized',
-                      projectId: UNASSIGNED_PROJECT_ID,
-                      projectName: 'Unassigned',
-                      currentBalance: 0, // Placeholder, actual balance not tracked here
-                      totalIncome: 0,
-                      totalExpenses: 0,
-                    }] : []),
-                    ...filteredProjectAccounts
-                  ].map(acc => {
-                    const isActive = selectedProjectFilter === acc.projectId;
+        <div className="space-y-6">
+          {/* Top: Project Accounts Card (Full Width) */}
+          <Card title="Project Accounts">
+            <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
+              <div className="flex flex-row gap-4 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                {[
+                  ...(uncategorizedProjectTxCount > 0 ? [{
+                    id: 'uncategorized',
+                    projectId: UNASSIGNED_PROJECT_ID,
+                    projectName: 'Unassigned',
+                    currentBalance: 0,
+                    totalIncome: 0,
+                    totalExpenses: 0,
+                  }] : []),
+                  ...filteredProjectAccounts
+                ].map(acc => {
+                  const isActive = selectedProjectFilter === acc.projectId;
 
-                    // Logic for PT vs Bank comparison
-                    const bankIncome = acc.totalIncome || 0;
-                    const bankExpenses = acc.totalExpenses || 0;
-                    const bankNet = bankIncome - bankExpenses;
+                  // Logic for PT vs Bank comparison
+                  const bankIncome = acc.totalIncome || 0;
+                  const bankExpenses = acc.totalExpenses || 0;
+                  const bankNet = bankIncome - bankExpenses;
 
-                    // PT Values from projectTrackerSummary
-                    const ptData = projectTrackerSummary[acc.projectId] || { income: 0, expenses: 0 };
-                    const ptIncome = ptData.income;
-                    const ptExpenses = ptData.expenses;
-                    const ptNet = ptIncome - ptExpenses;
+                  // PT Values from projectTrackerSummary
+                  const ptData = projectTrackerSummary[acc.projectId] || { income: 0, expenses: 0 };
+                  const ptIncome = ptData.income;
+                  const ptExpenses = ptData.expenses;
+                  const ptNet = ptIncome - ptExpenses;
 
-                    // Match logic: Check if values match exactly
-                    const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
+                  // Match logic: Check if values match exactly
+                  const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
 
-                    return (
-                      <div
-                        key={acc.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedProjectFilter(isActive ? null : acc.projectId)}
-                        onKeyDown={(e) => e.key === 'Enter' && setSelectedProjectFilter(isActive ? null : acc.projectId)}
-                        className={`py-3 px-2 cursor-pointer rounded-lg transition-colors ${isActive ? 'bg-jci-blue/10 ring-1 ring-jci-blue/30' : 'hover:bg-slate-50'}`}
-                      >
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-2">
-                            <Briefcase size={18} className={`text-slate-600 ${isActive ? 'text-jci-blue' : ''}`} />
-                            <span className={`font-medium ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>{acc.projectName}</span>
-                            {/* Green check logic: Only show if NOT unassigned and matches perfectly */}
-                            {acc.projectId !== UNASSIGNED_PROJECT_ID && isMatch && (
-                              <CheckCircle size={16} className="text-green-600 ml-1" />
-                            )}
-                          </div>
-                          {acc.projectId === UNASSIGNED_PROJECT_ID && (
-                            <div className="font-medium text-slate-500 text-sm">{uncategorizedProjectTxCount} entries</div>
+                  return (
+                    <div
+                      key={acc.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedProjectFilter(isActive ? null : acc.projectId)}
+                      onKeyDown={(e) => e.key === 'Enter' && setSelectedProjectFilter(isActive ? null : acc.projectId)}
+                      className={`p-4 cursor-pointer rounded-xl transition-all border shrink-0 min-w-[280px] max-w-[320px] shadow-sm flex flex-col justify-between ${isActive
+                        ? 'bg-jci-blue/5 border-jci-blue ring-1 ring-jci-blue/20 shadow-md shadow-jci-blue/5'
+                        : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow'
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <Briefcase size={18} className={`text-slate-600 shrink-0 ${isActive ? 'text-jci-blue' : ''}`} />
+                          <span className={`font-medium truncate ${isActive ? 'text-jci-blue' : 'text-slate-900'}`}>{acc.projectName}</span>
+                          {acc.projectId !== UNASSIGNED_PROJECT_ID && isMatch && (
+                            <CheckCircle size={16} className="text-green-600 ml-1 shrink-0" />
                           )}
                         </div>
-
-                        {acc.projectId !== UNASSIGNED_PROJECT_ID && (
-                          <div className="bg-white/50 rounded-md p-2 text-xs">
-                            <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-1 mb-1 font-semibold text-slate-500">
-                              <div></div>
-                              <div className="text-right">PT</div>
-                              <div className="text-right">HT</div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 py-0.5">
-                              <div className="text-slate-500">Incomes</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(ptIncome)}</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(bankIncome)}</div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 py-0.5">
-                              <div className="text-slate-500">Expenses</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(ptExpenses)}</div>
-                              <div className="text-right font-mono text-slate-700">{formatCurrency(bankExpenses)}</div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 py-0.5 border-t border-slate-200 mt-1 pt-1 font-medium">
-                              <div className="text-slate-900">Net</div>
-                              <div className={`text-right font-mono ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(ptNet)}</div>
-                              <div className={`text-right font-mono ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(bankNet)}</div>
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </LoadingState>
-            </Card>
-          </div>
-          <div className="lg:col-span-5">
-            <Card
-              title={selectedProjectFilter === UNASSIGNED_PROJECT_ID ? 'Project Transactions · Unassigned' : (selectedProjectFilter ? `Project Transactions · ${projectAccounts.find(p => p.projectId === selectedProjectFilter)?.projectName || selectedProjectFilter}` : 'Project Transactions')}
-              action={selectedProjectFilter && (
-                <Button variant="ghost" size="sm" onClick={() => setSelectedProjectFilter(null)}>Clear Filter</Button>
-              )}
-            >
-              {(() => {
-                const filteredProjectTx = projectTransactions;
-                return (
-                  <LoadingState loading={loading} error={error} empty={filteredProjectTx.length === 0} emptyMessage={selectedProjectFilter ? `No transactions for this project.` : "No project transactions found. Use 'New Transaction' above to add one."}>
-                    {/* Desktop View */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full table-fixed text-left text-sm">
-                        <colgroup>
-                          <col className="w-32" />
-                          <col />
-                          <col className="w-36" />
-                          <col className="w-24" />
-                        </colgroup>
-                        <thead className="bg-slate-50 text-slate-500">
-                          <tr>
-                            <th className="py-3 px-4 font-semibold whitespace-nowrap">Date</th>
-                            <th className="py-3 px-4 font-semibold">Description</th>
-                            <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">Amount</th>
-                            <th className="py-3 px-4 font-semibold text-center">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredProjectTx
-                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                            .map(tx => (
-                              <tr key={tx.id} className="hover:bg-slate-50">
-                                <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
-                                <td className="py-3 px-4 max-w-0 overflow-hidden">
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    {(() => {
-                                      const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                      const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                      if (tx.isSplit) {
-                                        return <Badge variant="info" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Split</Badge>;
-                                      } else if (hasProjectId && hasPurpose) {
-                                        return <Badge variant="success" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Categorized</Badge>;
-                                      } else {
-                                        return <Badge variant="warning" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Uncategorized</Badge>;
-                                      }
-                                    })()}
-                                    <span className="font-medium text-slate-900 truncate min-w-0">{tx.description}</span>
-                                    {tx.referenceNumber && (
-                                      <span className="text-[11px] text-slate-400 font-mono shrink-0">({tx.referenceNumber})</span>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                                    <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5 h-4.5 flex items-center">
-                                      {tx.type}
-                                    </Badge>
-                                    <span className="text-xs text-slate-500 font-medium">
-                                      {tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className={`py-3 px-4 text-right font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-900'}`}>
-                                  {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  {hasPermission('canEditFinance') && (
-                                    <div className="flex justify-center gap-1">
-                                      <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)}>
-                                        <Edit size={14} />
-                                      </Button>
-                                      <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)}>
-                                        <Trash2 size={14} />
-                                      </Button>
-                                    </div>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
 
-                    {/* Mobile View */}
-                    <div className="md:hidden space-y-4 p-2">
-                      {filteredProjectTx
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map(tx => (
-                          <div key={tx.id} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex flex-col">
-                                <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
-                                <span className="text-sm font-bold text-slate-900 mt-1">{tx.description}</span>
-                              </div>
-                              <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                                {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                              <div>
-                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Project</span>
-                                <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}</p>
-                              </div>
-                              {tx.referenceNumber && (
-                                <div>
-                                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
-                                  <p className="text-xs text-slate-700 font-mono truncate">{tx.referenceNumber}</p>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                              <div className="flex gap-2">
-                                <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px]">{tx.type}</Badge>
-                                {(() => {
-                                  const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                  const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                  if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split</Badge>;
-                                  if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
-                                  return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
-                                })()}
-                              </div>
-                              {hasPermission('canEditFinance') && (
-                                <div className="flex gap-1">
-                                  <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1">
-                                    <Edit size={16} className="text-slate-500" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1">
-                                    <Trash2 size={16} className="text-red-500" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
+                      {acc.projectId === UNASSIGNED_PROJECT_ID ? (
+                        <div className="bg-slate-50/50 rounded-lg p-3 text-xs border border-slate-100/50 flex flex-col justify-center items-center h-[98px]">
+                          <span className="text-slate-400 font-medium">Pending Categorization</span>
+                          <span className="text-lg font-bold text-slate-700 mt-1">{uncategorizedProjectTxCount}</span>
+                          <span className="text-[10px] text-slate-400">Transactions</span>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50/50 rounded-lg p-2 text-xs border border-slate-100/50">
+                          <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-1 mb-1 font-semibold text-slate-500">
+                            <div></div>
+                            <div className="text-right">PT</div>
+                            <div className="text-right">HT</div>
                           </div>
-                        ))}
+                          <div className="grid grid-cols-3 gap-2 py-0.5">
+                            <div className="text-slate-500">Incomes</div>
+                            <div className="text-right font-mono text-slate-700">{formatCurrency(ptIncome)}</div>
+                            <div className="text-right font-mono text-slate-700">{formatCurrency(bankIncome)}</div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 py-0.5">
+                            <div className="text-slate-500">Expenses</div>
+                            <div className="text-right font-mono text-slate-700">{formatCurrency(ptExpenses)}</div>
+                            <div className="text-right font-mono text-slate-700">{formatCurrency(bankExpenses)}</div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 py-0.5 border-t border-slate-200 mt-1 pt-1 font-medium">
+                            <div className="text-slate-900">Net</div>
+                            <div className={`text-right font-mono ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(ptNet)}</div>
+                            <div className={`text-right font-mono ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(bankNet)}</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </LoadingState>
-                );
-              })()}
-            </Card>
+                  );
+                })}
+              </div>
+            </LoadingState>
+          </Card>
+
+          {/* Bottom Section: Stats on Left, Transactions Table on Right */}
+          <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+            {/* Left Column: Project Statistics */}
+            <div className="lg:col-span-2">
+              <Card title="Project Statistics">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Projects</span>
+                      <p className="text-sm font-bold text-slate-800">{filteredProjectAccounts.length}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Balance</span>
+                      <p className="text-sm font-bold text-slate-800 truncate" title={formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}>
+                        {formatCurrency(filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0))}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-100 pt-3 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500">Avg. Balance</span>
+                      <span className="font-semibold text-slate-800">
+                        {formatCurrency(filteredProjectAccounts.length > 0 ? filteredProjectAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0) / filteredProjectAccounts.length : 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500">Positive Balance</span>
+                      <span className="font-semibold text-green-600">
+                        {filteredProjectAccounts.filter(acc => acc.currentBalance >= 0).length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500">Negative Balance</span>
+                      <span className="font-semibold text-red-600">
+                        {filteredProjectAccounts.filter(acc => acc.currentBalance < 0).length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500">Unassigned Txs</span>
+                      <span className="font-semibold text-amber-600">
+                        {uncategorizedProjectTxCount}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedProjectInfo && (
+                    <div className="border-t border-slate-100 pt-3 mt-3">
+                      <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Selected Project</h4>
+                      <div className="bg-slate-50 rounded-lg p-3 space-y-2 border border-slate-100">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 font-medium">Project Name:</span>
+                          <span className="font-semibold text-slate-800 truncate max-w-[120px]" title={selectedProjectInfo.name || selectedProjectInfo.title}>
+                            {selectedProjectInfo.name || selectedProjectInfo.title}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-slate-500 font-medium">LO Budget:</span>
+                          <span className="font-semibold text-slate-800">
+                            {formatCurrency(selectedProjectInfo.budget || selectedProjectInfo.proposedBudget || 0)}
+                          </span>
+                        </div>
+                        <Button
+                          className="w-full mt-2 bg-jci-blue hover:bg-jci-blue/90 text-white font-semibold flex items-center justify-center gap-1.5 text-xs py-2 shadow-sm"
+                          size="sm"
+                          onClick={() => {
+                            loadProjectTrxList(selectedProjectFilter);
+                            setIsProjectTrxModalOpen(true);
+                          }}
+                        >
+                          <Settings size={14} />
+                          Configure Project Trx (PT)
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Right Column: Project Transactions Table */}
+            <div className="lg:col-span-5">
+              <Card
+                title={selectedProjectFilter === UNASSIGNED_PROJECT_ID ? 'Project Transactions · Unassigned' : (selectedProjectFilter ? `Project Transactions · ${projectAccounts.find(p => p.projectId === selectedProjectFilter)?.projectName || selectedProjectFilter}` : 'Project Transactions')}
+                action={selectedProjectFilter && (
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedProjectFilter(null)}>Clear Filter</Button>
+                )}
+              >
+                {(() => {
+                  const filteredProjectTx = (selectedProjectFilter && selectedProjectFilter !== UNASSIGNED_PROJECT_ID)
+                    ? selectedProjectTransactions
+                    : projectTransactions;
+                  return (
+                    <LoadingState loading={loading || loadingSelectedProjectTransactions} error={error} empty={filteredProjectTx.length === 0} emptyMessage={selectedProjectFilter ? `No transactions for this project.` : "No project transactions found. Use 'New Transaction' above to add one."}>
+                      {/* Desktop View */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full table-fixed text-left text-sm">
+                          <colgroup>
+                            <col className="w-32" />
+                            <col />
+                            <col className="w-36" />
+                            <col className="w-24" />
+                          </colgroup>
+                          <thead className="bg-slate-50 text-slate-500">
+                            <tr>
+                              <th className="py-3 px-4 font-semibold whitespace-nowrap">Date</th>
+                              <th className="py-3 px-4 font-semibold">Description</th>
+                              <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">Amount</th>
+                              <th className="py-3 px-4 font-semibold text-center">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredProjectTx
+                              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                              .map(tx => (
+                                <tr key={tx.id} className="hover:bg-slate-50">
+                                  <td className="py-3 px-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                                  <td className="py-3 px-4 max-w-0 overflow-hidden">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      {(() => {
+                                        const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                        const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                        if (tx.isSplit) {
+                                          return <Badge variant="info" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Split</Badge>;
+                                        } else if (hasProjectId && hasPurpose) {
+                                          return <Badge variant="success" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Categorized</Badge>;
+                                        } else {
+                                          return <Badge variant="warning" className="text-[10px] py-0 px-1.5 h-4.5 flex items-center shrink-0">Uncategorized</Badge>;
+                                        }
+                                      })()}
+                                      <span className="font-medium text-slate-900 truncate min-w-0">{tx.description}</span>
+                                      {tx.referenceNumber && (
+                                        <span className="text-[11px] text-slate-400 font-mono shrink-0">({tx.referenceNumber})</span>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                      <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px] py-0 px-1.5 h-4.5 flex items-center">
+                                        {tx.type}
+                                      </Badge>
+                                      <span className="text-xs text-slate-500 font-medium">
+                                        {tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className={`py-3 px-4 text-right font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-900'}`}>
+                                    {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    {hasPermission('canEditFinance') && (
+                                      <div className="flex justify-center gap-1">
+                                        <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)}>
+                                          <Edit size={14} />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)}>
+                                          <Trash2 size={14} />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile View */}
+                      <div className="md:hidden space-y-4 p-2">
+                        {filteredProjectTx
+                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                          .map(tx => (
+                            <div key={tx.id} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
+                                  <span className="text-sm font-bold text-slate-900 mt-1">{tx.description}</span>
+                                </div>
+                                <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div>
+                                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Project</span>
+                                  <p className="text-xs text-slate-700 truncate">{tx.projectId ? (projects.find(p => p.id === tx.projectId)?.name || tx.projectId) : '—'}</p>
+                                </div>
+                                {tx.referenceNumber && (
+                                  <div>
+                                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Ref No.</span>
+                                    <p className="text-xs text-slate-700 font-mono truncate">{tx.referenceNumber}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                                <div className="flex gap-2">
+                                  <Badge variant={tx.type === 'Income' ? 'success' : 'neutral'} className="text-[10px]">{tx.type}</Badge>
+                                  {(() => {
+                                    const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                    const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                    if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split</Badge>;
+                                    if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
+                                    return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
+                                  })()}
+                                </div>
+                                {hasPermission('canEditFinance') && (
+                                  <div className="flex gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1">
+                                      <Edit size={16} className="text-slate-500" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1">
+                                      <Trash2 size={16} className="text-red-500" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </LoadingState>
+                  );
+                })()}
+              </Card>
+            </div>
           </div>
         </div>
       )}
-
       {moduleTab === 'Transactions' && (
         <div className="space-y-4">
           <Card>
             <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
               <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                <div className="w-full md:w-32">
+                  <Select
+                    value={reportYear.toString()}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setReportYear(val);
+                      setProjectAccountYearFilter(val);
+                    }}
+                    options={[
+                      { label: 'All Years', value: '0' },
+                      ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
+                    ]}
+                  />
+                </div>
                 <div className="w-full md:w-48">
                   <Select
                     value={bankAccountFilter}
@@ -2587,6 +2925,362 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         </Modal>
       )}
 
+      {/* Project Tracker Transactions (Project Trx) Modal */}
+      {selectedProjectFilter && selectedProjectInfo && (
+        <Modal
+          isOpen={isProjectTrxModalOpen}
+          onClose={() => setIsProjectTrxModalOpen(false)}
+          title={`Configure Project Tracker Transactions - ${selectedProjectInfo.name || selectedProjectInfo.title}`}
+          size="4xl"
+          bottomSheet={false}
+          drawerOnMobile={false}
+          footer={
+            <div className="flex justify-end w-full">
+              <Button variant="ghost" onClick={() => setIsProjectTrxModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+            {/* Quick Stats Section */}
+            <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Project Budget</span>
+                <p className="text-sm font-bold text-slate-800">
+                  {formatCurrency(selectedProjectInfo.budget || selectedProjectInfo.proposedBudget || 0)}
+                </p>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">PT Total Income</span>
+                <p className="text-sm font-bold text-green-600">
+                  {formatCurrency(projectTrxList.filter(t => t.type === 'Income').reduce((sum, t) => sum + (t.amount || 0), 0))}
+                </p>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">PT Total Expense</span>
+                <p className="text-sm font-bold text-red-600">
+                  {formatCurrency(projectTrxList.filter(t => t.type === 'Expense').reduce((sum, t) => sum + (t.amount || 0), 0))}
+                </p>
+              </div>
+            </div>
+
+            {/* Paste Area */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
+                Paste Transactions from Excel / Google Sheets
+              </label>
+              <p className="text-[11px] text-slate-500 mb-2">
+                Copy columns from your spreadsheet: <strong>Description | Remarks | Income | Expense | Date</strong> and paste them in the box below to batch import.
+              </p>
+              <textarea
+                placeholder="Paste copied cells from Excel/Google Sheets here..."
+                className="w-full h-14 p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-jci-blue font-mono"
+                onPaste={(e) => {
+                  const pastedText = e.clipboardData.getData('Text');
+                  if (pastedText) {
+                    e.preventDefault();
+                    handleProjectTrxPaste(pastedText);
+                  }
+                }}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleProjectTrxPaste(e.target.value);
+                    e.target.value = ''; // clear it immediately
+                  }
+                }}
+              />
+            </div>
+
+            {/* Add Transaction Section */}
+            <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Add Single Transaction</h4>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Date</label>
+                  <Input
+                    type="date"
+                    value={projectTrxAddForm.date || ''}
+                    onChange={(e) => setProjectTrxAddForm({ ...projectTrxAddForm, date: e.target.value })}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-slate-500 mb-1">Description</label>
+                  <Input
+                    type="text"
+                    placeholder="Transaction description"
+                    value={projectTrxAddForm.description || ''}
+                    onChange={(e) => setProjectTrxAddForm({ ...projectTrxAddForm, description: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Amount</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={projectTrxAddForm.amount || ''}
+                    onChange={(e) => setProjectTrxAddForm({ ...projectTrxAddForm, amount: parseFloat(e.target.value) || undefined })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Type</label>
+                  <Select
+                    value={projectTrxAddForm.type || 'Expense'}
+                    onChange={(e) => setProjectTrxAddForm({ ...projectTrxAddForm, type: e.target.value as 'Income' | 'Expense' })}
+                    options={[
+                      { label: 'Expense', value: 'Expense' },
+                      { label: 'Income', value: 'Income' }
+                    ]}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-slate-500 mb-1">Ref / Remarks</label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Receipt No, Member Name"
+                    value={projectTrxAddForm.referenceNumber || ''}
+                    onChange={(e) => setProjectTrxAddForm({ ...projectTrxAddForm, referenceNumber: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Purpose / Section</label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. F&B, Logistics"
+                    value={projectTrxAddForm.purpose || ''}
+                    onChange={(e) => setProjectTrxAddForm({ ...projectTrxAddForm, purpose: e.target.value })}
+                  />
+                </div>
+                <div className="md:col-span-2 flex gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleAddProjectTrx}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2"
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setProjectTrxAddForm({})}
+                    className="py-2"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Tracker Transactions */}
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Transaction List ({projectTrxList.length} items)
+                </h4>
+              </div>
+              {projectTrxLoading ? (
+                <div className="p-8 flex justify-center">
+                  <RefreshCw className="animate-spin text-jci-blue" size={24} />
+                </div>
+              ) : projectTrxList.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-sm">
+                  No project tracker transactions found. Copy and paste or use the form above to add some.
+                </div>
+              ) : (
+                <div className="overflow-x-auto font-sans">
+                  <table
+                    className="w-full text-left text-xs"
+                    onPaste={(e) => {
+                      const pastedText = e.clipboardData.getData('Text');
+                      if (pastedText && pastedText.includes('\t')) {
+                        e.preventDefault();
+                        handleProjectTrxPaste(pastedText);
+                      }
+                    }}
+                  >
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-[10px] border-b border-slate-100">
+                      <tr>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Type</th>
+                        <th className="p-3">Description</th>
+                        <th className="p-3">Remarks</th>
+                        <th className="p-3">Purpose</th>
+                        <th className="p-3">Bank Transaction</th>
+                        <th className="p-3 text-right">Amount</th>
+                        <th className="p-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {projectTrxList.map((tx) => {
+                        const isEditing = projectTrxEditingId === tx.id;
+                        return (
+                          <tr key={tx.id} className="hover:bg-slate-50/50">
+                            <td className="p-3 font-mono">
+                              {isEditing ? (
+                                <Input
+                                  type="date"
+                                  className="py-1 px-2 text-xs"
+                                  value={projectTrxEditForm.date || ''}
+                                  onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, date: e.target.value })}
+                                />
+                              ) : (
+                                formatDate(tx.date)
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {isEditing ? (
+                                <Select
+                                  className="py-1 px-2 text-xs"
+                                  value={projectTrxEditForm.type || 'Expense'}
+                                  onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, type: e.target.value as 'Income' | 'Expense' })}
+                                  options={[
+                                    { label: 'Expense', value: 'Expense' },
+                                    { label: 'Income', value: 'Income' }
+                                  ]}
+                                />
+                              ) : (
+                                <Badge variant={tx.type === 'Income' ? 'success' : 'error'}>
+                                  {tx.type}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-3 font-medium">
+                              {isEditing ? (
+                                <Input
+                                  type="text"
+                                  className="py-1 px-2 text-xs"
+                                  value={projectTrxEditForm.description || ''}
+                                  onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, description: e.target.value })}
+                                />
+                              ) : (
+                                tx.description
+                              )}
+                            </td>
+                            <td className="p-3 text-slate-500">
+                              {isEditing ? (
+                                <Input
+                                  type="text"
+                                  className="py-1 px-2 text-xs"
+                                  value={projectTrxEditForm.referenceNumber || ''}
+                                  onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, referenceNumber: e.target.value })}
+                                />
+                              ) : (
+                                tx.referenceNumber || '—'
+                              )}
+                            </td>
+                            <td className="p-3 text-slate-500">
+                              {isEditing ? (
+                                <Input
+                                  type="text"
+                                  className="py-1 px-2 text-xs"
+                                  value={projectTrxEditForm.purpose || ''}
+                                  onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, purpose: e.target.value })}
+                                />
+                              ) : (
+                                tx.purpose || '—'
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {(() => {
+                                const bankInfo = getLinkedBankTxInfo(tx.id);
+                                if (!bankInfo) {
+                                  return <span className="text-slate-400 italic text-[11px]">Unlinked</span>;
+                                }
+                                return (
+                                  <div className="text-[11px] bg-blue-50/70 text-blue-800 p-1.5 rounded border border-blue-100 flex flex-col gap-0.5 max-w-[180px]">
+                                    <div className="flex justify-between items-center text-[9px] text-blue-600 font-medium">
+                                      <span className="uppercase font-bold tracking-wider">
+                                        {bankInfo.isSplit ? 'Split Match' : 'Bank Match'}
+                                      </span>
+                                      <span className="font-mono">{formatDate(bankInfo.date)}</span>
+                                    </div>
+                                    <p className="font-semibold text-slate-800 truncate" title={bankInfo.description}>
+                                      {bankInfo.description}
+                                    </p>
+                                    <div className="flex justify-between items-center text-[9px] text-blue-500 font-semibold">
+                                      <span>{bankInfo.bankAccountName}</span>
+                                      <span className="font-bold text-blue-700">{formatCurrency(bankInfo.amount)}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td className="p-3 text-right font-semibold">
+                              {isEditing ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="py-1 px-2 text-xs text-right"
+                                  value={projectTrxEditForm.amount || ''}
+                                  onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, amount: parseFloat(e.target.value) || undefined })}
+                                />
+                              ) : (
+                                <span className={tx.type === 'Income' ? 'text-green-600' : 'text-slate-700'}>
+                                  {formatCurrency(tx.amount)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              <div className="flex justify-center gap-1.5">
+                                {isEditing ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="success"
+                                      onClick={() => handleUpdateProjectTrx(tx.id)}
+                                      className="py-1 px-2 text-[10px]"
+                                    >
+                                      Save
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setProjectTrxEditingId(null)}
+                                      className="py-1 px-2 text-[10px]"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="p-1"
+                                      onClick={() => {
+                                        setProjectTrxEditingId(tx.id);
+                                        setProjectTrxEditForm(tx);
+                                      }}
+                                    >
+                                      <Edit size={14} className="text-slate-500" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="p-1"
+                                      onClick={() => handleDeleteProjectTrx(tx.id)}
+                                    >
+                                      <Trash2 size={14} className="text-red-500" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Financial Reports Modal */}
       <FinancialReportsModal
         isOpen={isReportsModalOpen}
@@ -2602,20 +3296,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         onFiscalYearStartChange={setFiscalYearStart}
       />
 
-      {/* Bank Account Reconciliation Modal */}
-      <BankReconciliationModal
-        isOpen={isReconciliationModalOpen}
-        onClose={() => {
-          setIsReconciliationModalOpen(false);
-          setSelectedAccount(null);
-        }}
-        accounts={accounts}
-        onReconcile={async () => {
-          await loadData();
-          setIsReconciliationModalOpen(false);
-          setSelectedAccount(null);
-        }}
-      />
+
 
       {/* Dues Renewal Modal */}
       <DuesRenewalModal
@@ -2725,7 +3406,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               <span className="text-xs text-slate-500 font-medium">Reporting Year:</span>
               <select
                 value={detailYear}
-                onChange={(e) => setDetailYear(Number(e.target.value))}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setDetailYear(val);
+                  setReportYear(val);
+                  setProjectAccountYearFilter(val);
+                }}
                 className="text-sm border-slate-200 rounded-lg py-1.5 pl-3 pr-10 focus:ring-jci-blue focus:border-jci-blue bg-white border shadow-sm outline-none transition-all duration-200"
               >
                 {availableYears.map(year => (
@@ -3313,12 +3999,6 @@ const CheckCircleIcon = ({ size, className }: { size: number, className: string 
 );
 
 
-interface BankReconciliationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  accounts: BankAccount[];
-  onReconcile: () => Promise<void>;
-}
 // Add Bank Account Modal
 interface AddBankAccountModalProps {
   isOpen: boolean;
@@ -3428,126 +4108,7 @@ const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen, onClo
   );
 };
 
-const BankReconciliationModal: React.FC<BankReconciliationModalProps> = ({
-  isOpen,
-  onClose,
-  accounts,
-  onReconcile,
-}) => {
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
-  const [statementBalance, setStatementBalance] = useState<string>('');
-  const [reconciliationDate, setReconciliationDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState<string>('');
-  const [isReconciling, setIsReconciling] = useState(false);
-  const { showToast } = useToast();
-  const { member } = useAuth();
 
-  const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-
-  const handleReconcile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedAccountId || !statementBalance || !member) {
-      showToast('Please fill in all required fields', 'error');
-      return;
-    }
-
-    setIsReconciling(true);
-    try {
-      await FinanceService.reconcileBankAccount(
-        selectedAccountId,
-        parseFloat(statementBalance),
-        reconciliationDate,
-        member.id,
-        notes || undefined
-      );
-      showToast('Bank account reconciled successfully', 'success');
-      await onReconcile();
-      // Reset form
-      setSelectedAccountId('');
-      setStatementBalance('');
-      setReconciliationDate(new Date().toISOString().split('T')[0]);
-      setNotes('');
-      onClose(); // Auto close on success
-    } catch (err) {
-      showToast('Failed to reconcile bank account', 'error');
-    } finally {
-      setIsReconciling(false);
-    }
-  };
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Reconcile Bank Account"
-      size="lg"
-      bottomSheet
-      drawerOnMobile
-      footer={
-        <div className="flex gap-3 w-full">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="bank-reconciliation-form" className="flex-1" disabled={isReconciling}>
-            {isReconciling ? 'Reconciling...' : 'Reconcile Account'}
-          </Button>
-        </div>
-      }
-    >
-      <form id="bank-reconciliation-form" onSubmit={handleReconcile} className="space-y-4">
-        <Select
-          label="Select Bank Account"
-          value={selectedAccountId}
-          onChange={(e) => setSelectedAccountId(e.target.value)}
-          options={accounts.map(acc => ({ label: acc.name, value: acc.id }))}
-          required
-        />
-
-        {selectedAccount && (
-          <div className="p-4 bg-slate-50 rounded-lg space-y-2">
-            <div className="flex justify-between">
-              <span className="text-sm text-slate-600">Current System Balance:</span>
-              <span className="font-semibold text-slate-900">{formatCurrency(selectedAccount.balance, selectedAccount.currency)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-slate-600">Last Reconciled:</span>
-              <span className="text-sm text-slate-700">{formatDate(selectedAccount.lastReconciled)}</span>
-            </div>
-          </div>
-        )}
-
-        <Input
-          label="Statement Balance"
-          type="number"
-          step="0.01"
-          value={statementBalance}
-          onChange={(e) => setStatementBalance(e.target.value)}
-          placeholder="0.00"
-          required
-        />
-
-        <Input
-          label="Reconciliation Date"
-          type="date"
-          value={reconciliationDate}
-          onChange={(e) => setReconciliationDate(e.target.value)}
-          required
-        />
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Notes (Optional)</label>
-          <textarea
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-jci-blue"
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add any notes about this reconciliation..."
-          />
-        </div>
-      </form>
-    </Modal>
-  );
-};
 
 // Dues Renewal Modal
 interface DuesRenewalModalProps {

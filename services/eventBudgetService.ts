@@ -211,11 +211,24 @@ export class EventBudgetService {
     transactions: Transaction[];
   }> {
     try {
-      // Get all transactions related to this event
+      // 1. Get transactions directly assigned to this event (project ID matches eventId, which includes split virtual transactions)
+      const directTransactions = await FinanceService.getBankTransactionsByProject(eventId);
+
+      // 2. Get all transactions to filter by description containing eventId (for backward compatibility)
       const allTransactions = await FinanceService.getAllTransactions();
-      const eventTransactions = allTransactions.filter(
-        t => (t.description && t.description.toLowerCase().includes(eventId.toLowerCase()))
+      const descriptionMatchTransactions = allTransactions.filter(
+        t => (t.description && t.description.toLowerCase().includes(eventId.toLowerCase())) && !t.isSplit
       );
+
+      // 3. Combine them using a Map to avoid duplicates by ID
+      const mergedTransactionsMap = new Map<string, Transaction>();
+      
+      // Add description matches first
+      descriptionMatchTransactions.forEach(t => mergedTransactionsMap.set(t.id, t));
+      // Add project-linked transactions (which includes splits as virtual transactions)
+      directTransactions.forEach(t => mergedTransactionsMap.set(t.id, t));
+
+      const eventTransactions = Array.from(mergedTransactionsMap.values());
 
       const totalSpent = eventTransactions
         .filter(t => t.type === 'Expense')

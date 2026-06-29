@@ -717,8 +717,14 @@ class ProjectFinancialService {
   /**
    * Get all project financial accounts (for admin/reporting purposes)
    */
-  async getAllProjectAccounts(): Promise<ProjectFinancialAccount[]> {
+  async getAllProjectAccounts(year?: number): Promise<ProjectFinancialAccount[]> {
     if (isDevMode()) {
+      if (year) {
+        return Array.from(this.accounts.values()).filter(acc => {
+          const pDate = acc.createdAt || new Date().toISOString();
+          return new Date(pDate).getFullYear() === year;
+        });
+      }
       return Array.from(this.accounts.values());
     }
 
@@ -728,45 +734,48 @@ class ProjectFinancialService {
         query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
       );
 
-      const projects = projectsSnapshot.docs
+      let projects = projectsSnapshot.docs
         .filter(doc => !['Draft', 'Submitted', 'Under Review', 'Rejected'].includes(doc.data().status ?? ''))
         .map(doc => ({ id: doc.id, ...doc.data() } as Project));
 
-      // Get all transactions categorized as "Projects & Activities"
-      const allProjectTransactions = await FinanceService.getTransactionsByCategory('Projects & Activities');
-
-      const accounts: ProjectFinancialAccount[] = [];
-
-      for (const project of projects) {
-        // Filter transactions for this specific project
-        const projectTransactions = allProjectTransactions.filter(t => t.projectId === project.id);
-
-        const totalIncome = projectTransactions
-          .filter(t => t.type === 'Income')
-          .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-        const totalExpenses = projectTransactions
-          .filter(t => t.type === 'Expense')
-          .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
-
-        const budget = project.budget || project.proposedBudget || 0;
-
-        accounts.push({
-          id: `proj_acc_${project.id}`,
-          projectId: project.id,
-          projectName: project.name || project.title || 'Unnamed Project',
-          budget: budget,
-          startingBalance: budget, // Using budget as starting balance for LO-allocated funds
-          currentBalance: budget + totalIncome - totalExpenses,
-          totalIncome,
-          totalExpenses,
-          budgetCategories: [], // Dynamic calculation doesn't yet support categories from Firestore
-          alertThresholds: [],
-          createdAt: project.createdAt || new Date().toISOString(),
-          updatedAt: project.updatedAt || new Date().toISOString(),
-          createdBy: project.submittedBy || 'system',
+      if (year) {
+        projects = projects.filter(project => {
+          const pDate = project.eventStartDate || project.startDate || project.date || project.proposedDate || project.createdAt || project.updatedAt || new Date().toISOString();
+          return new Date(pDate).getFullYear() === year;
         });
       }
+
+      const accounts: ProjectFinancialAccount[] = await Promise.all(
+        projects.map(async (project) => {
+          const projectTransactions = await FinanceService.getBankTransactionsByProject(project.id);
+
+          const totalIncome = projectTransactions
+            .filter(t => t.type === 'Income')
+            .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+          const totalExpenses = projectTransactions
+            .filter(t => t.type === 'Expense')
+            .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
+
+          const budget = project.budget || project.proposedBudget || 0;
+
+          return {
+            id: `proj_acc_${project.id}`,
+            projectId: project.id,
+            projectName: project.name || project.title || 'Unnamed Project',
+            budget: budget,
+            startingBalance: budget,
+            currentBalance: budget + totalIncome - totalExpenses,
+            totalIncome,
+            totalExpenses,
+            budgetCategories: [],
+            alertThresholds: [],
+            createdAt: project.createdAt || new Date().toISOString(),
+            updatedAt: project.updatedAt || new Date().toISOString(),
+            createdBy: project.submittedBy || 'system',
+          };
+        })
+      );
 
       return accounts;
     } catch (error) {

@@ -25,6 +25,7 @@ import { ProjectAccountsService, ProjectAccount } from '../../services/projectAc
 import { ProjectReportService, ProjectReport } from '../../services/projectReportService';
 // ProjectTransactionModal removed Header: Title and Due Date
 import { FinanceService } from '../../services/financeService';
+import { ReconciliationService } from '../../services/reconciliationService';
 import { Transaction } from '../../types';
 import { useBatchMode } from '../../contexts/BatchModeContext';
 
@@ -1794,12 +1795,23 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
   const [bankTxSearchQuery, setBankTxSearchQuery] = useState('');
   const [selectedBankTxIds, setSelectedBankTxIds] = useState<string[]>([]);
   const [selectedProjectTxIds, setSelectedProjectTxIds] = useState<string[]>([]);
+  const [batchProjectPurposeValue, setBatchProjectPurposeValue] = useState('');
   const [batchProjectTxIds, setBatchProjectTxIds] = useState<string[]>([]);
+  const isMixedBankTxSelected = useMemo(() => {
+    if (selectedBankTxIds.length === 0) return false;
+    const selectedTxTypes = selectedBankTxIds.map(id => {
+      const tx = bankTransactions.find(bt => bt.id === id);
+      return tx?.type;
+    }).filter(Boolean);
+    return new Set(selectedTxTypes).size > 1;
+  }, [selectedBankTxIds, bankTransactions]);
+  const [tempSelectedProjectTxIds, setTempSelectedProjectTxIds] = useState<Record<string, string[]>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAddingIncome, setIsAddingIncome] = useState(false);
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
   const [addForm, setAddForm] = useState<Partial<Transaction>>({});
+  const { members } = useMembers();
 
   const uniquePurposes = useMemo(() => {
     return Array.from(new Set(transactions.map(t => t.purpose).filter(Boolean))) as string[];
@@ -1842,6 +1854,20 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
     }
   };
 
+  const refreshTransactionsBackground = async () => {
+    if (!account) return;
+    try {
+      const [projectTx, bankTx] = await Promise.all([
+        FinanceService.getProjectTransactions(account.projectId),
+        FinanceService.getBankTransactionsByProject(account.projectId)
+      ]);
+      setTransactions(projectTx);
+      setBankTransactions(bankTx);
+    } catch (err) {
+      console.error('Failed to load transactions in background', err);
+    }
+  };
+
 
   const handleTablePaste = async (e: React.ClipboardEvent, type: 'Income' | 'Expense', currentPurpose: string) => {
     const pastedText = e.clipboardData.getData('Text');
@@ -1854,6 +1880,39 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
     const rows = pastedText.split(/\r?\n/).filter(r => r.trim());
     let parsedCount = 0;
     let dynamicPurpose = currentPurpose;
+
+    const parsePastedDate = (dateStr: string): string => {
+      if (!dateStr) return '';
+      const clean = dateStr.trim();
+      
+      // Pattern 1: DD/MM/YYYY or DD-MM-YYYY
+      const dmyMatch = clean.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+      if (dmyMatch) {
+        const day = dmyMatch[1].padStart(2, '0');
+        const month = dmyMatch[2].padStart(2, '0');
+        const year = dmyMatch[3];
+        return `${year}-${month}-${day}`;
+      }
+
+      // Pattern 2: YYYY/MM/DD or YYYY-MM-DD
+      const ymdMatch = clean.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})$/);
+      if (ymdMatch) {
+        const year = ymdMatch[1];
+        const month = ymdMatch[2].padStart(2, '0');
+        const day = ymdMatch[3].padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      // Fallback: standard parser
+      try {
+        const d = new Date(clean);
+        if (!isNaN(d.getTime())) {
+          return d.toISOString().split('T')[0];
+        }
+      } catch {}
+
+      return '';
+    };
 
     setLoadingTransactions(true);
     try {
@@ -1883,7 +1942,9 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
         if (incomeAmount > 0) txType = 'Income';
         else if (expenseAmount > 0) txType = 'Expense';
 
-        const dateStr = new Date().toISOString().split('T')[0];
+        // Check 5th column for date. If empty, dateStr will be '' representing unpaid payment request.
+        const rawDate = cols.length > 4 ? cols[4]?.trim() : '';
+        const dateStr = parsePastedDate(rawDate);
 
         if (account?.projectId) {
           await FinanceService.createProjectTransaction({
@@ -1997,11 +2058,19 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
         await Promise.all(relatedBankTxs.map(btx => {
           const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
           const newLinkedIds = btxLinkedIds.filter((id: string) => id !== transactionId);
-          return FinanceService.updateTransaction(btx.id, {
+          const updates: any = {
             projectTransactionIds: newLinkedIds,
             projectTransactionId: newLinkedIds[0] || null,
             status: newLinkedIds.length > 0 ? 'Reconciled' : 'Cleared'
-          } as any);
+          };
+          if (newLinkedIds.length === 0) {
+            updates.purpose = '';
+          }
+          if ((btx as any).isSplitChild) {
+            return FinanceService.updateTransactionSplit(btx.id, updates);
+          } else {
+            return FinanceService.updateTransaction(btx.id, updates);
+          }
         }));
       }
 
@@ -2032,11 +2101,19 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
         await Promise.all(relatedBankTxs.map(btx => {
           const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
           const newLinkedIds = btxLinkedIds.filter((id: string) => !selectedProjectTxIds.includes(id));
-          return FinanceService.updateTransaction(btx.id, {
+          const updates: any = {
             projectTransactionIds: newLinkedIds,
             projectTransactionId: newLinkedIds[0] || null,
             status: newLinkedIds.length > 0 ? 'Reconciled' : 'Cleared'
-          } as any);
+          };
+          if (newLinkedIds.length === 0) {
+            updates.purpose = '';
+          }
+          if ((btx as any).isSplitChild) {
+            return FinanceService.updateTransactionSplit(btx.id, updates);
+          } else {
+            return FinanceService.updateTransaction(btx.id, updates);
+          }
         }));
       }
 
@@ -2054,65 +2131,73 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
     }
   };
 
+  const handleBatchSetProjectTxPurpose = async () => {
+    if (selectedProjectTxIds.length === 0 || !batchProjectPurposeValue.trim()) return;
+    try {
+      setLoadingTransactions(true);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const id of selectedProjectTxIds) {
+        try {
+          await FinanceService.updateProjectTransaction(id, {
+            purpose: batchProjectPurposeValue.trim()
+          });
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to update purpose for project transaction ${id}`, err);
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        showToast(
+          `Successfully set purpose for ${successCount} transaction${successCount > 1 ? 's' : ''}${failCount > 0 ? `, failed ${failCount}` : ''}`,
+          'success'
+        );
+      } else if (failCount > 0) {
+        showToast(`Failed to update purpose for selected transactions`, 'error');
+      }
+
+      setSelectedProjectTxIds([]);
+      setBatchProjectPurposeValue('');
+      loadTransactions();
+      onRefresh(); // Refresh parent account data
+    } catch (err) {
+      console.error('Batch set project transaction purpose failed', err);
+      showToast('Failed to batch set purpose', 'error');
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
 
   const handleAutoMatch = async () => {
     try {
-      let matchedCount = 0;
+      const matches = ReconciliationService.analyzeMatches(bankTransactions, transactions || [], members);
 
-      const unmatchedProjectTxs = (transactions || []).filter(t => {
-        const isLinkedElsewhere = bankTransactions.some(btx => {
-          const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-          return btxLinkedIds.includes(t.id);
-        });
-        return !isLinkedElsewhere;
-      });
-
-      const promises = [];
-
-      for (const bankTx of bankTransactions) {
-        const linkedIds = (bankTx as any).projectTransactionIds || ((bankTx as any).projectTransactionId ? [(bankTx as any).projectTransactionId] : []);
-        if (linkedIds.length > 0) continue;
-
-        const match = unmatchedProjectTxs.find(pTx => {
-          const isSameAmount = Math.abs(pTx.amount) === Math.abs(bankTx.amount);
-          if (!isSameAmount) return false;
-
-          const pDesc = (pTx.description || '').toLowerCase();
-          const pRef = (pTx.referenceNumber || '').toLowerCase();
-          const bDesc = (bankTx.description || '').toLowerCase();
-          const bRef = (bankTx.referenceNumber || '').toLowerCase();
-
-          const descMatch = (pDesc && bDesc.includes(pDesc)) || (bDesc && pDesc.includes(bDesc));
-          const refMatch = (pRef && bRef.includes(pRef)) || (bRef && pRef.includes(bRef));
-
-          return descMatch || refMatch;
-        });
-
-        if (match) {
-          const idx = unmatchedProjectTxs.indexOf(match);
-          if (idx > -1) unmatchedProjectTxs.splice(idx, 1);
-
-          promises.push(FinanceService.updateTransaction(bankTx.id, {
-            projectTransactionIds: [match.id],
-            projectTransactionId: match.id,
-            purpose: match.purpose || bankTx.purpose,
-            description: match.description || bankTx.description
-          } as any));
-          matchedCount++;
-        }
-      }
-
-      if (promises.length > 0) {
-        await Promise.all(promises);
-        showToast(`Auto-matched ${matchedCount} transactions`, 'success');
-        loadTransactions();
-        if (account?.projectId) {
-          const bankTx = await FinanceService.getBankTransactionsByProject(account.projectId);
-          setBankTransactions(bankTx);
-        }
-      } else {
+      if (matches.length === 0) {
         showToast('No matching transactions found', 'info');
+        return;
       }
+
+      const summary = await ReconciliationService.executeAutoMatch(
+        matches,
+        bankTransactions,
+        transactions || [],
+        account?.projectId || '',
+        'current-user'
+      );
+
+      const parts: string[] = [];
+      if (summary.matched > 0) parts.push(`${summary.matched} matched`);
+      if (summary.splitCreated > 0) parts.push(`${summary.splitCreated} auto-split`);
+      if (summary.remainderSplits > 0) parts.push(`${summary.remainderSplits} with unallocated balance`);
+      if (summary.errors.length > 0) parts.push(`${summary.errors.length} errors`);
+
+      showToast(parts.length > 0 ? `Auto-match: ${parts.join(', ')}` : 'Auto-match completed', summary.errors.length > 0 ? 'warning' : 'success');
+
+      await refreshTransactionsBackground();
     } catch (err) {
       console.error('Auto match failed', err);
       showToast('Failed to auto-match transactions', 'error');
@@ -2121,19 +2206,27 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
 
   const handleLinkBankTransaction = async (bankTxId: string, projectTxIds: string[]) => {
     try {
-      let updates: any = { projectTransactionIds: projectTxIds, projectTransactionId: projectTxIds[0] || null };
-      if (projectTxIds.length > 0) {
-        const firstMatch = transactions.find(t => t.id === projectTxIds[0]);
-        if (firstMatch) {
-          if (firstMatch.purpose) updates.purpose = firstMatch.purpose;
-          if (firstMatch.description) updates.description = firstMatch.description;
-        }
+      if (projectTxIds.length === 0) {
+        // Unlink
+        await ReconciliationService.unlinkMatch(
+          bankTxId, undefined, bankTransactions, transactions || [], account?.projectId || ''
+        );
+        showToast('Link removed', 'success');
+      } else {
+        const result = await ReconciliationService.manualMatch(
+          bankTxId, projectTxIds, bankTransactions, transactions || [], account?.projectId || '', 'current-user'
+        );
+        const msg = result.splitCreated
+          ? `Linked and auto-split${result.remainder > 0 ? ` (${formatCurrency(result.remainder, account?.currency || 'MYR')} unallocated)` : ''}`
+          : 'Bank transaction linked to project transaction';
+        showToast(msg, 'success');
       }
-      await FinanceService.updateTransaction(bankTxId, updates);
-      showToast(projectTxIds.length > 0 ? 'Bank transaction linked to project transaction' : 'Link removed', 'success');
-      loadTransactions();
-      const bankTx = await FinanceService.getBankTransactionsByProject(account!.projectId);
-      setBankTransactions(bankTx);
+      setTempSelectedProjectTxIds(prev => {
+        const copy = { ...prev };
+        delete copy[bankTxId];
+        return copy;
+      });
+      await refreshTransactionsBackground();
     } catch (err) {
       console.error('Failed to link bank transaction', err);
       showToast('Failed to update bank transaction link', 'error');
@@ -2143,33 +2236,60 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
   const handleBatchLinkBankTransactions = async () => {
     if (selectedBankTxIds.length === 0 || batchProjectTxIds.length === 0) return;
     try {
-      setLoadingBankTransactions(true);
-      let updates: any = { projectTransactionIds: batchProjectTxIds, projectTransactionId: batchProjectTxIds[0] || null };
-      if (batchProjectTxIds.length > 0) {
-        const firstMatch = transactions.find(t => t.id === batchProjectTxIds[0]);
-        if (firstMatch) {
-          if (firstMatch.purpose) updates.purpose = firstMatch.purpose;
-          if (firstMatch.description) updates.description = firstMatch.description;
+      let successCount = 0;
+      let failCount = 0;
+      
+      // Process sequentially to avoid concurrent write/read conflicts in ReconciliationService
+      for (const id of selectedBankTxIds) {
+        try {
+          await ReconciliationService.manualMatch(
+            id,
+            batchProjectTxIds,
+            bankTransactions,
+            transactions || [],
+            account?.projectId || '',
+            'current-user'
+          );
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to link bank transaction ${id}`, err);
+          failCount++;
         }
       }
-
-      const promises = selectedBankTxIds.map(id =>
-        FinanceService.updateTransaction(id, updates)
-      );
-      await Promise.all(promises);
-      showToast(`Successfully linked ${selectedBankTxIds.length} transactions`, 'success');
+      
+      if (successCount > 0) {
+        showToast(
+          `Successfully linked ${successCount} transaction${successCount > 1 ? 's' : ''}${failCount > 0 ? `, failed ${failCount}` : ''}`,
+          'success'
+        );
+      } else if (failCount > 0) {
+        showToast(`Failed to link selected transactions`, 'error');
+      }
+      
       setSelectedBankTxIds([]);
       setBatchProjectTxIds([]);
-      loadTransactions();
-      if (account?.projectId) {
-        const bankTx = await FinanceService.getBankTransactionsByProject(account.projectId);
-        setBankTransactions(bankTx);
-      }
+      await refreshTransactionsBackground();
     } catch (err) {
       console.error('Batch link failed', err);
       showToast('Failed to batch link transactions', 'error');
-    } finally {
-      setLoadingBankTransactions(false);
+    }
+  };
+
+  const handleBatchUnlinkBankTransactions = async () => {
+    if (selectedBankTxIds.length === 0) return;
+    if (!confirm(`Are you sure you want to remove matches for ${selectedBankTxIds.length} selected bank transactions?`)) return;
+    try {
+      await Promise.all(selectedBankTxIds.map(id =>
+        ReconciliationService.unlinkMatch(
+          id, undefined, bankTransactions, transactions || [], account?.projectId || ''
+        )
+      ));
+      showToast(`Successfully removed matches for ${selectedBankTxIds.length} transactions`, 'success');
+      setSelectedBankTxIds([]);
+      await refreshTransactionsBackground();
+    } catch (err) {
+      console.error('Batch unlink failed', err);
+      showToast('Failed to batch remove matches', 'error');
     }
   };
 
@@ -2346,19 +2466,39 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
           )}
 
           {selectedProjectTxIds.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-              <span className="text-red-800 text-sm font-medium">
+            <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sticky top-0 z-10 shadow-sm">
+              <span className="text-blue-900 text-sm font-bold">
                 {selectedProjectTxIds.length} transactions selected
               </span>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={handleBatchDeleteProjectTransactions}
-                disabled={loadingTransactions}
-              >
-                <Trash2 size={16} className="mr-2" />
-                Delete Selected
-              </Button>
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-2 bg-white rounded-lg p-1 border border-blue-200">
+                  <Combobox
+                    placeholder="Set Purpose..."
+                    options={uniquePurposes}
+                    value={batchProjectPurposeValue}
+                    onChange={setBatchProjectPurposeValue}
+                    className="w-48 border-none"
+                  />
+                  <Button
+                    onClick={handleBatchSetProjectTxPurpose}
+                    disabled={selectedProjectTxIds.length === 0 || !batchProjectPurposeValue.trim() || loadingTransactions}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    Set Purpose
+                  </Button>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleBatchDeleteProjectTransactions}
+                  disabled={loadingTransactions}
+                  className="shrink-0"
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  Delete Selected
+                </Button>
+              </div>
             </div>
           )}
 
@@ -2581,7 +2721,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
                                   <Input
                                     className="h-8 text-xs"
                                     type="date"
-                                    value={editForm.date || ''}
+                                    value={editForm.date ? editForm.date.split('T')[0] : ''}
                                     onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
                                   />
                                 </td>
@@ -2897,7 +3037,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
                                   <Input
                                     className="h-8 text-xs"
                                     type="date"
-                                    value={editForm.date || ''}
+                                    value={editForm.date ? editForm.date.split('T')[0] : ''}
                                     onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
                                   />
                                 </td>
@@ -3019,28 +3159,42 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
       )}
 
       {activeFinancialTab === 'bankTrx' && (
-        <Card title="Bank Transactions" className="animate-in slide-in-from-right-2 duration-300">
-          <div className="space-y-6">
-            {/* Action Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <Input
-                  placeholder="Search description, ref, or amount..."
-                  value={bankTxSearchQuery}
-                  onChange={(e) => setBankTxSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-sm text-slate-500 whitespace-nowrap">
-                  {selectedBankTxIds.length} selected
+        <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
+          {/* Action Bar */}
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div className="relative w-full lg:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Input
+                placeholder="Search description, ref, or amount..."
+                value={bankTxSearchQuery}
+                onChange={(e) => setBankTxSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+              <span className="text-sm text-slate-500 whitespace-nowrap">
+                {selectedBankTxIds.length} selected
+              </span>
+              {isMixedBankTxSelected ? (
+                <span className="text-xs text-rose-600 bg-rose-50 px-2 py-1.5 rounded border border-rose-200 font-medium">
+                  Cannot batch link mixed Income & Expense transactions
                 </span>
+              ) : (
                 <MultiSelectDropdown
                   selected={batchProjectTxIds}
                   onChange={setBatchProjectTxIds}
                   options={(() => {
+                    const selectedTxTypes = selectedBankTxIds.map(id => {
+                      const tx = bankTransactions.find(bt => bt.id === id);
+                      return tx?.type;
+                    }).filter(Boolean);
+                    
+                    const targetType = selectedTxTypes[0];
+
                     const opts = (transactions || []).filter(t => {
+                      // Filter by targetType if bank transactions are selected
+                      if (targetType && t.type !== targetType) return false;
+
                       const totalLinkedAmount = bankTransactions.reduce((sum, btx) => {
                         const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
                         if (btxLinkedIds.includes(t.id)) {
@@ -3052,7 +3206,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
 
                       return !isFullyMatched || batchProjectTxIds.includes(t.id);
                     }).map(t => ({
-                      label: `${t.description || t.purpose || 'Txn'} • ${formatCurrency(t.amount, account.currency)}`,
+                      label: `${t.description || t.purpose || 'Txn'}${t.referenceNumber ? ` (${t.referenceNumber})` : ''} • ${formatCurrency(t.amount, account.currency)}`,
                       value: t.id
                     }));
                     opts.sort((a, b) => {
@@ -3067,42 +3221,117 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
                   placeholder="Link to Project Trx..."
                   className="w-56"
                 />
+              )}
+              <Button
+                onClick={handleBatchLinkBankTransactions}
+                disabled={selectedBankTxIds.length === 0 || batchProjectTxIds.length === 0 || isMixedBankTxSelected}
+                className="shrink-0"
+              >
+                Apply
+              </Button>
+              {selectedBankTxIds.length > 0 && bankTransactions.some(t => selectedBankTxIds.includes(t.id) && ((t as any).projectTransactionIds?.length > 0 || (t as any).projectTransactionId || t.status === 'Reconciled')) && (
                 <Button
-                  onClick={handleBatchLinkBankTransactions}
-                  disabled={selectedBankTxIds.length === 0 || batchProjectTxIds.length === 0}
-                  className="shrink-0"
+                  onClick={handleBatchUnlinkBankTransactions}
+                  variant="outline"
+                  className="shrink-0 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
                 >
-                  Apply
+                  Unlink Selected
                 </Button>
-                <Button onClick={handleAutoMatch} variant="outline" className="shrink-0 text-jci-blue border-jci-blue hover:bg-jci-blue hover:text-white">
-                  <BrainCircuit size={16} className="mr-2" /> Auto Match
-                </Button>
-              </div>
+              )}
+              <Button onClick={handleAutoMatch} variant="outline" className="shrink-0 text-jci-blue border-jci-blue hover:bg-jci-blue hover:text-white">
+                <BrainCircuit size={16} className="mr-2" /> Auto Match
+              </Button>
             </div>
+          </div>
 
-            {loadingBankTransactions ? (
-              <div className="text-center py-4 text-slate-500">Loading bank transactions...</div>
-            ) : bankTransactions.length === 0 ? (
-              <div className="text-center py-4 text-slate-500">No bank transactions linked to this project found</div>
-            ) : (() => {
-              const filteredBankTx = bankTransactions.filter(tx => {
-                if (!bankTxSearchQuery) return true;
-                const q = bankTxSearchQuery.toLowerCase().trim();
-                const isNumericStr = q !== '' && !isNaN(Number(q));
-                const isAmountMatch = isNumericStr && tx.amount === Number(q);
-                return (isAmountMatch ||
-                  tx.description?.toLowerCase().includes(q) ||
-                  tx.referenceNumber?.toLowerCase().includes(q));
+          {loadingBankTransactions ? (
+            <div className="text-center py-8 text-slate-500">
+              <RefreshCw className="animate-spin text-jci-blue mx-auto mb-2" size={32} />
+              Loading bank transactions...
+            </div>
+          ) : bankTransactions.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">No bank transactions linked to this project found</div>
+          ) : (() => {
+            const filteredBankTx = bankTransactions.filter(tx => {
+              if (!bankTxSearchQuery) return true;
+              const q = bankTxSearchQuery.toLowerCase().trim();
+              const isNumericStr = q !== '' && !isNaN(Number(q));
+              const isAmountMatch = isNumericStr && tx.amount === Number(q);
+              return (isAmountMatch ||
+                tx.description?.toLowerCase().includes(q) ||
+                tx.referenceNumber?.toLowerCase().includes(q));
+            });
+
+            const bankIncomes = filteredBankTx.filter(tx => tx.type === 'Income');
+            const bankExpenses = filteredBankTx.filter(tx => tx.type === 'Expense');
+
+            const bankIncomeTotal = bankIncomes.reduce((sum, tx) => sum + tx.amount, 0);
+            const bankExpensesTotal = bankExpenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+            const getAvailableProjectTxOptions = (currentBankTx: any) => {
+              const currentLinkedIds = currentBankTx.projectTransactionIds || (currentBankTx.projectTransactionId ? [currentBankTx.projectTransactionId] : []);
+              const opts = (transactions || []).filter(t => {
+                // Only show project transactions that match the bank transaction's type (Income or Expense)
+                if (t.type !== currentBankTx.type) return false;
+                if (currentLinkedIds.includes(t.id)) return true;
+                const totalLinkedAmount = bankTransactions.reduce((sum, btx) => {
+                  const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
+                  if (btxLinkedIds.includes(t.id)) {
+                    return sum + Math.abs(btx.amount);
+                  }
+                  return sum;
+                }, 0);
+                const isFullyMatched = totalLinkedAmount >= Math.abs(t.amount) - 0.01;
+                return !isFullyMatched;
+              }).map(t => ({
+                label: `${t.description || t.purpose || 'Txn'}${t.referenceNumber ? ` (${t.referenceNumber})` : ''} • ${formatCurrency(t.amount, account.currency)}`,
+                value: t.id
+              }));
+              opts.sort((a, b) => {
+                const aSelected = currentLinkedIds.includes(a.value);
+                const bSelected = currentLinkedIds.includes(b.value);
+                if (aSelected && !bSelected) return -1;
+                if (!aSelected && bSelected) return 1;
+                return a.label.localeCompare(b.label);
               });
+              return opts;
+            };
+
+            const renderBankTxTable = (list: Transaction[], isIncome: boolean) => {
+              if (list.length === 0) {
+                return (
+                  <div className="py-8 text-center text-slate-400 text-sm">
+                    <Layout size={32} className="mx-auto mb-2 opacity-20" />
+                    No transactions found in this category.
+                  </div>
+                );
+              }
+
+              // Group by purpose based on first matched transaction
+              const grouped = list.reduce((groups, tx) => {
+                const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
+                const matchedTx = transactions.find(t => linkedIds.includes(t.id));
+                const purpose = tx.purpose || matchedTx?.purpose || 'Unmatched / Uncategorized';
+                if (!groups[purpose]) groups[purpose] = [];
+                groups[purpose].push(tx);
+                return groups;
+              }, {} as Record<string, Transaction[]>);
 
               return (
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500">
+                  <thead className="bg-slate-50 text-slate-500 font-medium">
                     <tr>
                       <th className="py-2 px-3 pl-4 w-10">
                         <Checkbox
-                          checked={filteredBankTx.length > 0 && selectedBankTxIds.length === filteredBankTx.length && filteredBankTx.every(tx => selectedBankTxIds.includes(tx.id))}
-                          onChange={(e) => setSelectedBankTxIds(e.target.checked ? filteredBankTx.map(tx => tx.id) : [])}
+                          checked={list.length > 0 && list.every(tx => selectedBankTxIds.includes(tx.id))}
+                          onChange={(e) => {
+                            const ids = list.map(tx => tx.id);
+                            if (e.target.checked) {
+                              setSelectedBankTxIds([...new Set([...selectedBankTxIds, ...ids])]);
+                            } else {
+                              setSelectedBankTxIds(selectedBankTxIds.filter(id => !ids.includes(id)));
+                            }
+                          }}
                         />
                       </th>
                       <th className="py-2 px-3">Date</th>
@@ -3114,111 +3343,164 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(() => {
+                    {Object.entries(grouped).map(([purpose, groupTransactions]) => {
+                      const groupBg = isIncome ? 'bg-green-100/50' : 'bg-red-100/50';
+                      const groupText = isIncome ? 'text-green-600' : 'text-red-600';
 
-                      const getAvailableProjectTxOptions = (currentBankTx: any) => {
-                        const currentLinkedIds = currentBankTx.projectTransactionIds || (currentBankTx.projectTransactionId ? [currentBankTx.projectTransactionId] : []);
-                        const opts = (transactions || []).filter(t => {
-                          if (currentLinkedIds.includes(t.id)) return true;
-                          const totalLinkedAmount = bankTransactions.reduce((sum, btx) => {
-                            const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-                            if (btxLinkedIds.includes(t.id)) {
-                              return sum + Math.abs(btx.amount);
-                            }
-                            return sum;
-                          }, 0);
-                          const isFullyMatched = totalLinkedAmount >= Math.abs(t.amount) - 0.01;
-                          return !isFullyMatched;
-                        }).map(t => ({
-                          label: `${t.description || t.purpose || 'Txn'} • ${formatCurrency(t.amount, account.currency)}`,
-                          value: t.id
-                        }));
-                        opts.sort((a, b) => {
-                          const aSelected = currentLinkedIds.includes(a.value);
-                          const bSelected = currentLinkedIds.includes(b.value);
-                          if (aSelected && !bSelected) return -1;
-                          if (!aSelected && bSelected) return 1;
-                          return a.label.localeCompare(b.label);
-                        });
-                        return opts;
-                      };
-
-                      return Object.entries(
-                        filteredBankTx.reduce((groups, tx) => {
-                          const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
-                          const matchedTx = transactions.find(t => linkedIds.includes(t.id));
-                          const purpose = matchedTx?.purpose || 'Unmatched / Uncategorized';
-                          if (!groups[purpose]) groups[purpose] = [];
-                          groups[purpose].push(tx);
-                          return groups;
-                        }, {} as Record<string, Transaction[]>)
-                      ).map(([purpose, groupTransactions]) => {
-                        const purposeExpected = purpose === 'Unmatched / Uncategorized' ? 0 : transactions.filter(t => t.purpose === purpose).reduce((acc, t) => acc + Math.abs(t.amount), 0);
-                        const purposeMatched = purpose === 'Unmatched / Uncategorized' ? 0 : bankTransactions.filter(btx => {
-                          const linkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-                          const matchedTx = transactions.find(t => linkedIds.includes(t.id));
-                          return matchedTx?.purpose === purpose;
-                        }).reduce((acc, btx) => acc + Math.abs(btx.amount), 0);
-
-                        return (
-                          <React.Fragment key={purpose}>
-                            <tr className="bg-slate-50/50 border-b border-slate-100">
-                              <td colSpan={7} className="py-2 px-4 font-bold text-slate-600 bg-slate-100/50">
-                                <div className="flex justify-between items-center">
-                                  <span>{purpose} ({groupTransactions.length})</span>
-                                  {purpose !== 'Unmatched / Uncategorized' && (
-                                    <span className={`text-sm font-mono ${purposeMatched >= purposeExpected - 0.01 ? 'text-green-600' : 'text-slate-500'}`}>
-                                      {formatCurrency(purposeMatched, account.currency)} / {formatCurrency(purposeExpected, account.currency)}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                            {groupTransactions.map((tx) => {
-                              const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
-                              return (
-                                <tr key={tx.id} className="hover:bg-slate-50">
-                                  <td className="py-2 px-3 pl-4">
-                                    <Checkbox
-                                      checked={selectedBankTxIds.includes(tx.id)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) setSelectedBankTxIds([...selectedBankTxIds, tx.id]);
-                                        else setSelectedBankTxIds(selectedBankTxIds.filter(id => id !== tx.id));
-                                      }}
-                                    />
-                                  </td>
-                                  <td className="py-2 px-3 text-slate-500 font-mono">{new Date(tx.date).toLocaleDateString()}</td>
-                                  <td className="py-2 px-3 font-medium text-slate-900">{tx.description}</td>
-                                  <td className="py-2 px-3 text-slate-500">{tx.referenceNumber || '-'}</td>
-                                  <td className="py-2 px-3 w-64">
-                                    <MultiSelectDropdown
-                                      selected={linkedIds}
-                                      onChange={(selectedIds) => handleLinkBankTransaction(tx.id, selectedIds)}
-                                      options={getAvailableProjectTxOptions(tx)}
-                                      placeholder="Select Transactions..."
-                                    />
-                                  </td>
-                                  <td className={`py-2 px-3 text-right font-mono ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), account.currency)}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <Badge variant={(linkedIds.length > 0) ? 'success' : 'warning'}>
-                                      {(linkedIds.length > 0) ? 'Reconciled' : 'Unreconciled'}
-                                    </Badge>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </React.Fragment>
-                        );
-                      });
-                    })()}
+                      return (
+                        <React.Fragment key={purpose}>
+                          <tr className="bg-slate-50/50 border-b border-slate-100">
+                            <td colSpan={5} className={`py-2 px-4 font-bold text-slate-600 ${groupBg}`}>
+                              <div className="flex justify-between items-center">
+                                <span>{purpose} ({groupTransactions.length})</span>
+                              </div>
+                            </td>
+                            <td className={`py-2 px-3 text-right font-mono font-bold ${groupText} ${groupBg}`}>
+                              {formatCurrency(groupTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0), account.currency)}
+                            </td>
+                            <td className={groupBg}></td>
+                          </tr>
+                          {groupTransactions.map((tx) => {
+                            const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
+                            const tempSelected = tempSelectedProjectTxIds[tx.id];
+                            const hasChanged = tempSelected !== undefined && JSON.stringify(tempSelected.slice().sort()) !== JSON.stringify(linkedIds.slice().sort());
+                            const selectedValue = tempSelected !== undefined ? tempSelected : linkedIds;
+                            return (
+                              <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="py-2 px-3 pl-4">
+                                  <Checkbox
+                                    checked={selectedBankTxIds.includes(tx.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) setSelectedBankTxIds([...selectedBankTxIds, tx.id]);
+                                      else setSelectedBankTxIds(selectedBankTxIds.filter(id => id !== tx.id));
+                                    }}
+                                  />
+                                </td>
+                                <td className="py-2 px-3 text-slate-500 font-mono">{new Date(tx.date).toLocaleDateString()}</td>
+                                <td className="py-2 px-3 font-medium text-slate-900">{tx.description}</td>
+                                <td className="py-2 px-3 text-slate-500">{tx.referenceNumber || '-'}</td>
+                                <td className="py-2 px-3 w-72">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <MultiSelectDropdown
+                                        selected={selectedValue}
+                                        onChange={(selectedIds) => {
+                                          setTempSelectedProjectTxIds(prev => ({
+                                            ...prev,
+                                            [tx.id]: selectedIds
+                                          }));
+                                        }}
+                                        options={getAvailableProjectTxOptions(tx)}
+                                        placeholder="Select Transactions..."
+                                      />
+                                    </div>
+                                    {hasChanged && (
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                          onClick={() => handleLinkBankTransaction(tx.id, selectedValue)}
+                                          className="p-1 hover:bg-green-50 rounded text-green-600 border border-green-200 shadow-sm"
+                                          title="Confirm selection"
+                                        >
+                                          <Check size={16} />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setTempSelectedProjectTxIds(prev => {
+                                              const copy = { ...prev };
+                                              delete copy[tx.id];
+                                              return copy;
+                                            });
+                                          }}
+                                          className="p-1 hover:bg-red-50 rounded text-red-600 border border-red-200 shadow-sm"
+                                          title="Cancel selection"
+                                        >
+                                          <X size={16} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className={`py-2 px-3 text-right font-mono ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), account.currency)}
+                                </td>
+                                <td className="py-2 px-3">
+                                  <Badge variant={(linkedIds.length > 0) ? 'success' : 'warning'}>
+                                    {(linkedIds.length > 0) ? 'Reconciled' : 'Unreconciled'}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               );
-            })()}
-          </div>
-        </Card>
+            };
+
+            return (
+              <div className="space-y-6">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-green-50/30 rounded-lg border border-green-100 shadow-sm transition-all hover:shadow-md">
+                    <div className="text-xs text-green-700 uppercase tracking-wider mb-1 font-semibold">Total Bank Income</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(bankIncomeTotal, account.currency)}</div>
+                    <div className="text-xs text-slate-400 mt-1">({bankIncomes.length} items matched/filtered)</div>
+                  </div>
+                  <div className="p-4 bg-red-50/30 rounded-lg border border-red-100 shadow-sm transition-all hover:shadow-md">
+                    <div className="text-xs text-red-700 uppercase tracking-wider mb-1 font-semibold">Total Bank Expenses</div>
+                    <div className="text-xl font-bold text-red-600">{formatCurrency(bankExpensesTotal, account.currency)}</div>
+                    <div className="text-xs text-slate-400 mt-1">({bankExpenses.length} items matched/filtered)</div>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 shadow-sm transition-all hover:shadow-md">
+                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1 font-semibold">Bank Net Balance</div>
+                    <div className={`text-xl font-bold ${(bankIncomeTotal - bankExpensesTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(bankIncomeTotal - bankExpensesTotal, account.currency)}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1">Total Items: {filteredBankTx.length}</div>
+                  </div>
+                </div>
+
+                {/* Incomes Section */}
+                <Card className="overflow-hidden border-none shadow-sm" noPadding>
+                  <div className="flex justify-between items-center p-4 border-b-2 border-green-500 bg-white">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 rounded-full text-green-600">
+                        <TrendingUp size={20} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-green-700">Bank Incomes</h3>
+                        <p className="text-xs text-slate-500">{bankIncomes.length} Items</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-0 overflow-x-auto">
+                    {renderBankTxTable(bankIncomes, true)}
+                  </div>
+                </Card>
+
+                {/* Expenses Section */}
+                <Card className="overflow-hidden border-none shadow-sm" noPadding>
+                  <div className="flex justify-between items-center p-4 border-b-2 border-red-500 bg-white">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-red-100 rounded-full text-red-600">
+                        <TrendingUp size={20} className="rotate-180" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-red-700">Bank Expenses</h3>
+                        <p className="text-xs text-slate-500">{bankExpenses.length} Items</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-0 overflow-x-auto">
+                    {renderBankTxTable(bankExpenses, false)}
+                  </div>
+                </Card>
+              </div>
+            );
+          })()}
+        </div>
       )}
     </div>
   );
