@@ -6,6 +6,7 @@ import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { LoadingState } from '../ui/Loading';
+import { MemberSelector } from '../ui/MemberSelector';
 import { useProjects } from '../../hooks/useProjects';
 import { useTemplates } from '../../hooks/useTemplates';
 import { useAuth } from '../../hooks/useAuth';
@@ -27,7 +28,9 @@ import { ProjectReportService, ProjectReport } from '../../services/projectRepor
 import { FinanceService } from '../../services/financeService';
 import { ReconciliationService } from '../../services/reconciliationService';
 import { Transaction } from '../../types';
+import type { ProjectFinancialAccount as ProjectFinancialAccountType, ProjectTransaction } from '../../types';
 import { useBatchMode } from '../../contexts/BatchModeContext';
+import { projectFinancialService } from '../../services/projectFinancialService';
 
 const PENDING_USE_TEMPLATE_KEY = 'jci_pending_use_template_id';
 
@@ -52,6 +55,44 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
   const { setIsBatchMode } = useBatchMode();
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    years.add(new Date().getFullYear());
+    projects.forEach(p => {
+      const dateStr = p.eventStartDate || p.startDate || p.date || p.proposedDate || p.createdAt;
+      if (dateStr) {
+        try {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) {
+            years.add(d.getFullYear());
+          }
+        } catch { }
+      }
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [projects]);
+
+  const [projectAccounts, setProjectAccounts] = useState<ProjectFinancialAccountType[]>([]);
+  const [projectTrackerTransactions, setProjectTrackerTransactions] = useState<ProjectTransaction[]>([]);
+
+  const loadFinancials = useCallback(async () => {
+    try {
+      const [accountsList, ptTrxs] = await Promise.all([
+        projectFinancialService.getAllProjectAccounts(),
+        projectFinancialService.getAllProjectTrackerTransactions()
+      ]);
+      setProjectAccounts(accountsList);
+      setProjectTrackerTransactions(ptTrxs);
+    } catch (err) {
+      console.error('Error loading project financials:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFinancials();
+  }, [loadFinancials, projects]);
 
   useEffect(() => {
     setIsBatchMode(selectedProjectIds.size > 1);
@@ -83,6 +124,20 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       return [];
     }
 
+    // Filter by year
+    filtered = filtered.filter(p => {
+      const dateStr = p.eventStartDate || p.startDate || p.date || p.proposedDate || p.createdAt;
+      if (dateStr) {
+        try {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) {
+            return d.getFullYear() === selectedYear;
+          }
+        } catch { }
+      }
+      return selectedYear === new Date().getFullYear();
+    });
+
     if (term) {
       filtered = filtered.filter(p =>
         (p.name ?? '').toLowerCase().includes(term) ||
@@ -97,7 +152,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     }
 
     return filtered;
-  }, [projects, activeTab, searchQuery]);
+  }, [projects, activeTab, searchQuery, selectedYear]);
 
   const handleBatchDelete = async () => {
     if (selectedProjectIds.size === 0) return;
@@ -396,17 +451,34 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
 
       {!selectedProject ? (
         <Card noPadding>
-          <div className="px-4 md:px-6 pt-4">
-            <Tabs
-              tabs={['Ongoing Events', 'Past Events', 'Templates']}
-              activeTab={activeTab === 'projects' ? 'Ongoing Events' : activeTab === 'past-projects' ? 'Past Events' : 'Templates'}
-              onTabChange={(tab) => {
-                if (tab === 'Ongoing Events') setActiveTab('projects');
-                else if (tab === 'Past Events') setActiveTab('past-projects');
-                else setActiveTab('templates');
-                setSelectedProjectId(null);
-              }}
-            />
+          <div className="px-4 md:px-6 pt-4 flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 border-b border-slate-100">
+            <div className="flex-1 min-w-0">
+              <Tabs
+                tabs={['Ongoing Events', 'Past Events', 'Templates']}
+                activeTab={activeTab === 'projects' ? 'Ongoing Events' : activeTab === 'past-projects' ? 'Past Events' : 'Templates'}
+                onTabChange={(tab) => {
+                  if (tab === 'Ongoing Events') setActiveTab('projects');
+                  else if (tab === 'Past Events') setActiveTab('past-projects');
+                  else setActiveTab('templates');
+                  setSelectedProjectId(null);
+                }}
+                className="border-b-0"
+              />
+            </div>
+            {activeTab !== 'templates' && (
+              <div className="flex items-center gap-2 pb-2 self-start md:self-auto">
+                <span className="text-xs font-semibold text-slate-500">Year:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-jci-blue focus:border-jci-blue bg-white shadow-sm outline-none transition-all cursor-pointer"
+                >
+                  {availableYears.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="p-4">
             {(activeTab === 'projects' || activeTab === 'past-projects') ? (
@@ -427,6 +499,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                   });
                 }}
                 onSelectAll={handleSelectAll}
+                projectAccounts={projectAccounts}
+                projectTrackerTransactions={projectTrackerTransactions}
               />
             ) : (
               <div className="space-y-4">
@@ -830,110 +904,178 @@ const ProjectGrid: React.FC<{
   selectedIds?: Set<string>;
   onToggleSelection?: (id: string) => void;
   onSelectAll?: () => void;
-}> = ({ projects, loading, error, onSelect, onNewProposal, onImport, selectedIds, onToggleSelection, onSelectAll }) => {
-  const getStatusLabel = (status: Project['status']) => {
-    switch (status) {
-      case 'Planning':
-      case 'Draft': return 'Draft / Unpublished';
-      case 'Under Review': return 'Under Review';
-      case 'Approved': return 'Approved';
-      case 'Active': return 'Published';
-      default: return status ?? '-';
-    }
-  };
+  projectAccounts?: ProjectFinancialAccountType[];
+  projectTrackerTransactions?: ProjectTransaction[];
+}> = ({
+  projects,
+  loading,
+  error,
+  onSelect,
+  onNewProposal,
+  onImport,
+  selectedIds,
+  onToggleSelection,
+  onSelectAll,
+  projectAccounts = [],
+  projectTrackerTransactions = []
+}) => {
+    const getStatusLabel = (status: Project['status']) => {
+      switch (status) {
+        case 'Planning':
+        case 'Draft': return 'Draft / Unpublished';
+        case 'Under Review': return 'Under Review';
+        case 'Approved': return 'Approved';
+        case 'Active': return 'Published';
+        default: return status ?? '-';
+      }
+    };
 
-  const getStatusVariant = (status: Project['status']) => {
-    switch (status) {
-      case 'Active': return 'success';
-      case 'Approved': return 'info';
-      case 'Under Review': return 'warning';
-      case 'Planning':
-      case 'Draft': return 'neutral';
-      default: return 'info';
-    }
-  };
+    const getStatusVariant = (status: Project['status']) => {
+      switch (status) {
+        case 'Active': return 'success';
+        case 'Approved': return 'info';
+        case 'Under Review': return 'warning';
+        case 'Planning':
+        case 'Draft': return 'neutral';
+        default: return 'info';
+      }
+    };
 
-  return (
-    <LoadingState loading={loading} error={error} empty={false}>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {/* Always show the CTA card first */}
-        <div
-          onClick={onNewProposal}
-          className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors h-full min-h-[300px] cursor-pointer"
-        >
-          <Zap size={32} className="mb-3" />
-          <span className="font-medium">Start New Project</span>
-          <span className="text-xs mt-1">or submit an activity plan</span>
-          <div className="mt-4 pt-4 border-t border-slate-200 w-full flex justify-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => { e.stopPropagation(); onImport(); }}
-              className="text-xs"
-            >
-              <Copy size={14} className="mr-1" /> Paste Import
-            </Button>
-          </div>
-        </div>
-
-        {/* Then render all existing projects (if any) */}
-        {projects.map(project => (
-          <Card
-            key={project.id}
-            className={`flex flex-col h-full cursor-pointer transition-all group relative ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
-            onClick={() => onToggleSelection?.(project.id)}
+    return (
+      <LoadingState loading={loading} error={error} empty={false}>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {/* Always show the CTA card first */}
+          <div
+            onClick={onNewProposal}
+            className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors h-full min-h-[300px] cursor-pointer"
           >
-            {/* Checkbox for batch selection */}
-            <div
-              className="absolute top-4 right-4 z-10 pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
+            <Zap size={32} className="mb-3" />
+            <span className="font-medium">Start New Project</span>
+            <span className="text-xs mt-1">or submit an activity plan</span>
+            <div className="mt-4 pt-4 border-t border-slate-200 w-full flex justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onImport(); }}
+                className="text-xs"
+              >
+                <Copy size={14} className="mr-1" /> Paste Import
+              </Button>
+            </div>
+          </div>
+
+          {/* Then render all existing projects (if any) */}
+          {projects.map(project => (
+            <Card
+              key={project.id}
+              className={`flex flex-col h-full cursor-pointer transition-all group relative ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
+              onClick={() => onToggleSelection?.(project.id)}
             >
-              <Checkbox
-                checked={selectedIds?.has(project.id)}
-                onChange={() => onToggleSelection?.(project.id)}
-              />
-            </div>
-
-            {/* Wrapper div to capture click event but stop propagation on buttons if needed */}
-            <div className="pointer-events-none">
-              <div className="flex justify-between items-start mb-4">
-                <Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge>
+              {/* Checkbox for batch selection */}
+              <div
+                className="absolute top-4 right-4 z-10 pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Checkbox
+                  checked={selectedIds?.has(project.id)}
+                  onChange={() => onToggleSelection?.(project.id)}
+                />
               </div>
 
-              <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors">{project.name ?? project.title ?? 'Unnamed'}</h3>
-              <p className="text-sm text-slate-500 mb-6">{project.description ?? `Lead: ${project.lead ?? '-'}`}</p>
-
-              <div className="space-y-4 mb-6 flex-1">
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-600">Completion</span>
-                    <span className="font-medium text-slate-900">{project.completion ?? 0}%</span>
-                  </div>
-                  <ProgressBar progress={project.completion ?? 0} />
+              {/* Wrapper div to capture click event but stop propagation on buttons if needed */}
+              <div className="pointer-events-none">
+                <div className="flex justify-between items-start">
+                  <Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge>
                 </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors line-clamp-2 h-14">{project.name ?? project.title ?? 'Unnamed'}</h3>
+                <div className="space-y-4 flex-1">
+                  <div className="bg-slate-50 p-3 rounded-lg space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Team Size</span>
+                      <span className="font-semibold text-slate-900">{project.teamSize ?? 0} Members</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Budget Used</span>
+                      <span className="font-semibold text-slate-900">{formatCurrency(project.spent ?? 0)} / {formatCurrency(project.budget ?? 0)}</span>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <span className="text-xs text-slate-500 block">Budget Used</span>
-                    <span className="font-semibold text-slate-900">{formatCurrency(project.spent ?? 0)} / {formatCurrency(project.budget ?? 0)}</span>
-                  </div>
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <span className="text-xs text-slate-500 block">Team Size</span>
-                    <span className="font-semibold text-slate-900">{project.teamSize ?? 0} Members</span>
-                  </div>
+                  {/* PT vs Bank Comparison Box */}
+                  {(() => {
+                    const acc = projectAccounts.find(a => a.projectId === project.id);
+                    const bankIncome = acc?.totalIncome || 0;
+                    const bankExpenses = acc?.totalExpenses || 0;
+                    const bankNet = bankIncome - bankExpenses;
+
+                    const ptData = projectTrackerTransactions.filter(tx => tx.projectId === project.id);
+                    const ptIncome = ptData
+                      .filter(tx => tx.type === 'income')
+                      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                    const ptExpenses = ptData
+                      .filter(tx => tx.type === 'expense')
+                      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                    const ptNet = ptIncome - ptExpenses;
+
+                    const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
+                    const hasData = ptIncome > 0 || ptExpenses > 0 || bankIncome > 0 || bankExpenses > 0;
+
+                    return (
+                      <div className={`p-3 rounded-lg border transition-all ${isMatch
+                        ? 'bg-cyan-50/40 border-cyan-100/70'
+                        : 'bg-slate-50/50 border-slate-100'
+                        }`}>
+                        <div className={`flex justify-between items-center mb-1.5 pb-1.5 border-b ${isMatch ? 'border-cyan-200/60' : 'border-slate-200'
+                          }`}>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-xs font-semibold ${isMatch ? 'text-cyan-800' : 'text-slate-700'}`}>
+                              PT vs Bank Stats
+                            </span>
+                            {isMatch && (
+                              <CheckCircle size={12} className="text-cyan-600" />
+                            )}
+                          </div>
+                          {isMatch && (
+                            <span className="text-[10px] text-cyan-700 bg-cyan-100/80 px-1.5 py-0.5 rounded font-semibold">
+                              Reconciled
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-[28px_1fr_1fr] gap-y-1 gap-x-2 text-[10px]">
+                          <div></div>
+                          <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>PT</div>
+                          <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>Bank</div>
+
+                          <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>In</div>
+                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptIncome)}</div>
+                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankIncome)}</div>
+
+                          <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>Out</div>
+                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptExpenses)}</div>
+                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankExpenses)}</div>
+
+                          <div className={`font-bold border-t pt-1 mt-0.5 ${isMatch ? 'text-cyan-955 border-cyan-200/60' : 'text-slate-900 border-slate-200/60'}`}>Net</div>
+                          <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(ptNet)}
+                          </div>
+                          <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(bankNet)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
-            </div>
 
-            <div className="border-t border-slate-100 pt-4 mt-auto">
-              <Button variant="outline" className="w-full text-sm" onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}>Open Board</Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </LoadingState>
-  );
-}
+              <div className="border-slate-100 pt-4 mt-auto">
+                <Button variant="outline" className="w-full text-sm" onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}>Open Board</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </LoadingState>
+    );
+  };
 
 // Project AI Predictions Component
 const ProjectAIPredictions: React.FC<{ projectId: string }> = ({ projectId }) => {
@@ -1884,7 +2026,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
     const parsePastedDate = (dateStr: string): string => {
       if (!dateStr) return '';
       const clean = dateStr.trim();
-      
+
       // Pattern 1: DD/MM/YYYY or DD-MM-YYYY
       const dmyMatch = clean.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
       if (dmyMatch) {
@@ -1909,7 +2051,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
         if (!isNaN(d.getTime())) {
           return d.toISOString().split('T')[0];
         }
-      } catch {}
+      } catch { }
 
       return '';
     };
@@ -2238,7 +2380,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
     try {
       let successCount = 0;
       let failCount = 0;
-      
+
       // Process sequentially to avoid concurrent write/read conflicts in ReconciliationService
       for (const id of selectedBankTxIds) {
         try {
@@ -2256,7 +2398,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
           failCount++;
         }
       }
-      
+
       if (successCount > 0) {
         showToast(
           `Successfully linked ${successCount} transaction${successCount > 1 ? 's' : ''}${failCount > 0 ? `, failed ${failCount}` : ''}`,
@@ -2265,7 +2407,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
       } else if (failCount > 0) {
         showToast(`Failed to link selected transactions`, 'error');
       }
-      
+
       setSelectedBankTxIds([]);
       setBatchProjectTxIds([]);
       await refreshTransactionsBackground();
@@ -2312,20 +2454,13 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
     );
   }
 
-  const isInKindSponsor = (t: any) => {
-    const desc = (t.description || '').toLowerCase();
-    const purp = (t.purpose || '').toLowerCase();
-    return desc.includes('in-kind') || desc.includes('in kind') || desc.includes('inkind') ||
-           purp.includes('in-kind') || purp.includes('in kind') || purp.includes('inkind');
-  };
-
   // Calculate financials from transactions to ensure data consistency with projectTrx collection
   const totalExpenses = transactions
     .filter(t => t.type === 'Expense')
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const totalIncome = transactions
-    .filter(t => t.type === 'Income' && !isInKindSponsor(t))
+    .filter(t => t.type === 'Income')
     .reduce((sum, t) => sum + t.amount, 0);
 
   const budgetUtilization = account.budget > 0 ? (totalExpenses / account.budget) * 100 : 0;
@@ -3195,7 +3330,7 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
                       const tx = bankTransactions.find(bt => bt.id === id);
                       return tx?.type;
                     }).filter(Boolean);
-                    
+
                     const targetType = selectedTxTypes[0];
 
                     const opts = (transactions || []).filter(t => {
@@ -4324,22 +4459,23 @@ const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ project, onSa
                       {/* Committee - 1/5 */}
                       <div className="md:col-span-1">
                         {tIndex === 0 ? (
-                          <Select
+                          <MemberSelector
+                            label=""
+                            placeholder="Select member..."
+                            members={members}
                             value={row.memberId || ''}
                             disabled={!isEditing}
-                            onChange={(e) => {
+                            onChange={(value) => {
                               if (!isEditing) return;
-                              const value = e.target.value;
                               setRows(prev => {
                                 const next = [...prev];
                                 next[rowIndex] = { ...next[rowIndex], memberId: value };
                                 return next;
                               });
                             }}
-                            options={[
-                              { label: '— Not Assigned —', value: '' },
-                              ...members.map((m) => ({ label: m.name, value: m.id })),
-                            ]}
+                            selfOption={false}
+                            showLookupFields={false}
+                            getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
                           />
                         ) : (
                           <div className="hidden md:block" />
@@ -4583,25 +4719,25 @@ const ProjectTrainerTab: React.FC<ProjectTrainerTabProps> = ({ project, onSave }
                       }}
                       placeholder="e.g. 2.5"
                     />
-                    <Select
-                      name={`trainer-member-${rowIndex}`}
+                    <MemberSelector
                       label="Link to Member (Optional)"
-                      value={row.memberId}
-                      onChange={(e) => {
+                      placeholder="Search member..."
+                      members={members}
+                      value={row.memberId || ''}
+                      onChange={(value) => {
                         setRows(prev => {
                           const next = [...prev];
-                          next[rowIndex].memberId = e.target.value;
-                          if (e.target.value && !next[rowIndex].name) {
-                            const member = members.find(m => m.id === e.target.value);
+                          next[rowIndex].memberId = value;
+                          if (value) {
+                            const member = members.find(m => m.id === value);
                             if (member) next[rowIndex].name = member.name || '';
                           }
                           return next;
                         });
                       }}
-                      options={[
-                        { label: '— Not a Member —', value: '' },
-                        ...members.map(m => ({ label: m.name || 'Unknown', value: m.id })),
-                      ]}
+                      selfOption={false}
+                      showLookupFields={false}
+                      getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
                     />
                   </div>
                 ) : (
@@ -4621,7 +4757,7 @@ const ProjectTrainerTab: React.FC<ProjectTrainerTabProps> = ({ project, onSave }
                     )}
                   </div>
                 )}
-                
+
                 {isEditing && (
                   <div className="flex justify-end">
                     <Button
@@ -4636,7 +4772,7 @@ const ProjectTrainerTab: React.FC<ProjectTrainerTabProps> = ({ project, onSave }
                 )}
               </div>
             ))}
-            
+
             {isEditing && (
               <Button
                 type="button"
