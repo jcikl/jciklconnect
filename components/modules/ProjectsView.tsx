@@ -1077,22 +1077,20 @@ const ProjectGrid: React.FC<{
                   </div>
                 </div>
 
-                <div className="border-slate-100 pt-4 mt-auto">
-                  <Button
-                    variant={canOpenBoard ? "outline" : "ghost"}
-                    className={`w-full text-sm ${!canOpenBoard ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!canOpenBoard) {
-                        showToast('Only committee members, BOD members, or the event creator are allowed to open this board.', 'error');
-                        return;
-                      }
-                      onSelect(project.id);
-                    }}
-                  >
-                    Open Board
-                  </Button>
-                </div>
+                {canOpenBoard && (
+                  <div className="border-slate-100 pt-4 mt-auto">
+                    <Button
+                      variant="outline"
+                      className="w-full text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(project.id);
+                      }}
+                    >
+                      Open Board
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })}
