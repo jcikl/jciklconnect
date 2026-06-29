@@ -91,8 +91,10 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   }, []);
 
   useEffect(() => {
-    loadFinancials();
-  }, [loadFinancials, projects]);
+    if (isPrivileged) {
+      loadFinancials();
+    }
+  }, [loadFinancials, projects, isPrivileged]);
 
   useEffect(() => {
     setIsBatchMode(selectedProjectIds.size > 1);
