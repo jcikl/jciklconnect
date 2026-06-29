@@ -161,6 +161,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
   const [eventTab, setEventTab] = useState<'upcoming' | 'past'>('upcoming');
   const [contracts, setContracts] = useState<CommitmentContract[]>([]);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
