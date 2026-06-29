@@ -97,20 +97,17 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
             </div>
 
             {/* Year Selector */}
-            <div className="absolute top-3 right-4 flex items-center gap-1">
-              {availableYears.map(y => (
-                <button
-                  key={y}
-                  onClick={() => setRadarYear(y)}
-                  className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
-                    y === radarYear
-                      ? 'bg-amber-400/90 text-slate-900 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
-                      : 'bg-white/5 text-slate-500 hover:bg-white/10 hover:text-slate-300'
-                  }`}
-                >
-                  {y}
-                </button>
-              ))}
+            <div className="absolute top-3 right-4">
+              <select
+                value={radarYear}
+                onChange={(e) => setRadarYear(Number(e.target.value))}
+                className="appearance-none bg-white/10 text-amber-400 text-[10px] font-black uppercase tracking-wider rounded-full pl-2.5 pr-6 py-1 border border-white/15 cursor-pointer hover:bg-white/15 transition-all focus:outline-none focus:ring-1 focus:ring-amber-400/50"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y} className="bg-slate-900 text-white">{y}</option>
+                ))}
+              </select>
             </div>
 
             <PointsSourceRadarChart memberId={selectedMemberId || undefined} year={radarYear} className="mt-4" />
