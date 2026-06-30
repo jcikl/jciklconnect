@@ -272,6 +272,10 @@ export interface BoardMember {
   isActive: boolean;
   permissions: string[];
   commissionDirectorIds?: string[]; // IDs of members serving as Commission Directors under this position
+  /** Denormalized for public About page (guests cannot read members collection) */
+  memberName?: string;
+  avatarUrl?: string;
+  companyName?: string;
   createdAt: string;
   updatedAt: string;
 }

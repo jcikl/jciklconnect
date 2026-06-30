@@ -4,8 +4,7 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
-  updateDoc,
+  setDoc,
   deleteDoc,
   query,
   where,
@@ -18,79 +17,128 @@ import { BusinessProfile } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MOCK_BUSINESSES } from './mockData';
 
+export function mapMemberToBusinessProfile(id: string, data: Record<string, unknown>): BusinessProfile | null {
+  const business = (data.business ?? {}) as Record<string, unknown>;
+  const general = (data.general ?? {}) as Record<string, unknown>;
+  const companyName =
+    (data.companyName as string | undefined) ||
+    (business.companyName as string | undefined);
+
+  if (!companyName?.trim()) {
+    return null;
+  }
+
+  const businessCategory = data.businessCategory ?? business.businessCategory;
+
+  return {
+    id,
+    memberId: id,
+    ownerName:
+      (data.name as string | undefined) ||
+      (general.name as string | undefined) ||
+      (general.fullName as string | undefined) ||
+      'Unknown',
+    companyName,
+    industry: (data.industry as string | undefined) || (business.industry as string | undefined) || 'Other',
+    description:
+      (data.companyDescription as string | undefined) ||
+      (business.introduction as string | undefined) ||
+      '',
+    website:
+      (data.companyWebsite as string | undefined) ||
+      (business.companyWebsite as string | undefined) ||
+      '',
+    offer:
+      (data.specialOffer as string | undefined) ||
+      (business.specialOffer as string | undefined) ||
+      '',
+    logo:
+      (data.companyLogoUrl as string | undefined) ||
+      (business.companyLogoUrl as string | undefined) ||
+      '',
+    internationalConnections: (data.internationalConnections as BusinessProfile['internationalConnections']) || [],
+    businessCategory: Array.isArray(businessCategory) ? businessCategory.join(', ') : ((businessCategory as string) || ''),
+    acceptsInternationalBusiness:
+      (data.acceptInternationalBusiness as boolean | undefined) ??
+      (business.acceptInternationalBusiness as boolean | undefined) ??
+      false,
+    globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
+    internationalPartnershipTypes: (data.internationalPartnershipTypes as BusinessProfile['internationalPartnershipTypes']) || [],
+  };
+}
+
+function mapListingDoc(id: string, data: Record<string, unknown>): BusinessProfile {
+  return {
+    id,
+    memberId: (data.memberId as string | undefined) || id,
+    ownerName: (data.ownerName as string | undefined) || 'Unknown',
+    companyName: (data.companyName as string | undefined) || '',
+    industry: (data.industry as string | undefined) || 'Other',
+    description: (data.description as string | undefined) || '',
+    website: (data.website as string | undefined) || '',
+    offer: (data.offer as string | undefined) || '',
+    logo: (data.logo as string | undefined) || '',
+    internationalConnections: (data.internationalConnections as BusinessProfile['internationalConnections']) || [],
+    businessCategory: (data.businessCategory as string | undefined) || '',
+    acceptsInternationalBusiness: (data.acceptsInternationalBusiness as boolean | undefined) || false,
+    globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
+    internationalPartnershipTypes: (data.internationalPartnershipTypes as BusinessProfile['internationalPartnershipTypes']) || [],
+  };
+}
+
 export class BusinessDirectoryService {
-  // Aggregate business profiles from Members
+  static async syncPublicListing(memberId: string, data: Record<string, unknown>): Promise<void> {
+    if (isDevMode()) return;
+
+    const profile = mapMemberToBusinessProfile(memberId, data);
+    const listingRef = doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, memberId);
+
+    if (!profile) {
+      try {
+        await deleteDoc(listingRef);
+      } catch {
+        // Listing may not exist yet.
+      }
+      return;
+    }
+
+    await setDoc(listingRef, { ...profile, memberId, updatedAt: Timestamp.now() }, { merge: true });
+  }
+
   static async getAllBusinesses(): Promise<BusinessProfile[]> {
     if (isDevMode()) {
       return MOCK_BUSINESSES;
     }
 
     try {
-      // Query members who have a company name - using where clause for public access rule compatibility
       const q = query(
-        collection(db, COLLECTIONS.MEMBERS), 
-        where('companyName', '!=', ''),
+        collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS),
         orderBy('companyName', 'asc')
       );
       const snapshot = await getDocs(q);
-
-      const businesses: BusinessProfile[] = [];
-
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
-        if (data.companyName) {
-          businesses.push({
-            id: doc.id,
-            memberId: doc.id,
-            ownerName: data.name || 'Unknown',
-            companyName: data.companyName,
-            industry: data.industry || 'Other',
-            description: data.companyDescription || '',
-            website: data.companyWebsite || '',
-            offer: data.specialOffer || '',
-            logo: data.companyLogoUrl || '',
-            internationalConnections: data.internationalConnections || [],
-            businessCategory: Array.isArray(data.businessCategory) ? data.businessCategory.join(', ') : (data.businessCategory || ''),
-            acceptsInternationalBusiness: data.acceptInternationalBusiness || false,
-            globalNetworkEnabled: data.globalNetworkEnabled || false,
-            internationalPartnershipTypes: data.internationalPartnershipTypes || [],
-          });
-        }
-      });
-
-      return businesses;
+      return snapshot.docs
+        .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data()))
+        .filter((profile) => profile.companyName.trim().length > 0);
     } catch (error) {
       console.error('Error fetching business profiles:', error);
       throw error;
     }
   }
 
-  // Get business by ID (which is member ID in this aggregation model)
   static async getBusinessById(businessId: string): Promise<BusinessProfile | null> {
-    try {
-      const docRef = doc(db, COLLECTIONS.MEMBERS, businessId);
-      const docSnap = await getDoc(docRef);
+    if (isDevMode()) {
+      return MOCK_BUSINESSES.find((b) => b.id === businessId) || null;
+    }
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.companyName) {
-          return {
-            id: docSnap.id,
-            memberId: docSnap.id,
-            ownerName: data.name || 'Unknown',
-            companyName: data.companyName,
-            industry: data.industry || 'Other',
-            description: data.companyDescription || '',
-            website: data.companyWebsite || '',
-            offer: data.specialOffer || '',
-            logo: data.companyLogoUrl || '',
-            internationalConnections: data.internationalConnections || [],
-            businessCategory: Array.isArray(data.businessCategory) ? data.businessCategory.join(', ') : (data.businessCategory || ''),
-            acceptsInternationalBusiness: data.acceptInternationalBusiness || false,
-            globalNetworkEnabled: data.globalNetworkEnabled || false,
-            internationalPartnershipTypes: data.internationalPartnershipTypes || [],
-          };
-        }
+    try {
+      const listingSnap = await getDoc(doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, businessId));
+      if (listingSnap.exists()) {
+        return mapListingDoc(listingSnap.id, listingSnap.data());
+      }
+
+      const memberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, businessId));
+      if (memberSnap.exists()) {
+        return mapMemberToBusinessProfile(memberSnap.id, memberSnap.data());
       }
       return null;
     } catch (error) {
@@ -99,64 +147,28 @@ export class BusinessDirectoryService {
     }
   }
 
-  // Search businesses
   static async searchBusinesses(searchTerm: string): Promise<BusinessProfile[]> {
-    try {
-      const allBusinesses = await this.getAllBusinesses();
-      const lowerSearchTerm = searchTerm.toLowerCase();
-
-      return allBusinesses.filter(business =>
-        business.companyName.toLowerCase().includes(lowerSearchTerm) ||
-        business.industry.toLowerCase().includes(lowerSearchTerm) ||
-        business.description?.toLowerCase().includes(lowerSearchTerm)
-      );
-    } catch (error) {
-      console.error('Error searching businesses:', error);
-      throw error;
-    }
+    const allBusinesses = await this.getAllBusinesses();
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return allBusinesses.filter(business =>
+      business.companyName.toLowerCase().includes(lowerSearchTerm) ||
+      business.industry.toLowerCase().includes(lowerSearchTerm) ||
+      business.description?.toLowerCase().includes(lowerSearchTerm)
+    );
   }
 
-  // Get businesses by industry
   static async getBusinessesByIndustry(industry: string): Promise<BusinessProfile[]> {
     try {
-      // Note: This relies on exact string match. Search might be better for partials.
       const q = query(
-        collection(db, COLLECTIONS.MEMBERS),
-        where('companyName', '!=', ''),
+        collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS),
         where('industry', '==', industry),
         orderBy('companyName', 'asc')
       );
-
       const snapshot = await getDocs(q);
-      const businesses: BusinessProfile[] = [];
-
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
-        if (data.companyName) {
-          businesses.push({
-            id: doc.id,
-            memberId: doc.id,
-            ownerName: data.name || 'Unknown',
-            companyName: data.companyName,
-            industry: data.industry || 'Other',
-            description: data.companyDescription || '',
-            website: data.companyWebsite || '',
-            offer: data.specialOffer || '',
-            logo: data.companyLogoUrl || '',
-            internationalConnections: data.internationalConnections || [],
-            businessCategory: Array.isArray(data.businessCategory) ? data.businessCategory.join(', ') : (data.businessCategory || ''),
-            acceptsInternationalBusiness: data.acceptInternationalBusiness || false,
-            globalNetworkEnabled: data.globalNetworkEnabled || false,
-            internationalPartnershipTypes: data.internationalPartnershipTypes || [],
-          });
-        }
-      });
-
-      return businesses;
+      return snapshot.docs.map((docSnap) => mapListingDoc(docSnap.id, docSnap.data()));
     } catch (error) {
       console.error('Error fetching businesses by industry:', error);
       throw error;
     }
   }
 }
-

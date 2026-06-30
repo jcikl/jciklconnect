@@ -306,6 +306,23 @@ export class MembersService {
       result.jciCareer = jciCareer;
     }
 
+    const companyName =
+      business.companyName ??
+      result.companyName ??
+      existing?.companyName ??
+      existing?.business?.companyName;
+    if (companyName !== undefined) {
+      result.companyName = companyName;
+    }
+    const industry =
+      business.industry ??
+      result.industry ??
+      existing?.industry ??
+      existing?.business?.industry;
+    if (industry !== undefined) {
+      result.industry = industry;
+    }
+
     return result;
   }
 
@@ -339,6 +356,9 @@ export class MembersService {
       const normalizedData = this.normalizeMemberData(cleanMemberData);
 
       const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), normalizedData);
+
+      const { BusinessDirectoryService } = await import('./businessDirectoryService');
+      await BusinessDirectoryService.syncPublicListing(docRef.id, normalizedData);
       
       if (cleanMemberData.introducer) {
         this.recalculateIntroducerStats(cleanMemberData.introducer).catch(console.error);
@@ -426,6 +446,10 @@ export class MembersService {
       const normalizedUpdates = this.normalizeMemberData(cleanUpdates, currentData);
 
       await updateDoc(memberRef, normalizedUpdates);
+
+      const mergedMember = { ...(currentData ?? {}), ...normalizedUpdates, id: memberId };
+      const { BusinessDirectoryService } = await import('./businessDirectoryService');
+      await BusinessDirectoryService.syncPublicListing(memberId, mergedMember as Record<string, unknown>);
 
       // Trigger introducer recalculation if introducer changes
       if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {

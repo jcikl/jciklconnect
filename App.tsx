@@ -1323,31 +1323,12 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
 
         const activeBoard = termMembers.filter(m => m.isActive);
         if (activeBoard.length > 0) {
-          const memberObjects = await Promise.all(
-            activeBoard.map(bm => MembersService.getMemberById(bm.memberId).catch(() => null))
-          );
-
-          if (!active) return;
-
-          const mapped = activeBoard.map((bm, idx) => {
-            const memberObj = memberObjects[idx];
-            const name = memberObj
-              ? (memberObj.general?.name || memberObj.fullName || memberObj.name || 'Unknown Name')
-              : 'Unknown Name';
-            const avatar = memberObj
-              ? (memberObj.general?.avatarUrl || memberObj.avatarUrl || memberObj.avatar || undefined)
-              : undefined;
-            const company = memberObj
-              ? (memberObj.business?.companyName || memberObj.companyName || memberObj.profession || 'JCI Kuala Lumpur')
-              : 'JCI Kuala Lumpur';
-
-            return {
-              position: bm.position,
-              name,
-              avatar,
-              company
-            };
-          });
+          const mapped = activeBoard.map((bm) => ({
+            position: bm.position,
+            name: bm.memberName || 'JCI Member',
+            avatar: bm.avatarUrl,
+            company: bm.companyName || 'JCI Kuala Lumpur',
+          }));
           setBoardMembers(mapped);
         } else {
           setBoardMembers(getMockBoardData(selectedYear));

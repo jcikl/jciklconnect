@@ -209,8 +209,10 @@ export class BoardManagementService {
   // Activate a board member
   private static async activateBoardMember(boardMember: BoardMember): Promise<void> {
     try {
+      const display = await this.getMemberDisplayFields(boardMember.memberId);
       const boardMemberData = {
         ...boardMember,
+        ...display,
         isActive: true,
         startDate: new Date().toISOString(),
         createdAt: new Date().toISOString(),
@@ -299,6 +301,25 @@ export class BoardManagementService {
     return permissionMap[position] || ['board'];
   }
 
+  private static async getMemberDisplayFields(memberId: string): Promise<{
+    memberName?: string;
+    avatarUrl?: string;
+    companyName?: string;
+  }> {
+    try {
+      const member = await MembersService.getMemberById(memberId);
+      if (!member) return {};
+
+      return {
+        memberName: member.general?.name || member.fullName || member.name || undefined,
+        avatarUrl: member.general?.avatarUrl || member.avatarUrl || member.avatar || undefined,
+        companyName: member.business?.companyName || member.companyName || member.profession || undefined,
+      };
+    } catch {
+      return {};
+    }
+  }
+
   /** Default board positions for each term (can be used by UI for dropdowns) */
   static getDefaultBoardPositions(): string[] {
     return [
@@ -349,6 +370,7 @@ export class BoardManagementService {
         if (!memberId || !position) continue;
 
         const permissions = this.getRolePermissions(position);
+        const display = await this.getMemberDisplayFields(memberId);
         const newMember: Omit<BoardMember, 'id'> = {
           memberId,
           position,
@@ -358,6 +380,7 @@ export class BoardManagementService {
           isActive: true,
           permissions,
           commissionDirectorIds: commissionDirectorIds || [],
+          ...display,
           createdAt: now,
           updatedAt: now,
         };

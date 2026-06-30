@@ -98,8 +98,14 @@ service cloud.firestore {
     // Members collection: 组织财政/活动财政/会员 boundary; multi-LO: read by same loId or self.
     match /members/{memberId} {
       // 1. Basic Read Access (Get and List)
-      // Allow public get so referenced profiles can be viewed publicly by guests
-      allow get: if true;
+      // Allow if: own linked record, own email match (for linking), or authorized role
+      // OR if it's a public business profile (has companyName)
+      allow get, read: if (isAuthenticated() && (
+        request.auth.uid == memberId || 
+        (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
+        isMember() || 
+        canReadOrgMembers()
+      )) || (resource != null && resource.data.get('companyName', '') != '');
       
       // Allow listing specifically for email search during linking
       // OR for the public business directory (where companyName filter is used)
@@ -562,7 +568,7 @@ service cloud.firestore {
       allow update, delete: if isBoard();
     }
     
-    // Board of Directors: boardMembers, boardTransitions (Member Directory — Board of Directors tab)
+    // Board of Directors: boardMembers, boardTransitions (public read for guest About page)
     match /boardMembers/{docId} {
       allow read: if true;
       allow create, update, delete: if isBoard();
@@ -708,12 +714,18 @@ service cloud.firestore {
       allow write: if isBoard() || isAuthenticated(); // Allow members to update (e.g. birthday processing)
     }
 
-    // Publications (E-Newsletters): public read for guest page; Board/Admin can manage
-    match /publications/{docId} {
-      allow read: if true;  // Public — shows on Guest E-Newsletters page
-      allow create, update, delete: if isBoard();
+    // System config collection (e.g. radar_mappings)
+    match /system/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard();
     }
 
+    // Radar Contributions collection
+    match /RadarContributions/{recordId} {
+      allow read: if isAuthenticated();
+      allow write: if isBoard();
+    }
+    
     // Radar Contributions collection
     match /RadarContributions/{contributionId} {
       allow read: if isAuthenticated();
@@ -729,6 +741,26 @@ service cloud.firestore {
     // System config collection (e.g. radar_mappings)
     match /system/{systemId} {
       allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+    
+    // Publications (E-Newsletters): public read for guest page; Board/Admin can manage
+    match /publications/{docId} {
+      allow read: if true;  // Public — shows on Guest E-Newsletters page
+      allow create, update, delete: if isBoard();
+    }
+
+    // Public business directory (denormalized from members — guest-readable)
+    match /publicBusinessListings/{listingId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() && (
+        request.auth.uid == listingId || isBoard()
+      );
+    }
+    
+		// Partnership : public read for guest page; Board/Admin can manage
+		match /partnerships/{docId} {
+      allow read: if true;
       allow create, update, delete: if isBoard();
     }
 

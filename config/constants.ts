@@ -22,6 +22,7 @@ export const COLLECTIONS = {
   TRAINING_MODULES: 'trainingModules',
   HOBBY_CLUBS: 'hobbyClubs',
   BUSINESS_PROFILES: 'businessProfiles',
+  PUBLIC_BUSINESS_LISTINGS: 'publicBusinessListings',
   SURVEYS: 'surveys',
   SURVEY_RESPONSES: 'surveyResponses',
   COMMUNICATION: 'communication',
