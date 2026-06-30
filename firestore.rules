@@ -98,14 +98,8 @@ service cloud.firestore {
     // Members collection: 组织财政/活动财政/会员 boundary; multi-LO: read by same loId or self.
     match /members/{memberId} {
       // 1. Basic Read Access (Get and List)
-      // Allow if: own linked record, own email match (for linking), or authorized role
-      // OR if it's a public business profile (has companyName)
-      allow get, read: if (isAuthenticated() && (
-        request.auth.uid == memberId || 
-        (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
-        isMember() || 
-        canReadOrgMembers()
-      )) || (resource != null && resource.data.get('companyName', '') != '');
+      // Allow public get so referenced profiles can be viewed publicly by guests
+      allow get: if true;
       
       // Allow listing specifically for email search during linking
       // OR for the public business directory (where companyName filter is used)
@@ -570,11 +564,11 @@ service cloud.firestore {
     
     // Board of Directors: boardMembers, boardTransitions (Member Directory — Board of Directors tab)
     match /boardMembers/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create, update, delete: if isBoard();
     }
     match /boardTransitions/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create, update, delete: if isBoard();
     }
     

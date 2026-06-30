@@ -1317,17 +1317,20 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
     const fetchBoard = async () => {
       setLoadingBoard(true);
       try {
-        const [allMembers, termMembers] = await Promise.all([
-          MembersService.getAllMembers(),
-          BoardManagementService.getBoardMembersByYear(selectedYear)
-        ]);
+        const termMembers = await BoardManagementService.getBoardMembersByYear(selectedYear);
 
         if (!active) return;
 
         const activeBoard = termMembers.filter(m => m.isActive);
         if (activeBoard.length > 0) {
-          const mapped = activeBoard.map(bm => {
-            const memberObj = allMembers.find(m => m.id === bm.memberId);
+          const memberObjects = await Promise.all(
+            activeBoard.map(bm => MembersService.getMemberById(bm.memberId).catch(() => null))
+          );
+
+          if (!active) return;
+
+          const mapped = activeBoard.map((bm, idx) => {
+            const memberObj = memberObjects[idx];
             const name = memberObj
               ? (memberObj.general?.name || memberObj.fullName || memberObj.name || 'Unknown Name')
               : 'Unknown Name';
