@@ -548,7 +548,7 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
                   <Card key={project.id} noPadding className="hover:shadow-lg transition-all border border-slate-100 flex flex-col h-full bg-white rounded-xl overflow-hidden group">
                     <div className="h-40 bg-slate-50 relative flex items-center justify-center border-b border-slate-100 overflow-hidden">
                       {project.logoUrl ? (
-                        <img src={project.logoUrl} alt={project.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <img src={project.logoUrl} alt={project.title} className="w-auto h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
                         <Briefcase size={32} className="text-slate-400" />
                       )}

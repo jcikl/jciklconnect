@@ -34,6 +34,8 @@ import { NonMemberLeadService } from './services/nonMemberLeadService';
 import { CommunicationService } from './services/communicationService';
 import { ProjectsService } from './services/projectsService';
 import { FlagshipProjectsService } from './services/flagshipProjectsService';
+import { BoardManagementService } from './services/boardManagementService';
+import { MembersService } from './services/membersService';
 import { DEFAULT_LO_ID } from './config/constants';
 
 // Module Imports
@@ -1238,6 +1240,216 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
     { year: '2024', title: 'Program NextGen awarded as Best of the Best Project in JCI World Congress', description: '' },
   ];
 
+  const [selectedYear, setSelectedYear] = useState<string>('2026');
+  const [boardMembers, setBoardMembers] = useState<any[]>([]);
+  const [loadingBoard, setLoadingBoard] = useState<boolean>(true);
+
+  // Available years: from 2023 to current year + 1
+  const currentYear = new Date().getFullYear();
+  const availableYears = useMemo(() => {
+    const years = [];
+    for (let y = currentYear + 1; y >= 2023; y--) {
+      years.push(String(y));
+    }
+    return years;
+  }, [currentYear]);
+
+  const getMockBoardData = (year: string) => {
+    const data: Record<string, Array<{ position: string; name: string; avatar?: string; company?: string }>> = {
+      '2026': [
+        { position: 'President', name: 'Eric Wong', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', company: 'TechNova Solutions' },
+        { position: 'Immediate Past President', name: 'Chris Teng', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', company: 'Teng Holdings' },
+        { position: 'Secretary', name: 'Lim Mei Kee', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', company: 'Lumina PR' },
+        { position: 'Honorary Treasurer', name: 'Tan Ka Yi', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80', company: 'Nexus Advisory' },
+        { position: 'General Legal Counsel', name: 'Nicholas Chew', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', company: 'Chew & Partners' },
+        { position: 'Executive Vice President', name: 'Chong Wei Sheng', avatar: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=150&auto=format&fit=crop&q=80', company: 'Apex Ventures' },
+        { position: 'Vice President (Individual)', name: 'Jessie Liew', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Bright Horizons' },
+        { position: 'Vice President (Community)', name: 'Marcus Wong', avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80', company: 'GreenEarth Co.' },
+        { position: 'Vice President (Business)', name: 'Alvin Tan', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'ScaleUp Consulting' },
+        { position: 'Vice President (International Affairs)', name: 'Derrick Lim', avatar: 'https://images.unsplash.com/photo-1489980508314-941910ded1f4?w=150&auto=format&fit=crop&q=80', company: 'Global Bridge Inc.' },
+        { position: 'Vice President (LOM)', name: 'Cheah Kok Wai', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80', company: 'Synergy Labs' },
+      ],
+      '2025': [
+        { position: 'President', name: 'Chris Teng', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', company: 'Teng Holdings' },
+        { position: 'Immediate Past President', name: 'Thomas Chin', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Chin & Associates' },
+        { position: 'Secretary', name: 'Jane Doe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'JCI KL' },
+        { position: 'Honorary Treasurer', name: 'John Smith', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80', company: 'Capital Partners' },
+        { position: 'General Legal Counsel', name: 'Alice Johnson', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', company: 'Apex Legal' },
+        { position: 'Executive Vice President', name: 'Bob Brown', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', company: 'Brown Enterprises' },
+        { position: 'Vice President (Individual)', name: 'Sarah Connor', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Cyberdyne Systems' },
+        { position: 'Vice President (Community)', name: 'Michael Scott', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', company: 'Dunder Mifflin' },
+        { position: 'Vice President (Business)', name: 'David Brent', avatar: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=150&auto=format&fit=crop&q=80', company: 'Wernham Hogg' },
+        { position: 'Vice President (International Affairs)', name: 'Emma Watson', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80', company: 'HeForShe' },
+        { position: 'Vice President (LOM)', name: 'Ryan Gosling', avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80', company: 'Kenergy Ltd' },
+      ],
+      '2024': [
+        { position: 'President', name: 'Alex Rivera', avatar: 'https://i.pravatar.cc/150?u=alex', company: 'Rivera Growth Co.' },
+        { position: 'Immediate Past President', name: 'Jessica Day', avatar: 'https://i.pravatar.cc/150?u=jessica', company: 'Day Strategies' },
+        { position: 'Secretary', name: 'Sarah Chen', avatar: 'https://i.pravatar.cc/150?u=sarah', company: 'Chen Events' },
+        { position: 'Honorary Treasurer', name: 'Michael Ross', avatar: 'https://i.pravatar.cc/150?u=michael', company: 'Pearson Specter' },
+        { position: 'General Legal Counsel', name: 'Harvey Specter', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80', company: 'Specter Litt' },
+        { position: 'Executive Vice President', name: 'Louis Litt', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', company: 'Litt & Partners' },
+        { position: 'Vice President (Individual)', name: 'Donna Paulsen', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Donna Corp' },
+        { position: 'Vice President (Community)', name: 'Rachel Zane', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80', company: 'Zane Legal' },
+        { position: 'Vice President (Business)', name: 'Mike Ross', avatar: 'https://i.pravatar.cc/150?u=michael', company: 'Ross Advisory' },
+        { position: 'Vice President (International Affairs)', name: 'Katrina Bennett', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', company: 'Bennett Global' },
+        { position: 'Vice President (LOM)', name: 'Samantha Wheeler', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'Wheeler Media' },
+      ],
+      '2023': [
+        { position: 'President', name: 'Chris Teng', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', company: 'Teng Holdings' },
+        { position: 'Immediate Past President', name: 'Thomas Chin', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Chin & Associates' },
+        { position: 'Secretary', name: 'Jane Doe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'JCI KL' },
+        { position: 'Honorary Treasurer', name: 'John Smith', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80', company: 'Capital Partners' },
+        { position: 'General Legal Counsel', name: 'Alice Johnson', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', company: 'Apex Legal' },
+        { position: 'Executive Vice President', name: 'Bob Brown', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', company: 'Brown Enterprises' },
+        { position: 'Vice President (Individual)', name: 'Sarah Connor', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Cyberdyne Systems' },
+        { position: 'Vice President (Community)', name: 'Michael Scott', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', company: 'Dunder Mifflin' },
+        { position: 'Vice President (Business)', name: 'David Brent', avatar: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=150&auto=format&fit=crop&q=80', company: 'Wernham Hogg' },
+        { position: 'Vice President (International Affairs)', name: 'Emma Watson', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80', company: 'HeForShe' },
+        { position: 'Vice President (LOM)', name: 'Ryan Gosling', avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80', company: 'Kenergy Ltd' },
+      ]
+    };
+    return data[year] || data['2026'];
+  };
+
+  useEffect(() => {
+    let active = true;
+    const fetchBoard = async () => {
+      setLoadingBoard(true);
+      try {
+        const [allMembers, termMembers] = await Promise.all([
+          MembersService.getAllMembers(),
+          BoardManagementService.getBoardMembersByYear(selectedYear)
+        ]);
+
+        if (!active) return;
+
+        const activeBoard = termMembers.filter(m => m.isActive);
+        if (activeBoard.length > 0) {
+          const mapped = activeBoard.map(bm => {
+            const memberObj = allMembers.find(m => m.id === bm.memberId);
+            return {
+              position: bm.position,
+              name: memberObj ? (memberObj.fullName || memberObj.name) : 'Unknown Name',
+              avatar: memberObj?.avatar || undefined,
+              company: memberObj?.companyName || memberObj?.profession || 'JCI Member'
+            };
+          });
+          setBoardMembers(mapped);
+        } else {
+          setBoardMembers(getMockBoardData(selectedYear));
+        }
+      } catch (err) {
+        console.error('Error fetching board members:', err);
+        if (active) {
+          setBoardMembers(getMockBoardData(selectedYear));
+        }
+      } finally {
+        if (active) {
+          setLoadingBoard(false);
+        }
+      }
+    };
+
+    fetchBoard();
+    return () => {
+      active = false;
+    };
+  }, [selectedYear]);
+
+  // Tree lookup helpers
+  const president = boardMembers.find(bm => (bm.position || '').toLowerCase() === 'president');
+  const ipp = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('past president') || pos.includes('ipp');
+  });
+  const secretary = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('secretary') && !pos.includes('vice');
+  });
+  const treasurer = boardMembers.find(bm => (bm.position || '').toLowerCase().includes('treasurer'));
+  const glc = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('legal counsel') || pos.includes('legal council') || pos.includes('glc');
+  });
+  const evp = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('executive vice') || pos.includes('evp');
+  });
+  const vpIndividual = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('vice president') && (pos.includes('individual') || pos.includes('ind'));
+  });
+  const vpCommunity = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('vice president') && (pos.includes('community') || pos.includes('com'));
+  });
+  const vpBusiness = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('vice president') && (pos.includes('business') || pos.includes('bus'));
+  });
+  const vpInternational = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('vice president') && (pos.includes('international') || pos.includes('int'));
+  });
+  const vpLom = boardMembers.find(bm => {
+    const pos = (bm.position || '').toLowerCase();
+    return pos.includes('vice president') && (pos.includes('lom') || pos.includes('local organisation') || pos.includes('local organization'));
+  });
+
+  const BoardNode = ({ member, defaultRole, variant = 'default' }: { 
+    member?: any; 
+    defaultRole: string;
+    variant?: 'default' | 'president' | 'ipp';
+  }) => {
+    const name = member?.name || 'Vacant';
+    const role = member?.position || defaultRole;
+    const avatar = member?.avatar;
+    const company = member?.company || 'JCI Kuala Lumpur';
+
+    let cardClasses = "bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:shadow-md hover:border-jci-blue transition-all flex flex-col items-center text-center w-full max-w-[210px] mx-auto shrink-0 relative group";
+    let roleClasses = "text-[10px] font-extrabold uppercase tracking-wider text-jci-blue mb-0.5 max-w-full truncate";
+    let nameClasses = "font-bold text-slate-800 text-sm mb-0.5 line-clamp-1";
+    let avatarSize = "w-16 h-16";
+
+    if (variant === 'president') {
+      cardClasses = "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200/80 rounded-2xl p-5 shadow-md hover:shadow-lg hover:border-jci-blue transition-all flex flex-col items-center text-center w-full max-w-[230px] mx-auto shrink-0 relative group ring-2 ring-jci-blue/10";
+      roleClasses = "text-[11px] font-black uppercase tracking-widest text-jci-blue mb-1 max-w-full truncate";
+      nameClasses = "font-black text-slate-900 text-base mb-0.5 line-clamp-1";
+      avatarSize = "w-20 h-20 border-2 border-jci-blue/20";
+    } else if (variant === 'ipp') {
+      cardClasses = "bg-white border-2 border-dashed border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-jci-blue transition-all flex flex-col items-center text-center w-full max-w-[210px] mx-auto shrink-0 relative group";
+      roleClasses = "text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-0.5 max-w-full truncate";
+    }
+
+    return (
+      <div className={cardClasses}>
+        {variant === 'president' && (
+          <div className="absolute top-0 right-0 bg-jci-blue text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-bl-lg">
+            Leader
+          </div>
+        )}
+        {variant === 'ipp' && (
+          <div className="absolute top-0 right-0 bg-slate-100 text-slate-500 text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-bl-lg">
+            Support
+          </div>
+        )}
+        <div className="relative mb-3">
+          {avatar ? (
+            <img src={avatar} alt={name} className={`${avatarSize} rounded-full object-cover border-2 border-slate-100 shadow-sm group-hover:border-jci-blue transition-colors`} />
+          ) : (
+            <div className={`${avatarSize} rounded-full bg-slate-100 flex items-center justify-center border-2 border-slate-100 text-slate-400`}>
+              <span className="text-xl font-bold text-slate-300">{name.charAt(0)}</span>
+            </div>
+          )}
+        </div>
+        <p className={roleClasses}>{role}</p>
+        <h4 className={nameClasses}>{name}</h4>
+        <p className="text-[11px] text-slate-400 line-clamp-1">{company}</p>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <GuestHeader currentPage="about" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
@@ -1341,26 +1553,110 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
 
         {/* Board of Directors */}
-        <section className="py-16 bg-white">
+        <section className="py-16 bg-white border-b border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-slate-900 mb-12 text-center">Board of Directors</h2>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900">Board of Directors</h2>
+                <p className="text-slate-500 text-sm mt-1">Meet the leaders driving positive impact in Kuala Lumpur</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 bg-slate-100 p-1 rounded-full self-start md:self-auto shadow-inner">
+                {availableYears.map(year => (
+                  <button
+                    key={year}
+                    onClick={() => setSelectedYear(year)}
+                    className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all duration-200 ${
+                      selectedYear === year
+                        ? 'bg-jci-blue text-white shadow-sm scale-105'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            {/* Group Photo */}
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-slate-100 rounded-2xl overflow-hidden shadow-lg">
-                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-jci-blue/10 to-jci-lightblue/10">
-                  <div className="text-center p-8">
-                    <Users size={80} className="mx-auto mb-4 text-jci-blue/50" />
-                    <p className="text-slate-500 text-lg">2025 Board of Directors Group Photo</p>
-                    <p className="text-slate-400 text-sm mt-2">Photo will be displayed here</p>
+            {loadingBoard ? (
+              <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-jci-blue mb-4"></div>
+                <p className="text-slate-500 text-sm font-semibold">Loading Board Directory...</p>
+              </div>
+            ) : (
+              <div className="space-y-12">
+                {/* Level 1: President & IPP */}
+                <div className="relative flex flex-col md:flex-row justify-center items-center gap-8 md:gap-16">
+                  {/* President */}
+                  <div className="w-full max-w-[240px]">
+                    <BoardNode member={president} defaultRole="President" variant="president" />
                   </div>
-                  {/* Uncomment and replace with actual image when available:
-                <img 
-                  src="/images/board-of-directors-2025.jpg" 
-                  alt="2025 JCI Kuala Lumpur Board of Directors" 
-                  className="w-full h-full object-cover"
-                />
-                */}
+                  
+                  {/* Connecting Line for Support */}
+                  <div className="hidden md:flex flex-col items-center justify-center shrink-0">
+                    <div className="w-16 h-0.5 border-t-2 border-dashed border-slate-300"></div>
+                    <span className="mt-1 px-2.5 py-0.5 bg-sky-50 text-jci-blue font-extrabold uppercase tracking-widest text-[8px] rounded-full border border-sky-100">
+                      Support
+                    </span>
+                  </div>
+
+                  {/* Immediate Past President */}
+                  <div className="w-full max-w-[220px]">
+                    <BoardNode member={ipp} defaultRole="Immediate Past President" variant="ipp" />
+                  </div>
+                </div>
+
+                {/* Line downwards from President to Level 2 */}
+                <div className="hidden lg:block w-0.5 h-10 bg-gradient-to-b from-slate-300 to-slate-200 mx-auto -mt-6"></div>
+
+                {/* Level 2: Secretary, Treasurer, GLC, EVP */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+                  <div className="w-full">
+                    <BoardNode member={secretary} defaultRole="Secretary" />
+                  </div>
+                  <div className="w-full">
+                    <BoardNode member={treasurer} defaultRole="Honorary Treasurer" />
+                  </div>
+                  <div className="w-full">
+                    <BoardNode member={glc} defaultRole="General Legal Counsel" />
+                  </div>
+                  <div className="w-full relative group">
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-jci-blue to-jci-lightblue rounded-2xl blur opacity-15 group-hover:opacity-30 transition duration-300"></div>
+                    <div className="relative">
+                      <BoardNode member={evp} defaultRole="Executive Vice President" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Line downwards from EVP to Level 3 VPs */}
+                <div className="hidden lg:block w-0.5 h-10 bg-gradient-to-b from-slate-200 to-slate-100 mx-auto"></div>
+
+                {/* Level 3: VPs under Executive Vice President */}
+                <div className="bg-slate-50/50 rounded-3xl p-6 sm:p-8 border border-slate-200/50 max-w-6xl mx-auto">
+                  <div className="text-center mb-8">
+                    <span className="px-4 py-1 bg-sky-50 border border-sky-100 text-jci-blue font-extrabold text-[10px] uppercase tracking-wider rounded-full">
+                      Vice Presidents (Directly under EVP)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 justify-center">
+                    <div className="w-full"><BoardNode member={vpIndividual} defaultRole="Vice President (Individual)" /></div>
+                    <div className="w-full"><BoardNode member={vpCommunity} defaultRole="Vice President (Community)" /></div>
+                    <div className="w-full"><BoardNode member={vpBusiness} defaultRole="Vice President (Business)" /></div>
+                    <div className="w-full"><BoardNode member={vpInternational} defaultRole="Vice President (International Affairs)" /></div>
+                    <div className="w-full"><BoardNode member={vpLom} defaultRole="Vice President (LOM)" /></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Optional Group Photo Section */}
+            <div className="max-w-4xl mx-auto mt-16 pt-12 border-t border-slate-100">
+              <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-200/60 shadow-sm">
+                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 relative">
+                  <div className="text-center p-8">
+                    <Users size={48} className="mx-auto mb-3 text-slate-400/80" />
+                    <p className="text-slate-600 font-bold text-base">{selectedYear} Board of Directors Group Photo</p>
+                    <p className="text-slate-400 text-xs mt-1">Photo will be updated shortly</p>
+                  </div>
                 </div>
               </div>
             </div>
