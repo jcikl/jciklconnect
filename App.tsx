@@ -1329,7 +1329,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
           const mapped = activeBoard.map(bm => {
             const memberObj = allMembers.find(m => m.id === bm.memberId);
             const name = memberObj
-              ? (memberObj.general?.fullName || memberObj.general?.name || memberObj.fullName || memberObj.name || 'Unknown Name')
+              ? (memberObj.general?.name || memberObj.fullName || memberObj.name || 'Unknown Name')
               : 'Unknown Name';
             const avatar = memberObj
               ? (memberObj.general?.avatarUrl || memberObj.avatarUrl || memberObj.avatar || undefined)
