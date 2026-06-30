@@ -53,11 +53,14 @@ import { MentorMatching } from './MemberManagement/MentorMatching';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { ProjectsService } from '../../services/projectsService';
+import { PointsService } from '../../services/pointsService';
+import type { PointRule } from '../../services/pointsService';
 import { PromotionTracking } from './MemberManagement/PromotionTracking';
 import { SenatorshipManagement } from './MemberManagement/SenatorshipManagement';
 import { BoardOfDirectorsSection } from './MemberManagement/BoardOfDirectorsSection';
 import { IntroducerManagement } from './MemberManagement/IntroducerManagement';
 import { MemberBatchImportModal } from './Members/MemberBatchImportModal';
+import { PointsSourceRadarChart } from '../dashboard/Analytics';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { useBatchMode } from '../../contexts/BatchModeContext';
 import { formatDateToDDMMMYYYY } from '../../utils/dateUtils';
@@ -1721,6 +1724,9 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [radarContributions, setRadarContributions] = useState<any[]>([]);
   const [recruitedMembers, setRecruitedMembers] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const currentYear = new Date().getFullYear();
+  const [radarYear, setRadarYear] = useState(currentYear);
+  const availableYears = useMemo(() => Array.from({ length: 5 }, (_, i) => currentYear - i), [currentYear]);
 
   const groupedRadarContributions = useMemo(() => {
     const sorted = [...radarContributions].sort((a, b) => {
@@ -2395,27 +2401,25 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
         <Card className="bg-white border-2 border-slate-900 border-b-8 border-r-8 hover:translate-x-1 hover:translate-y-1 transition-all flex flex-col justify-between">
           <div className="p-2 h-full flex flex-col justify-between">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-2 flex items-center gap-2">
-              <Target size={16} className="text-jci-blue animate-pulse" /> Elite Leaderboard Radar
-            </h3>
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                <Target size={16} className="text-jci-blue animate-pulse" /> Elite Leaderboard Radar
+              </h3>
+              <div className="relative">
+                <select
+                  value={radarYear}
+                  onChange={(e) => setRadarYear(Number(e.target.value))}
+                  className="appearance-none bg-slate-100 text-jci-blue text-[10px] font-black uppercase tracking-wider rounded-full pl-2.5 pr-6 py-1 border border-slate-200 cursor-pointer hover:bg-slate-200/70 transition-all focus:outline-none focus:ring-1 focus:ring-jci-blue/50"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%230097D7' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
+                >
+                  {availableYears.map(y => (
+                    <option key={y} value={y} className="bg-white text-slate-900">{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="flex-1 min-h-[220px] w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
-                  <PolarGrid stroke="#e2e8f0" />
-                  <PolarAngleAxis
-                    dataKey="displaySubject"
-                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 'bold' }}
-                  />
-                  <PolarRadiusAxis angle={30} domain={[0, maxRadarVal]} tick={false} axisLine={false} />
-                  <Radar
-                    name="Points"
-                    dataKey="value"
-                    stroke="#0097D7"
-                    fill="#0097D7"
-                    fillOpacity={0.4}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
+              <PointsSourceRadarChart memberId={member.id} year={radarYear} lightTheme={true} />
             </div>
           </div>
         </Card>

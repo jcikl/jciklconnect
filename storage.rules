@@ -127,6 +127,15 @@ service firebase.storage {
                       isValidFileSize(5); // 5MB limit
       allow delete: if isBoard();
     }
+
+    // Flagship Projects images
+    match /flagship_projects/{allPaths=**} {
+      allow read: if true;
+      allow write: if isBoard() && 
+                      isValidImageFile() && 
+                      isValidFileSize(5); // 5MB limit
+      allow delete: if isBoard();
+    }
     
     // Member benefits banners
     match /benefits/{fileName} {

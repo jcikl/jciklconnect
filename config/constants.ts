@@ -6,6 +6,7 @@ export const COLLECTIONS = {
   MEMBERS: 'members',
   EVENTS: 'events',
   PROJECTS: 'projects',
+  FLAGSHIP_PROJECTS: 'flagship_projects',
   TRANSACTIONS: 'transactions',
   PROJECT_TRANSACTIONS: 'projectTrx',
   BANK_ACCOUNTS: 'bankAccounts',

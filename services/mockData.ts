@@ -1,4 +1,4 @@
-import { Member, Event, Project, UserRole, MemberTier, DashboardStats, Notification, Transaction, BankAccount, PaymentRequest, InventoryItem, BusinessProfile, AutomationRule, HobbyClub, TrainingModule, Document, NewsPost, Task, Survey, DuesRenewalTransaction, MembershipType, ProjectFinancialAccount, ProjectTransaction, BudgetCategory, AlertThreshold } from '../types';
+import { Member, Event, Project, FlagshipProject, UserRole, MemberTier, DashboardStats, Notification, Transaction, BankAccount, PaymentRequest, InventoryItem, BusinessProfile, AutomationRule, HobbyClub, TrainingModule, Document, NewsPost, Task, Survey, DuesRenewalTransaction, MembershipType, ProjectFinancialAccount, ProjectTransaction, BudgetCategory, AlertThreshold } from '../types';
 
 export const CURRENT_USER: Member = {
   id: 'u1',
@@ -189,6 +189,47 @@ export const MOCK_PROJECTS: Project[] = [
   { id: 'p1', name: 'Youth Mentorship 2024', lead: 'Jessica Day', status: 'Active', budget: 5000, spent: 2100, completion: 45, teamSize: 12, description: 'Connecting high school students with industry leaders.' },
   { id: 'p2', name: 'Business Expo', lead: 'Alex Rivera', status: 'Planning', budget: 15000, spent: 500, completion: 10, teamSize: 8, description: 'Annual showcase of local businesses.' },
   { id: 'p3', name: 'Tech for Good', lead: 'Michael Ross', status: 'Review', budget: 2000, spent: 1950, completion: 95, teamSize: 4, description: 'Refurbishing laptops for schools.' },
+];
+
+export const MOCK_FLAGSHIP_PROJECTS: FlagshipProject[] = [
+  {
+    id: 'fp1',
+    title: 'Youth Mentorship Flagship 2024',
+    description: 'Our flagship mentorship project connecting hundreds of students with expert corporate leaders and JCI alumni.',
+    logoUrl: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=200&auto=format&fit=crop&q=60',
+    galleryUrls: [
+      'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600&auto=format&fit=crop&q=60',
+      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&auto=format&fit=crop&q=60',
+    ],
+    galleryByYear: {
+      'Launch Ceremony': [
+        'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600&auto=format&fit=crop&q=60',
+      ],
+      'Main Event': [
+        'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&auto=format&fit=crop&q=60',
+      ]
+    },
+    status: 'Active',
+    teamSize: 15,
+    completion: 60,
+  },
+  {
+    id: 'fp2',
+    title: 'Sustainable Cities Summit',
+    description: 'Annual conference focusing on sustainability initiatives, public policy dialogues, and community cleanups.',
+    logoUrl: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=200&auto=format&fit=crop&q=60',
+    galleryUrls: [
+      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&auto=format&fit=crop&q=60',
+    ],
+    galleryByYear: {
+      'Main Event': [
+        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&auto=format&fit=crop&q=60',
+      ]
+    },
+    status: 'Active',
+    teamSize: 8,
+    completion: 80,
+  }
 ];
 
 export const MOCK_NOTIFICATIONS: Notification[] = [

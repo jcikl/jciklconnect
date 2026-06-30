@@ -1,7 +1,7 @@
 // Payment Requests – submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Trash2, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User } from 'lucide-react';
-import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
+import { Button, Card, Modal, useToast, Tabs, Badge, ProgressBar } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { MemberSelector } from '../ui/MemberSelector';
@@ -20,8 +20,7 @@ import { DEFAULT_LO_ID } from '../../config/constants';
 import { formatCurrency } from '../../utils/formatUtils';
 import { jsPDF } from 'jspdf';
 import { PDFDocument } from 'pdf-lib';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../config/firebase';
+import { uploadToCloudinary } from '../../services/cloudinaryService';
 import imageCompression from 'browser-image-compression';
 
 const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
@@ -109,6 +108,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState(0);
 
   // Form States
   const [formApplicantId, setFormApplicantId] = useState<string>('');
@@ -714,7 +714,9 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       // Handle Attachments
       const attachmentUrls: string[] = [];
       if (formAttachments.length > 0) {
-        for (const file of formAttachments) {
+        setAttachmentUploadProgress(0);
+        for (let i = 0; i < formAttachments.length; i++) {
+          const file = formAttachments[i];
           let fileToUpload = file;
 
           // Compress image if it's an image file
@@ -736,9 +738,15 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
             }
           }
 
-          const fileRef = ref(storage, `payment-requests/${loId}/${Date.now()}_${fileToUpload.name}`);
-          const snapshot = await uploadBytes(fileRef, fileToUpload);
-          const url = await getDownloadURL(snapshot.ref);
+          const baseProgress = (i / formAttachments.length) * 100;
+          const url = await uploadToCloudinary(
+            fileToUpload,
+            `payment-requests/${loId}`,
+            (progress) => {
+              const currentTotalProgress = Math.round(baseProgress + (progress / formAttachments.length));
+              setAttachmentUploadProgress(currentTotalProgress);
+            }
+          );
           attachmentUrls.push(url);
         }
       }
@@ -775,6 +783,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       showToast(err instanceof Error ? err.message : 'Submit failed', 'error');
     } finally {
       setSubmitting(false);
+      setAttachmentUploadProgress(0);
     }
   };
 
@@ -1265,6 +1274,12 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                 <span className="text-xs text-slate-400 mt-1">Images or PDFs up to 5MB</span>
               </div>
             </div>
+
+            {attachmentUploadProgress > 0 && (
+              <div className="w-full">
+                <ProgressBar progress={attachmentUploadProgress} label={`Uploading attachments... ${attachmentUploadProgress}%`} />
+              </div>
+            )}
 
             {formAttachments.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

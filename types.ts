@@ -790,6 +790,8 @@ export interface Project {
   title?: string;
   name?: string;
   description?: string;
+  logoUrl?: string;
+  galleryUrls?: string[];
   lead?: string;
   organizerId?: string | null;
   level?: ProjectLevel;
@@ -850,6 +852,25 @@ export interface Project {
   /** Trainers / Facilitators for this project (can be members or non-members) */
   trainers?: ProjectTrainer[];
 
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FlagshipProject {
+  id: string;
+  title: string;
+  description: string;
+  logoUrl?: string;
+  galleryUrls?: string[];
+  status: 'Active' | 'Inactive';
+  teamSize?: number;
+  completion?: number;
+  startDate?: string;
+  endDate?: string;
+  level?: string;
+  pillar?: string;
+  unsdg?: string[];
+  galleryByYear?: { [folder: string]: string[] };
   createdAt?: string;
   updatedAt?: string;
 }

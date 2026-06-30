@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers } from 'lucide-react';
+import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers, Image } from 'lucide-react';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs } from '../ui/Common';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -3868,13 +3868,21 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [formType, setFormType] = useState<string>(project.type || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
+  const [newPhotoUrl, setNewPhotoUrl] = useState('');
+
+  useEffect(() => {
+    setGalleryPhotos(project.galleryUrls || []);
+  }, [project.galleryUrls]);
 
   const hasPlanFields =
     project.proposedDate ||
     project.proposedBudget != null ||
     project.objectives ||
     project.eventStartDate ||
-    project.eventEndDate;
+    project.eventEndDate ||
+    project.logoUrl ||
+    (project.galleryUrls && project.galleryUrls.length > 0);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -3883,7 +3891,10 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
       const formData = new FormData(e.currentTarget);
       await onSave({
         title: formData.get('title') as string,
+        name: formData.get('title') as string,
         description: (formData.get('description') as string) || '',
+        logoUrl: (formData.get('logoUrl') as string) || '',
+        galleryUrls: galleryPhotos,
         level: (formData.get('level') as any) || undefined,
         pillar: (formData.get('pillar') as any) || undefined,
         type: (formData.get('type') as any) || undefined,
@@ -3948,6 +3959,14 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
               required
             />
 
+            <Input
+              name="logoUrl"
+              label="Project Logo URL"
+              placeholder="https://example.com/logo.png"
+              defaultValue={project.logoUrl}
+              icon={<Image size={16} />}
+            />
+
             <Textarea
               name="description"
               label="Description"
@@ -3955,6 +3974,49 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
               defaultValue={project.description}
               rows={3}
             />
+
+            <div className="space-y-2 border border-slate-200 rounded p-4 bg-slate-50">
+              <label className="text-sm font-semibold text-slate-700 block">Activity Photo Gallery</label>
+              <div className="flex gap-2">
+                <Input
+                  label=""
+                  placeholder="https://example.com/photo.jpg"
+                  value={newPhotoUrl}
+                  onChange={(e) => setNewPhotoUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (newPhotoUrl.trim()) {
+                      setGalleryPhotos([...galleryPhotos, newPhotoUrl.trim()]);
+                      setNewPhotoUrl('');
+                    }
+                  }}
+                  className="mt-1"
+                >
+                  Add Photo
+                </Button>
+              </div>
+
+              {galleryPhotos.length > 0 && (
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {galleryPhotos.map((url, index) => (
+                    <div key={index} className="relative group border border-slate-200 rounded overflow-hidden aspect-video bg-white">
+                      <img src={url} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setGalleryPhotos(galleryPhotos.filter((_, i) => i !== index))}
+                        className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Select
@@ -4213,6 +4275,28 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
             <div>
               <h4 className="text-sm font-semibold text-slate-700 mb-2">Expected Impact</h4>
               <p className="text-slate-600 whitespace-pre-wrap">{project.expectedImpact}</p>
+            </div>
+          )}
+
+          {project.logoUrl && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-2">Project Logo</h4>
+              <div className="w-20 h-20 rounded border border-slate-200 overflow-hidden bg-white">
+                <img src={project.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              </div>
+            </div>
+          )}
+
+          {project.galleryUrls && project.galleryUrls.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-2">Activity Photo Gallery</h4>
+              <div className="grid grid-cols-4 gap-2">
+                {project.galleryUrls.map((url, i) => (
+                  <div key={i} className="border border-slate-200 rounded overflow-hidden aspect-video bg-white">
+                    <img src={url} alt={`Gallery ${i}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

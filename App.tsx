@@ -6,14 +6,14 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield,
+  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw,
   Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
-import { UserRole, Notification, Event } from './types';
+import { UserRole, Notification, Event, Project } from './types';
 import { EventCalendarView } from './components/modules/EventCalendarView';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { usePermissions } from './hooks/usePermissions';
@@ -32,6 +32,8 @@ import { AsyncErrorBoundary } from './components/ui/AsyncErrorBoundary';
 import { errorLoggingService } from './services/errorLoggingService';
 import { NonMemberLeadService } from './services/nonMemberLeadService';
 import { CommunicationService } from './services/communicationService';
+import { ProjectsService } from './services/projectsService';
+import { FlagshipProjectsService } from './services/flagshipProjectsService';
 import { DEFAULT_LO_ID } from './config/constants';
 
 // Module Imports
@@ -41,6 +43,7 @@ import { GamificationView } from './components/modules/GamificationView';
 import { EventsView } from './components/modules/EventsView';
 import { MembersView } from './components/modules/MembersView';
 import { ProjectsView } from './components/modules/ProjectsView';
+import { GuestProjectsManagementView } from './components/modules/GuestProjectsManagementView';
 import { InventoryView } from './components/modules/InventoryView';
 import { BusinessDirectoryView } from './components/modules/BusinessDirectoryView';
 import { AutomationStudio } from './components/modules/AutomationStudio';
@@ -70,13 +73,13 @@ import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId }
 import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 import { PartnershipsService } from './services/partnershipsService';
-import { Partnership } from './types';
+import { Partnership, FlagshipProject } from './types';
 import { AdvertisementService } from './services/advertisementService';
 
 // --- View Definitions ---
 import { RadarDataImporter } from './components/admin/RadarDataImporter';
 
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'GUEST_PROJECTS_MGT';
 
 // --- Helper Components ---
 
@@ -694,8 +697,49 @@ const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
   onRegister: () => void;
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
 }) => {
-  const { projects, loading } = useProjects();
+  const [projects, setProjects] = useState<FlagshipProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedProject, setSelectedProject] = useState<FlagshipProject | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
+
+  const toggleFlip = (id: string, e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    setFlippedCards(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    FlagshipProjectsService.getAllProjects().then(data => {
+      if (!cancelled) {
+        setProjects(data);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const activeProjects = projects.filter(p => p.status === 'Active');
+
+  const handlePrevPhoto = (photosCount: number) => {
+    if (lightboxIndex === null) return;
+    setLightboxIndex(lightboxIndex === 0 ? photosCount - 1 : lightboxIndex - 1);
+  };
+
+  const handleNextPhoto = (photosCount: number) => {
+    if (lightboxIndex === null) return;
+    setLightboxIndex(lightboxIndex === photosCount - 1 ? 0 : lightboxIndex + 1);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -725,36 +769,448 @@ const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
                 <p className="text-slate-600">Check back soon for new projects!</p>
               </div>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activeProjects.map(project => (
-                  <Card key={project.id} className="hover:shadow-lg transition-shadow">
-                    <div className="p-4">
-                      <div className="flex items-start justify-between mb-4">
-                        <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
-                          {project.status}
-                        </Badge>
-                        <span className="text-sm text-slate-500">{project.completion}% complete</span>
+              <div className="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
+                {/* 3D Flip Card Styles */}
+                <style>{`
+                  .flip-card {
+                    perspective: 1000px;
+                    height: 480px;
+                    width: 100%;
+                  }
+                  @media (min-width: 768px) {
+                    .flip-card {
+                      height: 320px;
+                    }
+                  }
+                  .flip-card-inner {
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
+                    transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                    transform-style: preserve-3d;
+                  }
+                  .flip-card.flipped .flip-card-inner {
+                    transform: rotateY(180deg);
+                  }
+                  .flip-card-front, .flip-card-back {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    backface-visibility: hidden;
+                    -webkit-backface-visibility: hidden;
+                    border-radius: 1rem;
+                    overflow: hidden;
+                  }
+                  .flip-card-front {
+                    transform: rotateY(0deg);
+                  }
+                  .flip-card-back {
+                    transform: rotateY(180deg);
+                  }
+                  .truncate-2-lines {
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                  }
+                  .scrollbar-none::-webkit-scrollbar {
+                    display: none;
+                  }
+                  .scrollbar-none {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                  }
+                `}</style>
+
+                {activeProjects.map(project => {
+                  const hasPhotos = project.galleryUrls && project.galleryUrls.length > 0;
+                  const isFlipped = !!flippedCards[project.id];
+                  return (
+                    <div
+                      key={project.id}
+                      className={`flip-card ${isFlipped ? 'flipped' : ''}`}
+                      onClick={(e) => toggleFlip(project.id, e)}
+                    >
+                      <div className="flip-card-inner">
+                        {/* FRONT FACE (2-Column Layout) */}
+                        <div className="flip-card-front bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row overflow-hidden cursor-pointer h-full">
+                          {/* Left Column: Project Logo */}
+                          <div className="w-full md:w-1/3 bg-slate-50 flex items-center justify-center relative p-6 border-b md:border-b-0 md:border-r border-slate-100 flex-shrink-0 h-44 md:h-full">
+                            {project.logoUrl ? (
+                              <img
+                                src={project.logoUrl}
+                                alt={`${project.title} Logo`}
+                                className="max-w-full max-h-full object-contain rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
+                                <Briefcase size={32} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right Column: Banner, Title, Description, Progress & Buttons */}
+                          <div className="w-full md:w-2/3 p-6 flex flex-col justify-between h-full min-w-0">
+                            <div>
+                              {/* Banner Wrapper */}
+                              <div className="relative mb-3">
+                                {/* Banner */}
+                                <div className="h-10 w-full rounded bg-gradient-to-r from-jci-blue/10 to-indigo-500/10 flex items-center px-2 border-l-2 border-jci-blue">
+                                  <span className="text-[24px] font-bold text-jci-blue uppercase tracking-wider">{project.title}</span>
+                                </div>
+
+                                {/* Selected UNSDG goals row */}
+                                {project.unsdg && project.unsdg.length > 0 && (
+                                  <div className="absolute right-0 -bottom-3 flex gap-1 z-10">
+                                    {project.unsdg.map(goalId => (
+                                      <img
+                                        key={goalId}
+                                        src={`/UNSDG/${goalId}.png`}
+                                        alt={goalId}
+                                        className="w-12 h-12 rounded object-cover shadow-sm border border-white hover:scale-110 transition-transform duration-200"
+                                        title={goalId}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {project.description ? (
+                                <p className="text-slate-600 text-xs line-clamp-3 leading-relaxed mb-3">{project.description}</p>
+                              ) : (
+                                <p className="text-slate-400 text-xs italic mb-3">No description available.</p>
+                              )}
+                            </div>
+
+                            <div className="mt-auto pt-3 border-t border-slate-100">
+                              <div className="flex justify-between items-center gap-2 mt-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFlip(project.id, e);
+                                  }}
+                                  className="inline-flex items-center text-xs font-semibold text-jci-blue hover:text-sky-600 transition-colors"
+                                >
+                                  <ImageIcon size={14} className="mr-1" /> View Gallery
+                                </button>
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRegister();
+                                  }}
+                                  className="text-xs font-semibold px-3 py-1.5 bg-jci-blue hover:bg-jci-blue/90 text-white border-0 h-8"
+                                >
+                                  Get Involved
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* BACK FACE: Photo Gallery */}
+                        <div className="flip-card-back bg-white border border-slate-100 shadow-sm p-6 flex flex-col justify-between h-full overflow-hidden cursor-pointer">
+                          <div className="flex justify-between items-center pb-3 border-b border-slate-100 flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                              <ImageIcon size={16} className="text-jci-blue" />
+                              <h4 className="font-bold text-slate-800 text-sm">Photo Gallery</h4>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFlip(project.id, e);
+                              }}
+                              className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all"
+                              title="Back to details"
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          </div>
+
+                          <div className="flex-1 py-4 overflow-y-auto min-h-0">
+                            {hasPhotos ? (() => {
+                              const foldersData: Record<string, string[]> = project.galleryByYear || {
+                                'General': project.galleryUrls || []
+                              };
+                              const sortedFolders = Object.keys(foldersData).sort((a, b) => a.localeCompare(b));
+                              return (
+                                <div className="relative pl-4 border-l-2 border-slate-100 space-y-6 ml-2 my-2">
+                                  {sortedFolders.map((folder) => {
+                                    const urls = foldersData[folder] || [];
+                                    if (urls.length === 0) return null;
+                                    return (
+                                      <div key={folder} className="relative flex flex-col sm:flex-row gap-4 items-start border-b border-slate-50 pb-4 last:border-b-0 last:pb-0">
+                                        {/* Timeline Dot */}
+                                        <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-jci-blue border-2 border-white ring-4 ring-blue-50 shadow-sm" />
+
+                                        {/* Folder Label Column */}
+                                        <div className="flex sm:flex-col items-start gap-1 w-full sm:w-28 flex-shrink-0">
+                                          <span className="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded select-none flex items-center gap-1">
+                                            {folder}
+                                          </span>
+                                          <span className="text-[10px] text-slate-400 font-medium pl-1 sm:pl-0">{urls.length} photo(s)</span>
+                                        </div>
+
+                                        {/* 6x2 Grid Column */}
+                                        <div className="grid grid-cols-6 gap-1.5 flex-1 w-full">
+                                          {urls.slice(0, 12).map((url, imgIndex) => {
+                                            const globalIndex = project.galleryUrls?.indexOf(url) ?? imgIndex;
+                                            return (
+                                              <div
+                                                key={imgIndex}
+                                                className="aspect-video rounded-lg overflow-hidden border border-slate-100 cursor-pointer relative group shadow-sm hover:shadow transition-shadow"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedProject(project);
+                                                  setLightboxIndex(globalIndex);
+                                                }}
+                                              >
+                                                <img src={url} alt={`Gallery ${folder}-${imgIndex}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                                                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                  <span className="text-[8px] text-white bg-black/50 px-1 py-0.5 rounded scale-75 sm:scale-100">Enlarge</span>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })() : (
+                              <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                <ImageIcon size={32} className="mb-2 opacity-50" />
+                                <p className="text-xs">No photos in gallery yet.</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-100 flex justify-between items-center flex-shrink-0">
+                            <span className="text-xs text-slate-500 font-medium">
+                              {project.galleryUrls?.length || 0} photos available
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFlip(project.id, e);
+                              }}
+                              className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1"
+                            >
+                              <RotateCcw size={12} /> Flip to details
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-2">{project.name}</h3>
-                      {project.description && (
-                        <p className="text-slate-600 text-sm mb-4 line-clamp-3">{project.description}</p>
-                      )}
-                      <div className="flex items-center justify-between text-sm text-slate-500 mb-4">
-                        <span>{project.teamSize} team members</span>
-                        <span>{project.status}</span>
-                      </div>
-                      <ProgressBar progress={project.completion} />
-                      <Button className="w-full" onClick={onRegister}>
-                        Get Involved
-                      </Button>
                     </div>
-                  </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </section>
 
+        {/* Project Detail & Photo Gallery Modal */}
+        {selectedProject && (
+          <Modal
+            isOpen={true}
+            onClose={() => {
+              setSelectedProject(null);
+              setLightboxIndex(null);
+            }}
+            title={selectedProject.title}
+            size="lg"
+            drawerOnMobile
+          >
+            <div className="space-y-6">
+              {/* Top Section with Logo and Banner */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-slate-100">
+                {selectedProject.logoUrl ? (
+                  <div className="w-24 h-24 rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-sm flex-shrink-0 flex items-center justify-center">
+                    <img src={selectedProject.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
+                    <Briefcase size={36} />
+                  </div>
+                )}
+                <div className="text-center sm:text-left flex-1">
+                  <div className="flex flex-wrap gap-2 items-center justify-center sm:justify-start mb-2">
+                    <Badge variant="success" className="bg-emerald-500 text-white border-0 font-semibold px-2.5 py-0.5">
+                      {selectedProject.status}
+                    </Badge>
+                    {selectedProject.level && (
+                      <Badge variant="neutral" className="text-slate-600 border-slate-200 bg-slate-50">
+                        Level: {selectedProject.level}
+                      </Badge>
+                    )}
+                    {selectedProject.pillar && (
+                      <Badge variant="neutral" className="text-slate-600 border-slate-200 bg-slate-50">
+                        Pillar: {selectedProject.pillar}
+                      </Badge>
+                    )}
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-slate-900 mb-1">
+                    {selectedProject.title}
+                  </h2>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">About the Project</h4>
+                <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-base">
+                  {selectedProject.description || 'No description available.'}
+                </p>
+              </div>
+
+              {/* Project Stats and Details Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                {selectedProject.startDate && (
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Start Date</span>
+                    <span className="text-sm font-medium text-slate-800 font-sans">
+                      {new Date(selectedProject.startDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                    </span>
+                  </div>
+                )}
+                {selectedProject.endDate && (
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">End Date</span>
+                    <span className="text-sm font-medium text-slate-800 font-sans">
+                      {new Date(selectedProject.endDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* UNSDG Goals Section */}
+              {selectedProject.unsdg && selectedProject.unsdg.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">UN Sustainable Development Goals</h4>
+                  <div className="flex flex-wrap gap-2.5">
+                    {selectedProject.unsdg.map(goalId => (
+                      <div key={goalId} className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl p-2 pr-4 shadow-sm">
+                        <img
+                          src={`/UNSDG/${goalId}.png`}
+                          alt={goalId}
+                          className="w-8 h-8 rounded object-cover"
+                        />
+                        <span className="text-xs font-semibold text-slate-700">{goalId}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Photo Gallery Timeline */}
+              {selectedProject.galleryUrls && selectedProject.galleryUrls.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Event Photo Gallery</h4>
+
+                  {(() => {
+                    const foldersData: Record<string, string[]> = selectedProject.galleryByYear || {
+                      'General': selectedProject.galleryUrls || []
+                    };
+                    const sortedFolders = Object.keys(foldersData).sort((a, b) => a.localeCompare(b));
+
+                    return (
+                      <div className="relative pl-6 border-l-2 border-slate-100 space-y-8 ml-2">
+                        {sortedFolders.map((folder) => {
+                          const urls = foldersData[folder] || [];
+                          if (urls.length === 0) return null;
+                          return (
+                            <div key={folder} className="relative">
+                              {/* Timeline Node Ring */}
+                              <div className="absolute -left-[32px] top-1.5 w-4 h-4 rounded-full bg-white border-4 border-jci-blue ring-4 ring-blue-50 shadow-sm" />
+
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="text-sm font-bold text-slate-900 bg-slate-100 border border-slate-200/50 px-3 py-1 rounded-xl shadow-sm">
+                                  {folder}
+                                </span>
+                                <span className="text-xs text-slate-400 font-medium">({urls.length} photos)</span>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                {urls.map((url, imgIndex) => {
+                                  const globalIndex = selectedProject.galleryUrls?.indexOf(url) ?? imgIndex;
+                                  return (
+                                    <div
+                                      key={imgIndex}
+                                      className="relative group cursor-pointer border border-slate-100 rounded-xl overflow-hidden aspect-video bg-white hover:shadow-md transition-shadow"
+                                      onClick={() => setLightboxIndex(globalIndex)}
+                                    >
+                                      <img
+                                        src={url}
+                                        alt={`Gallery Item ${folder}-${imgIndex}`}
+                                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                      />
+                                      <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <span className="text-white text-xs bg-black/40 px-2 py-1 rounded-md backdrop-blur-sm">Enlarge</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Lightbox / Overlay for Photo Enlarging */}
+              {lightboxIndex !== null && selectedProject.galleryUrls && (
+                <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
+                  <button
+                    className="absolute top-4 right-4 text-white hover:text-slate-300 transition-colors p-2 z-[110]"
+                    onClick={() => setLightboxIndex(null)}
+                  >
+                    <X size={32} />
+                  </button>
+
+                  <button
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-slate-300 transition-colors p-2 z-[110] bg-white/10 hover:bg-white/20 rounded-full"
+                    onClick={() => handlePrevPhoto(selectedProject.galleryUrls!.length)}
+                  >
+                    <ChevronLeft size={36} />
+                  </button>
+
+                  <div className="max-w-4xl max-h-[80vh] flex items-center justify-center">
+                    <img
+                      src={selectedProject.galleryUrls[lightboxIndex]}
+                      alt={`Enlarged Gallery Item ${lightboxIndex}`}
+                      className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+                    />
+                  </div>
+
+                  <button
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-slate-300 transition-colors p-2 z-[110] bg-white/10 hover:bg-white/20 rounded-full"
+                    onClick={() => handleNextPhoto(selectedProject.galleryUrls!.length)}
+                  >
+                    <ChevronRight size={36} />
+                  </button>
+
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-slate-400 text-sm font-semibold">
+                    {lightboxIndex + 1} / {selectedProject.galleryUrls.length}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 flex gap-3">
+                <Button onClick={onRegister} className="flex-1 bg-jci-blue text-white hover:bg-jci-blue/90 border-0 py-3 text-sm font-bold shadow-md">
+                  Register / Get Involved
+                </Button>
+                <Button variant="ghost" onClick={() => setSelectedProject(null)} className="flex-1 border border-slate-200 text-slate-700 font-semibold py-3 text-sm">
+                  Close
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </main>
       <GuestFooter />
     </div>
@@ -1490,8 +1946,8 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                           setSelectedNewsletter(item);
                         }}
                         className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${isCurrent
-                            ? 'bg-sky-50/80 border-jci-blue text-jci-blue shadow-sm'
-                            : 'bg-slate-50/50 border-slate-200/60 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
+                          ? 'bg-sky-50/80 border-jci-blue text-jci-blue shadow-sm'
+                          : 'bg-slate-50/50 border-slate-200/60 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
                           }`}
                       >
                         <FileText size={16} className={`flex-shrink-0 mt-0.5 ${isCurrent ? 'text-jci-blue' : 'text-slate-400'}`} />
@@ -2442,6 +2898,11 @@ export const JCIKLApp: React.FC = () => {
           return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
         }
         return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
+      case 'GUEST_PROJECTS_MGT':
+        if (!canViewEventsManagement) {
+          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+        }
+        return <GuestProjectsManagementView searchQuery={searchQuery} />;
       case 'EVENTS': return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
       case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
@@ -2623,13 +3084,22 @@ export const JCIKLApp: React.FC = () => {
                   <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Workspace</p>
 
                   {canViewEventsManagement && (
-                    <SidebarItem
-                      icon={<FolderKanban size={18} />}
-                      label="Events Management"
-                      isActive={view === 'PROJECTS'}
-                      onClick={() => { handleViewChange('PROJECTS'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
+                    <>
+                      <SidebarItem
+                        icon={<FolderKanban size={18} />}
+                        label="Events Management"
+                        isActive={view === 'PROJECTS'}
+                        onClick={() => { handleViewChange('PROJECTS'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                      <SidebarItem
+                        icon={<Briefcase size={18} />}
+                        label="Guest Projects Mgt"
+                        isActive={view === 'GUEST_PROJECTS_MGT'}
+                        onClick={() => { handleViewChange('GUEST_PROJECTS_MGT'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
+                    </>
                   )}
                   <SidebarItem
                     icon={<CheckSquare size={18} />}
@@ -2908,7 +3378,7 @@ export const JCIKLApp: React.FC = () => {
 
           {/* Scrollable Area */}
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-32 md:pb-4 px-5 sm:px-8 ">
-              {renderCurrentView(scrollContainerRef)}
+            {renderCurrentView(scrollContainerRef)}
           </div>
         </main>
 

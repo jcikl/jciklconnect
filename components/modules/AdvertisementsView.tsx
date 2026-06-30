@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Megaphone, Plus, Edit, Trash2, Eye, MousePointerClick, TrendingUp, Calendar, Image as ImageIcon, Link as LinkIcon, BarChart3, Download, Filter } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast, Tabs, StatCardsContainer } from '../ui/Common';
+import { Megaphone, Plus, Edit, Trash2, Eye, MousePointerClick, TrendingUp, Calendar, Image as ImageIcon, Link as LinkIcon, BarChart3, Download, Filter, Upload } from 'lucide-react';
+import { Button, Card, Badge, Modal, useToast, Tabs, StatCardsContainer, ProgressBar } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
@@ -9,8 +9,7 @@ import { Advertisement } from '../../services/advertisementService';
 import { formatDate, toDate } from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/formatUtils';
 import { Timestamp } from 'firebase/firestore';
-import { storage } from '../../config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadToCloudinary } from '../../services/cloudinaryService';
 import imageCompression from 'browser-image-compression';
 
 // AdImage component extracted outside to avoid React Hooks rule violation
@@ -48,6 +47,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
   const [formImage, setFormImage] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   React.useEffect(() => {
     if (selectedAd) {
@@ -97,9 +97,9 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           console.error('Image compression failed, using original file:', error);
         }
 
-        const fileRef = ref(storage, `advertisements/${Date.now()}_${fileToUpload.name}`);
-        const snapshot = await uploadBytes(fileRef, fileToUpload);
-        imageUrl = await getDownloadURL(snapshot.ref);
+        imageUrl = await uploadToCloudinary(fileToUpload, 'advertisements', (progress) => {
+          setUploadProgress(progress);
+        });
       } else if (!imageUrl && formData.get('imageUrl')) {
         imageUrl = formData.get('imageUrl') as string;
       }
@@ -139,6 +139,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       // Error handled by hook
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -453,9 +454,14 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                   htmlFor="ad-image-upload"
                   className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-jci-blue bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
                 >
-                  <ImageIcon size={16} />
+                  <Upload size={16} />
                   {formImage ? 'Change Image' : selectedAd?.imageUrl ? 'Change Image' : 'Upload Image'}
                 </label>
+                {isUploading && (
+                  <div className="mt-2 w-full max-w-xs">
+                    <ProgressBar progress={uploadProgress} label={`Uploading... ${uploadProgress}%`} />
+                  </div>
+                )}
                 <p className="text-xs text-slate-500 mt-2">Max 1MB.</p>
               </div>
             </div>

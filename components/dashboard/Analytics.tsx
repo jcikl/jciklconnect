@@ -7,6 +7,12 @@ import {
 import { Card } from '../ui/Common';
 import { Member } from '../../types';
 import { PointTransaction, PointsService } from '../../services/pointsService';
+import type { PointRule } from '../../services/pointsService';
+import { BoardManagementService } from '../../services/boardManagementService';
+import { ProjectsService } from '../../services/projectsService';
+import { db } from '../../config/firebase';
+import { COLLECTIONS } from '../../config/constants';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
 const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5', '#94A3B8'];
 
@@ -122,6 +128,7 @@ interface PointsSourceRadarChartProps {
   memberId?: string;
   year?: number;
   className?: string;
+  lightTheme?: boolean;
 }
 
 // Map point transaction categories to radar chart dimensions
@@ -149,49 +156,240 @@ const CATEGORY_TO_DIMENSION: Record<string, string> = {
 
 const RADAR_DIMENSIONS = ['Leadership', 'Events', 'Recruitment', 'Sponsorship', 'Training'];
 
-export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ memberId, year, className }) => {
-  const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ memberId, year, className, lightTheme = false }) => {
+  const [boardPositions, setBoardPositions] = useState<any[]>([]);
+  const [commissionDirectorPositions, setCommissionDirectorPositions] = useState<any[]>([]);
+  const [projectRoles, setProjectRoles] = useState<any[]>([]);
+  const [radarContributions, setRadarContributions] = useState<any[]>([]);
+  const [recruitedMembers, setRecruitedMembers] = useState<any[]>([]);
+  const [sponsorshipRecords, setSponsorshipRecords] = useState<any[]>([]);
+  const [pointRules, setPointRules] = useState<PointRule[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadRules = async () => {
+      try {
+        const rules = await PointsService.getPointRules();
+        if (!cancelled) setPointRules(rules);
+      } catch (err) {
+        console.error('Failed to load rules:', err);
+      }
+    };
+    loadRules();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!memberId) {
-      setTransactions([]);
+      setBoardPositions([]);
+      setCommissionDirectorPositions([]);
+      setProjectRoles([]);
+      setRadarContributions([]);
+      setRecruitedMembers([]);
+      setSponsorshipRecords([]);
       return;
     }
+
     let cancelled = false;
-    PointsService.getMemberPointHistory(memberId).then((history) => {
-      if (!cancelled) setTransactions(history);
-    }).catch(() => {
-      if (!cancelled) setTransactions([]);
-    });
+    const fetchAllData = async () => {
+      setLoading(true);
+      try {
+        // 1. Fetch Member record to get name & fullName
+        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+        const memberSnap = await getDoc(memberRef);
+        if (cancelled || !memberSnap.exists()) return;
+        const member = { id: memberSnap.id, ...memberSnap.data() } as any;
+
+        // 2. Parallel fetch other documents
+        const [
+          positions,
+          commissionPositions,
+          projects,
+          sponsorshipsSnap,
+          contributionsSnap,
+          allMembersSnap
+        ] = await Promise.all([
+          BoardManagementService.getMemberBoardPositions(memberId),
+          BoardManagementService.getMemberCommissionDirectorPositions(memberId),
+          ProjectsService.getAllProjects(),
+          getDocs(query(collection(db, 'sponsorships'), where('memberId', '==', memberId))),
+          getDocs(query(collection(db, 'RadarContributions'), where('memberId', '==', memberId))),
+          getDocs(collection(db, COLLECTIONS.MEMBERS))
+        ]);
+
+        if (cancelled) return;
+
+        // Save board positions
+        setBoardPositions(positions);
+        setCommissionDirectorPositions(commissionPositions);
+
+        // Process project roles (Committee & Trainers)
+        const roles: any[] = [];
+        projects.forEach((proj: any) => {
+          if (proj.committee && Array.isArray(proj.committee)) {
+            proj.committee.forEach((c: any) => {
+              if (c.memberId === memberId) {
+                roles.push({
+                  type: 'Committee',
+                  date: proj.startDate || proj.proposedDate || proj.eventStartDate || '',
+                });
+              }
+            });
+          }
+          if (proj.trainers && Array.isArray(proj.trainers)) {
+            proj.trainers.forEach((t: any) => {
+              if (t.memberId === memberId) {
+                roles.push({
+                  type: 'Trainer',
+                  hours: parseFloat(t.durationHours) || 0,
+                  date: proj.startDate || proj.proposedDate || proj.eventStartDate || '',
+                });
+              }
+            });
+          }
+        });
+        setProjectRoles(roles);
+
+        // Process sponsorships
+        const sponsorList: any[] = [];
+        sponsorshipsSnap.forEach((doc) => {
+          const data = doc.data();
+          const amt = parseFloat(data.amount) || 0;
+          sponsorList.push({
+            amount: amt,
+            date: data.createdAt?.toDate?.() || data.createdAt || '',
+          });
+        });
+        setSponsorshipRecords(sponsorList);
+
+        // Process contributions
+        const contribList: any[] = [];
+        contributionsSnap.forEach((doc) => {
+          const data = doc.data();
+          const rawDateVal = typeof data.eventDate === 'string'
+            ? data.eventDate.trim().substring(0, 11)
+            : (data.eventDate || data.createdAt?.toDate?.() || data.createdAt || '');
+          contribList.push({
+            points: parseFloat(data.points) || 0,
+            date: rawDateVal,
+          });
+        });
+        setRadarContributions(contribList);
+
+        // Process recruited members
+        const recruitList: any[] = [];
+        const memberName = member.name || '';
+        const memberFullName = member.fullName || member.general?.name || '';
+        allMembersSnap.forEach((doc) => {
+          const m = doc.data() as any;
+          const intro = (m.introducer || '').trim().toLowerCase();
+          if (intro) {
+            if (
+              intro === memberId.toLowerCase() ||
+              (memberName && intro === memberName.trim().toLowerCase()) ||
+              (memberFullName && intro === memberFullName.trim().toLowerCase())
+            ) {
+              recruitList.push({
+                joinDate: m.joinDate || '',
+              });
+            }
+          }
+        });
+        setRecruitedMembers(recruitList);
+
+      } catch (err) {
+        console.error('Error fetching data for Radar Chart:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchAllData();
     return () => { cancelled = true; };
   }, [memberId]);
 
   const data = useMemo(() => {
-    // Accumulate points per radar dimension
-    const totals: Record<string, number> = {};
-    RADAR_DIMENSIONS.forEach(d => { totals[d] = 0; });
+    const selectedYearStr = year ? String(year) : null;
 
-    // Filter by year if provided
-    const filtered = year
-      ? transactions.filter(tx => {
-          try {
-            const d = new Date(tx.createdAt as string);
-            return !isNaN(d.getTime()) && d.getFullYear() === year;
-          } catch { return false; }
-        })
-      : transactions;
+    // --- Dynamic Point Rule Base Values ---
+    const boardRule = pointRules.find(r => r.category === 'role_fulfillment' && r.conditions?.roleType === 'Board');
+    const boardBase = boardRule ? boardRule.basePoints : 50;
 
-    filtered.forEach(tx => {
-      const dim = CATEGORY_TO_DIMENSION[tx.category] || CATEGORY_TO_DIMENSION[tx.category?.toLowerCase()] || null;
-      if (dim) {
-        totals[dim] += Math.abs(tx.points || tx.amount || 0);
-      } else {
-        // Fallback: distribute uncategorised points to "Events"
-        totals['Events'] += Math.abs(tx.points || tx.amount || 0);
-      }
-    });
+    const committeeRule = pointRules.find(r => r.category === 'role_fulfillment' && r.conditions?.roleType === 'Committee');
+    const committeeBase = committeeRule ? committeeRule.basePoints : 15;
 
-    // Find max for fullMark normalisation (minimum 100 so the chart looks decent)
+    const recruitmentRule = pointRules.find(r => r.category === 'recruitment');
+    const recruitBase = recruitmentRule ? recruitmentRule.basePoints : 10;
+
+    const trainingRule = pointRules.find(r => r.category === 'training');
+    const trainingBase = trainingRule ? trainingRule.basePoints : 15;
+
+    const sponsorshipRule = pointRules.find(r => r.category === 'sponsorship_referral');
+    const sponsorshipBaseMultiplier = sponsorshipRule ? sponsorshipRule.basePoints : 2;
+
+    // --- 1. Leadership Score ---
+    const activeBoards = [
+      ...boardPositions.filter(pos => !selectedYearStr || pos.term === selectedYearStr),
+      ...commissionDirectorPositions.filter(pos => !selectedYearStr || pos.term === selectedYearStr)
+    ].length;
+
+    const activeCommittees = projectRoles.filter(
+      role => role.type === 'Committee' && (!selectedYearStr || (role.date && role.date.includes(selectedYearStr)))
+    ).length;
+
+    const leadershipScore = (activeBoards * boardBase) + (activeCommittees * committeeBase);
+
+    // --- 2. Events Score ---
+    const eventsScore = radarContributions
+      .filter(contrib => {
+        if (!selectedYearStr) return true;
+        if (!contrib.date) return false;
+        // Parse date safely
+        const dateStr = typeof contrib.date === 'string' ? contrib.date : String(contrib.date);
+        return dateStr.includes(selectedYearStr);
+      })
+      .reduce((sum, item) => sum + (item.points || 0), 0);
+
+    // --- 3. Recruitment Score ---
+    const recruitCount = recruitedMembers.filter(
+      recruit => !selectedYearStr || (recruit.joinDate && recruit.joinDate.includes(selectedYearStr))
+    ).length;
+    const recruitmentScore = recruitCount * recruitBase;
+
+    // --- 4. Sponsorship Score ---
+    const sponsorshipScore = sponsorshipRecords
+      .filter(sponsor => {
+        if (!selectedYearStr) return true;
+        if (!sponsor.date) return false;
+        try {
+          let d: Date;
+          if (typeof (sponsor.date as any).toDate === 'function') {
+            d = (sponsor.date as any).toDate();
+          } else {
+            d = new Date(sponsor.date);
+          }
+          return !isNaN(d.getTime()) && String(d.getFullYear()) === selectedYearStr;
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, item) => sum + Math.floor((item.amount || 0) / 100) * sponsorshipBaseMultiplier, 0);
+
+    // --- 5. Training Score ---
+    const activeTrainers = projectRoles.filter(
+      role => role.type === 'Trainer' && (!selectedYearStr || (role.date && role.date.includes(selectedYearStr)))
+    ).length;
+    const trainingScore = activeTrainers * trainingBase;
+
+    const totals: Record<string, number> = {
+      Leadership: leadershipScore,
+      Events: eventsScore,
+      Recruitment: recruitmentScore,
+      Sponsorship: sponsorshipScore,
+      Training: trainingScore,
+    };
+
     const maxVal = Math.max(100, ...Object.values(totals));
 
     return RADAR_DIMENSIONS.map(dim => ({
@@ -200,24 +398,33 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
       displaySubject: `${dim}: ${totals[dim]}`,
       fullMark: maxVal,
     }));
-  }, [transactions, year]);
+  }, [
+    year,
+    pointRules,
+    boardPositions,
+    commissionDirectorPositions,
+    projectRoles,
+    radarContributions,
+    recruitedMembers,
+    sponsorshipRecords
+  ]);
 
   return (
-    <div className={`w-full h-full min-h-[220px] ${className}`}>
+    <div className={`w-full h-full min-h-[220px] pointer-events-none ${className}`}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
         <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
-          <PolarGrid stroke="#ffffff20" />
+          <PolarGrid stroke={lightTheme ? '#e2e8f0' : '#ffffff20'} />
           <PolarAngleAxis 
             dataKey="displaySubject" 
-            tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 'bold' }} 
+            tick={{ fill: lightTheme ? '#475569' : '#94a3b8', fontSize: 9, fontWeight: 'bold' }} 
           />
           <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
           <Radar
             name="Points"
             dataKey="A"
-            stroke="#F59E0B"
-            fill="#F59E0B"
-            fillOpacity={0.5}
+            stroke={lightTheme ? '#0097D7' : '#F59E0B'}
+            fill={lightTheme ? '#0097D7' : '#F59E0B'}
+            fillOpacity={lightTheme ? 0.4 : 0.5}
           />
         </RadarChart>
       </ResponsiveContainer>

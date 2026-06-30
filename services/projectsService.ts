@@ -98,6 +98,8 @@ export class ProjectsService {
       if (projectData.eventEndTime != null) payload.eventEndTime = projectData.eventEndTime;
       if (projectData.committee != null) payload.committee = projectData.committee;
       if (projectData.submittedBy != null) payload.submittedBy = projectData.submittedBy;
+      if (projectData.logoUrl != null) payload.logoUrl = projectData.logoUrl;
+      if (projectData.galleryUrls != null) payload.galleryUrls = projectData.galleryUrls;
 
       const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
       return docRef.id;
