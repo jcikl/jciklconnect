@@ -1328,11 +1328,21 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
         if (activeBoard.length > 0) {
           const mapped = activeBoard.map(bm => {
             const memberObj = allMembers.find(m => m.id === bm.memberId);
+            const name = memberObj
+              ? (memberObj.general?.fullName || memberObj.general?.name || memberObj.fullName || memberObj.name || 'Unknown Name')
+              : 'Unknown Name';
+            const avatar = memberObj
+              ? (memberObj.general?.avatarUrl || memberObj.avatarUrl || memberObj.avatar || undefined)
+              : undefined;
+            const company = memberObj
+              ? (memberObj.business?.companyName || memberObj.companyName || memberObj.profession || 'JCI Kuala Lumpur')
+              : 'JCI Kuala Lumpur';
+
             return {
               position: bm.position,
-              name: memberObj ? (memberObj.fullName || memberObj.name) : 'Unknown Name',
-              avatar: memberObj?.avatar || undefined,
-              company: memberObj?.companyName || memberObj?.profession || 'JCI Member'
+              name,
+              avatar,
+              company
             };
           });
           setBoardMembers(mapped);
@@ -1397,8 +1407,8 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
     return pos.includes('vice president') && (pos.includes('lom') || pos.includes('local organisation') || pos.includes('local organization'));
   });
 
-  const BoardNode = ({ member, defaultRole, variant = 'default' }: { 
-    member?: any; 
+  const BoardNode = ({ member, defaultRole, variant = 'default' }: {
+    member?: any;
     defaultRole: string;
     variant?: 'default' | 'president' | 'ipp';
   }) => {
@@ -1565,11 +1575,10 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                   <button
                     key={year}
                     onClick={() => setSelectedYear(year)}
-                    className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all duration-200 ${
-                      selectedYear === year
+                    className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all duration-200 ${selectedYear === year
                         ? 'bg-jci-blue text-white shadow-sm scale-105'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                    }`}
+                      }`}
                   >
                     {year}
                   </button>
@@ -1590,7 +1599,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                   <div className="w-full max-w-[240px]">
                     <BoardNode member={president} defaultRole="President" variant="president" />
                   </div>
-                  
+
                   {/* Connecting Line for Support */}
                   <div className="hidden md:flex flex-col items-center justify-center shrink-0">
                     <div className="w-16 h-0.5 border-t-2 border-dashed border-slate-300"></div>
@@ -1634,7 +1643,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 <div className="bg-slate-50/50 rounded-3xl p-6 sm:p-8 border border-slate-200/50 max-w-6xl mx-auto">
                   <div className="text-center mb-8">
                     <span className="px-4 py-1 bg-sky-50 border border-sky-100 text-jci-blue font-extrabold text-[10px] uppercase tracking-wider rounded-full">
-                      Vice Presidents (Directly under EVP)
+                      Vice Presidents
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 justify-center">

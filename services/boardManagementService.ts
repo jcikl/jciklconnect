@@ -73,21 +73,25 @@ export class BoardManagementService {
 
   // Get board members for a specific year
   static async getBoardMembersByYear(year: string): Promise<BoardMember[]> {
-    if (isDevMode()) {
-      return [];
-    }
-
     try {
       const boardMembersRef = collection(db, 'boardMembers');
       const q = query(boardMembersRef, where('term', '==', year));
       const snapshot = await getDocs(q);
 
-      return snapshot.docs.map(doc => ({
+      const docs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       })) as BoardMember[];
+
+      if (docs.length === 0 && isDevMode()) {
+        return [];
+      }
+      return docs;
     } catch (error) {
       console.error('Error getting board members by year:', error);
+      if (isDevMode()) {
+        return [];
+      }
       throw error;
     }
   }

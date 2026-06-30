@@ -64,13 +64,6 @@ export class MembersService {
   }
   /** Get all members, optionally filtered by loId (for multi-LO). */
   static async getAllMembers(loIdFilter?: string | null): Promise<Member[]> {
-    if (isDevMode()) {
-      const list = loIdFilter
-        ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
-        : MOCK_MEMBERS;
-      return list;
-    }
-
     try {
       let q;
       if (loIdFilter != null && loIdFilter !== '') {
@@ -83,7 +76,15 @@ export class MembersService {
         q = query(collection(db, COLLECTIONS.MEMBERS));
       }
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ ...(d.data() as any), id: d.id } as Member));
+      const docs = snapshot.docs.map(d => ({ ...(d.data() as any), id: d.id } as Member));
+
+      if (docs.length === 0 && isDevMode()) {
+        const list = loIdFilter
+          ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
+          : MOCK_MEMBERS;
+        return list;
+      }
+      return docs;
     } catch (error) {
       if (isDevMode()) {
         const list = loIdFilter
