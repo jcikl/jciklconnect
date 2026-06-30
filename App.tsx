@@ -43,7 +43,7 @@ import { GamificationView } from './components/modules/GamificationView';
 import { EventsView } from './components/modules/EventsView';
 import { MembersView } from './components/modules/MembersView';
 import { ProjectsView } from './components/modules/ProjectsView';
-import { GuestProjectsManagementView } from './components/modules/GuestProjectsManagementView';
+import { FlagshipProjectsManagementView } from './components/modules/FlagshipProjectsManagementView';
 import { InventoryView } from './components/modules/InventoryView';
 import { BusinessDirectoryView } from './components/modules/BusinessDirectoryView';
 import { AutomationStudio } from './components/modules/AutomationStudio';
@@ -79,7 +79,7 @@ import { AdvertisementService } from './services/advertisementService';
 // --- View Definitions ---
 import { RadarDataImporter } from './components/admin/RadarDataImporter';
 
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'GUEST_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'GUEST_PROJECTS_MGT';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
 
 // --- Helper Components ---
 
@@ -691,8 +691,8 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   );
 };
 
-// Guest Projects Page
-const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
+// Flagship Projects Page
+const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
@@ -2640,7 +2640,7 @@ export const JCIKLApp: React.FC = () => {
     const titles: Partial<Record<ViewType, string>> = {
       GUEST: 'Home',
       GUEST_EVENTS: 'Events',
-      GUEST_PROJECTS: 'Flagship Projects',
+      FLAGSHIP_PROJECTS: 'Flagship Projects',
       GUEST_ABOUT: 'About',
       GUEST_ENEWSLETTERS: 'E-Newsletters',
       GUEST_DIRECTORY: 'Business Directory',
@@ -2735,7 +2735,7 @@ export const JCIKLApp: React.FC = () => {
       } else if (path === '/events') {
         setView('GUEST_EVENTS');
       } else if (path === '/projects') {
-        setView('GUEST_PROJECTS');
+        setView('FLAGSHIP_PROJECTS');
       } else if (path === '/enewsletters') {
         setView('GUEST_ENEWSLETTERS');
       } else if (path === '/directory') {
@@ -2828,7 +2828,7 @@ export const JCIKLApp: React.FC = () => {
       setView('GUEST_EVENTS');
       navigate('/events');
     } else if (page === 'projects') {
-      setView('GUEST_PROJECTS');
+      setView('FLAGSHIP_PROJECTS');
       navigate('/projects');
     } else if (page === 'about') {
       setView('GUEST_ABOUT');
@@ -2846,7 +2846,7 @@ export const JCIKLApp: React.FC = () => {
   };
 
   // Conditional Rendering Helper for Guest Pages
-  if (view === 'GUEST' || view === 'GUEST_EVENTS' || view === 'GUEST_PROJECTS' || view === 'GUEST_ABOUT' || view === 'GUEST_ENEWSLETTERS' || view === 'GUEST_DIRECTORY' || view === 'GUEST_PARTNERSHIPS') {
+  if (view === 'GUEST' || view === 'GUEST_EVENTS' || view === 'FLAGSHIP_PROJECTS' || view === 'GUEST_ABOUT' || view === 'GUEST_ENEWSLETTERS' || view === 'GUEST_DIRECTORY' || view === 'GUEST_PARTNERSHIPS') {
     const guestPageProps = {
       onLogin: handleLogin,
       onRegister: openRegistration,
@@ -2858,7 +2858,7 @@ export const JCIKLApp: React.FC = () => {
         <Routes>
           <Route path="/" element={<GuestLandingPage {...guestPageProps} />} />
           <Route path="/events" element={<GuestEventsPage {...guestPageProps} />} />
-          <Route path="/projects" element={<GuestProjectsPage {...guestPageProps} />} />
+          <Route path="/projects" element={<FlagshipProjectsPage {...guestPageProps} />} />
           <Route path="/about" element={<GuestAboutPage {...guestPageProps} />} />
           <Route path="/enewsletters" element={<GuestEnewslettersPage {...guestPageProps} />} />
           <Route path="/directory" element={<GuestDirectoryPage {...guestPageProps} />} />
@@ -2898,11 +2898,11 @@ export const JCIKLApp: React.FC = () => {
           return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
         }
         return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
-      case 'GUEST_PROJECTS_MGT':
+      case 'FLAGSHIP_PROJECTS_MGT':
         if (!canViewEventsManagement) {
           return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
         }
-        return <GuestProjectsManagementView searchQuery={searchQuery} />;
+        return <FlagshipProjectsManagementView searchQuery={searchQuery} />;
       case 'EVENTS': return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
       case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
@@ -3095,8 +3095,8 @@ export const JCIKLApp: React.FC = () => {
                       <SidebarItem
                         icon={<Briefcase size={18} />}
                         label="Flagship Projects Mgt"
-                        isActive={view === 'GUEST_PROJECTS_MGT'}
-                        onClick={() => { handleViewChange('GUEST_PROJECTS_MGT'); setIsSidebarOpen(false); }}
+                        isActive={view === 'FLAGSHIP_PROJECTS_MGT'}
+                        onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                     </>

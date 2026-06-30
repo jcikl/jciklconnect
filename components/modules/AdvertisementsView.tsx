@@ -75,7 +75,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
     setIsUploading(true);
     try {
       let imageUrl = selectedAd?.imageUrl || '';
@@ -84,7 +84,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         let fileToUpload = formImage;
         try {
           const options = {
-            maxSizeMB: 1,
+            maxSizeMB: 0.2,
             maxWidthOrHeight: 1920,
             useWebWorker: true,
           };

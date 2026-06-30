@@ -17,7 +17,7 @@ const UNSDG_GOALS = Array.from({ length: 17 }, (_, i) => {
   };
 });
 
-export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [projects, setProjects] = useState<FlagshipProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -224,7 +224,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
       try {
         const projectToDelete = projects.find(p => p.id === projectId);
         await FlagshipProjectsService.deleteProject(projectId);
-        
+
         // Also delete all of its images from Cloudinary!
         if (projectToDelete && projectToDelete.galleryUrls && projectToDelete.galleryUrls.length > 0) {
           Promise.all(projectToDelete.galleryUrls.map(url => deleteFromCloudinary(url)))
@@ -253,7 +253,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
       let fileToUpload = file;
       try {
         const options = {
-          maxSizeMB: 1,
+          maxSizeMB: 0.2,
           maxWidthOrHeight: 1024,
           useWebWorker: true,
         };
@@ -289,7 +289,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
     const targetYear = selectedUploadYear === '__new_year__' ? (customUploadYear.trim() || new Date().getFullYear().toString()) : selectedUploadYear;
     const targetVenue = selectedUploadVenue === '__new_venue__' ? (customUploadVenue.trim() || 'General') : selectedUploadVenue;
     const targetFolder = `${targetYear} - ${targetVenue}`;
-    
+
     const currentPhotosCount = galleryByYear[targetFolder]?.length || 0;
     const availableSlots = 12 - currentPhotosCount;
     if (availableSlots <= 0) {
@@ -319,7 +319,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
         let fileToUpload = file;
         try {
           const options = {
-            maxSizeMB: 1.5,
+            maxSizeMB: 0.2,
             maxWidthOrHeight: 1600,
             useWebWorker: true,
           };
@@ -366,7 +366,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
     }
     setIsUploadingGallery(false);
     setGalleryUploadProgress(0);
-    
+
     if (selectedUploadYear === '__new_year__') {
       setSelectedUploadYear(targetYear);
       setCustomUploadYear('');
@@ -430,7 +430,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
       const currentPhotos = galleryByYear[targetFolder] || [];
       const movingFromOtherFolders = draggedItems.filter(item => item.folder !== targetFolder);
       const newPhotosCount = currentPhotos.length + movingFromOtherFolders.length;
-      
+
       if (newPhotosCount > 12) {
         showToast(`Cannot move photos. "${targetFolder}" would exceed the limit of 12 photos.`, 'error');
         setSelectedPhotos([]);
@@ -439,7 +439,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
 
       setGalleryByYear(prev => {
         const next = { ...prev };
-        
+
         // Remove from original folders
         draggedItems.forEach(item => {
           if (next[item.folder]) {
@@ -449,12 +449,12 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
             }
           }
         });
-        
+
         // Add to targetFolder
         const targetPhotos = next[targetFolder] || [];
         const newUrls = draggedItems.map(item => item.url).filter(url => !targetPhotos.includes(url));
         next[targetFolder] = [...targetPhotos, ...newUrls];
-        
+
         return next;
       });
 
@@ -472,7 +472,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
     const currentPhotos = galleryByYear[targetFolder] || [];
     const movingFromOtherFolders = selectedPhotos.filter(item => item.folder !== targetFolder);
     const newPhotosCount = currentPhotos.length + movingFromOtherFolders.length;
-    
+
     if (newPhotosCount > 12) {
       showToast(`Cannot move photos. "${targetFolder}" would exceed the limit of 12 photos.`, 'error');
       setSelectedPhotos([]);
@@ -668,11 +668,10 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                 />
                 <label
                   htmlFor="create-project-logo-upload"
-                  className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border transition-all cursor-pointer ${
-                    isUploadingLogo
-                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                      : 'text-jci-blue bg-blue-50 border-blue-100 hover:bg-blue-100'
-                  }`}
+                  className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border transition-all cursor-pointer ${isUploadingLogo
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'text-jci-blue bg-blue-50 border-blue-100 hover:bg-blue-100'
+                    }`}
                 >
                   <Upload size={16} />
                   {logoPreviewUrl ? 'Change Logo Image' : 'Upload Logo Image'}
@@ -742,7 +741,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
             <p className="text-xs text-slate-500 leading-relaxed mb-2">
               Upload and organize photos in your project's details gallery. Drag and drop items between categories to group them.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 items-end bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-full">
               {/* Year Select & Input */}
               <div className="w-full sm:w-1/4 flex flex-col gap-1.5">
@@ -812,11 +811,10 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                 />
                 <label
                   htmlFor="create-gallery-photo-upload"
-                  className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-lg border shadow-sm transition-all cursor-pointer w-full sm:w-auto ${
-                    isUploadingGallery
-                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                      : 'text-white bg-gradient-to-r from-jci-blue to-indigo-600 hover:from-jci-blue/95 hover:to-indigo-600/95 border-0 hover:shadow active:scale-95 duration-150'
-                  }`}
+                  className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-lg border shadow-sm transition-all cursor-pointer w-full sm:w-auto ${isUploadingGallery
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'text-white bg-gradient-to-r from-jci-blue to-indigo-600 hover:from-jci-blue/95 hover:to-indigo-600/95 border-0 hover:shadow active:scale-95 duration-150'
+                    }`}
                 >
                   <Upload size={16} />
                   {isUploadingGallery ? 'Uploading...' : 'Upload Photos (Multiple)'}
@@ -906,11 +904,10 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                         }}
                         onDragLeave={() => setDragOverFolder(null)}
                         onDrop={(e) => handleDrop(e, folder)}
-                        className={`bg-white p-4 rounded-xl border transition-all duration-300 ${
-                          isDragOver
-                            ? 'border-dashed border-jci-blue bg-blue-50/80 scale-[1.01] shadow-md ring-4 ring-jci-blue/15'
-                            : 'border-slate-200/60 shadow-sm hover:shadow-md'
-                        }`}
+                        className={`bg-white p-4 rounded-xl border transition-all duration-300 ${isDragOver
+                          ? 'border-dashed border-jci-blue bg-blue-50/80 scale-[1.01] shadow-md ring-4 ring-jci-blue/15'
+                          : 'border-slate-200/60 shadow-sm hover:shadow-md'
+                          }`}
                       >
                         <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 pointer-events-none select-none">
                           <span className="text-xs font-bold text-slate-800 bg-slate-100/80 px-2.5 py-1 rounded-md flex items-center gap-1.5">
@@ -919,13 +916,12 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                           </span>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-400 font-semibold">{photos.length} photo(s)</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              photos.length >= 12
-                                ? 'bg-red-50 text-red-600 border-red-200/80'
-                                : photos.length >= 9
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${photos.length >= 12
+                              ? 'bg-red-50 text-red-600 border-red-200/80'
+                              : photos.length >= 9
                                 ? 'bg-amber-50 text-amber-600 border-amber-200/80'
                                 : 'bg-emerald-50 text-emerald-600 border-emerald-200/80'
-                            }`}>
+                              }`}>
                               {photos.length}/12 slots
                             </span>
                           </div>
@@ -942,25 +938,23 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                                   e.stopPropagation();
                                   togglePhotoSelection(folder, url);
                                 }}
-                                className={`relative group border rounded-lg overflow-hidden aspect-video bg-slate-50 cursor-grab active:cursor-grabbing transition-all duration-200 select-none shadow-sm ${
-                                  isSelected
-                                    ? 'ring-2 ring-jci-blue border-jci-blue scale-[0.96] shadow-inner'
-                                    : 'border-slate-200 hover:border-slate-300 hover:shadow hover:scale-[1.02]'
-                                }`}
+                                className={`relative group border rounded-lg overflow-hidden aspect-video bg-slate-50 cursor-grab active:cursor-grabbing transition-all duration-200 select-none shadow-sm ${isSelected
+                                  ? 'ring-2 ring-jci-blue border-jci-blue scale-[0.96] shadow-inner'
+                                  : 'border-slate-200 hover:border-slate-300 hover:shadow hover:scale-[1.02]'
+                                  }`}
                               >
                                 <img src={url} alt={`Gallery ${folder}-${index}`} className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
-                                
+
                                 {/* Overlay gradient on hover */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none flex items-end p-1.5">
                                   <span className="text-[8px] text-white font-medium drop-shadow-sm select-none">Drag to move</span>
                                 </div>
 
                                 <div
-                                  className={`absolute top-1.5 left-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                                    isSelected
-                                      ? 'bg-jci-blue border-jci-blue text-white shadow-sm'
-                                      : 'bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100 shadow-sm'
-                                  }`}
+                                  className={`absolute top-1.5 left-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all ${isSelected
+                                    ? 'bg-jci-blue border-jci-blue text-white shadow-sm'
+                                    : 'bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100 shadow-sm'
+                                    }`}
                                 >
                                   {isSelected && <Check size={10} strokeWidth={4} />}
                                 </div>
@@ -1051,11 +1045,10 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                   />
                   <label
                     htmlFor="edit-project-logo-upload"
-                    className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border transition-all cursor-pointer ${
-                      isUploadingLogo
-                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                        : 'text-jci-blue bg-blue-50 border-blue-100 hover:bg-blue-100'
-                    }`}
+                    className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border transition-all cursor-pointer ${isUploadingLogo
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'text-jci-blue bg-blue-50 border-blue-100 hover:bg-blue-100'
+                      }`}
                   >
                     <Upload size={16} />
                     {logoPreviewUrl ? 'Change Logo Image' : 'Upload Logo Image'}
@@ -1126,7 +1119,7 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
               <p className="text-xs text-slate-500 leading-relaxed mb-2">
                 Upload and organize photos in your project's details gallery. Drag and drop items between categories to group them.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-4 items-end bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-full">
                 {/* Year Select & Input */}
                 <div className="w-full sm:w-1/4 flex flex-col gap-1.5">
@@ -1196,11 +1189,10 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                   />
                   <label
                     htmlFor="edit-gallery-photo-upload"
-                    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-lg border shadow-sm transition-all cursor-pointer w-full sm:w-auto ${
-                      isUploadingGallery
-                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                        : 'text-white bg-gradient-to-r from-jci-blue to-indigo-600 hover:from-jci-blue/95 hover:to-indigo-600/95 border-0 hover:shadow active:scale-95 duration-150'
-                    }`}
+                    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold rounded-lg border shadow-sm transition-all cursor-pointer w-full sm:w-auto ${isUploadingGallery
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'text-white bg-gradient-to-r from-jci-blue to-indigo-600 hover:from-jci-blue/95 hover:to-indigo-600/95 border-0 hover:shadow active:scale-95 duration-150'
+                      }`}
                   >
                     <Upload size={16} />
                     {isUploadingGallery ? 'Uploading...' : 'Upload Photos (Multiple)'}
@@ -1290,11 +1282,10 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                           }}
                           onDragLeave={() => setDragOverFolder(null)}
                           onDrop={(e) => handleDrop(e, folder)}
-                          className={`bg-white p-4 rounded-xl border transition-all duration-300 ${
-                            isDragOver
-                              ? 'border-dashed border-jci-blue bg-blue-50/80 scale-[1.01] shadow-md ring-4 ring-jci-blue/15'
-                              : 'border-slate-200/60 shadow-sm hover:shadow-md'
-                          }`}
+                          className={`bg-white p-4 rounded-xl border transition-all duration-300 ${isDragOver
+                            ? 'border-dashed border-jci-blue bg-blue-50/80 scale-[1.01] shadow-md ring-4 ring-jci-blue/15'
+                            : 'border-slate-200/60 shadow-sm hover:shadow-md'
+                            }`}
                         >
                           <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 pointer-events-none select-none">
                             <span className="text-xs font-bold text-slate-800 bg-slate-100/80 px-2.5 py-1 rounded-md flex items-center gap-1.5">
@@ -1303,13 +1294,12 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] text-slate-400 font-semibold">{photos.length} photo(s)</span>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                photos.length >= 12
-                                  ? 'bg-red-50 text-red-600 border-red-200/80'
-                                  : photos.length >= 9
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${photos.length >= 12
+                                ? 'bg-red-50 text-red-600 border-red-200/80'
+                                : photos.length >= 9
                                   ? 'bg-amber-50 text-amber-600 border-amber-200/80'
                                   : 'bg-emerald-50 text-emerald-600 border-emerald-200/80'
-                              }`}>
+                                }`}>
                                 {photos.length}/12 slots
                               </span>
                             </div>
@@ -1326,25 +1316,23 @@ export const GuestProjectsManagementView: React.FC<{ searchQuery?: string }> = (
                                     e.stopPropagation();
                                     togglePhotoSelection(folder, url);
                                   }}
-                                  className={`relative group border rounded-lg overflow-hidden aspect-video bg-slate-50 cursor-grab active:cursor-grabbing transition-all duration-200 select-none shadow-sm ${
-                                    isSelected
-                                      ? 'ring-2 ring-jci-blue border-jci-blue scale-[0.96] shadow-inner'
-                                      : 'border-slate-200 hover:border-slate-300 hover:shadow hover:scale-[1.02]'
-                                  }`}
+                                  className={`relative group border rounded-lg overflow-hidden aspect-video bg-slate-50 cursor-grab active:cursor-grabbing transition-all duration-200 select-none shadow-sm ${isSelected
+                                    ? 'ring-2 ring-jci-blue border-jci-blue scale-[0.96] shadow-inner'
+                                    : 'border-slate-200 hover:border-slate-300 hover:shadow hover:scale-[1.02]'
+                                    }`}
                                 >
                                   <img src={url} alt={`Gallery ${folder}-${index}`} className="w-full h-full object-cover pointer-events-none group-hover:scale-105 transition-transform duration-200" />
-                                  
+
                                   {/* Overlay gradient on hover */}
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none flex items-end p-1.5">
                                     <span className="text-[8px] text-white font-medium drop-shadow-sm select-none">Drag to move</span>
                                   </div>
 
                                   <div
-                                    className={`absolute top-1.5 left-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                                      isSelected
-                                        ? 'bg-jci-blue border-jci-blue text-white shadow-sm'
-                                        : 'bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100 shadow-sm'
-                                    }`}
+                                    className={`absolute top-1.5 left-1.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all ${isSelected
+                                      ? 'bg-jci-blue border-jci-blue text-white shadow-sm'
+                                      : 'bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100 shadow-sm'
+                                      }`}
                                   >
                                     {isSelected && <Check size={10} strokeWidth={4} />}
                                   </div>

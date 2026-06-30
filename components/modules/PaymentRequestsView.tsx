@@ -723,7 +723,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           if (file.type.startsWith('image/')) {
             try {
               const options = {
-                maxSizeMB: 1, // Compress down to max 1MB
+                maxSizeMB: 0.2, // Compress down to max 1MB
                 maxWidthOrHeight: 1920,
                 useWebWorker: true,
               };
