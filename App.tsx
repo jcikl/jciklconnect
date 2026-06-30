@@ -126,7 +126,7 @@ const GuestHeader = ({
   const navItems: { page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships'; label: string; icon: React.ReactNode }[] = [
     { page: 'home', label: 'Home', icon: <LayoutDashboard size={18} /> },
     { page: 'events', label: 'Events', icon: <Calendar size={18} /> },
-    { page: 'projects', label: 'Projects', icon: <FolderKanban size={18} /> },
+    { page: 'projects', label: 'Flagship Projects', icon: <FolderKanban size={18} /> },
     { page: 'about', label: 'About', icon: <Users size={18} /> },
     { page: 'enewsletters', label: 'E-Newsletters', icon: <FileText size={18} /> },
     { page: 'directory', label: 'Directory', icon: <Briefcase size={18} /> },
@@ -748,7 +748,7 @@ const GuestProjectsPage = ({ onLogin, onRegister, onPageChange }: {
       <main id="main-content">
         <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Our Projects</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Flagship Projects</h1>
             <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               Discover the impactful projects we're working on to create positive change in our community.
             </p>
@@ -2640,7 +2640,7 @@ export const JCIKLApp: React.FC = () => {
     const titles: Partial<Record<ViewType, string>> = {
       GUEST: 'Home',
       GUEST_EVENTS: 'Events',
-      GUEST_PROJECTS: 'Projects',
+      GUEST_PROJECTS: 'Flagship Projects',
       GUEST_ABOUT: 'About',
       GUEST_ENEWSLETTERS: 'E-Newsletters',
       GUEST_DIRECTORY: 'Business Directory',
@@ -3094,7 +3094,7 @@ export const JCIKLApp: React.FC = () => {
                       />
                       <SidebarItem
                         icon={<Briefcase size={18} />}
-                        label="Guest Projects Mgt"
+                        label="Flagship Projects Mgt"
                         isActive={view === 'GUEST_PROJECTS_MGT'}
                         onClick={() => { handleViewChange('GUEST_PROJECTS_MGT'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
