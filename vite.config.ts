@@ -18,6 +18,9 @@ export default defineConfig(({ mode }) => {
           strategies: 'injectManifest',
           srcDir: 'public',
           filename: 'firebase-messaging-sw.js',
+          injectManifest: {
+            injectionPoint: undefined,
+          },
           manifest: {
             name: 'JCI Kuala Lumpur',
             short_name: 'JCI KL',
