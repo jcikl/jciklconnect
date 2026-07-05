@@ -14,7 +14,7 @@ import { useMembers } from '../../hooks/useMembers';
 import { usePermissions } from '../../hooks/usePermissions';
 import { formatCurrency } from '../../utils/formatUtils';
 import { formatDate, toDate } from '../../utils/dateUtils';
-import { Project, Task, ProjectCommitteeMember, BankAccount } from '../../types';
+import { Project, Task, ProjectCommitteeMember, BankAccount, ProjectLevel, ProjectPillar, ProjectType } from '../../types';
 import { PROJECT_LEVELS, PROJECT_PILLARS, PROJECT_TYPES, PROJECT_CATEGORIES_BY_TYPE, PROJECT_TYPE_LABELS } from '../../config/constants';
 import { BatchImportModal } from '../shared/batchImport/BatchImportModal';
 import { projectImportConfig } from './Projects/config/projectImportConfig';
@@ -34,23 +34,402 @@ import { projectFinancialService } from '../../services/projectFinancialService'
 
 const PENDING_USE_TEMPLATE_KEY = 'jci_pending_use_template_id';
 
+interface RoadmapEventDetails {
+  logoUrl: string;
+  title: string;
+  description: string;
+  level: ProjectLevel | '';
+  pillar: ProjectPillar | '';
+  type: ProjectType | '';
+  category: string;
+  eventStartDate: string;
+  eventEndDate: string;
+  eventStartTime: string;
+  eventEndTime: string;
+  proposedDate: string;
+}
+
+const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDetails> => {
+  let eventId = input.trim();
+  if (eventId.includes('eventid=')) {
+    const urlParams = new URLSearchParams(eventId.split('?')[1]);
+    eventId = urlParams.get('eventid') || '';
+  }
+  if (!eventId) {
+    throw new Error('Invalid Event ID or URL');
+  }
+
+  const targetUrl = `https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=${eventId}`;
+  let html = '';
+  let lastError = '';
+
+  // Try 1: corsproxy.io (extremely popular, fast and supports raw text fetch)
+  try {
+    const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+    if (response.ok) {
+      html = await response.text();
+    } else {
+      lastError = `corsproxy.io returned status ${response.status}`;
+    }
+  } catch (err: any) {
+    lastError = err.message || err;
+  }
+
+  // Try 2: AllOrigins JSON endpoint (most reliable CORS fallback proxy format)
+  if (!html) {
+    try {
+      const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.contents) {
+          html = data.contents;
+        }
+      } else {
+        lastError = `AllOrigins returned status ${response.status}`;
+      }
+    } catch (err: any) {
+      lastError = err.message || err;
+    }
+  }
+
+  // Try 3: CodeTabs Proxy (Fallback 2)
+  if (!html) {
+    try {
+      const response = await fetch(`https://api.codetabs.com/v1/proxy?target=${encodeURIComponent(targetUrl)}`);
+      if (response.ok) {
+        html = await response.text();
+      } else {
+        lastError = `CodeTabs returned status ${response.status}`;
+      }
+    } catch (err: any) {
+      lastError = err.message || err;
+    }
+  }
+
+  // Try 4: Direct fetch (Fallback 3 - in case CORS is allowed directly)
+  if (!html) {
+    try {
+      const response = await fetch(targetUrl);
+      if (response.ok) {
+        html = await response.text();
+      } else {
+        lastError = `Direct fetch returned status ${response.status}`;
+      }
+    } catch (err: any) {
+      lastError = err.message || err;
+    }
+  }
+
+  if (!html) {
+    throw new Error(`Failed to fetch page. Please verify your internet connection or try again later. (Details: ${lastError || 'Proxy failed'})`);
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // 1. Get Logo / Poster Url
+  let logoUrl = '';
+  const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
+  if (ogImage) {
+    logoUrl = ogImage.trim();
+  } else {
+    const twitterImage = doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
+    if (twitterImage) {
+      logoUrl = twitterImage.trim();
+    } else {
+      const imgElement = doc.querySelector('.d-flex.align-items-center.justify-content-center img.product-img') || doc.querySelector('img.product-img');
+      const src = imgElement?.getAttribute('src');
+      if (src) {
+        logoUrl = src.startsWith('http') ? src.trim() : `https://jcimalaysia.cc/roadmap/${src.trim()}`;
+      }
+    }
+  }
+
+  // 2. Get Title
+  const title = doc.querySelector('.col-md-7 h3')?.textContent?.trim() || 
+                doc.querySelector('h3')?.textContent?.trim() || 
+                doc.querySelector('title')?.textContent?.split('|')[0].trim() || '';
+
+  // 3. Get Description in Paragraph Format
+  const cardTexts = Array.from(doc.querySelectorAll('.col-md-7 p.card-text, p.card-text'));
+  const shortEl = cardTexts.find(el => !el.querySelector('.badge') && el.textContent?.trim() !== '');
+  let shortDesc = '';
+  if (shortEl) {
+    let htmlContent = shortEl.innerHTML || '';
+    htmlContent = htmlContent.replace(/<\/p>/gi, '\n\n').replace(/<br\s*\/?>/gi, '\n');
+    const tempDiv = parser.parseFromString(htmlContent, 'text/html');
+    shortDesc = (tempDiv.body.textContent || '').trim();
+  }
+
+  const pb2Elements = Array.from(doc.querySelectorAll('.pb-2'));
+  const longEl = pb2Elements.find(el => !el.querySelector('.badge') && el.textContent?.trim() !== '');
+  let longDesc = '';
+  if (longEl) {
+    let htmlContent = longEl.innerHTML || '';
+    htmlContent = htmlContent.replace(/<\/p>/gi, '\n\n').replace(/<br\s*\/?>/gi, '\n');
+    const tempDiv = parser.parseFromString(htmlContent, 'text/html');
+    longDesc = (tempDiv.body.textContent || '').trim();
+  }
+
+  let rawDesc = '';
+  if (shortDesc && longDesc) {
+    if (longDesc.includes(shortDesc) || shortDesc.includes(longDesc)) {
+      rawDesc = longDesc.length >= shortDesc.length ? longDesc : shortDesc;
+    } else {
+      rawDesc = shortDesc + '\n\n' + longDesc;
+    }
+  } else {
+    rawDesc = shortDesc || longDesc || '';
+  }
+
+  const lines = rawDesc.split(/\r?\n/).map(line => line.trim());
+  const formattedParagraphs: string[] = [];
+  let currentParagraph = '';
+
+  for (const line of lines) {
+    if (line === '') {
+      if (currentParagraph) {
+        formattedParagraphs.push(currentParagraph);
+        currentParagraph = '';
+      }
+    } else {
+      // If it starts with a list bullet (e.g. •, -, *, 1.), make it a separate block
+      const isListItem = /^[•\-\*\d+\.]/.test(line);
+      if (isListItem) {
+        if (currentParagraph) {
+          formattedParagraphs.push(currentParagraph);
+        }
+        formattedParagraphs.push(line);
+        currentParagraph = '';
+      } else {
+        if (currentParagraph) {
+          currentParagraph += ' ' + line;
+        } else {
+          currentParagraph = line;
+        }
+      }
+    }
+  }
+  if (currentParagraph) {
+    formattedParagraphs.push(currentParagraph);
+  }
+  const description = formattedParagraphs.join('\n\n');
+
+  // 4. Parse Dates & Times
+  const dateText = doc.querySelector('h6.text-success')?.textContent?.trim() || '';
+  let eventStartDate = '';
+  let eventEndDate = '';
+  let eventStartTime = '';
+  let eventEndTime = '';
+
+  const parseRoadmapDate = (str: string) => {
+    const cleaned = str.replace(/\s+/g, ' ').trim();
+    const parts = cleaned.split(' ');
+    let day = '';
+    let monthStr = '';
+    let year = '';
+    let time = '';
+    let ampm = '';
+
+    if (parts.length >= 3) {
+      day = parts[0];
+      monthStr = parts[1];
+      year = parts[2];
+    }
+    if (parts.length >= 5) {
+      time = parts[3];
+      ampm = parts[4];
+    }
+
+    const months: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+    const mKey = monthStr.toLowerCase().slice(0, 3);
+    const month = months[mKey] || '01';
+    
+    const formattedDay = day.padStart(2, '0');
+    const formattedDate = (year && month && formattedDay) ? `${year}-${month}-${formattedDay}` : '';
+
+    let formattedTime = '';
+    if (time) {
+      const [h, m] = time.split(':');
+      let hour = parseInt(h, 10);
+      const min = m || '00';
+      if (ampm.toLowerCase() === 'pm' && hour < 12) {
+        hour += 12;
+      } else if (ampm.toLowerCase() === 'am' && hour === 12) {
+        hour = 0;
+      }
+      formattedTime = `${hour.toString().padStart(2, '0')}:${min}`;
+    }
+
+    return { date: formattedDate, time: formattedTime };
+  };
+
+  if (dateText) {
+    const parts = dateText.split(' - ');
+    if (parts.length === 2) {
+      const startParsed = parseRoadmapDate(parts[0]);
+      const endParsed = parseRoadmapDate(parts[1]);
+      eventStartDate = startParsed.date;
+      eventStartTime = startParsed.time;
+      eventEndDate = endParsed.date;
+      eventEndTime = endParsed.time;
+    } else {
+      const parsed = parseRoadmapDate(dateText);
+      eventStartDate = parsed.date;
+      eventStartTime = parsed.time;
+    }
+  }
+
+  // 5. Parse Level, Pillar, Type, Category from badges
+  const badges = Array.from(doc.querySelectorAll('span.badge')).map(el => el.textContent?.trim() || '');
+  let level: ProjectLevel | '' = '';
+  let pillar: ProjectPillar | '' = '';
+  let type: ProjectType | '' = '';
+  let category = '';
+
+  badges.forEach(badge => {
+    const lower = badge.toLowerCase();
+    
+    if (lower === 'national') level = 'National';
+    else if (lower === 'jci') level = 'JCI';
+    else if (lower.includes('area')) level = 'Area';
+    else if (lower.includes('local')) level = 'Local';
+    
+    if (lower === 'event') type = 'event';
+    else if (lower === 'program') type = 'program';
+    else if (lower === 'project') type = 'project';
+    else if (lower.includes('skill')) type = 'skill_development';
+
+    if (lower === 'individual') pillar = 'Individual';
+    else if (lower === 'community') pillar = 'Community';
+    else if (lower === 'business') pillar = 'Business';
+    else if (lower === 'international') pillar = 'International';
+    else if (lower === 'lom') pillar = 'LOM';
+    else if (lower === 'chapter') pillar = 'Chapter';
+  });
+
+  const unmatchedBadges = badges.filter(badge => {
+    const lower = badge.toLowerCase();
+    const isLevel = lower === 'national' || lower === 'jci' || lower.includes('area') || lower.includes('local');
+    const isType = lower === 'event' || lower === 'program' || lower === 'project' || lower.includes('skill');
+    const isPillar = ['individual', 'community', 'business', 'international', 'lom', 'chapter'].includes(lower);
+    return !isLevel && !isType && !isPillar;
+  });
+  const parsedCategory = unmatchedBadges.join(', ');
+
+  // Match the matched category against allowed system category options
+  if (type) {
+    const allowedCategories = PROJECT_CATEGORIES_BY_TYPE[type] || [];
+    const searchStr = `${parsedCategory} ${title}`.toLowerCase();
+    const match = allowedCategories.find(c => {
+      const cLower = c.toLowerCase();
+      return searchStr.includes(cLower) || cLower.includes(parsedCategory.toLowerCase());
+    });
+    category = match || allowedCategories[0] || '';
+  } else {
+    category = parsedCategory;
+  }
+
+  return {
+    logoUrl,
+    title,
+    description,
+    level,
+    pillar,
+    type,
+    category,
+    eventStartDate,
+    eventEndDate,
+    eventStartTime,
+    eventEndTime,
+    proposedDate: eventStartDate
+  };
+};
+
 export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searchQuery?: string; initialSelectedProjectId?: string | null; onClearSelection?: () => void }> = ({ onNavigate, searchQuery, initialSelectedProjectId, onClearSelection }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialSelectedProjectId ?? null);
   const [isProposalModalOpen, setProposalModalOpen] = useState(false);
+  const [newRoadmapUrl, setNewRoadmapUrl] = useState('');
+  const [newLogoUrl, setNewLogoUrl] = useState('');
+  const [isFetchingPoster, setIsFetchingPoster] = useState(false);
   const [activeTab, setActiveTab] = useState<'projects' | 'past-projects' | 'templates'>('projects');
   const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EventTemplate | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EventTemplate | null>(null);
   const [templateSearchTerm, setTemplateSearchTerm] = useState('');
   const [templateFilterType, setTemplateFilterType] = useState<string>('all');
-  // For project creation form: track selected category so Type options can update
+  
+  // States for Create Project Form
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newLevel, setNewLevel] = useState<ProjectLevel | ''>('');
+  const [newPillar, setNewPillar] = useState<ProjectPillar | ''>('');
   const [projectType, setProjectType] = useState<string>('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newProposedDate, setNewProposedDate] = useState('');
+  const [newEventStartDate, setNewEventStartDate] = useState('');
+  const [newEventEndDate, setNewEventEndDate] = useState('');
+  const [newEventStartTime, setNewEventStartTime] = useState('');
+  const [newEventEndTime, setNewEventEndTime] = useState('');
+
   const { projects, loading, error, createProject, updateProject, deleteProject } = useProjects();
   const { eventTemplates, loading: templatesLoading, createEventTemplate, updateEventTemplate, deleteEventTemplate } = useTemplates();
   const { member } = useAuth();
   const { isBoard, isAdmin, isDeveloper } = usePermissions();
   const isPrivileged = isBoard || isAdmin || isDeveloper;
   const { showToast } = useToast();
+  
+  useEffect(() => {
+    if (isProposalModalOpen) {
+      setNewRoadmapUrl('');
+      setNewLogoUrl('');
+      setNewTitle('');
+      setNewDescription('');
+      setNewLevel('');
+      setNewPillar('');
+      setProjectType('');
+      setNewCategory('');
+      setNewProposedDate('');
+      setNewEventStartDate('');
+      setNewEventEndDate('');
+      setNewEventStartTime('');
+      setNewEventEndTime('');
+    }
+  }, [isProposalModalOpen]);
+
+  const handleFetchPosterForCreate = async () => {
+    if (!newRoadmapUrl) {
+      showToast('Please enter a Roadmap Event URL or ID', 'warning');
+      return;
+    }
+    setIsFetchingPoster(true);
+    try {
+      const details = await fetchRoadmapEventDetails(newRoadmapUrl);
+      setNewLogoUrl(details.logoUrl);
+      if (details.title) setNewTitle(details.title);
+      if (details.description) setNewDescription(details.description);
+      if (details.level) setNewLevel(details.level);
+      if (details.pillar) setNewPillar(details.pillar);
+      if (details.type) setProjectType(details.type);
+      if (details.category) setNewCategory(details.category);
+      if (details.eventStartDate) {
+        setNewEventStartDate(details.eventStartDate);
+        setNewProposedDate(details.eventStartDate);
+      }
+      if (details.eventEndDate) setNewEventEndDate(details.eventEndDate);
+      if (details.eventStartTime) setNewEventStartTime(details.eventStartTime);
+      if (details.eventEndTime) setNewEventEndTime(details.eventEndTime);
+      
+      showToast('Successfully synchronized event details!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to sync event details', 'error');
+    } finally {
+      setIsFetchingPoster(false);
+    }
+  };
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
@@ -252,6 +631,15 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     }
   };
 
+  const handleClaimReimbursement = () => {
+    if (selectedProject) {
+      sessionStorage.setItem('pr_preselected_project_id', selectedProject.id || '');
+      sessionStorage.setItem('pr_preselected_category', 'projects_activities');
+      sessionStorage.setItem('pr_auto_open_submit', 'true');
+      onNavigate?.('PAYMENT_REQUESTS');
+    }
+  };
+
   const selectedProject = useMemo(() => {
     const proj = projects.find(p => p.id === selectedProjectId);
     if (!proj) return undefined;
@@ -294,10 +682,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         type: (formData.get('type') as any) || undefined,
         category: (formData.get('category') as string) || undefined,
         proposedDate: formData.get('proposedDate') as string,
-        proposedBudget: parseFloat(formData.get('proposedBudget') as string) || 0,
         objectives: formData.get('objectives') as string,
         expectedImpact: formData.get('expectedImpact') as string || '',
-        targetAudience: formData.get('targetAudience') as string || undefined,
         eventStartDate: (formData.get('eventStartDate') as string) || undefined,
         eventEndDate: (formData.get('eventEndDate') as string) || undefined,
         eventStartTime: (formData.get('eventStartTime') as string) || undefined,
@@ -305,6 +691,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         status: 'Planning',
         submittedBy: member.id,
         committee: defaultCommittee,
+        logoUrl: newLogoUrl || undefined,
+        roadmapUrl: newRoadmapUrl || undefined,
       });
 
       // Activity Plan will be created/managed in the Project Detail page's Activity Plan tab
@@ -463,6 +851,17 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                 </>
               )}
 
+              {/* Claim Reimbursement button for active/approved projects */}
+              {(selectedProject.status === 'Approved' || selectedProject.status === 'Active') && (
+                <Button
+                  variant="outline"
+                  onClick={handleClaimReimbursement}
+                  className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
+                >
+                  <DollarSign size={16} className="mr-2" /> Claim Reimbursement
+                </Button>
+              )}
+
             </div>
           )}
         </div>
@@ -617,6 +1016,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               await deleteProject(projectId);
               setSelectedProjectId(null);
             }}
+            onNavigate={onNavigate}
           />
         </>
       )}
@@ -697,6 +1097,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             name="title"
             label="Project Title *"
             placeholder="e.g. Summer Leadership Summit"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
             icon={<FileText size={16} />}
             required
           />
@@ -705,14 +1107,65 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             name="description"
             label="Description"
             placeholder="Brief description of the project..."
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
             rows={3}
           />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <Input
+              name="roadmapUrl"
+              label="JCI Malaysia Roadmap Event URL / ID"
+              placeholder="e.g. https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=6274 or 6274"
+              value={newRoadmapUrl}
+              onChange={(e) => setNewRoadmapUrl(e.target.value)}
+              icon={<Globe size={16} />}
+            />
+            <div className="pb-1">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleFetchPosterForCreate}
+                disabled={isFetchingPoster}
+                className="w-full h-10 flex items-center justify-center gap-2 border-jci-blue text-jci-blue hover:bg-sky-50"
+              >
+                {isFetchingPoster ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Fetching Details...
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} />
+                    Sync Event Details
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <Input
+            name="logoUrl"
+            label="Project Logo / Poster URL"
+            placeholder="https://example.com/logo.png"
+            value={newLogoUrl}
+            onChange={(e) => setNewLogoUrl(e.target.value)}
+            icon={<Image size={16} />}
+          />
+
+          {newLogoUrl && (
+            <div className="mt-2 border border-slate-200 rounded-xl p-2 bg-slate-50 flex justify-center overflow-hidden">
+              <img src={newLogoUrl} alt="Preview" className="max-h-48 object-contain rounded-lg shadow-sm" />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <Select
               name="level"
               label="Level *"
               required
+              value={newLevel}
+              onChange={(e) => setNewLevel(e.target.value as any)}
               options={[
                 { label: '— Select —', value: '' },
                 ...PROJECT_LEVELS.map(l => ({ label: l, value: l })),
@@ -722,6 +1175,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               name="pillar"
               label="Pillar *"
               required
+              value={newPillar}
+              onChange={(e) => setNewPillar(e.target.value as any)}
               options={[
                 { label: '— Select —', value: '' },
                 ...PROJECT_PILLARS.map(p => ({ label: p, value: p })),
@@ -744,6 +1199,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               name="category"
               label="Category *"
               required
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
               options={[
                 { label: '— Select —', value: '' },
                 ...(projectType ? (PROJECT_CATEGORIES_BY_TYPE[projectType] ?? []) : []).map(t => ({ label: t, value: t })),
@@ -755,6 +1212,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               name="proposedDate"
               label="Proposed Date *"
               type="date"
+              value={newProposedDate}
+              onChange={(e) => setNewProposedDate(e.target.value)}
               icon={<Calendar size={16} />}
               required
             />
@@ -765,6 +1224,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               name="eventStartDate"
               label="Event Start Date *"
               type="date"
+              value={newEventStartDate}
+              onChange={(e) => setNewEventStartDate(e.target.value)}
               icon={<Calendar size={16} />}
               required
             />
@@ -772,6 +1233,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               name="eventEndDate"
               label="Event End Date"
               type="date"
+              value={newEventEndDate}
+              onChange={(e) => setNewEventEndDate(e.target.value)}
               icon={<Calendar size={16} />}
             />
           </div>
@@ -780,31 +1243,21 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               name="eventStartTime"
               label="Event Start Time"
               type="time"
+              value={newEventStartTime}
+              onChange={(e) => setNewEventStartTime(e.target.value)}
               icon={<Clock size={16} />}
             />
             <Input
               name="eventEndTime"
               label="Event End Time"
               type="time"
+              value={newEventEndTime}
+              onChange={(e) => setNewEventEndTime(e.target.value)}
               icon={<Clock size={16} />}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              name="proposedBudget"
-              label="Proposed Budget (RM)"
-              type="number"
-              step="0.01"
-              placeholder="5000"
-              icon={<DollarSign size={16} />}
-            />
-            <Input
-              name="targetAudience"
-              label="Target Audience"
-              placeholder="e.g. All Members, Youth, etc."
-            />
-          </div>
+
 
           <Textarea
             name="objectives"
@@ -819,8 +1272,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             placeholder="Describe the expected outcomes and impact..."
             rows={3}
           />
-
-
         </form>
       </Modal>
 
@@ -992,12 +1443,13 @@ const ProjectGrid: React.FC<{
           {projects.map(project => (
             <Card
               key={project.id}
-              className={`flex flex-col h-full cursor-pointer transition-all group relative ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
+              noPadding
+              className={`flex flex-col h-full cursor-pointer transition-all group relative overflow-hidden ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
               onClick={() => onToggleSelection?.(project.id)}
             >
               {/* Checkbox for batch selection */}
               <div
-                className="absolute top-4 right-4 z-10 pointer-events-auto"
+                className="absolute top-4 right-4 z-20 pointer-events-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Checkbox
@@ -1006,11 +1458,26 @@ const ProjectGrid: React.FC<{
                 />
               </div>
 
-              {/* Wrapper div to capture click event but stop propagation on buttons if needed */}
-              <div className="pointer-events-none">
-                <div className="flex justify-between items-start">
+              {/* Project Poster Image */}
+              <div className="w-full h-40 bg-slate-100 overflow-hidden relative flex-shrink-0">
+                {project.logoUrl ? (
+                  <img
+                    src={project.logoUrl}
+                    alt={project.name || project.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center text-white">
+                    <Zap size={36} className="opacity-45 animate-pulse" />
+                  </div>
+                )}
+                <div className="absolute top-3 left-3 z-10 pointer-events-none">
                   <Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge>
                 </div>
+              </div>
+
+              {/* Content area with padding */}
+              <div className="p-4 flex flex-col flex-1 pointer-events-none">
                 <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors line-clamp-2 h-14">{project.name ?? project.title ?? 'Unnamed'}</h3>
                 <div className="space-y-4 flex-1">
                   <div className="bg-slate-50 p-3 rounded-lg space-y-1.5 text-xs">
@@ -1041,7 +1508,6 @@ const ProjectGrid: React.FC<{
                     const ptNet = ptIncome - ptExpenses;
 
                     const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
-                    const hasData = ptIncome > 0 || ptExpenses > 0 || bankIncome > 0 || bankExpenses > 0;
 
                     return (
                       <div className={`p-3 rounded-lg border transition-all ${isMatch
@@ -1091,7 +1557,7 @@ const ProjectGrid: React.FC<{
                 </div>
               </div>
 
-              <div className="border-slate-100 pt-4 mt-auto">
+              <div className="border-t border-slate-100 p-4 mt-auto">
                 <Button variant="outline" className="w-full text-sm" onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}>Open Board</Button>
               </div>
             </Card>
@@ -1750,9 +2216,10 @@ interface ProjectDetailTabsProps {
   project: Project;
   onUpdateProject: (projectId: string, updates: Partial<Project>) => Promise<void>;
   onDeleteProject: (projectId: string) => Promise<void>;
+  onNavigate?: (view: string) => void;
 }
 
-const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, onUpdateProject, onDeleteProject }) => {
+const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, onUpdateProject, onDeleteProject, onNavigate }) => {
   const { projectId, projectName } = { projectId: project.id, projectName: project.name ?? project.title ?? 'Project' };
   const [activeTab, setActiveTab] = useState<'activity-plan' | 'committee' | 'trainers' | 'kanban' | 'gantt' | 'finance' | 'reports' | 'ai'>('activity-plan');
   const [projectAccount, setProjectAccount] = useState<ProjectAccount | null>(null);
@@ -1885,6 +2352,7 @@ const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, onUpdate
                 await loadProjectAccount(); // Refresh account to reflect new budget
               }}
               onRefresh={loadProjectAccount}
+              onNavigate={onNavigate}
             />
           )}
           {activeTab === 'reports' && (
@@ -1938,16 +2406,27 @@ interface ProjectFinancialAccountProps {
   }>;
   onUpdateBudget: (newBudget: number) => Promise<void>;
   onRefresh: () => void;
+  onNavigate?: (view: string) => void;
 }
 
 const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
+  projectId,
+  project,
   account,
   loading,
   onReconcile,
   onUpdateBudget,
-  onRefresh
+  onRefresh,
+  onNavigate
 }) => {
   const { showToast } = useToast();
+
+  const handleClaimReimbursement = () => {
+    sessionStorage.setItem('pr_preselected_project_id', projectId);
+    sessionStorage.setItem('pr_preselected_category', 'projects_activities');
+    sessionStorage.setItem('pr_auto_open_submit', 'true');
+    onNavigate?.('PAYMENT_REQUESTS');
+  };
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bankTransactions, setBankTransactions] = useState<Transaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -2576,9 +3055,16 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100">
+                <div className="pt-4 border-t border-slate-100 space-y-2">
                   <Button variant="outline" className="w-full" onClick={onReconcile}>
                     <RefreshCw size={16} className="mr-2" /> Reconcile Account
+                  </Button>
+                  <Button
+                    variant="success"
+                    className="w-full"
+                    onClick={handleClaimReimbursement}
+                  >
+                    <DollarSign size={16} className="mr-2" /> Claim Reimbursement
                   </Button>
                 </div>
               </div>
@@ -3865,11 +4351,76 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
   onSave,
   onDelete,
 }) => {
+  const { showToast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [formType, setFormType] = useState<string>(project.type || '');
   const [isSaving, setIsSaving] = useState(false);
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
+  const [editRoadmapUrl, setEditRoadmapUrl] = useState(project.roadmapUrl || '');
+  const [editLogoUrl, setEditLogoUrl] = useState(project.logoUrl || '');
+  const [isFetchingPoster, setIsFetchingPoster] = useState(false);
+
+  // States for Edit Project Form
+  const [editTitle, setEditTitle] = useState(project.title ?? project.name ?? '');
+  const [editDescription, setEditDescription] = useState(project.description || '');
+  const [editLevel, setEditLevel] = useState<ProjectLevel | ''>(project.level || '');
+  const [editPillar, setEditPillar] = useState<ProjectPillar | ''>(project.pillar || '');
+  const [editCategory, setEditCategory] = useState(project.category || '');
+  const [editProposedDate, setEditProposedDate] = useState(project.proposedDate || '');
+  const [editEventStartDate, setEditEventStartDate] = useState(project.eventStartDate || '');
+  const [editEventEndDate, setEditEventEndDate] = useState(project.eventEndDate || '');
+  const [editEventStartTime, setEditEventStartTime] = useState(project.eventStartTime || '');
+  const [editEventEndTime, setEditEventEndTime] = useState(project.eventEndTime || '');
+
+  useEffect(() => {
+    setEditRoadmapUrl(project.roadmapUrl || '');
+    setEditLogoUrl(project.logoUrl || '');
+    setEditTitle(project.title ?? project.name ?? '');
+    setEditDescription(project.description || '');
+    setEditLevel(project.level || '');
+    setEditPillar(project.pillar || '');
+    setFormType(project.type || '');
+    setEditCategory(project.category || '');
+    setEditProposedDate(project.proposedDate || '');
+    setEditEventStartDate(project.eventStartDate || '');
+    setEditEventEndDate(project.eventEndDate || '');
+    setEditEventStartTime(project.eventStartTime || '');
+    setEditEventEndTime(project.eventEndTime || '');
+  }, [project, isEditing]);
+
+  const handleFetchPosterForEdit = async () => {
+    if (!editRoadmapUrl) {
+      showToast('Please enter a Roadmap Event URL or ID', 'warning');
+      return;
+    }
+    setIsFetchingPoster(true);
+    try {
+      const details = await fetchRoadmapEventDetails(editRoadmapUrl);
+      setEditLogoUrl(details.logoUrl);
+      if (details.title) setEditTitle(details.title);
+      if (details.description) setEditDescription(details.description);
+      if (details.level) setEditLevel(details.level);
+      if (details.pillar) setEditPillar(details.pillar);
+      if (details.type) {
+        setFormType(details.type);
+      }
+      if (details.category) setEditCategory(details.category);
+      if (details.eventStartDate) {
+        setEditEventStartDate(details.eventStartDate);
+        setEditProposedDate(details.eventStartDate);
+      }
+      if (details.eventEndDate) setEditEventEndDate(details.eventEndDate);
+      if (details.eventStartTime) setEditEventStartTime(details.eventStartTime);
+      if (details.eventEndTime) setEditEventEndTime(details.eventEndTime);
+      
+      showToast('Successfully synchronized event details!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to sync event details', 'error');
+    } finally {
+      setIsFetchingPoster(false);
+    }
+  };
 
   useEffect(() => {
     setGalleryPhotos(project.galleryUrls || []);
@@ -3893,17 +4444,16 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
         title: formData.get('title') as string,
         name: formData.get('title') as string,
         description: (formData.get('description') as string) || '',
-        logoUrl: (formData.get('logoUrl') as string) || '',
+        logoUrl: editLogoUrl || '',
+        roadmapUrl: editRoadmapUrl || '',
         galleryUrls: galleryPhotos,
         level: (formData.get('level') as any) || undefined,
         pillar: (formData.get('pillar') as any) || undefined,
         type: (formData.get('type') as any) || undefined,
         category: (formData.get('category') as string) || undefined,
         proposedDate: formData.get('proposedDate') as string,
-        proposedBudget: parseFloat(formData.get('proposedBudget') as string) || 0,
         objectives: formData.get('objectives') as string,
         expectedImpact: (formData.get('expectedImpact') as string) || '',
-        targetAudience: (formData.get('targetAudience') as string) || undefined,
         eventStartDate: (formData.get('eventStartDate') as string) || undefined,
         eventEndDate: (formData.get('eventEndDate') as string) || undefined,
         eventStartTime: (formData.get('eventStartTime') as string) || undefined,
@@ -3954,24 +4504,65 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
               name="title"
               label="Title *"
               placeholder="e.g. Summer Leadership Summit"
-              defaultValue={project.title ?? project.name}
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
               icon={<FileText size={16} />}
               required
             />
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <Input
+                name="roadmapUrl"
+                label="JCI Malaysia Roadmap Event URL / ID"
+                placeholder="e.g. https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=6274 or 6274"
+                value={editRoadmapUrl}
+                onChange={(e) => setEditRoadmapUrl(e.target.value)}
+                icon={<Globe size={16} />}
+              />
+              <div className="pb-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleFetchPosterForEdit}
+                  disabled={isFetchingPoster}
+                  className="w-full h-10 flex items-center justify-center gap-2 border-jci-blue text-jci-blue hover:bg-sky-50"
+                >
+                  {isFetchingPoster ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Fetching Details...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={14} />
+                      Sync Event Details
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
             <Input
               name="logoUrl"
-              label="Project Logo URL"
+              label="Project Logo / Poster URL"
               placeholder="https://example.com/logo.png"
-              defaultValue={project.logoUrl}
+              value={editLogoUrl}
+              onChange={(e) => setEditLogoUrl(e.target.value)}
               icon={<Image size={16} />}
             />
+
+            {editLogoUrl && (
+              <div className="mt-2 border border-slate-200 rounded-xl p-2 bg-slate-50 flex justify-center overflow-hidden">
+                <img src={editLogoUrl} alt="Preview" className="max-h-48 object-contain rounded-lg shadow-sm" />
+              </div>
+            )}
 
             <Textarea
               name="description"
               label="Description"
               placeholder="Brief description of the activity plan..."
-              defaultValue={project.description}
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
               rows={3}
             />
 
@@ -4023,7 +4614,8 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="level"
                 label="Level *"
                 required
-                defaultValue={project.level}
+                value={editLevel}
+                onChange={(e) => setEditLevel(e.target.value as any)}
                 options={[
                   { label: '— Select —', value: '' },
                   ...PROJECT_LEVELS.map(l => ({ label: l, value: l })),
@@ -4033,7 +4625,8 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="pillar"
                 label="Pillar *"
                 required
-                defaultValue={project.pillar}
+                value={editPillar}
+                onChange={(e) => setEditPillar(e.target.value as any)}
                 options={[
                   { label: '— Select —', value: '' },
                   ...PROJECT_PILLARS.map(p => ({ label: p, value: p })),
@@ -4046,7 +4639,7 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="type"
                 label="Type *"
                 required
-                defaultValue={project.type ?? formType}
+                value={formType}
                 options={[
                   { label: '— Select —', value: '' },
                   ...PROJECT_TYPES.map(c => ({ label: PROJECT_TYPE_LABELS[c] || c, value: c })),
@@ -4057,11 +4650,12 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="category"
                 label="Category *"
                 required
-                defaultValue={project.category}
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
                 options={[
                   { label: '— Select —', value: '' },
-                  ...((formType || project.type)
-                    ? (PROJECT_CATEGORIES_BY_TYPE[formType || project.type || ''] ?? []).map(t => ({
+                  ...(formType
+                    ? (PROJECT_CATEGORIES_BY_TYPE[formType] ?? []).map(t => ({
                       label: t,
                       value: t,
                     }))
@@ -4075,7 +4669,8 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="proposedDate"
                 label="Proposed Date *"
                 type="date"
-                defaultValue={project.proposedDate}
+                value={editProposedDate}
+                onChange={(e) => setEditProposedDate(e.target.value)}
                 icon={<Calendar size={16} />}
                 required
               />
@@ -4086,7 +4681,8 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="eventStartDate"
                 label="Event Start Date *"
                 type="date"
-                defaultValue={project.eventStartDate}
+                value={editEventStartDate}
+                onChange={(e) => setEditEventStartDate(e.target.value)}
                 icon={<Calendar size={16} />}
                 required
               />
@@ -4094,7 +4690,8 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="eventEndDate"
                 label="Event End Date"
                 type="date"
-                defaultValue={project.eventEndDate}
+                value={editEventEndDate}
+                onChange={(e) => setEditEventEndDate(e.target.value)}
                 icon={<Calendar size={16} />}
               />
             </div>
@@ -4104,35 +4701,21 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 name="eventStartTime"
                 label="Event Start Time"
                 type="time"
-                defaultValue={project.eventStartTime}
+                value={editEventStartTime}
+                onChange={(e) => setEditEventStartTime(e.target.value)}
                 icon={<Clock size={16} />}
               />
               <Input
                 name="eventEndTime"
                 label="Event End Time"
                 type="time"
-                defaultValue={project.eventEndTime}
+                value={editEventEndTime}
+                onChange={(e) => setEditEventEndTime(e.target.value)}
                 icon={<Clock size={16} />}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                name="proposedBudget"
-                label="Proposed Budget (RM)"
-                type="number"
-                step="0.01"
-                placeholder="5000"
-                defaultValue={project.proposedBudget?.toString()}
-                icon={<DollarSign size={16} />}
-              />
-              <Input
-                name="targetAudience"
-                label="Target Audience"
-                placeholder="e.g. All Members, Youth, etc."
-                defaultValue={project.targetAudience}
-              />
-            </div>
+
 
             <Textarea
               name="objectives"
@@ -4228,12 +4811,6 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                 {project.proposedDate ? formatDate(toDate(project.proposedDate as any)) : '—'}
               </p>
             </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Proposed Budget (RM)</h4>
-              <p className="text-slate-600 font-semibold">
-                {project.proposedBudget != null ? formatCurrency(project.proposedBudget) : '—'}
-              </p>
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -4259,12 +4836,7 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
             </div>
           </div>
 
-          {project.targetAudience && (
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Target Audience</h4>
-              <p className="text-slate-600">{project.targetAudience}</p>
-            </div>
-          )}
+
 
           <div>
             <h4 className="text-sm font-semibold text-slate-700 mb-2">Objectives & Goals</h4>

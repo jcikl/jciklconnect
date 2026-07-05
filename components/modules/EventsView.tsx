@@ -111,7 +111,7 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
             empty={filteredEvents.length === 0}
             emptyMessage="No events found in this category."
           >
-            <div className="divide-y divide-slate-100">
+            <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredEvents.map(event => (
                 <EventRow
                   key={event.id}
@@ -160,51 +160,61 @@ const EventRow: React.FC<{
   onClick?: () => void;
 }> = ({ event, member, onRegister, onCheckIn, onClick }) => {
   const date = new Date(event.date);
+  const isUpcoming = date >= new Date(new Date().setHours(0, 0, 0, 0));
   const isRegistered = member && event.registeredMembers?.includes(member.id);
 
   return (
     <div
-      className="p-4 md:p-6 flex flex-row items-start sm:items-center gap-4 md:gap-6 hover:bg-slate-50 transition-colors cursor-pointer active:bg-slate-100"
+      className="flex flex-col rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer active:scale-[0.99]"
       onClick={onClick}
     >
-      {/* Date Box */}
-      <div className="flex-shrink-0 w-16 h-16 bg-blue-50 text-jci-blue rounded-xl flex flex-col items-center justify-center border border-blue-100">
-        <span className="text-xs font-bold uppercase tracking-wider">{date.toLocaleString('default', { month: 'short' })}</span>
-        <span className="text-2xl font-bold leading-none">{date.getDate()}</span>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <Badge variant="neutral" className="text-[10px] px-1.5 py-0">{event.type}</Badge>
+      {/* Top: Poster */}
+      <div className="relative w-full h-44 bg-gradient-to-br from-blue-50 to-slate-100 flex-shrink-0 overflow-hidden">
+        {event.imageUrl ? (
+          <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+            <Calendar size={40} strokeWidth={1.5} />
+            <span className="text-xs font-semibold mt-2 text-slate-400">No Poster</span>
+          </div>
+        )}
+        {/* Overlay badges */}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          <Badge variant="neutral" className="text-[10px] px-2 py-0.5 bg-white/90 backdrop-blur-sm shadow-sm border-0 text-slate-700">{event.type}</Badge>
           {event.predictedDemand === 'High' && (
-            <Badge variant="jci" className="text-[10px] px-1.5 py-0"><BrainCircuit size={10} className="mr-1 inline" /> AI</Badge>
+            <Badge variant="jci" className="text-[10px] px-2 py-0.5 bg-jci-blue/90 backdrop-blur-sm shadow-sm border-0 text-white"><BrainCircuit size={9} className="mr-1 inline" />Hot</Badge>
           )}
         </div>
-        <h3 className="text-base md:text-lg font-bold text-slate-900 mb-1 truncate leading-snug">{event.title}</h3>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-1 sm:gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-1">
-            <Clock size={12} className="text-slate-400" />
-            <span>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-          <div className="flex items-center gap-1 min-w-0">
-            <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-            <span className="truncate">{event.location || 'TBA'}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Users size={12} className="text-slate-400" />
-            <span>{event.attendees} registered</span>
-          </div>
+        {/* Date pill */}
+        <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl px-2.5 py-1.5 shadow-sm text-center min-w-[44px]">
+          <p className="text-[9px] font-black text-jci-blue uppercase tracking-widest leading-none">{date.toLocaleString('default', { month: 'short' })}</p>
+          <p className="text-lg font-black text-slate-900 leading-tight">{date.getDate()}</p>
         </div>
       </div>
 
-      {/* Action */}
-      <div className="flex items-center gap-2">
-        {new Date(event.date) >= new Date(new Date().setHours(0, 0, 0, 0)) && onRegister && (
+      {/* Bottom: Info */}
+      <div className="flex flex-col flex-1 p-4 gap-2">
+        <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2">{event.title}</h3>
+        <div className="flex flex-col gap-1 text-xs text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <Clock size={11} className="text-slate-400 flex-shrink-0" />
+            <span>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <MapPin size={11} className="text-slate-400 flex-shrink-0" />
+            <span className="truncate">{event.location || 'TBA'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Users size={11} className="text-slate-400 flex-shrink-0" />
+            <span>{event.attendees}{event.maxAttendees ? `/${event.maxAttendees}` : ''} registered</span>
+          </div>
+        </div>
+        {isUpcoming && onRegister && (
           <Button
             size="sm"
             variant={isRegistered ? "success" : "primary"}
-            disabled={isRegistered}
+            disabled={!!isRegistered}
+            className="mt-auto w-full"
             onClick={(e) => { e.stopPropagation(); onRegister(); }}
           >
             {isRegistered ? 'Registered' : 'Register'}
@@ -212,7 +222,7 @@ const EventRow: React.FC<{
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // Event Detail Modal with Budget Management

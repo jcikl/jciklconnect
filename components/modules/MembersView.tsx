@@ -43,6 +43,7 @@ import { HobbyClubsService } from '../../services/hobbyClubsService';
 import { HobbyClub } from '../../types';
 import { DataImportExportService } from '../../services/dataImportExportService';
 import { MemberStatsService, MemberStatistics } from '../../services/memberStatsService';
+import { deleteFromCloudinary, uploadMemberAvatarToCloudinary } from '../../services/cloudinaryService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { EventsService } from '../../services/eventsService';
 import type { EventRegistration } from '../../types';
@@ -1714,6 +1715,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [assessmentShowZh, setAssessmentShowZh] = useState(false);
   const [savingAssessment, setSavingAssessment] = useState(false);
   const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
 
   const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'career' | null>(null);
   const [inlineValues, setInlineValues] = useState<any>(null);
@@ -1782,6 +1785,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const startInlineEdit = (card: 'basic' | 'professional' | 'contact' | 'apparel' | 'career') => {
     setInlineValues({
       name: member.name || '',
+      avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
       fullName: member.fullName || '',
       idNumber: member.idNumber || '',
       dateOfBirth: member.dateOfBirth || '',
@@ -1834,13 +1838,38 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     setActiveInlineEditCard(card);
   };
 
+  const handleInlineAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !inlineValues) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please upload an image file', 'error');
+      return;
+    }
+
+    setAvatarUploading(true);
+    setAvatarUploadProgress(0);
+    try {
+      const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
+      setInlineValues({ ...inlineValues, avatar: uploadedUrl });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to upload avatar', 'error');
+    } finally {
+      setAvatarUploading(false);
+      setAvatarUploadProgress(0);
+    }
+  };
+
   const handleInlineSave = async (card: 'basic' | 'professional' | 'contact' | 'apparel' | 'career', updates: Partial<Member>) => {
     try {
       await updateMember(member.id, updates);
       setActiveInlineEditCard(null);
       showToast('Profile updated successfully', 'success');
+      return true;
     } catch (err) {
       showToast('Failed to update profile', 'error');
+      return false;
     }
   };
 
@@ -2464,6 +2493,46 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 >
                   {activeInlineEditCard === 'basic' && inlineValues ? (
                     <div className="space-y-4 text-sm">
+                      <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-blue-50 shadow-sm shrink-0">
+                          {inlineValues.avatar ? (
+                            <img src={inlineValues.avatar} alt={inlineValues.name || member.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xl font-black text-jci-blue">
+                              {(inlineValues.name || member.name || 'M').charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-3">
+                          <div>
+                            <p className="font-bold text-slate-900">Member Avatar</p>
+                            <p className="text-xs text-slate-500 mt-0.5">Upload a profile photo for member-facing pages.</p>
+                          </div>
+                          {avatarUploading && (
+                            <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                              <div className="h-full bg-jci-blue transition-all" style={{ width: `${avatarUploadProgress}%` }} />
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <label className={`inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-bold transition-colors ${avatarUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-jci-blue text-white hover:bg-jci-navy cursor-pointer'}`}>
+                              {avatarUploading ? 'Uploading...' : 'Upload'}
+                              <input type="file" accept="image/*" className="hidden" disabled={avatarUploading} onChange={handleInlineAvatarUpload} />
+                            </label>
+                            {inlineValues.avatar && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={avatarUploading}
+                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                onClick={() => setInlineValues({ ...inlineValues, avatar: '' })}
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name (Short)<span className="text-red-500 ml-1">*</span></label>
@@ -2601,9 +2670,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
                       <div className="flex justify-end gap-2 pt-3 border-t">
                         <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                        <Button variant="primary" size="sm" onClick={() => {
+                        <Button variant="primary" size="sm" onClick={async () => {
                           const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-                          handleInlineSave('basic', {
+                          const saved = await handleInlineSave('basic', {
+                            avatar: inlineValues.avatar || '',
+                            avatarUrl: inlineValues.avatar || '',
                             name: inlineValues.name,
                             fullName: inlineValues.fullName,
                             idNumber: inlineValues.idNumber,
@@ -2616,6 +2687,12 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             hobbies: inlineValues.hobbies,
                             skills: skillsArr,
                           });
+                          const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+                          if (saved && originalAvatar && originalAvatar !== inlineValues.avatar) {
+                            deleteFromCloudinary(originalAvatar).catch((err) => {
+                              console.error('Failed to delete previous member avatar from Cloudinary:', err);
+                            });
+                          }
                         }}>Save</Button>
                       </div>
                     </div>

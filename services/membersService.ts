@@ -450,6 +450,7 @@ export class MembersService {
       const mergedMember = { ...(currentData ?? {}), ...normalizedUpdates, id: memberId };
       const { BusinessDirectoryService } = await import('./businessDirectoryService');
       await BusinessDirectoryService.syncPublicListing(memberId, mergedMember as Record<string, unknown>);
+      await this.syncBoardMemberDisplayFields(memberId, mergedMember as Member);
 
       // Trigger introducer recalculation if introducer changes
       if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {
@@ -521,6 +522,57 @@ export class MembersService {
           updatedAt: Timestamp.now(),
         });
       }
+    }
+  }
+
+  private static async syncBoardMemberDisplayFields(memberId: string, member: Member): Promise<void> {
+    try {
+      const memberAny = member as any;
+      const firstText = (...values: unknown[]): string | undefined => {
+        const found = values.find((value) => typeof value === 'string' && value.trim().length > 0);
+        return typeof found === 'string' ? found.trim() : undefined;
+      };
+
+      const display = {
+        memberName: firstText(
+          memberAny.general?.name,
+          memberAny.general?.fullName,
+          memberAny.fullName,
+          memberAny.name
+        ),
+        avatarUrl: firstText(
+          memberAny.general?.avatar,
+          memberAny.general?.avatarUrl,
+          memberAny.avatarUrl,
+          memberAny.avatar
+        ) || '',
+        companyName: firstText(
+          memberAny.business?.companyName,
+          memberAny.companyName,
+          memberAny.profession,
+          memberAny.departmentAndPosition
+        ),
+      };
+
+      const cleanDisplay = Object.fromEntries(
+        Object.entries(display).filter(([, value]) => value !== undefined)
+      );
+      if (Object.keys(cleanDisplay).length === 0) return;
+
+      const boardSnapshot = await getDocs(
+        query(collection(db, 'boardMembers'), where('memberId', '==', memberId))
+      );
+
+      await Promise.all(
+        boardSnapshot.docs.map((boardDoc) =>
+          updateDoc(doc(db, 'boardMembers', boardDoc.id), {
+            ...cleanDisplay,
+            updatedAt: new Date().toISOString(),
+          })
+        )
+      );
+    } catch (err) {
+      console.warn('Board member display sync skipped:', err);
     }
   }
 

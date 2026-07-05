@@ -20,33 +20,81 @@ interface MemberGrowthChartProps {
   members?: Member[];
 }
 
+type MembershipGrowthPeriod = 'year' | 'month';
+
 export const MemberGrowthChart: React.FC<MemberGrowthChartProps> = ({ members = [] }) => {
+  const [period, setPeriod] = useState<MembershipGrowthPeriod>('year');
+
   const growthData = useMemo(() => {
     const now = new Date();
-    const months: { name: string; members: number }[] = [];
+    const buckets: { name: string; members: number; fullLabel: string }[] = [];
 
-    // Generate last 6 months
-    for (let i = 5; i >= 0; i--) {
+    if (period === 'year') {
+      for (let i = 11; i >= 0; i--) {
+        const year = now.getFullYear() - i;
+        const membersJoinedInYear = members.filter(m => {
+          if (!m.joinDate) return false;
+          const joinDate = new Date(m.joinDate);
+          return !Number.isNaN(joinDate.getTime()) && joinDate.getFullYear() === year;
+        }).length;
+
+        buckets.push({
+          name: String(year),
+          members: membersJoinedInYear,
+          fullLabel: String(year),
+        });
+      }
+
+      return buckets;
+    }
+
+    for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-
-      // Count members joined up to this month (cumulative)
-      const membersUpToMonth = members.filter(m => {
+      const membersJoinedInMonth = members.filter(m => {
+        if (!m.joinDate) return false;
         const joinDate = new Date(m.joinDate);
-        return joinDate <= new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        return !Number.isNaN(joinDate.getTime()) &&
+          joinDate.getFullYear() === date.getFullYear() &&
+          joinDate.getMonth() === date.getMonth();
       }).length;
 
-      months.push({
-        name: monthName,
-        members: membersUpToMonth,
+      buckets.push({
+        name: date.toLocaleDateString('en-US', { month: 'short' }),
+        members: membersJoinedInMonth,
+        fullLabel: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
       });
     }
 
-    return months;
-  }, [members]);
+    return buckets;
+  }, [members, period]);
+
+  const rangeLabel = period === 'year' ? 'Past 12 years' : 'Past 12 months';
+  const unitLabel = period === 'year' ? 'Year' : 'Month';
 
   return (
-    <Card title="Membership Growth (Trend)" noPadding className="h-80 flex flex-col">
+    <Card
+      title="Membership Growth (Trend)"
+      description={`New members by join date - ${rangeLabel}`}
+      action={
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+          {(['year', 'month'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setPeriod(option)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${period === option
+                ? 'bg-jci-blue text-white shadow-sm'
+                : 'text-slate-600 hover:text-jci-blue hover:bg-slate-50'
+                }`}
+            >
+              {option === 'year' ? 'Year' : 'Month'}
+            </button>
+          ))}
+        </div>
+      }
+      noPadding
+      className="h-80 flex flex-col"
+    >
       <div className="flex-1 p-6 min-h-0" style={{ height: 280 }}>
         <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={0}>
           <AreaChart data={growthData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -61,8 +109,10 @@ export const MemberGrowthChart: React.FC<MemberGrowthChartProps> = ({ members = 
             <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
             <Tooltip
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              labelFormatter={(_, payload) => payload?.[0]?.payload?.fullLabel || unitLabel}
+              formatter={(value: number) => [value, 'New Members']}
             />
-            <Area type="monotone" dataKey="members" stroke="#0097D7" fillOpacity={1} fill="url(#colorMembers)" strokeWidth={2} />
+            <Area type="monotone" dataKey="members" name="New Members" stroke="#0097D7" fillOpacity={1} fill="url(#colorMembers)" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
       </div>

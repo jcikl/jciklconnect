@@ -1,9 +1,69 @@
 /**
  * Cloudinary Upload Service
  */
+import imageCompression from 'browser-image-compression';
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'drpa1zcmp';
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'jci-kl-membership';
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'jciklconnect';
+const MEMBER_AVATAR_ASSET_ROOT = import.meta.env.VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT || 'jciklconnect';
+
+type MemberAvatarFolderSource = {
+  id?: string;
+  name?: string;
+  fullName?: string;
+  general?: {
+    name?: string;
+    fullName?: string;
+  };
+};
+
+const sanitizePathSegment = (value: string): string => {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+const sanitizeFolderPath = (folder: string): string => {
+  const safeFolder = folder
+    .split('/')
+    .map((segment) => sanitizePathSegment(segment))
+    .filter(Boolean)
+    .join('/');
+
+  return safeFolder;
+};
+
+export const getMemberAvatarKey = (member: MemberAvatarFolderSource): string => {
+  const memberName = member.name || member.fullName || member.general?.name || member.general?.fullName || member.id || 'member';
+  const memberIdLast4 = (member.id || '').replace(/[^a-z0-9]/gi, '').slice(-4).toLowerCase();
+
+  return `${sanitizePathSegment(memberName)}-${memberIdLast4 || 'unknown'}`;
+};
+
+export const getMemberAvatarFolder = (member: MemberAvatarFolderSource): string => {
+  return `${sanitizePathSegment(MEMBER_AVATAR_ASSET_ROOT)}/members/${getMemberAvatarKey(member)}/avatar`;
+};
+
+export const uploadMemberAvatarToCloudinary = async (
+  file: File,
+  member: MemberAvatarFolderSource,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 0.2,
+    maxWidthOrHeight: 1024,
+    useWebWorker: true,
+  });
+
+  const folder = getMemberAvatarFolder(member);
+  const avatarKey = getMemberAvatarKey(member);
+
+  return uploadToCloudinary(compressedFile, folder, onProgress, {
+    publicId: avatarKey,
+  });
+};
 
 /**
  * Uploads a file directly to Cloudinary using unsigned upload with progress tracking.
@@ -15,7 +75,10 @@ const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'jci-kl-m
 export const uploadToCloudinary = (
   file: File,
   folder?: string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  options?: {
+    publicId?: string;
+  }
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -24,6 +87,10 @@ export const uploadToCloudinary = (
     formData.append('upload_preset', UPLOAD_PRESET);
     if (folder) {
       formData.append('folder', folder);
+      formData.append('asset_folder', folder);
+    }
+    if (options?.publicId) {
+      formData.append('public_id', sanitizePathSegment(options.publicId));
     }
 
     const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
@@ -49,8 +116,10 @@ export const uploadToCloudinary = (
       } else {
         try {
           const errorData = JSON.parse(xhr.responseText);
+          console.error('Cloudinary upload failed:', errorData);
           reject(new Error(errorData.error?.message || 'Failed to upload image to Cloudinary'));
         } catch (e) {
+          console.error('Cloudinary upload failed:', xhr.responseText);
           reject(new Error(`Failed to upload to Cloudinary (status ${xhr.status})`));
         }
       }

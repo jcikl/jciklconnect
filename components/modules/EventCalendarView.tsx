@@ -17,6 +17,65 @@ interface EventCalendarViewProps {
 
 type ViewMode = 'month' | 'week' | 'day';
 
+const CalendarEventCard: React.FC<{
+  event: Event;
+  isUpcoming: boolean;
+  onEventClick?: (event: Event) => void;
+}> = ({ event, isUpcoming, onEventClick }) => {
+  const date = new Date(event.date);
+  return (
+    <div
+      className="flex flex-col rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer active:scale-[0.99]"
+      onClick={() => onEventClick?.(event)}
+    >
+      {/* Poster */}
+      <div className="relative w-full h-36 bg-gradient-to-br from-blue-50 to-slate-100 overflow-hidden flex-shrink-0">
+        {event.imageUrl ? (
+          <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+            <CalendarIcon size={36} strokeWidth={1.5} />
+            <span className="text-xs font-semibold mt-1.5 text-slate-400">No Poster</span>
+          </div>
+        )}
+        <div className="absolute top-2.5 left-2.5">
+          <Badge variant="neutral" className="text-[10px] px-2 py-0.5 bg-white/90 backdrop-blur-sm shadow-sm border-0 text-slate-700">{event.type}</Badge>
+        </div>
+        <div className="absolute bottom-2.5 right-2.5 bg-white/95 backdrop-blur-sm rounded-xl px-2 py-1 shadow-sm text-center min-w-[38px]">
+          <p className="text-[8px] font-black text-jci-blue uppercase tracking-widest leading-none">{date.toLocaleString('default', { month: 'short' })}</p>
+          <p className="text-base font-black text-slate-900 leading-tight">{date.getDate()}</p>
+        </div>
+      </div>
+      {/* Info */}
+      <div className="flex flex-col p-3 gap-1.5">
+        <h4 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug">{event.title}</h4>
+        <div className="flex flex-col gap-1 text-xs text-slate-500">
+          <div className="flex items-center gap-1.5">
+            <Clock size={10} className="text-slate-400 flex-shrink-0" />
+            <span>{formatTime(date)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <MapPin size={10} className="text-slate-400 flex-shrink-0" />
+            <span className="truncate">{event.location || 'TBA'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Users size={10} className="text-slate-400 flex-shrink-0" />
+            <span>{event.attendees}{event.maxAttendees ? `/${event.maxAttendees}` : ''} registered</span>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant={isUpcoming ? 'primary' : 'outline'}
+          className="mt-1 w-full"
+          onClick={(e) => { e.stopPropagation(); onEventClick?.(event); }}
+        >
+          {isUpcoming ? 'Register Now' : 'View Details'}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
   events,
   onEventClick,
@@ -222,73 +281,28 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
         <div className="w-full lg:w-1/3">
           {upcomingOnly ? (
             <div className="w-full">
-              <div className="p-0 md:p-0 space-y-4 max-h-[800px] overflow-y-auto">
+              <div className="space-y-4 max-h-[800px] overflow-y-auto">
                 {events
                   .filter(e => {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    const eventDate = new Date(e.date);
-                    return eventDate >= today;
+                    return new Date(e.date) >= today;
                   })
                   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                   .slice(0, 10)
                   .map(event => (
-                    <div
-                      key={event.id}
-                      className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 hover:border-jci-blue hover:shadow-md transition-all cursor-pointer bg-white"
-                      onClick={() => onEventClick?.(event)}
-                    >
-                      <div className="flex-shrink-0 w-16 h-16 bg-blue-50 text-jci-blue rounded-xl flex flex-col items-center justify-center border border-blue-100">
-                        <span className="text-xs font-bold uppercase tracking-wider">
-                          {new Date(event.date).toLocaleString('default', { month: 'short' })}
-                        </span>
-                        <span className="text-2xl font-bold leading-none">
-                          {new Date(event.date).getDate()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-bold text-slate-900">{event.title}</h4>
-                          <Badge variant="neutral">{event.type}</Badge>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-3">
-                          <div className="flex items-center gap-1">
-                            <Clock size={14} />
-                            <span>{formatTime(new Date(event.date))}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MapPin size={14} />
-                            <span className="truncate">{event.location}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Users size={14} />
-                            <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEventClick?.(event);
-                          }}
-                        >
-                          Register Now
-                        </Button>
-                      </div>
-                    </div>
+                    <CalendarEventCard key={event.id} event={event} isUpcoming={true} onEventClick={onEventClick} />
                   ))}
                 {events.filter(e => {
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
-                  const eventDate = new Date(e.date);
-                  return eventDate >= today;
+                  return new Date(e.date) >= today;
                 }).length === 0 && (
-                    <div className="text-center py-8 text-slate-500">
-                      <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />
-                      <p>No upcoming events</p>
-                    </div>
-                  )}
+                  <div className="text-center py-8 text-slate-500">
+                    <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />
+                    <p>No upcoming events</p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -306,89 +320,22 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const eventDate = new Date(e.date);
-                    if (activeListTab === 'Upcoming') {
-                      return eventDate >= today;
-                    } else {
-                      return eventDate < today;
-                    }
+                    return activeListTab === 'Upcoming' ? eventDate >= today : eventDate < today;
                   })
-                  .sort((a, b) => {
-                    if (activeListTab === 'Upcoming') {
-                      return new Date(a.date).getTime() - new Date(b.date).getTime();
-                    } else {
-                      return new Date(b.date).getTime() - new Date(a.date).getTime();
-                    }
-                  })
+                  .sort((a, b) =>
+                    activeListTab === 'Upcoming'
+                      ? new Date(a.date).getTime() - new Date(b.date).getTime()
+                      : new Date(b.date).getTime() - new Date(a.date).getTime()
+                  )
                   .slice(0, 10)
                   .map(event => (
-                    <div
-                      key={event.id}
-                      className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 hover:border-jci-blue hover:shadow-md transition-all cursor-pointer bg-white"
-                      onClick={() => onEventClick?.(event)}
-                    >
-                      <div className="flex-shrink-0 w-16 h-16 bg-blue-50 text-jci-blue rounded-xl flex flex-col items-center justify-center border border-blue-100">
-                        <span className="text-xs font-bold uppercase tracking-wider">
-                          {new Date(event.date).toLocaleString('default', { month: 'short' })}
-                        </span>
-                        <span className="text-2xl font-bold leading-none">
-                          {new Date(event.date).getDate()}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-bold text-slate-900">{event.title}</h4>
-                          <Badge variant="neutral">{event.type}</Badge>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mb-3">
-                          <div className="flex items-center gap-1">
-                            <Clock size={14} />
-                            <span>{formatTime(new Date(event.date))}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MapPin size={14} />
-                            <span className="truncate">{event.location}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Users size={14} />
-                            <span>{event.attendees} / {event.maxAttendees || '∞'} registered</span>
-                          </div>
-                        </div>
-                        {activeListTab === 'Upcoming' ? (
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEventClick?.(event);
-                            }}
-                          >
-                            Register Now
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEventClick?.(event);
-                            }}
-                          >
-                            View Details
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                    <CalendarEventCard key={event.id} event={event} isUpcoming={activeListTab === 'Upcoming'} onEventClick={onEventClick} />
                   ))}
                 {events.filter(e => {
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
                   const eventDate = new Date(e.date);
-                  if (activeListTab === 'Upcoming') {
-                    return eventDate >= today;
-                  } else {
-                    return eventDate < today;
-                  }
+                  return activeListTab === 'Upcoming' ? eventDate >= today : eventDate < today;
                 }).length === 0 && (
                   <div className="text-center py-8 text-slate-500">
                     <CalendarIcon className="mx-auto mb-2 text-slate-400" size={32} />

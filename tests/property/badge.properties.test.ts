@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
-import { BadgeDefinition, BadgeCriteria } from '../../services/badgeService';
+import { BadgeDefinition, AwardCriteria as BadgeCriteria } from '../../types';
 
 describe('Badge System Properties', () => {
   // Property 37: Badge automatic awarding

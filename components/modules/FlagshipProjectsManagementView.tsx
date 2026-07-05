@@ -573,11 +573,6 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
                           <Trash2 size={14} />
                         </Button>
                       </div>
-                      <div className="absolute bottom-3 left-3">
-                        <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
-                          {project.status}
-                        </Badge>
-                      </div>
 
                       {/* Selected UNSDG goals row in cover wrapper */}
                       {project.unsdg && project.unsdg.length > 0 && (

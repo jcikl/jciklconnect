@@ -599,7 +599,7 @@ export const BankTransactionImportModal: React.FC<Props> = ({
           <Button
             onClick={handleImport}
             disabled={!selectedAccountId || validRows.length === 0 || importing}
-            loading={importing}
+            isLoading={importing}
             className="flex-1"
           >
             {importing ? 'Importing...' : `Import ${validRows.length} rows`}

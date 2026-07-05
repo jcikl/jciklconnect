@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Search, Bell, LogOut, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3, MessageCircle, Phone, XCircle, Shield, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Search, TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3, MessageCircle, Phone, XCircle } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
 import { Select, Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
@@ -16,9 +16,8 @@ import { AIPredictionService } from '../../services/aiPredictionService';
 import { formatCurrency } from '../../utils/formatUtils';
 import { UserRole, Member } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { useCommunication } from '../../hooks/useCommunication';
 import { MemberGrowthChart, PointsDistributionChart } from './Analytics';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
@@ -40,36 +39,14 @@ const HOBBY_OPTIONS = [
 
 interface BoardDashboardProps {
   onNavigate?: (view: any, memberId?: string | null) => void;
-  onOpenNotifications: () => void;
-  onOpenSearch: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
-export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOpenNotifications, onOpenSearch, searchQuery, onSearchChange, scrollRef }) => {
-  const { member, signOut, isDevMode, simulatedRole, simulateRole } = useAuth();
+export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, searchQuery, onSearchChange, scrollRef }) => {
+  const { member, isDevMode, simulatedRole, simulateRole } = useAuth();
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
-
-  // Header Scroll Animations
-  const { scrollY } = useScroll({ container: scrollRef });
-
-  // Transform Greeting: Move left and fade out via vertical mask
-  const greetingX = useTransform(scrollY, [0, 120], [0, 0]);
-  const greetingOpacity = useTransform(scrollY, [0, 120], [1, 0]);
-
-  // Mask wipe effect: as we scroll, the mask moves down
-  const maskProgress = useTransform(scrollY, [0, 120], [0, 100]);
-  const greetingMask = useTransform(maskProgress, (p) =>
-    `linear-gradient(to top, transparent ${p}%, black ${p}%)`
-  );
-
-  // Transform Search Bar: Move up to dock with Top Row
-  const headerY = useTransform(scrollY, [0, 120], [0, -150]);
-  const counterY = useTransform(headerY, (y) => -Number(y));
-
-  const { notifications } = useCommunication();
-  const unreadNotifications = notifications.filter(n => !n.read);
   const { members: rawMembers, loading: membersLoading } = useMembers();
   const members = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -140,19 +117,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
   });
   const [loadingAI, setLoadingAI] = useState(false);
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  const roleDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Click outside to close role dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) {
-        setIsRoleDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   useEffect(() => {
     AdvertisementService.getActiveAdvertisements('Homepage').then(setHomepageAds).catch(console.error);
@@ -502,178 +466,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
     return months;
   }, [currentMonthIndex]);
 
-  const renderHeader = () => (
-    <div
-      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-4 sm:px-6 lg:px-8 text-white shadow-2xl relative -mt-4 -mx-5 sm:-mt-6 sm:-mx-6 lg:-mt-8 lg:-mx-8 pb-2 sm:pb-2 lg:pb-2"
-    >
-      {/* Decorative Background Pattern */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-      </div>
-
-      {/* Top Row: Fixed/Docked Area */}
-      <div className="sticky top-[0rem] z-20 pb-2">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3 sm:space-x-4">
-            <div className="relative group">
-              <img
-                src={member?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'Board')}&background=ffffff&color=0097D7`}
-                alt="Avatar"
-                className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
-              />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
-            </div>
-            <div className="group">
-              <div className="flex items-center space-x-2">
-                <span className="text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">{member?.name}</span>
-                <button
-                  onClick={() => onNavigate?.('MEMBERS', member?.id)}
-                  className="p-0 h-7 w-7 min-h-0 min-w-0 text-white/60 hover:text-white transition-colors flex items-center justify-center"
-                  title="Edit Profile"
-                >
-                  <Edit3 size={16} />
-                </button>
-              </div>
-              <p className="font-medium text-sm tracking-wide text-blue-200">{member?.role}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-1">
-            {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
-              <div className="relative mr-2" ref={roleDropdownRef}>
-                <button
-                  onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                  className="flex items-center bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/20 rounded-xl px-2.5 py-1 transition-all text-white text-[11px] font-bold shadow-sm h-[26px]"
-                  title="Simulate Role"
-                >
-                  <Shield size={12} className="text-purple-300 mr-1.5 shrink-0" />
-                  <span className="mr-1">{simulatedRole ? simulatedRole.charAt(0).toUpperCase() + simulatedRole.slice(1) : 'Dev/Admin'}</span>
-                  <ChevronDown size={11} className={`text-white/70 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {isRoleDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute right-0 mt-1.5 w-36 rounded-xl bg-slate-900/95 backdrop-blur-xl border border-white/10 shadow-2xl p-1 z-50 origin-top-right text-slate-200"
-                    >
-                      {[
-                        { value: '', label: 'Dev/Admin', desc: 'Default system' },
-                        { value: UserRole.ADMIN, label: 'Admin', desc: 'Full administration' },
-                        { value: UserRole.MEMBER, label: 'Member', desc: 'Standard member' },
-                        { value: UserRole.GUEST, label: 'Guest', desc: 'Limited guest view' }
-                      ].map((option) => {
-                        const isSelected = (simulatedRole || '') === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            onClick={() => {
-                              const val = option.value;
-                              simulateRole(val ? val as UserRole : null);
-                              showToast(val ? `Simulating ${val} role` : 'Reset to Admin role', 'info');
-                              setIsRoleDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-all flex flex-col gap-0.5 ${
-                              isSelected
-                                ? 'bg-gradient-to-r from-jci-blue to-sky-500 text-white font-extrabold shadow-md shadow-jci-blue/20'
-                                : 'hover:bg-white/10 text-slate-300 hover:text-white'
-                            }`}
-                          >
-                            <span className="text-[10px] font-bold leading-none">{option.label}</span>
-                            <span className={`text-[8px] leading-tight ${isSelected ? 'text-blue-100/90' : 'text-slate-500 hover:text-slate-400'}`}>
-                              {option.desc}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            <button
-              onClick={onOpenSearch}
-              className="p-0 text-white/70 hover:text-white transition-all group"
-              title="Search"
-            >
-              <Search size={20} className="group-hover:scale-110 transition-transform" />
-            </button>
-
-            <button
-              onClick={onOpenNotifications}
-              className="relative p-0 text-white/70 hover:text-white transition-all group"
-              title="Notifications"
-            >
-              <Bell size={20} className="group-hover:rotate-12 transition-transform" />
-              {unreadNotifications.length > 0 && (
-                <span className="absolute top-0 right-0 min-w-[16px] h-[16px] bg-red-500 rounded-full text-[9px] flex items-center justify-center font-black">
-                  {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={async () => {
-                try {
-                  await signOut();
-                  showToast('Logged out successfully', 'success');
-                } catch (error) {
-                  showToast('Failed to logout', 'error');
-                }
-              }}
-              className="p-0 text-white/70 hover:text-red-400 transition-all group"
-              title="Sign Out"
-            >
-              <LogOut size={20} className="group-hover:scale-110 transition-transform" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Dynamic Animation Area */}
-      <div className="relative pt-5">
-        {/* Greeting: Dissolves into the top row as we scroll */}
-        <motion.div
-          style={{
-            y: counterY,
-            x: greetingX,
-            opacity: greetingOpacity,
-            maskImage: greetingMask,
-            WebkitMaskImage: greetingMask
-          }}
-          className="space-y-3 mb-4"
-        >
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
-            Strategic Overview <br /> for {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </h2>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
-              <Users size={16} className="text-blue-200" />
-              <p className="text-sm font-medium text-blue-50">
-                {metrics.totalMembers} Total Members
-              </p>
-            </div>
-            <div className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex shadow-sm">
-              <DollarSign size={16} className="text-green-300" />
-              <p className="text-sm font-medium text-blue-50">
-                {formatCurrency(metrics.totalBankBalance)} Cash
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-    </div>
-  );
-
   return (
     <div className="space-y-2 pb-24">
-      {renderHeader()}
 
       {/* Homepage Advertisements Banner (Swiper) */}
       {homepageAds.length > 0 && (
@@ -681,14 +475,14 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
           <Swiper
             modules={[Autoplay, Pagination]}
             spaceBetween={16}
-            slidesPerView={1.15}
+            slidesPerView={1.65}
             breakpoints={{
               640: { slidesPerView: 3.15 },
               1024: { slidesPerView: 4.15 },
             }}
-            autoplay={{ delay: 5000, disableOnInteraction: false }}
+            autoplay={{ delay: 3000, disableOnInteraction: false }}
             pagination={{ clickable: true, dynamicBullets: true }}
-            loop={homepageAds.length > 5}
+            loop={homepageAds.length > 1}
             className="w-full"
             onSlideChange={(swiper) => {
               if (homepageAds.length > 0) {
@@ -1939,8 +1733,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, onOp
                           );
                         }}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border ${isSelected
-                            ? 'bg-pink-500 text-white border-pink-500 shadow-sm shadow-pink-200'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-pink-300 hover:text-pink-600'
+                          ? 'bg-pink-500 text-white border-pink-500 shadow-sm shadow-pink-200'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-pink-300 hover:text-pink-600'
                           }`}
                       >
                         {hobby}

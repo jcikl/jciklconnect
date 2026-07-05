@@ -310,11 +310,38 @@ export class BoardManagementService {
       const member = await MembersService.getMemberById(memberId);
       if (!member) return {};
 
-      return {
-        memberName: member.general?.name || member.fullName || member.name || undefined,
-        avatarUrl: member.general?.avatarUrl || member.avatarUrl || member.avatar || undefined,
-        companyName: member.business?.companyName || member.companyName || member.profession || undefined,
+      const memberAny = member as any;
+      const firstText = (...values: unknown[]): string | undefined => {
+        const found = values.find((value) => typeof value === 'string' && value.trim().length > 0);
+        return typeof found === 'string' ? found.trim() : undefined;
       };
+
+      const display = {
+        memberName: firstText(
+          memberAny.general?.name,
+          memberAny.general?.fullName,
+          memberAny.fullName,
+          memberAny.name
+        ),
+        avatarUrl: firstText(
+          memberAny.general?.avatar,
+          memberAny.general?.avatarUrl,
+          memberAny.avatarUrl,
+          memberAny.avatar,
+          memberAny.profilePicture,
+          memberAny.photoUrl
+        ),
+        companyName: firstText(
+          memberAny.business?.companyName,
+          memberAny.companyName,
+          memberAny.profession,
+          memberAny.departmentAndPosition
+        ),
+      };
+
+      return Object.fromEntries(
+        Object.entries(display).filter(([, value]) => value !== undefined)
+      );
     } catch {
       return {};
     }

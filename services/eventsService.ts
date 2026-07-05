@@ -52,7 +52,7 @@ export class EventsService {
       predictedDemand: data.predictedDemand ?? undefined,
       location: data.location ?? '',
       price: data.price ?? undefined,
-      imageUrl: data.imageUrl ?? undefined,
+      imageUrl: (data.imageUrl ?? data.logoUrl) as string | undefined,
       organizerId: data.organizerId ?? undefined,
       registeredMembers: data.registeredMembers as string[] ?? [],
       committee: data.committee as any[] ?? undefined,
@@ -366,8 +366,7 @@ export class EventsService {
         registeredAt: Timestamp.now(),
         status: 'Pending' as const,
       };
-      if (guestData.organization != null) guestRegistration.organization = guestData.organization;
-      if (guestData.notes != null) guestRegistration.notes = guestData.notes;
+      if (guestData.organization != null)      if (guestData.notes != null) guestRegistration.notes = guestData.notes;
 
       await addDoc(collection(db, COLLECTIONS.GUEST_REGISTRATIONS || 'guestRegistrations'), guestRegistration);
 

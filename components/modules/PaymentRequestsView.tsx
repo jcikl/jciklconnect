@@ -141,6 +141,31 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
   const { members: memberOptions } = useMembers(loId);
 
+  // Check for auto-open and preselected values from Events Management page
+  useEffect(() => {
+    const autoOpen = sessionStorage.getItem('pr_auto_open_submit');
+    if (autoOpen === 'true') {
+      const preselectedProj = sessionStorage.getItem('pr_preselected_project_id');
+      const preselectedCat = sessionStorage.getItem('pr_preselected_category');
+      
+      if (preselectedCat === 'projects_activities' || preselectedCat === 'administrative') {
+        setFormCategory(preselectedCat as 'projects_activities' | 'administrative');
+      }
+      if (preselectedProj) {
+        setFormActivityId(preselectedProj);
+      }
+      
+      // Clear the trigger and preselected values so they don't persist next time
+      sessionStorage.removeItem('pr_auto_open_submit');
+      sessionStorage.removeItem('pr_preselected_project_id');
+      sessionStorage.removeItem('pr_preselected_category');
+      
+      // Open the submit modal
+      setSuccessRef(null);
+      setSubmitModalOpen(true);
+    }
+  }, []);
+
   // Load Initial Data
   useEffect(() => {
     const loadSelectData = async () => {

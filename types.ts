@@ -795,6 +795,7 @@ export interface Project {
   name?: string;
   description?: string;
   logoUrl?: string;
+  roadmapUrl?: string;
   galleryUrls?: string[];
   lead?: string;
   organizerId?: string | null;

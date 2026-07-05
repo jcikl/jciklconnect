@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -6,7 +6,7 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw,
+  ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw,
   Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
@@ -36,6 +36,7 @@ import { ProjectsService } from './services/projectsService';
 import { FlagshipProjectsService } from './services/flagshipProjectsService';
 import { BoardManagementService } from './services/boardManagementService';
 import { MembersService } from './services/membersService';
+import { registerPushNotifications, unregisterPushNotifications, onForegroundMessage } from './services/notificationService';
 import { DEFAULT_LO_ID } from './config/constants';
 
 // Module Imports
@@ -65,7 +66,6 @@ import { BoardDashboard } from './components/dashboard/BoardDashboard';
 import { DashboardHome } from './components/dashboard/DashboardHome';
 import { CanvaView } from './components/modules/CanvaView';
 import { DeveloperInterface } from './components/modules/DeveloperInterface';
-import { BountyMarketplaceView } from './components/modules/BountyMarketplaceView';
 import { ToyyibView } from './components/modules/ToyyibView';
 import { WhapiConfigView } from './components/modules/WhapiConfigView';
 import { MembershipConfigView } from './components/modules/MembershipConfigView';
@@ -81,7 +81,7 @@ import { AdvertisementService } from './services/advertisementService';
 // --- View Definitions ---
 import { RadarDataImporter } from './components/admin/RadarDataImporter';
 
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'BOUNTIES' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
 
 // --- Helper Components ---
 
@@ -541,7 +541,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
                       <p className="text-sm font-bold text-slate-800">
-                        {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} • {selectedEvent.time || 'TBA'}
+                        {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} â€¢ {selectedEvent.time || 'TBA'}
                       </p>
                     </div>
                   </div>
@@ -771,7 +771,7 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
                 <p className="text-slate-600">Check back soon for new projects!</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 gap-8 mx-auto">
                 {/* 3D Flip Card Styles */}
                 <style>{`
                   .flip-card {
@@ -880,33 +880,31 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
                               </div>
 
                               {project.description ? (
-                                <p className="text-slate-600 text-xs line-clamp-3 leading-relaxed mb-3">{project.description}</p>
+                                <p className="text-slate-600 text-xs line-clamp-6 leading-relaxed whitespace-pre-wrap mb-3">{project.description}</p>
                               ) : (
-                                <p className="text-slate-400 text-xs italic mb-3">No description available.</p>
+                                <div className="text-slate-400 text-xs italic mb-3">No description available.</div>
                               )}
                             </div>
 
-                            <div className="mt-auto pt-3 border-t border-slate-100">
-                              <div className="flex justify-between items-center gap-2 mt-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleFlip(project.id, e);
-                                  }}
-                                  className="inline-flex items-center text-xs font-semibold text-jci-blue hover:text-sky-600 transition-colors"
-                                >
-                                  <ImageIcon size={14} className="mr-1" /> View Gallery
-                                </button>
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRegister();
-                                  }}
-                                  className="text-xs font-semibold px-3 py-1.5 bg-jci-blue hover:bg-jci-blue/90 text-white border-0 h-8"
-                                >
-                                  Get Involved
-                                </Button>
-                              </div>
+                            <div className="flex justify-between items-center gap-2 mt-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFlip(project.id, e);
+                                }}
+                                className="inline-flex items-center text-xs font-semibold text-jci-blue hover:text-sky-600 transition-colors"
+                              >
+                                <ImageIcon size={14} className="mr-1" /> View Gallery
+                              </button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRegister();
+                                }}
+                                className="text-xs font-semibold px-3 py-1.5 bg-jci-blue hover:bg-jci-blue/90 text-white border-0 h-8"
+                              >
+                                Get Involved
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -1038,21 +1036,7 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
                   </div>
                 )}
                 <div className="text-center sm:text-left flex-1">
-                  <div className="flex flex-wrap gap-2 items-center justify-center sm:justify-start mb-2">
-                    <Badge variant="success" className="bg-emerald-500 text-white border-0 font-semibold px-2.5 py-0.5">
-                      {selectedProject.status}
-                    </Badge>
-                    {selectedProject.level && (
-                      <Badge variant="neutral" className="text-slate-600 border-slate-200 bg-slate-50">
-                        Level: {selectedProject.level}
-                      </Badge>
-                    )}
-                    {selectedProject.pillar && (
-                      <Badge variant="neutral" className="text-slate-600 border-slate-200 bg-slate-50">
-                        Pillar: {selectedProject.pillar}
-                      </Badge>
-                    )}
-                  </div>
+
                   <h2 className="text-2xl font-extrabold text-slate-900 mb-1">
                     {selectedProject.title}
                   </h2>
@@ -1240,15 +1224,15 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
     { year: '2024', title: 'Program NextGen awarded as Best of the Best Project in JCI World Congress', description: '' },
   ];
 
-  const [selectedYear, setSelectedYear] = useState<string>('2026');
+  const [selectedYear, setSelectedYear] = useState<string>(() => String(new Date().getFullYear()));
   const [boardMembers, setBoardMembers] = useState<any[]>([]);
   const [loadingBoard, setLoadingBoard] = useState<boolean>(true);
 
-  // Available years: from 2023 to current year + 1
+  // Available years: from JCI KL's founding year to the current calendar year.
   const currentYear = new Date().getFullYear();
   const availableYears = useMemo(() => {
     const years = [];
-    for (let y = currentYear + 1; y >= 2023; y--) {
+    for (let y = currentYear; y >= 1954; y--) {
       years.push(String(y));
     }
     return years;
@@ -1495,27 +1479,27 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                   <h3 className="text-2xl font-bold text-slate-900 mb-6">JCI Creed</h3>
                   <ul className="space-y-4 text-slate-600">
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">•</span>
+                      <span className="text-jci-blue mr-2">â€¢</span>
                       <span>That faith in God gives meaning and purpose to human life;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">•</span>
+                      <span className="text-jci-blue mr-2">â€¢</span>
                       <span>That the brotherhood of man transcends the sovereignty of nations;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">•</span>
+                      <span className="text-jci-blue mr-2">â€¢</span>
                       <span>That economic justice can best be won by free men through free enterprise;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">•</span>
+                      <span className="text-jci-blue mr-2">â€¢</span>
                       <span>That government should be of laws rather than of men;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">•</span>
+                      <span className="text-jci-blue mr-2">â€¢</span>
                       <span>That earth's great treasure lies in human personality;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">•</span>
+                      <span className="text-jci-blue mr-2">â€¢</span>
                       <span>And that service to humanity is the best work of life.</span>
                     </li>
                   </ul>
@@ -1554,20 +1538,24 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 <h2 className="text-3xl font-bold text-slate-900">Board of Directors</h2>
                 <p className="text-slate-500 text-sm mt-1">Meet the leaders driving positive impact in Kuala Lumpur</p>
               </div>
-              <div className="flex flex-wrap gap-1.5 bg-slate-100 p-1 rounded-full self-start md:self-auto shadow-inner">
-                {availableYears.map(year => (
-                  <button
-                    key={year}
-                    onClick={() => setSelectedYear(year)}
-                    className={`px-4 py-1.5 rounded-full font-bold text-xs transition-all duration-200 ${selectedYear === year
-                        ? 'bg-jci-blue text-white shadow-sm scale-105'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                      }`}
+              <label className="flex flex-col gap-1.5 self-start md:self-auto">
+                <span className="text-[10px] font-black uppercase tracking-wider text-jci-blue">Board Year</span>
+                <div className="relative rounded-2xl bg-gradient-to-r from-jci-blue to-jci-lightblue p-[1px] shadow-sm shadow-jci-blue/10">
+                  <select
+                    value={selectedYear}
+                    onChange={(event) => setSelectedYear(event.target.value)}
+                    className="appearance-none min-w-[156px] rounded-2xl border-0 bg-white px-4 py-2.5 pr-10 text-sm font-black text-slate-900 outline-none transition-all cursor-pointer hover:bg-sky-50 focus:ring-2 focus:ring-jci-blue/20"
+                    aria-label="Select board year"
                   >
-                    {year}
-                  </button>
-                ))}
-              </div>
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-jci-blue">
+                    <ChevronDown size={16} strokeWidth={3} />
+                  </div>
+                </div>
+              </label>
             </div>
 
             {loadingBoard ? (
@@ -2009,7 +1997,7 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
           title={
             <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
               <span className="bg-sky-100 text-jci-blue text-xs font-bold px-2.5 py-1 rounded-md uppercase self-start md:self-auto">
-                {selectedNewsletter.year} • {selectedNewsletter.issue}
+                {selectedNewsletter.year} â€¢ {selectedNewsletter.issue}
               </span>
               <h2 className="text-lg font-bold text-slate-800 line-clamp-1">{selectedNewsletter.title}</h2>
             </div>
@@ -2143,7 +2131,7 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                         <h2 className="text-xl font-extrabold tracking-tight leading-snug">{selectedNewsletter.title}</h2>
                         <div className="flex items-center justify-center gap-2 mt-3 text-xs text-sky-100 font-medium">
                           <span>{selectedNewsletter.issue}</span>
-                          <span>•</span>
+                          <span>â€¢</span>
                           <span>{selectedNewsletter.year}</span>
                         </div>
                       </div>
@@ -2244,7 +2232,7 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                           <p className="text-xs font-extrabold truncate leading-tight">{item.title}</p>
                           <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400">
                             <span>{item.year}</span>
-                            <span>•</span>
+                            <span>â€¢</span>
                             <span>{item.issue}</span>
                           </div>
                         </div>
@@ -2510,15 +2498,15 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
               <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">How to Redeem</h4>
               {redeemStatus.allowed ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm font-medium">
-                  <p className="mb-2">🔓 Eligibility Verified successfully.</p>
+                  <p className="mb-2">ðŸ”“ Eligibility Verified successfully.</p>
                   <p className="text-base font-bold bg-white px-3 py-2 rounded-lg border border-emerald-100 shadow-sm mt-2">{selectedPartner.redeemMethod}</p>
                 </div>
               ) : (
                 <div className="bg-slate-100 border border-slate-200 rounded-xl p-6 text-slate-700 text-center space-y-4">
                   <p className="font-semibold text-slate-800">
-                    {redeemStatus.reason === 'login' && '🔒 Please login to view how to redeem.'}
-                    {redeemStatus.reason === 'role' && '🔒 This benefit is not available for your member tier.'}
-                    {redeemStatus.reason === 'dues' && '🔒 Please settle annual dues to unlock benefit details.'}
+                    {redeemStatus.reason === 'login' && 'ðŸ”’ Please login to view how to redeem.'}
+                    {redeemStatus.reason === 'role' && 'ðŸ”’ This benefit is not available for your member tier.'}
+                    {redeemStatus.reason === 'dues' && 'ðŸ”’ Please settle annual dues to unlock benefit details.'}
                   </p>
                   <p className="text-xs text-slate-500 leading-relaxed">
                     Merchant discount codes and instruction details are protected by JCI Kuala Lumpur Member Benefit Shielding policies.
@@ -2599,8 +2587,8 @@ const NotificationDrawer: React.FC<{
           {filteredNotifications.map(note => (
             <div key={note.id} className={`p-4 border rounded-lg shadow-sm transition-colors ${note.read ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-jci-blue'}`}>
               <div className="flex items-start gap-3 mb-3">
-                <div className={`p-2 rounded-full flex-shrink-0 ${note.type === 'ai' ? 'bg-purple-100 text-purple-600' : note.type === 'warning' ? 'bg-amber-100 text-amber-600' : note.title.includes('🎂') ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
-                  {note.type === 'ai' ? <Sparkles size={16} /> : note.type === 'warning' ? <AlertTriangle size={16} /> : note.title.includes('🎂') ? <Gift size={16} /> : <Bell size={16} />}
+                <div className={`p-2 rounded-full flex-shrink-0 ${note.type === 'ai' ? 'bg-purple-100 text-purple-600' : note.type === 'warning' ? 'bg-amber-100 text-amber-600' : note.title.includes('ðŸŽ‚') ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
+                  {note.type === 'ai' ? <Sparkles size={16} /> : note.type === 'warning' ? <AlertTriangle size={16} /> : note.title.includes('ðŸŽ‚') ? <Gift size={16} /> : <Bell size={16} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className={`text-sm font-bold truncate ${note.read ? 'text-slate-600' : 'text-slate-900'}`}>{note.title}</h4>
@@ -2812,6 +2800,7 @@ export const JCIKLApp: React.FC = () => {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMenuDrawerOpen, setIsMenuDrawerOpen] = useState(false);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
@@ -2838,6 +2827,7 @@ export const JCIKLApp: React.FC = () => {
   const location = useLocation();
 
   const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const { user, member, loading: authLoading, signOut, simulatedRole, simulateRole, isDevMode } = useAuth();
   const { showToast } = useToast();
@@ -2872,6 +2862,24 @@ export const JCIKLApp: React.FC = () => {
   const { notifications, markNotificationAsRead } = useCommunication();
   const { members } = useMembers();
 
+  // FCM push notification registration
+  React.useEffect(() => {
+    if (!user?.uid) return;
+    registerPushNotifications(user.uid);
+    const unsubscribe = onForegroundMessage(({ title, body }) => {
+      showToast(`${title}: ${body}`, 'info');
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.uid]);
+
+  // Unregister FCM token on logout
+  const handleSignOut = React.useCallback(async () => {
+    if (user?.uid) await unregisterPushNotifications(user.uid);
+    signOut();
+  }, [user?.uid, signOut]);
+
   // Generate birthday notifications
   const birthdayNotifications: Notification[] = React.useMemo(() => {
     if (!members.length) return [];
@@ -2888,7 +2896,7 @@ export const JCIKLApp: React.FC = () => {
       })
       .map(m => ({
         id: `birthday-${m.id}-${today.toISOString().split('T')[0]}`,
-        title: `🎂 Member Birthday Today!`,
+        title: `ðŸŽ‚ Member Birthday Today!`,
         message: `It's ${m.name}'s birthday today! Let's send them some warm wishes.`,
         type: 'info' as const,
         read: false,
@@ -2957,7 +2965,6 @@ export const JCIKLApp: React.FC = () => {
       ACTIVITY_PLANS: 'Activity Plans',
       REPORTS: 'Reports',
       DEVELOPER: 'Developer Interface',
-      BOUNTIES: 'Bounty Marketplace',
       WHAPI_CONFIG: 'Whapi Configuration',
     };
     const pageTitle = titles[view] ?? 'JCI LO Management';
@@ -3063,7 +3070,7 @@ export const JCIKLApp: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      await handleSignOut();
       localStorage.removeItem('jc_last_view'); // Clear persisted view on logout
       navigate('/', { replace: true });
       setView('GUEST');
@@ -3179,45 +3186,44 @@ export const JCIKLApp: React.FC = () => {
   // Note: Cannot use hooks inside this function - use values from component scope
   const renderCurrentView = (scrollRef?: React.RefObject<HTMLDivElement>) => {
     switch (view) {
-      case 'BOUNTIES': return <BountyMarketplaceView />;
       case 'MEMBERS': return <MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />;
       case 'ACTIVITIES': return <ActivityPlansView searchQuery={searchQuery} />;
       case 'PROJECTS':
         if (!canViewEventsManagement) {
-          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
         }
         return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
       case 'FLAGSHIP_PROJECTS_MGT':
-        if (!canViewEventsManagement) {
-          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+        if (!canViewEventsManagement || isPlainMember) {
+          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
         }
         return <FlagshipProjectsManagementView searchQuery={searchQuery} />;
       case 'EVENTS': return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
-      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
-      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
-      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
+      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />;
-      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+      case 'AUTOMATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <AutomationStudio /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
       case 'COMMUNICATION': return <CommunicationView searchQuery={searchQuery} />;
       case 'CLUBS': return <HobbyClubsView searchQuery={searchQuery} />;
       case 'SURVEYS': return <SurveysView searchQuery={searchQuery} />;
       case 'BENEFITS': return <MemberBenefitsView searchQuery={searchQuery} />;
-      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
-      case 'RADAR_IMPORTER': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <RadarDataImporter />;
-      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
-      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
-      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
+      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
+      case 'RADAR_IMPORTER': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <RadarDataImporter />;
+      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
+      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
+      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
       case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
-      case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
+      case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
       case 'TOYYIB': return <ToyyibView />;
       case 'CANVA': return <CanvaView />;
       case 'WHAPI_CONFIG': return <WhapiConfigView />;
       case 'MEMBERSHIP_CONFIG': return <MembershipConfigView />;
       case 'ACCESS_CONFIG': return <AccessConfigView />;
-      case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onOpenNotifications={() => setNotificationDrawerOpen(true)} onNavigate={handleViewChange} onEditProfile={handleEditProfile} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
+      case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
       default:
         // Show dashboard home for all users
         // Use isBoard and isAdmin from component scope (already fetched at top level)
@@ -3227,16 +3233,13 @@ export const JCIKLApp: React.FC = () => {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             scrollRef={scrollRef}
-            onOpenNotifications={() => setNotificationDrawerOpen(true)}
-            onOpenSearch={() => setSearchDrawerOpen(true)}
+           
+           
           />;
         }
         return <DashboardHome
           userRole={(member?.role as UserRole) || UserRole.MEMBER}
-          onOpenNotifications={() => setNotificationDrawerOpen(true)}
-          onOpenSearch={() => setSearchDrawerOpen(true)}
           onNavigate={handleViewChange}
-          onEditProfile={handleEditProfile}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           scrollRef={scrollRef}
@@ -3303,13 +3306,7 @@ export const JCIKLApp: React.FC = () => {
                 onClick={() => { handleViewChange('DASHBOARD'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
-              <SidebarItem
-                icon={<Target size={18} className="text-orange-500" />}
-                label="Marketplace"
-                isActive={view === 'BOUNTIES'}
-                onClick={() => { handleViewChange('BOUNTIES'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
+
               {canAccessWorkspaceModules && (
                 <SidebarItem
                   icon={<Users size={18} />}
@@ -3381,13 +3378,15 @@ export const JCIKLApp: React.FC = () => {
                         onClick={() => { handleViewChange('PROJECTS'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
-                      <SidebarItem
-                        icon={<Briefcase size={18} />}
-                        label="Flagship Projects Mgt"
-                        isActive={view === 'FLAGSHIP_PROJECTS_MGT'}
-                        onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
+                      {!isPlainMember && (
+                        <SidebarItem
+                          icon={<Briefcase size={18} />}
+                          label="Flagship Projects Mgt"
+                          isActive={view === 'FLAGSHIP_PROJECTS_MGT'}
+                          onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setIsSidebarOpen(false); }}
+                          isCollapsed={isSidebarCollapsed}
+                        />
+                      )}
                     </>
                   )}
                   <SidebarItem
@@ -3568,12 +3567,12 @@ export const JCIKLApp: React.FC = () => {
         {/* Main Content */}
         <main id="main-content" className="flex-1 flex flex-col min-w-0 h-full overflow-hidden" tabIndex={-1} role="main">
           <h1 className="sr-only">
-            {view === 'DASHBOARD' ? 'Dashboard' : view === 'BOUNTIES' ? 'Bounty Marketplace' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
+            {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 
           {/* Global Persistent Header - Always visible, not affected by scrolling */}
-          {view !== 'DASHBOARD' && member && (
+          {member && (
             <div className="z-[50] bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-4 pb-4 px-5 sm:px-8 text-white shadow-2xl relative overflow-hidden">
               {/* Decorative Background Pattern */}
               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
@@ -3700,7 +3699,7 @@ export const JCIKLApp: React.FC = () => {
             </section>
             <section>
               <h3 className="font-semibold text-slate-900 mb-2">Payment request flow</h3>
-              <p>Go to Payment Requests → Submit request (purpose, amount, activity) → System generates reference number → Finance reviews (Approve/Reject) → Applicant can check status under My Applications.</p>
+              <p>Go to Payment Requests â†’ Submit request (purpose, amount, activity) â†’ System generates reference number â†’ Finance reviews (Approve/Reject) â†’ Applicant can check status under My Applications.</p>
             </section>
             <section>
               <h3 className="font-semibold text-slate-900 mb-2">Member profile lookup</h3>
@@ -3708,7 +3707,7 @@ export const JCIKLApp: React.FC = () => {
             </section>
             <section>
               <h3 className="font-semibold text-slate-900 mb-2">Reconciliation</h3>
-              <p>Under Finances → Reconciliation, search by reference number to find transactions and payment requests. Match bank entries with business records, then mark as reconciled and keep an audit trail.</p>
+              <p>Under Finances â†’ Reconciliation, search by reference number to find transactions and payment requests. Match bank entries with business records, then mark as reconciled and keep an audit trail.</p>
             </section>
             <section>
               <h3 className="font-semibold text-slate-900 mb-2">Member data export and migration</h3>
@@ -3721,7 +3720,7 @@ export const JCIKLApp: React.FC = () => {
                 <div className="mb-4">
                   <h4 className="text-slate-700 font-medium mb-2">Lead list (for follow-up and outreach)</h4>
                   {leadListLoading ? (
-                    <p className="text-slate-500 text-sm">Loading…</p>
+                    <p className="text-slate-500 text-sm">Loadingâ€¦</p>
                   ) : leadList.length === 0 ? (
                     <p className="text-slate-500 text-sm">No leads yet</p>
                   ) : (
@@ -3741,9 +3740,9 @@ export const JCIKLApp: React.FC = () => {
                             <tr key={l.id} className="border-t border-slate-100">
                               <td className="p-2">{l.name}</td>
                               <td className="p-2">{l.email}</td>
-                              <td className="p-2">{l.phone ?? '—'}</td>
-                              <td className="p-2">{(l.interests ?? []).join(', ') || '—'}</td>
-                              <td className="p-2">{l.createdAt?.slice(0, 10) ?? '—'}</td>
+                              <td className="p-2">{l.phone ?? 'â€”'}</td>
+                              <td className="p-2">{(l.interests ?? []).join(', ') || 'â€”'}</td>
+                              <td className="p-2">{l.createdAt?.slice(0, 10) ?? 'â€”'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -3770,7 +3769,7 @@ export const JCIKLApp: React.FC = () => {
                         name: leadName.trim(),
                         email: leadEmail.trim(),
                         phone: leadPhone.trim() || null,
-                        interests: leadInterests.trim() ? leadInterests.trim().split(/[,，]/).map((s) => s.trim()).filter(Boolean) : null,
+                        interests: leadInterests.trim() ? leadInterests.trim().split(/[,ï¼Œ]/).map((s) => s.trim()).filter(Boolean) : null,
                         source: 'help_modal',
                         loId: (member as { loId?: string })?.loId ?? DEFAULT_LO_ID,
                       });
@@ -3790,7 +3789,7 @@ export const JCIKLApp: React.FC = () => {
                     <Forms.Input label="Interests (comma-separated)" value={leadInterests} onChange={(e) => setLeadInterests(e.target.value)} placeholder="e.g. training, networking, leadership" />
                   </div>
                   <div className="sm:col-span-2">
-                    <Button type="submit" disabled={leadFormSubmitting}>{leadFormSubmitting ? 'Submitting…' : 'Submit lead'}</Button>
+                    <Button type="submit" disabled={leadFormSubmitting}>{leadFormSubmitting ? 'Submittingâ€¦' : 'Submit lead'}</Button>
                   </div>
                 </form>
               )}
@@ -3814,6 +3813,7 @@ export const JCIKLApp: React.FC = () => {
       {/* Floating Bottom Navigation Bar (Mobile) */}
       {
         (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
+          <>
           <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
             <button
               onClick={() => handleViewChange('DASHBOARD')}
@@ -3824,18 +3824,7 @@ export const JCIKLApp: React.FC = () => {
               </div>
               <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
             </button>
-            <button
-              onClick={() => {
-                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                else handleViewChange('PAYMENT_REQUESTS');
-              }}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'PAYMENT_REQUESTS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <FileText size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'PAYMENT_REQUESTS' ? 'text-jci-blue' : 'text-slate-400'}`}>Claim</span>
-            </button>
+
             <button
               onClick={() => {
                 if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
@@ -3860,16 +3849,57 @@ export const JCIKLApp: React.FC = () => {
               </div>
               <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
             </button>
+
             <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] text-slate-400"
+              onClick={() => setShowMobileMenu(true)}
+              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}
             >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${isBoard || isAdmin || isDeveloper ? 'bg-white/5' : ''}`}>
+              <div className={`p-2 rounded-2xl transition-all duration-300 ${showMobileMenu ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
                 <Menu size={20} />
               </div>
-              <span className="text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 text-slate-400">Menu</span>
+              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}>Menu</span>
             </button>
           </div>
+
+          {/* Mobile Menu Bottom Drawer */}
+          {showMobileMenu && (
+            <div className="md:hidden fixed inset-0 z-[60]" onClick={() => setShowMobileMenu(false)}>
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+              <div
+                className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-10 pt-4 shadow-2xl`}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className={`w-10 h-1 rounded-full mx-auto mb-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => { handleViewChange('KNOWLEDGE'); setShowMobileMenu(false); }}
+                    className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 ${view === 'KNOWLEDGE' ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-slate-800 text-slate-200 active:bg-slate-700' : 'bg-slate-50 text-slate-700 active:bg-slate-100')}`}
+                  >
+                    <BookOpen size={20} />
+                    <span className="font-semibold text-sm">Knowledge</span>
+                  </button>
+                  {canViewEventsManagement && (
+                    <button
+                      onClick={() => { handleViewChange('PROJECTS'); setShowMobileMenu(false); }}
+                      className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 ${view === 'PROJECTS' ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-slate-800 text-slate-200 active:bg-slate-700' : 'bg-slate-50 text-slate-700 active:bg-slate-100')}`}
+                    >
+                      <FolderKanban size={20} />
+                      <span className="font-semibold text-sm">Event Management</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { handleViewChange('SURVEYS'); setShowMobileMenu(false); }}
+                    className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 ${view === 'SURVEYS' ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-slate-800 text-slate-200 active:bg-slate-700' : 'bg-slate-50 text-slate-700 active:bg-slate-100')}`}
+                  >
+                    <CheckSquare size={20} />
+                    <span className="font-semibold text-sm">Survey</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          </>
         )
       }
 

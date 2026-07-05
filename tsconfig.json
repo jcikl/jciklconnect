@@ -48,6 +48,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    ".git"
+    ".git",
+    "temp.tsx"
   ]
 }

@@ -1,7 +1,7 @@
 // Gamification Properties Test - Property-Based Testing for Achievement System
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fc from 'fast-check';
-import { AchievementService } from '../../services/achievementService';
+import { GamificationService as AchievementService } from '../../services/gamificationService';
 import { Achievement, AchievementMilestone, MemberAchievementProgress, Member } from '../../types';
 
 // Mock Firebase

@@ -9,10 +9,11 @@ import {
   computeMembershipTypeFromMember,
 } from '../../services/membershipConfigService';
 import { MembershipTypeDisplay } from '../shared/MembershipTypeDisplay';
+import { deleteFromCloudinary, uploadMemberAvatarToCloudinary } from '../../services/cloudinaryService';
 
 interface MemberEditFormProps {
   member: Member;
-  onSubmit: (updates: Partial<Member>) => void;
+  onSubmit: (updates: Partial<Member>) => void | Promise<void>;
   onCancel: () => void;
   /** When true (member/guest self-edit), only Contact + Apparel tabs, submit restricted to MEMBER_SELF_EDITABLE_FIELDS */
   selfEditableOnly?: boolean;
@@ -40,6 +41,7 @@ function initFormValues(member: Member) {
     nationality: member.nationality || 'Malaysia',
     introducer: member.introducer || '',
     bio: member.bio || '',
+    avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
     hobbies: Array.isArray(member.hobbies) ? member.hobbies : (member.hobbies ? [member.hobbies] : []),
     skills: Array.isArray(member.skills) ? member.skills.join(', ') : (member.skills || ''),
 
@@ -100,6 +102,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   );
   const [formValues, setFormValues] = useState(() => initFormValues(member));
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
 
   useEffect(() => {
     if (initialTab) {
@@ -145,7 +149,38 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     });
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const currentAvatar = formValues.avatar;
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      window.alert('Please upload an image file.');
+      return;
+    }
+
+    setAvatarUploading(true);
+    setAvatarUploadProgress(0);
+    try {
+      const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
+      handleChange('avatar', uploadedUrl);
+    } catch (err) {
+      console.error('Failed to upload member avatar:', err);
+      window.alert(err instanceof Error ? err.message : 'Failed to upload avatar.');
+    } finally {
+      setAvatarUploading(false);
+      setAvatarUploadProgress(0);
+    }
+  };
+
+  const handleAvatarDelete = () => {
+    if (!currentAvatar) return;
+    handleChange('avatar', '');
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const skillsArr = (formValues.skills || '')
@@ -177,6 +212,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
 
     const updates: Partial<Member> = {
       name: formValues.name || member.name,
+      avatar: formValues.avatar || '',
+      avatarUrl: formValues.avatar || '',
       email: formValues.email || member.email,
       phone: formValues.phone || undefined,
       introducer: formValues.introducer || undefined,
@@ -247,12 +284,21 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     const filteredUpdates = selfEditableOnly
       ? (Object.fromEntries(
         Object.entries(updates).filter(([k]) =>
-          (MEMBER_SELF_EDITABLE_FIELDS as readonly string[]).includes(k)
+          (MEMBER_SELF_EDITABLE_FIELDS as readonly string[]).includes(k) ||
+          k === 'avatar' ||
+          k === 'avatarUrl'
         )
       ) as Partial<Member>)
       : updates;
 
-    onSubmit(filteredUpdates);
+    await onSubmit(filteredUpdates);
+
+    const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+    if (originalAvatar && originalAvatar !== formValues.avatar) {
+      deleteFromCloudinary(originalAvatar).catch((err) => {
+        console.error('Failed to delete previous member avatar from Cloudinary:', err);
+      });
+    }
   };
 
   return (
@@ -279,6 +325,37 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 md:pr-2 py-4 md:py-6">
         {activeTab === 'basic' && (
           <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-slate-200 shadow-sm shrink-0">
+                {currentAvatar ? (
+                  <img src={currentAvatar} alt={formValues.name || member.name || 'Member avatar'} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xl font-black text-jci-blue bg-blue-50">
+                    {(formValues.name || member.name || 'M').charAt(0)}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-900">Member Avatar</p>
+                <p className="text-xs text-slate-500 mt-0.5">Upload a square profile photo for member directory, dashboard, and public board display.</p>
+                {avatarUploading && (
+                  <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                    <div className="h-full bg-jci-blue transition-all" style={{ width: `${avatarUploadProgress}%` }} />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                <label className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-bold transition-colors ${avatarUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-jci-blue text-white hover:bg-jci-navy cursor-pointer'}`}>
+                  {avatarUploading ? 'Uploading...' : 'Upload Photo'}
+                  <input type="file" accept="image/*" className="hidden" disabled={avatarUploading} onChange={handleAvatarUpload} />
+                </label>
+                {currentAvatar && (
+                  <Button type="button" variant="outline" onClick={handleAvatarDelete} disabled={avatarUploading} className="text-red-600 border-red-200 hover:bg-red-50">
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
               <div className="flex flex-row items-center gap-3">
                 <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Name<span className="text-red-500 ml-1">*</span></label>

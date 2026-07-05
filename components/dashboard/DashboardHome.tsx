@@ -1,17 +1,16 @@
 // Member Dashboard Home Component
 import React from 'react';
 import {
-  Calendar, Briefcase, Bell, Award, Sparkles, AlertTriangle, CheckCircle,
+  Calendar, Briefcase, Award, Sparkles, AlertTriangle, CheckCircle,
   TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
-  CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift, ChevronDown, Search, LogOut,
-  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, Save, RefreshCw, Edit3, Shield
+  CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift,
+  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, Save, RefreshCw
 } from 'lucide-react';
 import { Card, StatCard, StatCardsContainer, Badge, Button, useToast } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useEvents } from '../../hooks/useEvents';
 import { useProjects } from '../../hooks/useProjects';
-import { useCommunication } from '../../hooks/useCommunication';
 import { usePoints } from '../../hooks/usePoints';
 import { useMembers } from '../../hooks/useMembers';
 import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
@@ -27,7 +26,7 @@ import { MembersService } from '../../services/membersService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 import type { Event, MemberPromotionProgress } from '../../types';
 import { UserRole } from '../../types';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
 import { useState, useEffect, useRef } from 'react';
@@ -125,10 +124,7 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
 
 interface DashboardHomeProps {
   userRole: import('../../types').UserRole;
-  onOpenNotifications: () => void;
-  onOpenSearch?: () => void;
   onNavigate?: (view: string) => void;
-  onEditProfile?: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
@@ -136,38 +132,19 @@ interface DashboardHomeProps {
 
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
   userRole,
-  onOpenNotifications,
-  onOpenSearch,
   onNavigate,
-  onEditProfile,
   searchQuery,
   onSearchChange,
   scrollRef
 }) => {
-  const { scrollY } = useScroll({ container: scrollRef });
-
-  // Transform Greeting: Move left and fade out via vertical mask
-  const greetingX = useTransform(scrollY, [0, 120], [0, 0]);
-  const greetingOpacity = useTransform(scrollY, [0, 120], [1, 0]);
-
-  // Mask wipe effect: as we scroll, the mask moves down
-  const maskProgress = useTransform(scrollY, [0, 120], [0, 100]);
-  const greetingMask = useTransform(maskProgress, (p) =>
-    `linear-gradient(to top, transparent ${p}%, black ${p}%)`
-  );
-
-  // Transform Search Bar: Move up to dock with Top Row
-  const headerY = useTransform(scrollY, [0, 120], [0, -150]);
-  const counterY = useTransform(headerY, (y) => -Number(y));
 
   const { showToast } = useToast();
-  const { member, signOut, isDevMode, simulatedRole, simulateRole } = useAuth();
+  const { member, isDevMode, simulatedRole, simulateRole } = useAuth();
   const { isBoard, isAdmin, isDeveloper, hasPermission, isOrganizationFinance, isActivityFinance, isOrganizationSecretary } = usePermissions();
   const { events, loading: eventsLoading, registerForEvent, markAttendance } = useEvents();
   const { projects, loading: projectsLoading } = useProjects();
   const { members, loading: membersLoading } = useMembers();
   const { nudges, dismissNudge } = useBehavioralNudging();
-  const { notifications } = useCommunication();
   const { leaderboard, pointHistory } = usePoints();
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
@@ -180,20 +157,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [contracts, setContracts] = useState<CommitmentContract[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  const roleDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Click outside to close role dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) {
-        setIsRoleDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   // Promotion Progress state (for Probation members)
   const [promotionProgress, setPromotionProgress] = useState<any>(null);
   const [promoEditValues, setPromoEditValues] = useState<Record<string, string>>({});
@@ -360,8 +323,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status !== 'Cancelled');
   const myProjects = projects.filter(p => p.lead === member?.id);
   const pendingTasks = myProjects.length; // Simplified - would need to fetch tasks
-  const unreadNotifications = notifications.filter(n => !n.read);
-
   // Guest: only events this member has registered for
   const myRegisteredEvents = events.filter((e) => myRegistrationEventIds.includes(e.id));
   const pastRegisteredEvents = myRegisteredEvents
@@ -382,196 +343,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     return <div className="text-center py-10 text-slate-400">Loading member data...</div>;
   }
 
-  const renderHeader = () => (
-    <div
-      className="sticky top-[-10rem] z-30 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] px-5 sm:px-8 text-white shadow-2xl relative -mt-4 -mx-5 sm:-mx-8 pb-4"
-    >
-      {/* Decorative Background Pattern */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-b-[40px]">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-      </div>
-
-      {/* Top Row: Fixed/Docked Area */}
-      <div className="sticky top-[0rem] z-20 pb-2">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="relative group">
-              <img
-                src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
-                alt="Avatar"
-                className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
-              />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
-            </div>
-            <div className="cursor-pointer group" onClick={onEditProfile}>
-              <div className="flex items-center gap-1.5 text-blue-100 text-lg font-bold opacity-80 group-hover:opacity-100 transition-opacity">
-                <span>{member.name}</span>
-                <Edit3 size={14} className="text-white/50 group-hover:text-white transition-colors" />
-              </div>
-              <p className="font-medium text-sm tracking-wide text-blue-200">{member.role}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-1">
-            {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
-              <div className="relative mr-2" ref={roleDropdownRef}>
-                <button
-                  onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                  className="flex items-center bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/20 rounded-xl px-2.5 py-1 transition-all text-white text-[11px] font-bold shadow-sm h-[26px]"
-                  title="Simulate Role"
-                >
-                  <Shield size={12} className="text-purple-300 mr-1.5 shrink-0" />
-                  <span className="mr-1">{simulatedRole ? simulatedRole.charAt(0).toUpperCase() + simulatedRole.slice(1) : 'Dev/Admin'}</span>
-                  <ChevronDown size={11} className={`text-white/70 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {isRoleDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute right-0 mt-1.5 w-36 rounded-xl bg-slate-900/95 backdrop-blur-xl border border-white/10 shadow-2xl p-1 z-50 origin-top-right text-slate-200"
-                    >
-                      {[
-                        { value: '', label: 'Dev/Admin', desc: 'Default system' },
-                        { value: UserRole.ADMIN, label: 'Admin', desc: 'Full administration' },
-                        { value: UserRole.MEMBER, label: 'Member', desc: 'Standard member' },
-                        { value: UserRole.GUEST, label: 'Guest', desc: 'Limited guest view' }
-                      ].map((option) => {
-                        const isSelected = (simulatedRole || '') === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            onClick={() => {
-                              const val = option.value;
-                              simulateRole(val ? val as UserRole : null);
-                              showToast(val ? `Simulating ${val} role` : 'Reset to Admin role', 'info');
-                              setIsRoleDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-all flex flex-col gap-0.5 ${
-                              isSelected
-                                ? 'bg-gradient-to-r from-jci-blue to-sky-500 text-white font-extrabold shadow-md shadow-jci-blue/20'
-                                : 'hover:bg-white/10 text-slate-300 hover:text-white'
-                            }`}
-                          >
-                            <span className="text-[10px] font-bold leading-none">{option.label}</span>
-                            <span className={`text-[8px] leading-tight ${isSelected ? 'text-blue-100/90' : 'text-slate-500 hover:text-slate-400'}`}>
-                              {option.desc}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            <button
-              onClick={onOpenSearch}
-              className="p-0 text-white/70 hover:text-white transition-all group"
-              title="Search"
-            >
-              <Search size={20} className="group-hover:scale-110 transition-transform" />
-            </button>
-
-            <button
-              onClick={onOpenNotifications}
-              className="relative p-0 text-white/70 hover:text-white transition-all group"
-              title="Notifications"
-            >
-              <Bell size={20} className="group-hover:rotate-12 transition-transform" />
-              {unreadNotifications.length > 0 && (
-                <span className="absolute top-0 right-0 min-w-[16px] h-[16px] bg-red-500 rounded-full text-[9px] flex items-center justify-center font-black">
-                  {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={async () => {
-                try {
-                  await signOut();
-                  showToast('Logged out successfully', 'success');
-                } catch (error) {
-                  showToast('Failed to logout', 'error');
-                }
-              }}
-              className="p-0 text-white/70 hover:text-red-400 transition-all group"
-              title="Sign Out"
-            >
-              <LogOut size={20} className="group-hover:scale-110 transition-transform" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Dynamic Animation Area */}
-      <div className="relative pt-5">
-        <motion.div
-          style={{
-            y: counterY,
-            x: greetingX,
-            opacity: greetingOpacity,
-            maskImage: greetingMask,
-            WebkitMaskImage: greetingMask
-          }}
-          className="space-y-3 mb-4"
-        >
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
-            What would you <br /> prefer to do today?
-          </h2>
-          {topRecommendation ? (
-            <div
-              className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
-              onClick={() => {
-                if (topRecommendation.type === 'event') {
-                  const event = events.find(e => e.id === topRecommendation.itemId);
-                  if (event) {
-                    setSelectedEventForDetail(event);
-                    return;
-                  }
-                }
-                if (topRecommendation.actionUrl) {
-                  const view = topRecommendation.actionUrl.replace('/', '').toUpperCase();
-                  onNavigate?.(view);
-                }
-              }}
-            >
-              <Sparkles size={16} className="text-yellow-400 animate-pulse" />
-              <p className="text-sm font-medium text-blue-50">
-                AI Suggests: <span className="underline decoration-yellow-400/50 underline-offset-4">{topRecommendation.itemName}</span>
-              </p>
-            </div>
-          ) : nudges.length > 0 ? (
-            <div
-              className="flex items-center space-x-2 bg-white/5 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/10 inline-flex cursor-pointer hover:bg-white/10 transition-all shadow-sm"
-              onClick={() => {
-                if (nudges[0].actionUrl) {
-                  const view = nudges[0].actionUrl.replace('/', '').toUpperCase();
-                  onNavigate?.(view);
-                }
-              }}
-            >
-              <Zap size={16} className="text-amber-400 animate-pulse" />
-              <p className="text-sm font-medium text-blue-50">
-                {nudges[0].title}
-              </p>
-            </div>
-          ) : (
-            <p className="text-blue-100/70 font-medium">Ready to make an impact? Check out the latest.</p>
-          )}
-        </motion.div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
-      {renderHeader()}
 
       {/* Homepage Advertisements Banner (Swiper) */}
       {homepageAds.length > 0 && (
@@ -579,14 +352,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <Swiper
             modules={[Autoplay, Pagination]}
             spaceBetween={16}
-            slidesPerView={1.15}
+            slidesPerView={1.65}
             breakpoints={{
               640: { slidesPerView: 3.15 },
               1024: { slidesPerView: 4.15 },
             }}
-            autoplay={{ delay: 5000, disableOnInteraction: false }}
+            autoplay={{ delay: 3000, disableOnInteraction: false }}
             pagination={{ clickable: true, dynamicBullets: true }}
-            loop={homepageAds.length > 5}
+            loop={homepageAds.length > 1}
             className="w-full"
             onSlideChange={(swiper) => {
               if (homepageAds.length > 0) {
@@ -625,24 +398,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       )}
 
       {/* Horizontal Shortcuts Grid */}
-      <div className="grid grid-cols-6 sm:grid-cols-6 gap-y-6 gap-x-4">
+      <div className="grid grid-cols-4 sm:grid-cols-4 gap-y-6 gap-x-4">
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('PROJECTS')}>
           <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-green-50 text-green-600 border-green-100 group-hover:bg-green-100'}`}>
             <Briefcase size={24} />
           </div>
           <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>My Projects</span>
-        </div>
-        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('MEMBERS')}>
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-purple-50 text-purple-600 border-purple-100 group-hover:bg-purple-100'}`}>
-            <Users size={24} />
-          </div>
-          <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>Find Mentor</span>
-        </div>
-        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => handleRestrictedAction('GAMIFICATION')}>
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors shadow-sm ${member.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-100'}`}>
-            <Target size={24} />
-          </div>
-          <span className={`text-[10px] sm:text-xs font-medium text-center ${member.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>Set Goals</span>
         </div>
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => onNavigate?.('SURVEYS')}>
           <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 group-hover:bg-rose-100 transition-colors shadow-sm">
@@ -702,98 +463,172 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         </div>
       )}
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card noPadding>
-          <div className="px-6 pt-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900">Events</h3>
-              <button
-                onClick={() => onNavigate?.('EVENTS')}
-                className="text-xs font-black text-jci-blue uppercase tracking-widest hover:opacity-70 transition-opacity"
-              >
-                View All
-              </button>
+      {/* Birthday This Month */}
+      {(() => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentDay = now.getDate();
+        const getDob = (m: any): string | undefined =>
+          m.general?.dob || m.dob || m.dateOfBirth;
+        const birthdayMembers = members
+          .filter(m => {
+            const dob = getDob(m);
+            if (!dob) return false;
+            const d = new Date(dob);
+            return d.getMonth() === currentMonth;
+          })
+          .sort((a, b) => {
+            const da = new Date(getDob(a)!);
+            const db = new Date(getDob(b)!);
+            return da.getDate() - db.getDate();
+          });
+        if (birthdayMembers.length === 0) return null;
+        return (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">🎂</span>
+              <h3 className="font-bold text-slate-900">Birthdays This Month</h3>
+              <span className="text-xs text-slate-400 font-medium">{now.toLocaleString('default', { month: 'long' })}</span>
+            </div>
+            <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
+              {birthdayMembers.map(m => {
+                const dob = new Date(getDob(m)!);
+                const day = dob.getDate();
+                const isToday = day === currentDay;
+                return (
+                  <div
+                    key={m.id}
+                    className={`flex-none snap-start flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all w-24 text-center ${isToday ? 'bg-gradient-to-b from-yellow-50 to-orange-50 border-orange-200 shadow-md' : 'bg-white border-slate-100 shadow-sm'}`}
+                  >
+                    <div className="relative">
+                      <img
+                        src={m.general?.avatarUrl || m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.general?.name || m.name || '')}&background=e0f2fe&color=0097D7`}
+                        alt={m.general?.name || m.name}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
+                      />
+                      {isToday && (
+                        <span className="absolute -top-1 -right-1 text-sm">🎉</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 leading-tight line-clamp-1">{m.general?.name || m.name}</p>
+                      <p className={`text-[10px] font-bold mt-0.5 ${isToday ? 'text-orange-500' : 'text-slate-400'}`}>
+                        {isToday ? 'Today! 🎂' : `${dob.toLocaleString('default', { month: 'short' })} ${day}`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <div className="px-6 pb-6">
-            {eventsLoading ? (
-              <div className="text-center py-8 text-slate-400 text-sm">Loading events...</div>
-            ) : (eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length === 0 ? (
-              <div className="text-center py-8 text-slate-400 font-medium">
-                <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">No {eventTab} events</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date()))
-                  .sort((a, b) => eventTab === 'upcoming' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .slice(0, 5)
-                  .map(event => {
-                    const isRecommended = recommendedEvents.some(re => re.id === event.id);
-                    const isRegistered = myRegistrationEventIds.includes(event.id!);
-                    return (
-                      <div key={event.id} className="flex items-center space-x-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors" onClick={() => setSelectedEventForDetail(event)}>
-                        <div className={`w-12 h-12 ${eventTab === 'upcoming' ? 'bg-blue-50 text-jci-blue' : 'bg-slate-100 text-slate-500'} rounded-lg flex flex-col items-center justify-center flex-shrink-0 shadow-sm border border-slate-100`}>
-                          <span className="text-[10px] font-bold uppercase">{new Date(event.date).toLocaleString('default', { month: 'short' })}</span>
-                          <span className="text-lg font-bold leading-none">{new Date(event.date).getDate()}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-bold text-slate-900 truncate">{event.title}</h4>
-                            {isRecommended && <Badge variant="jci" className="bg-purple-100 text-purple-600 border-none px-1.5 py-0 text-[10px]">Recommended</Badge>}
+        );
+      })()}
+
+      {/* Main Content Grid */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-3">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-slate-900">Events</h3>
+            <button
+              onClick={() => onNavigate?.('EVENTS')}
+              className="text-xs font-black text-jci-blue uppercase tracking-widest hover:opacity-70 transition-opacity"
+            >
+              View All
+            </button>
+          </div>
+          {eventsLoading ? (
+            <div className="text-center py-8 text-slate-400 text-sm">Loading events...</div>
+          ) : (eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length === 0 ? (
+            <div className="text-center py-8 text-slate-400 font-medium">
+              <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
+              <p className="text-sm">No {eventTab} events</p>
+            </div>
+          ) : (
+            <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 snap-x snap-mandatory">
+              {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date()))
+                .sort((a, b) => eventTab === 'upcoming' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 8)
+                .map(event => {
+                  const isRecommended = recommendedEvents.some(re => re.id === event.id);
+                  const isRegistered = myRegistrationEventIds.includes(event.id!);
+                  const date = new Date(event.date);
+                  const isUpcoming = eventTab === 'upcoming';
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex flex-col flex-none w-[60.6%] sm:w-auto rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer active:scale-[0.99] snap-start"
+                      onClick={() => setSelectedEventForDetail(event)}
+                    >
+                      {/* Poster */}
+                      <div className="relative w-full h-32 bg-gradient-to-br from-blue-50 to-slate-100 overflow-hidden flex-shrink-0">
+                        {event.imageUrl ? (
+                          <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                            <Calendar size={32} strokeWidth={1.5} />
+                            <span className="text-[10px] font-semibold mt-1 text-slate-400">No Poster</span>
                           </div>
-                          <p className="text-xs text-slate-500">{event.type} • {event.attendees} Attending</p>
+                        )}
+                        <div className="absolute top-2 left-2 flex items-center gap-1">
+                          <Badge variant="neutral" className="text-[9px] px-1.5 py-0.5 bg-white/90 backdrop-blur-sm shadow-sm border-0 text-slate-700">{event.type}</Badge>
+                          {event.predictedDemand === 'High' && isUpcoming && (
+                            <Badge variant="jci" className="text-[9px] px-1.5 py-0.5 bg-jci-blue/90 backdrop-blur-sm shadow-sm border-0 text-white">Hot</Badge>
+                          )}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          {isRegistered ? (
-                            <Badge variant="success" className="px-2 py-0.5 text-[10px]">Registered</Badge>
-                          ) : (
-                            eventTab === 'upcoming' && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 px-2" onClick={(e) => { e.stopPropagation(); setSelectedEventForDetail(event); }}>
-                                Register
-                              </Button>
-                            )
-                          )}
-                          {event.predictedDemand === 'High' && eventTab === 'upcoming' && (
-                            <Badge variant="jci" className="px-2 py-0.5 text-[10px]">Hot</Badge>
-                          )}
+                        <div className="absolute bottom-2 right-2 bg-white/95 backdrop-blur-sm rounded-xl px-2 py-1 shadow-sm text-center min-w-[36px]">
+                          <p className="text-[8px] font-black text-jci-blue uppercase tracking-widest leading-none">{date.toLocaleString('default', { month: 'short' })}</p>
+                          <p className="text-sm font-black text-slate-900 leading-tight">{date.getDate()}</p>
                         </div>
                       </div>
-                    );
-                  })}
-                {((eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length > 5 && onNavigate) && (
-                  <Button variant="ghost" className="w-full mt-2 text-sm text-jci-blue hover:bg-blue-50" onClick={() => onNavigate('EVENTS')}>
-                    View All {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length} Events
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </Card>
+                      {/* Info */}
+                      <div className="flex flex-col p-3 gap-1.5">
+                        <div className="flex items-start gap-1">
+                          <h4 className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug flex-1">{event.title}</h4>
+                          {isRecommended && <Badge variant="jci" className="bg-purple-100 text-purple-600 border-none px-1.5 py-0 text-[9px] flex-shrink-0">AI</Badge>}
+                        </div>
+                        <p className="text-[10px] text-slate-500">{event.attendees} Attending</p>
+                        {isUpcoming && (
+                          isRegistered ? (
+                            <Badge variant="success" className="mt-auto text-center text-[10px] py-1">Registered</Badge>
+                          ) : (
+                            <Button size="sm" variant="primary" className="mt-auto w-full text-xs" onClick={(e) => { e.stopPropagation(); setSelectedEventForDetail(event); }}>
+                              Register
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+          {((eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length > 8 && onNavigate) && (
+            <Button variant="ghost" className="w-full mt-3 text-sm text-jci-blue hover:bg-blue-50" onClick={() => onNavigate('EVENTS')}>
+              View All {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length} Events
+            </Button>
+          )}
+        </div>
 
         {member.role !== UserRole.GUEST && (
           <>
-            {/* LEADERBOARD (Wolf Heart) - Spanning 2 columns */}
-            <div className="lg:col-span-2">
+            {/* LEADERBOARD (Wolf Heart) - Spanning 2 or 3 columns depending on active commitments */}
+            <div className={contracts.filter(c => c.status === 'Active').length > 0 ? "lg:col-span-2" : "lg:col-span-3"}>
               <EliteLeaderboard members={leaderboard} currentUser={member} />
             </div>
 
-            {/* OPPORTUNITY DROPS (FOMO) */}
-            <Card className="bg-slate-50 border-2 border-dashed border-slate-200 hover:border-jci-blue hover:bg-white transition-all group overflow-hidden">
-              <div className="flex items-center justify-between p-1 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
-                    <Flame size={18} className="animate-bounce" />
+            {/* ACTIVE COMMITMENTS / BETS */}
+            {contracts.filter(c => c.status === 'Active').length > 0 && (
+              <Card className="bg-slate-50 border-2 border-slate-200 hover:bg-white transition-all group overflow-hidden">
+                <div className="flex items-center justify-between p-1 mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
+                      <Flame size={18} className="animate-bounce" />
+                    </div>
+                    <h3 className="font-extrabold text-slate-900 uppercase tracking-tight">Active Commitments</h3>
                   </div>
-                  <h3 className="font-extrabold text-slate-900 uppercase tracking-tight">Active Opportunity Drops</h3>
                 </div>
-                <Badge variant="jci" className="bg-red-500 text-white animate-pulse">SCARCE</Badge>
-              </div>
 
-              {/* NEW: Active Commitments (Phase 3) */}
-              {contracts.filter(c => c.status === 'Active').length > 0 && (
-                <div className="mb-4 space-y-3">
+                <div className="space-y-3">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Your Active Bets</p>
                   {contracts.filter(c => c.status === 'Active').map(c => (
                     <div key={c.id} className="p-4 bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_rgba(15,23,42,0.1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all">
@@ -805,7 +640,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       </div>
                       <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
                         <Clock size={12} />
-                        Ends: {new Date(c.deadline?.seconds * 1000).toLocaleDateString()}
+                        Ends: {c.deadline?.seconds ? new Date(c.deadline.seconds * 1000).toLocaleDateString() : 'N/A'}
                       </div>
                       <div className="mt-3 text-[10px] p-2 bg-red-50 text-red-700 rounded-lg border border-red-100 font-bold italic">
                         WARNING: Failure to prove completion will results in permanent loss of {c.stakedPoints} PTS.
@@ -813,42 +648,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     </div>
                   ))}
                 </div>
-              )}
-
-              <div className="space-y-3">
-                <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm relative group cursor-pointer hover:shadow-lg transition-all active:scale-[0.98]">
-                  <div className="absolute top-2 right-2 text-[10px] font-black text-red-500 flex items-center gap-1">
-                    <Timer size={12} />
-                    ENDING IN 4H
-                  </div>
-                  <h4 className="text-sm font-black text-slate-800">Exclusive 1V1 Business Mentoring with Regional HQ</h4>
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex -space-x-2">
-                        {[1, 2, 3].map(i => (
-                          <div key={i} className="w-5 h-5 rounded-full bg-slate-200 border border-white" />
-                        ))}
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Only 2 Slots Left</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-jci-blue">
-                      <span className="text-sm font-black italic">1,200</span>
-                      <Coins size={14} />
-                    </div>
-                  </div>
-                  <div className="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-orange-500 h-full w-[80%]" />
-                  </div>
-                </div>
-                <Button
-                  onClick={() => onNavigate?.('BOUNTIES')}
-                  className="w-full h-10 font-black uppercase text-xs tracking-widest gap-2 bg-slate-900 hover:bg-black"
-                >
-                  Enter Marketplace
-                  <ArrowUpRight size={14} />
-                </Button>
-              </div>
-            </Card>
+              </Card>
+            )}
 
 
 
