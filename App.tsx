@@ -3574,9 +3574,12 @@ export const JCIKLApp: React.FC = () => {
 
           {/* Global Persistent Header - Always visible, not affected by scrolling */}
           {member && (
-            <div className="z-[50] bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] pt-4 pb-4 px-5 sm:px-8 text-white shadow-2xl relative overflow-hidden">
-              {/* Decorative Background Pattern */}
-              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+            <div className="z-[50] text-white relative pt-4 pb-4 px-5 sm:px-8">
+              {/* Background with rounded corners, shadow, and overflow hidden */}
+              <div className="absolute inset-0 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] overflow-hidden z-0 shadow-2xl">
+                {/* Decorative Background Pattern */}
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+              </div>
 
               <div className="relative z-10 space-y-6 max-w-7xl mx-auto">
                 {/* Top Row: Avatar & Status | Notifications */}
