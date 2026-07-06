@@ -644,14 +644,14 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   }
 
   const TAB_CONFIG = [
-    { id: 'directory',          label: 'Directory',   short: 'Directory',  icon: Users },
-    { id: 'guest',              label: 'Guests',      short: 'Guests',     icon: UserCheck },
-    { id: 'statistics',         label: 'Statistics',  short: 'Stats',      icon: BarChart3 },
-    { id: 'board-of-directors', label: 'Board',       short: 'Board',      icon: Shield },
-    { id: 'mentorship',         label: 'Mentorship',  short: 'Mentors',    icon: BookOpen },
-    { id: 'promotion-tracking', label: 'Promotions',  short: 'Promotions', icon: TrendingUp },
-    { id: 'senatorship',        label: 'Senatorship', short: 'Senators',   icon: Trophy },
-    { id: 'introducer',         label: 'Introducer',  short: 'Introducers',icon: Network },
+    { id: 'directory', label: 'Directory', short: 'Directory', icon: Users },
+    { id: 'guest', label: 'Guests', short: 'Guests', icon: UserCheck },
+    { id: 'statistics', label: 'Statistics', short: 'Stats', icon: BarChart3 },
+    { id: 'board-of-directors', label: 'Board', short: 'Board', icon: Shield },
+    { id: 'mentorship', label: 'Mentorship', short: 'Mentors', icon: BookOpen },
+    { id: 'promotion-tracking', label: 'Promotions', short: 'Promotions', icon: TrendingUp },
+    { id: 'senatorship', label: 'Senatorship', short: 'Senators', icon: Trophy },
+    { id: 'introducer', label: 'Introducer', short: 'Introducers', icon: Network },
   ] as const;
 
   const activeTabConfig = TAB_CONFIG.find(t => t.id === activeTab) ?? TAB_CONFIG[0];
@@ -728,11 +728,10 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-t-xl text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-[1px] ${
-                    isActive
-                      ? 'text-jci-blue border-jci-blue bg-jci-blue/5'
-                      : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-50'
-                  }`}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-t-xl text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-[1px] ${isActive
+                    ? 'text-jci-blue border-jci-blue bg-jci-blue/5'
+                    : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-50'
+                    }`}
                 >
                   <Icon size={15} />
                   {tab.label}
@@ -792,77 +791,77 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           )}
 
           <div>
-              {activeTab === 'directory' && (
-                <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
-                  <MemberTable
-                    members={paginatedMembers}
-                    onSelect={setSelectedMemberId}
-                    selectedIds={selectedIds}
-                    onToggleSelection={toggleSelection}
-                    onToggleAll={toggleAll}
-                    isAllSelected={isAllSelected}
-                    roleFilters={roleFilters}
-                    onRoleFiltersChange={setRoleFilters}
-                    membershipTypeFilters={membershipTypeFilters}
-                    onMembershipTypeFiltersChange={setMembershipTypeFilters}
-                    getDisplayMembershipType={getMemberDisplayMembershipType}
-                  />
-                  {filteredMembers.length > 0 && (
-                    <div className="mt-4">
-                      <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={filteredMembers.length}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={setCurrentPage}
-                        onItemsPerPageChange={(newItemsPerPage) => {
-                          setItemsPerPage(newItemsPerPage);
-                          setCurrentPage(1);
-                        }}
-                      />
-                    </div>
-                  )}
-                </LoadingState>
-              )}
-
-              {activeTab === 'guest' && (
-                <GuestManagementView searchQuery={searchQuery} onSelect={setSelectedMemberId} />
-              )}
-
-              {activeTab === 'statistics' && (
-                <MemberStatisticsView statistics={statistics} loading={loadingStats} members={members} />
-              )}
-
-              {activeTab === 'board-of-directors' && (
-                <BoardOfDirectorsSection members={members} canManage={canManageMembers} />
-              )}
-
-              {activeTab === 'mentorship' && (
-                <MentorMatching searchQuery={searchQuery} />
-              )}
-
-              {activeTab === 'promotion-tracking' && (
-                <PromotionTracking searchQuery={searchQuery} />
-              )}
-
-              {activeTab === 'senatorship' && (
-                <SenatorshipManagement
-                  members={members}
-                  canValidate={canManageMembers}
-                  searchQuery={searchQuery}
-                  onMembersChanged={loadMembers}
+            {activeTab === 'directory' && (
+              <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
+                <MemberTable
+                  members={paginatedMembers}
+                  onSelect={setSelectedMemberId}
+                  selectedIds={selectedIds}
+                  onToggleSelection={toggleSelection}
+                  onToggleAll={toggleAll}
+                  isAllSelected={isAllSelected}
+                  roleFilters={roleFilters}
+                  onRoleFiltersChange={setRoleFilters}
+                  membershipTypeFilters={membershipTypeFilters}
+                  onMembershipTypeFiltersChange={setMembershipTypeFilters}
+                  getDisplayMembershipType={getMemberDisplayMembershipType}
                 />
-              )}
+                {filteredMembers.length > 0 && (
+                  <div className="mt-4">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={filteredMembers.length}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={(newItemsPerPage) => {
+                        setItemsPerPage(newItemsPerPage);
+                        setCurrentPage(1);
+                      }}
+                    />
+                  </div>
+                )}
+              </LoadingState>
+            )}
 
-              {activeTab === 'introducer' && (
-                <IntroducerManagement
-                  members={members}
-                  allProjects={allProjects}
-                  onUpdateMember={updateMember}
-                  onBatchUpdateMembers={batchUpdateMembers}
-                />
-              )}
-            </div>
+            {activeTab === 'guest' && (
+              <GuestManagementView searchQuery={searchQuery} onSelect={setSelectedMemberId} />
+            )}
+
+            {activeTab === 'statistics' && (
+              <MemberStatisticsView statistics={statistics} loading={loadingStats} members={members} />
+            )}
+
+            {activeTab === 'board-of-directors' && (
+              <BoardOfDirectorsSection members={members} canManage={canManageMembers} />
+            )}
+
+            {activeTab === 'mentorship' && (
+              <MentorMatching searchQuery={searchQuery} />
+            )}
+
+            {activeTab === 'promotion-tracking' && (
+              <PromotionTracking searchQuery={searchQuery} />
+            )}
+
+            {activeTab === 'senatorship' && (
+              <SenatorshipManagement
+                members={members}
+                canValidate={canManageMembers}
+                searchQuery={searchQuery}
+                onMembersChanged={loadMembers}
+              />
+            )}
+
+            {activeTab === 'introducer' && (
+              <IntroducerManagement
+                members={members}
+                allProjects={allProjects}
+                onUpdateMember={updateMember}
+                onBatchUpdateMembers={batchUpdateMembers}
+              />
+            )}
+          </div>
         </>
       ) : (
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} />
@@ -1392,14 +1391,14 @@ const MemberStatisticsView: React.FC<{
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* KPI Cards — 2×2 on mobile, 4-col on desktop */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Members',   value: statistics.totalMembers,       color: 'text-slate-900',  bg: 'bg-slate-100',  icon: Users },
-          { label: 'Active Members',  value: statistics.activeMembers,      color: 'text-green-600',  bg: 'bg-green-50',   icon: CheckCircle },
-          { label: 'New This Month',  value: statistics.newMembersThisMonth, color: 'text-jci-blue',  bg: 'bg-blue-50',    icon: UserPlus },
-          { label: 'Avg Points',      value: statistics.averagePoints,      color: 'text-amber-600',  bg: 'bg-amber-50',   icon: Star },
+          { label: 'Total Members', value: statistics.totalMembers, color: 'text-slate-900', bg: 'bg-slate-100', icon: Users },
+          { label: 'Active Members', value: statistics.activeMembers, color: 'text-green-600', bg: 'bg-green-50', icon: CheckCircle },
+          { label: 'New This Month', value: statistics.newMembersThisMonth, color: 'text-jci-blue', bg: 'bg-blue-50', icon: UserPlus },
+          { label: 'Avg Points', value: statistics.averagePoints, color: 'text-amber-600', bg: 'bg-amber-50', icon: Star },
         ].map(({ label, value, color, bg, icon: Icon }) => (
           <Card key={label}>
             <div className="flex items-start gap-3">
@@ -1419,24 +1418,24 @@ const MemberStatisticsView: React.FC<{
       <Card title="Member Engagement Overview">
         {(() => {
           const high = statistics.engagementMetrics.highlyEngaged;
-          const mod  = statistics.engagementMetrics.moderatelyEngaged;
-          const low  = statistics.engagementMetrics.lowEngaged;
+          const mod = statistics.engagementMetrics.moderatelyEngaged;
+          const low = statistics.engagementMetrics.lowEngaged;
           const total = high + mod + low || 1;
           const highPct = Math.round((high / total) * 100);
-          const modPct  = Math.round((mod  / total) * 100);
-          const lowPct  = 100 - highPct - modPct;
+          const modPct = Math.round((mod / total) * 100);
+          const lowPct = 100 - highPct - modPct;
           return (
             <div className="space-y-3">
               <div className="flex h-4 rounded-full overflow-hidden gap-0.5">
                 {highPct > 0 && <div className="bg-green-500 transition-all" style={{ width: `${highPct}%` }} />}
-                {modPct  > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${modPct}%` }} />}
-                {lowPct  > 0 && <div className="bg-red-400  transition-all" style={{ width: `${lowPct}%` }} />}
+                {modPct > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${modPct}%` }} />}
+                {lowPct > 0 && <div className="bg-red-400  transition-all" style={{ width: `${lowPct}%` }} />}
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: 'Highly Engaged',    value: high, pct: highPct, color: 'text-green-600', dot: 'bg-green-500', sub: '>80%' },
-                  { label: 'Moderately Engaged', value: mod,  pct: modPct,  color: 'text-amber-500', dot: 'bg-amber-400', sub: '50–80%' },
-                  { label: 'Low Engaged',        value: low,  pct: lowPct,  color: 'text-red-500',   dot: 'bg-red-400',   sub: '<50%' },
+                  { label: 'Highly Engaged', value: high, pct: highPct, color: 'text-green-600', dot: 'bg-green-500', sub: '>80%' },
+                  { label: 'Moderately Engaged', value: mod, pct: modPct, color: 'text-amber-500', dot: 'bg-amber-400', sub: '50–80%' },
+                  { label: 'Low Engaged', value: low, pct: lowPct, color: 'text-red-500', dot: 'bg-red-400', sub: '<50%' },
                 ].map(({ label, value, pct, color, dot, sub }) => (
                   <div key={label} className="text-center">
                     <div className={`text-2xl font-black ${color}`}>{value}</div>
@@ -1454,7 +1453,7 @@ const MemberStatisticsView: React.FC<{
       </Card>
 
       {/* 2×2 donut chart grid */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-4 gap-4">
         <Card title="Age Demographics">
           <DonutChart data={ageData} colorOffset={0} />
         </Card>
@@ -1726,8 +1725,8 @@ const MemberTable: React.FC<{
             const isBoard = member.role === UserRole.BOARD;
             const tierColor = member.tier === 'Platinum'
               ? 'bg-purple-500' : member.tier === 'Gold'
-              ? 'bg-amber-400' : member.tier === 'Silver'
-              ? 'bg-slate-400' : 'bg-jci-blue';
+                ? 'bg-amber-400' : member.tier === 'Silver'
+                  ? 'bg-slate-400' : 'bg-jci-blue';
             const riskHigh = member.churnRisk === 'High';
             const riskMed = member.churnRisk === 'Medium';
 

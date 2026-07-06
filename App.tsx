@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -30,7 +30,6 @@ import { NudgeBanner } from './components/ui/NudgeBanner';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { AsyncErrorBoundary } from './components/ui/AsyncErrorBoundary';
 import { errorLoggingService } from './services/errorLoggingService';
-import { NonMemberLeadService } from './services/nonMemberLeadService';
 import { CommunicationService } from './services/communicationService';
 import { ProjectsService } from './services/projectsService';
 import { FlagshipProjectsService } from './services/flagshipProjectsService';
@@ -64,7 +63,6 @@ const ReportsView = lazy(() => import('./components/modules/ReportsView').then(m
 const RoleSimulator = lazy(() => import('./components/dev/RoleSimulator').then(m => ({ default: m.RoleSimulator })));
 const BoardDashboard = lazy(() => import('./components/dashboard/BoardDashboard').then(m => ({ default: m.BoardDashboard })));
 const DashboardHome = lazy(() => import('./components/dashboard/DashboardHome').then(m => ({ default: m.DashboardHome })));
-const CanvaView = lazy(() => import('./components/modules/CanvaView').then(m => ({ default: m.CanvaView })));
 const DeveloperInterface = lazy(() => import('./components/modules/DeveloperInterface').then(m => ({ default: m.DeveloperInterface })));
 const ToyyibView = lazy(() => import('./components/modules/ToyyibView').then(m => ({ default: m.ToyyibView })));
 const WhapiConfigView = lazy(() => import('./components/modules/WhapiConfigView').then(m => ({ default: m.WhapiConfigView })));
@@ -73,7 +71,6 @@ const AccessConfigView = lazy(() => import('./components/modules/AccessConfigVie
 const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
 const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
-import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 import { PartnershipsService } from './services/partnershipsService';
 import { Partnership, FlagshipProject } from './types';
@@ -81,7 +78,7 @@ import { AdvertisementService } from './services/advertisementService';
 
 // --- View Definitions ---
 
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
 
 // --- Helper Components ---
 
@@ -2805,13 +2802,6 @@ export const JCIKLApp: React.FC = () => {
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [isSearchDrawerOpen, setSearchDrawerOpen] = useState(false);
-  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [leadFormSubmitted, setLeadFormSubmitted] = useState(false);
-  const [leadFormSubmitting, setLeadFormSubmitting] = useState(false);
-  const [leadName, setLeadName] = useState('');
-  const [leadEmail, setLeadEmail] = useState('');
-  const [leadPhone, setLeadPhone] = useState('');
-  const [leadInterests, setLeadInterests] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [initialSelectedMemberId, setInitialSelectedMemberId] = useState<string | null>(null);
@@ -2854,9 +2844,6 @@ export const JCIKLApp: React.FC = () => {
     });
   }, [member, isAdmin, isBoard, isDeveloper, projects]);
 
-  const canViewLeads = isAdmin || isBoard;
-  const [leadList, setLeadList] = useState<{ id: string; name: string; email: string; phone?: string | null; interests?: string[] | null; createdAt: string }[]>([]);
-  const [leadListLoading, setLeadListLoading] = useState(false);
 
   // useCommunication hook is safe to call even without authentication
   // It handles the case when member is null internally
@@ -2872,7 +2859,7 @@ export const JCIKLApp: React.FC = () => {
       const isPaid = record?.status === 'paid' || record?.status === 'over paid';
       return m.role !== UserRole.GUEST && isPaid;
     }).length;
-    
+
     const newMembersThisMonth = members.filter(m => {
       if (!m.joinDate) return false;
       const joinDate = new Date(m.joinDate);
@@ -3006,15 +2993,6 @@ export const JCIKLApp: React.FC = () => {
     }
   }, [view]);
 
-  React.useEffect(() => {
-    if (!isHelpModalOpen || !canViewLeads || !member) return;
-    const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
-    setLeadListLoading(true);
-    NonMemberLeadService.listByLo(loId)
-      .then(setLeadList)
-      .catch(() => setLeadList([]))
-      .finally(() => setLeadListLoading(false));
-  }, [isHelpModalOpen, canViewLeads, member]);
 
   // Update view based on auth state
   React.useEffect(() => {
@@ -3249,7 +3227,6 @@ export const JCIKLApp: React.FC = () => {
       case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
       case 'TOYYIB': return <ToyyibView />;
-      case 'CANVA': return <CanvaView />;
       case 'WHAPI_CONFIG': return <WhapiConfigView />;
       case 'MEMBERSHIP_CONFIG': return <MembershipConfigView />;
       case 'ACCESS_CONFIG': return <AccessConfigView />;
@@ -3278,7 +3255,7 @@ export const JCIKLApp: React.FC = () => {
   };
 
   return (
-    <HelpModalProvider onOpenHelp={() => setIsHelpModalOpen(true)}>
+    <>
       <div className="h-screen bg-slate-50 flex overflow-hidden">
         {/* Mobile Sidebar Overlay */}
         {isSidebarOpen && (
@@ -3544,13 +3521,6 @@ export const JCIKLApp: React.FC = () => {
                         onClick={() => { handleViewChange('PUBLICATIONS'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
-                      <SidebarItem
-                        icon={<ImageIcon size={18} />}
-                        label="Canva"
-                        isActive={view === 'CANVA'}
-                        onClick={() => { handleViewChange('CANVA'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
                     </>
                   )}
                   {(isBoard || isAdmin) && (
@@ -3562,13 +3532,6 @@ export const JCIKLApp: React.FC = () => {
                       isCollapsed={isSidebarCollapsed}
                     />
                   )}
-                  <SidebarItem
-                    icon={<BookOpen size={18} />}
-                    label="Help / New Process Guide"
-                    isActive={false}
-                    onClick={() => { setIsHelpModalOpen(true); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
                 </div>
               )}
               {isDeveloper && (
@@ -3652,8 +3615,8 @@ export const JCIKLApp: React.FC = () => {
                                       setIsSimulateDropdownOpen(false);
                                     }}
                                     className={`w-full text-left px-3 py-2 rounded-lg text-[11px] transition-all flex flex-col gap-0.5 ${isSelected
-                                        ? 'bg-blue-600 text-white font-bold'
-                                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                      ? 'bg-blue-600 text-white font-bold'
+                                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
                                       }`}
                                   >
                                     <div className="flex items-center justify-between">
@@ -3734,122 +3697,6 @@ export const JCIKLApp: React.FC = () => {
           onNavigate={handleViewChange}
         />
 
-        <Modal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} title="Help / New Process Guide" size="lg">
-          <div className="space-y-4 text-sm text-slate-700">
-            <section>
-              <h3 className="font-semibold text-slate-900 mb-2">Reference number format</h3>
-              <p>Payment requests and transactions use a unified reference format: <code className="bg-slate-100 px-1 rounded">PR-{'{loId}'}-{'{YYYYMMDD}'}-{'{seq}'}</code> (e.g. PR-default-lo-20250216-001). Please use this reference in your bank transfer memo for reconciliation.</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-slate-900 mb-2">Payment request flow</h3>
-              <p>Go to Payment Requests â†’ Submit request (purpose, amount, activity) â†’ System generates reference number â†’ Finance reviews (Approve/Reject) â†’ Applicant can check status under My Applications.</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-slate-900 mb-2">Member profile lookup</h3>
-              <p>When submitting payment requests or creating events, you can select a member and the system will auto-fill name, term, contact details and other profile fields to avoid duplicate entry.</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-slate-900 mb-2">Reconciliation</h3>
-              <p>Under Finances â†’ Reconciliation, search by reference number to find transactions and payment requests. Match bank entries with business records, then mark as reconciled and keep an audit trail.</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-slate-900 mb-2">Member data export and migration</h3>
-              <p>Admins and organization secretaries can export member data (CSV/JSON) from the Members page; export scope is limited by the current LO. Data migration or cleanup should follow the scope and rules defined in the implementation plan; acceptance criteria are set out there.</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-slate-900 mb-2">Non-member lead capture (Story 9.1)</h3>
-              <p className="mb-2">Non-members can leave contact details and interests at check-in or via agreed flows for follow-up and outreach.</p>
-              {canViewLeads && (
-                <div className="mb-4">
-                  <h4 className="text-slate-700 font-medium mb-2">Lead list (for follow-up and outreach)</h4>
-                  {leadListLoading ? (
-                    <p className="text-slate-500 text-sm">Loadingâ€¦</p>
-                  ) : leadList.length === 0 ? (
-                    <p className="text-slate-500 text-sm">No leads yet</p>
-                  ) : (
-                    <div className="overflow-x-auto max-h-48 overflow-y-auto border border-slate-200 rounded text-xs">
-                      <table className="w-full">
-                        <thead className="bg-slate-50 sticky top-0">
-                          <tr>
-                            <th className="text-left p-2">Name</th>
-                            <th className="text-left p-2">Email</th>
-                            <th className="text-left p-2">Phone</th>
-                            <th className="text-left p-2">Interests</th>
-                            <th className="text-left p-2">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {leadList.slice(0, 50).map((l) => (
-                            <tr key={l.id} className="border-t border-slate-100">
-                              <td className="p-2">{l.name}</td>
-                              <td className="p-2">{l.email}</td>
-                              <td className="p-2">{l.phone ?? 'â€”'}</td>
-                              <td className="p-2">{(l.interests ?? []).join(', ') || 'â€”'}</td>
-                              <td className="p-2">{l.createdAt?.slice(0, 10) ?? 'â€”'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {leadList.length > 50 && <p className="p-2 text-slate-500">Showing latest 50 only</p>}
-                    </div>
-                  )}
-                </div>
-              )}
-              {leadFormSubmitted ? (
-                <p className="text-green-700">Thank you. We will contact you soon.</p>
-              ) : (
-                <form
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-3"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!leadName.trim() || !leadEmail.trim()) {
-                      showToast('Please enter name and email', 'error');
-                      return;
-                    }
-                    setLeadFormSubmitting(true);
-                    try {
-                      await NonMemberLeadService.create({
-                        name: leadName.trim(),
-                        email: leadEmail.trim(),
-                        phone: leadPhone.trim() || null,
-                        interests: leadInterests.trim() ? leadInterests.trim().split(/[,ï¼Œ]/).map((s) => s.trim()).filter(Boolean) : null,
-                        source: 'help_modal',
-                        loId: (member as { loId?: string })?.loId ?? DEFAULT_LO_ID,
-                      });
-                      setLeadFormSubmitted(true);
-                      showToast('Lead submitted', 'success');
-                    } catch (err) {
-                      showToast(err instanceof Error ? err.message : 'Submit failed', 'error');
-                    } finally {
-                      setLeadFormSubmitting(false);
-                    }
-                  }}
-                >
-                  <Forms.Input label="Name" value={leadName} onChange={(e) => setLeadName(e.target.value)} required />
-                  <Forms.Input label="Email" type="email" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} required />
-                  <Forms.Input label="Phone" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} />
-                  <div className="sm:col-span-2">
-                    <Forms.Input label="Interests (comma-separated)" value={leadInterests} onChange={(e) => setLeadInterests(e.target.value)} placeholder="e.g. training, networking, leadership" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Button type="submit" disabled={leadFormSubmitting}>{leadFormSubmitting ? 'Submittingâ€¦' : 'Submit lead'}</Button>
-                  </div>
-                </form>
-              )}
-            </section>
-            <section>
-              <h3 className="font-semibold text-slate-900 mb-2">Transition and handover (Story 9.1)</h3>
-              <p className="mb-2">The organization can use documentation and handover checklists for term changes or role transitions; responsibilities are defined in the implementation plan and the system provides the entry points.</p>
-              <ul className="list-disc list-inside text-slate-600 space-y-1">
-                <li>Handover of communications and member data maintenance</li>
-                <li>Handover of finance / payment request approval permissions</li>
-                <li>Handover of reference number and reconciliation process documentation</li>
-                <li>Member data export and migration acceptance documentation</li>
-              </ul>
-              <p className="mt-2 text-slate-500 text-xs">Follow the implementation plan for detailed checklists and acceptance criteria; document links in the system can be configured later if needed.</p>
-            </section>
-          </div>
-        </Modal>
 
       </div >
 
@@ -3915,7 +3762,7 @@ export const JCIKLApp: React.FC = () => {
               <div className="md:hidden fixed inset-0 z-[60]" onClick={() => setShowMobileMenu(false)}>
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
                 <div
-                  className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-10 pt-4 shadow-2xl`}
+                  className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-10 pt-4 shadow-2xl max-h-[85vh] overflow-y-auto`}
                   onClick={e => e.stopPropagation()}
                 >
                   <div className={`w-10 h-1 rounded-full mx-auto mb-4 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
@@ -3948,262 +3795,139 @@ export const JCIKLApp: React.FC = () => {
                     </div>
                   </div>
 
-                  <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
-                  <div className="grid grid-cols-4 gap-y-4 gap-x-1 my-2">
-                    {(isBoard || isAdmin || isDeveloper) ? (
-                      <>
-                        {/* 1. Projects */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('PROJECTS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-blue-950/30 text-blue-400 border-blue-900/50">
-                            <Briefcase size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Projects
-                          </span>
-                        </div>
-
-                        {/* 2. Survey */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('SURVEYS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-rose-950/30 text-rose-400 border-rose-900/50">
-                            <CheckSquare size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Surveys
-                          </span>
-                        </div>
-
-                        {/* 3. Members */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('MEMBERS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-purple-950/30 text-purple-400 border-purple-900/50">
-                            <Users size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Members
-                          </span>
-                        </div>
-
-                        {/* 4. Inventories */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('INVENTORY');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-amber-950/30 text-amber-400 border-amber-900/50">
-                            <Package size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Inventories
-                          </span>
-                        </div>
-
-                        {/* 5. Calendar */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('EVENTS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-green-950/30 text-green-400 border-green-900/50">
-                            <Zap size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Calendar
-                          </span>
-                        </div>
-
-                        {/* 6. Communication */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('COMMUNICATION');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50">
-                            <Activity size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Comm
-                          </span>
-                        </div>
-
-                        {/* 7. Knowledge */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('KNOWLEDGE');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-indigo-950/30 text-indigo-400 border-indigo-900/50">
-                            <BookOpen size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Knowledge
-                          </span>
-                        </div>
-
-                        {/* 8. Hobby Clubs */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('CLUBS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-pink-950/30 text-pink-400 border-pink-900/50">
-                            <Heart size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Hobbies
-                          </span>
-                        </div>
-
-                        {/* 9. Finance */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('FINANCE');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-emerald-950/30 text-emerald-400 border-emerald-900/50">
-                            <DollarSign size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Finance
-                          </span>
-                        </div>
-
-                        {/* 10. Claim */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('PAYMENT_REQUESTS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-amber-950/30 text-amber-400 border-amber-900/50">
-                            <CreditCard size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
-                            Claim
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* My Projects */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            setShowMobileMenu(false);
-                            if (member?.role === UserRole.GUEST) {
-                              setUpgradeModalOpen(true);
-                            } else {
-                              handleViewChange('PROJECTS');
-                            }
-                          }}
-                        >
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-green-50 text-green-600 border-green-100'}`}>
-                            <Briefcase size={22} />
-                          </div>
-                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>
-                            My Projects
-                          </span>
-                        </div>
-
-                        {/* Survey */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('SURVEYS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-rose-50 text-rose-600 border-rose-100">
-                            <CheckSquare size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-600">
-                            Survey
-                          </span>
-                        </div>
-
-                        {/* Hobby Clubs */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('CLUBS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-pink-50 text-pink-600 border-pink-100">
-                            <Heart size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-600">
-                            Hobby Clubs
-                          </span>
-                        </div>
-
-                        {/* Knowledge */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            handleViewChange('KNOWLEDGE');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-indigo-50 text-indigo-600 border-indigo-100">
-                            <BookOpen size={22} />
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-600">
-                            Knowledge
-                          </span>
-                        </div>
-
-                        {/* Claim */}
-                        <div
-                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                          onClick={() => {
-                            setShowMobileMenu(false);
-                            if (member?.role === UserRole.GUEST) {
-                              setUpgradeModalOpen(true);
-                            } else {
-                              handleViewChange('PAYMENT_REQUESTS');
-                            }
-                          }}
-                        >
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                            <CreditCard size={22} />
-                          </div>
-                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Claim
-                          </span>
-                        </div>
-                      </>
+                  {/* Main grid */}
+                  <div className="grid grid-cols-5 gap-y-4 gap-x-1 mb-4">
+                    {canAccessWorkspaceModules && (
+                      <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('MEMBERS'); setShowMobileMenu(false); }}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-purple-950/30 text-purple-400 border-purple-900/50' : 'bg-purple-50 text-purple-600 border-purple-100'}`}><Users size={22} /></div>
+                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Members</span>
+                      </div>
                     )}
+                    {canAccessWorkspaceModules && (
+                      <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('EVENTS'); setShowMobileMenu(false); }}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-green-950/30 text-green-400 border-green-900/50' : 'bg-green-50 text-green-600 border-green-100'}`}><Calendar size={22} /></div>
+                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Event List</span>
+                      </div>
+                    )}
+                    {canAccessWorkspaceModules && (
+                      <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('COMMUNICATION'); setShowMobileMenu(false); }}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-sky-950/30 text-sky-400 border-sky-900/50' : 'bg-sky-50 text-sky-600 border-sky-100'}`}><MessageSquare size={22} /></div>
+                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Comm</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('KNOWLEDGE'); setShowMobileMenu(false); }}>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-indigo-950/30 text-indigo-400 border-indigo-900/50' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}><BookOpen size={22} /></div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Knowledge</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('CLUBS'); setShowMobileMenu(false); }}>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-pink-950/30 text-pink-400 border-pink-900/50' : 'bg-pink-50 text-pink-600 border-pink-100'}`}><Heart size={22} /></div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Hobbies</span>
+                    </div>
                   </div>
+
+                  {/* Workspace section */}
+                  {member?.role !== UserRole.GUEST && (
+                    <div className={`pt-4 border-t ${isBoard || isAdmin || isDeveloper ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                      <p className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>Workspace</p>
+                      <div className="grid grid-cols-4 gap-y-4 gap-x-1 mb-4">
+                        {canViewEventsManagement && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PROJECTS'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-blue-950/30 text-blue-400 border-blue-900/50' : 'bg-blue-50 text-blue-600 border-blue-100'}`}><FolderKanban size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Evts Mgt</span>
+                          </div>
+                        )}
+                        {canViewEventsManagement && !isPlainMember && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-violet-950/30 text-violet-400 border-violet-900/50' : 'bg-violet-50 text-violet-600 border-violet-100'}`}><Briefcase size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Flagship</span>
+                          </div>
+                        )}
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SURVEYS'); setShowMobileMenu(false); }}>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-rose-950/30 text-rose-400 border-rose-900/50' : 'bg-rose-50 text-rose-600 border-rose-100'}`}><CheckSquare size={22} /></div>
+                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Surveys</span>
+                        </div>
+                        {canAccessWorkspaceModules && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PAYMENT_REQUESTS'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-amber-950/30 text-amber-400 border-amber-900/50' : 'bg-amber-50 text-amber-600 border-amber-100'}`}><FileText size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Payment Req</span>
+                          </div>
+                        )}
+                        {hasPermission('canViewFinance') && (
+                          <>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FINANCE'); setShowMobileMenu(false); }}>
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-emerald-950/30 text-emerald-400 border-emerald-900/50' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}><TrendingUp size={22} /></div>
+                              <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Finances</span>
+                            </div>
+                            <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('INVENTORY'); setShowMobileMenu(false); }}>
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-amber-950/30 text-amber-400 border-amber-900/50' : 'bg-amber-50 text-amber-600 border-amber-100'}`}><Package size={22} /></div>
+                              <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Inventory</span>
+                            </div>
+                          </>
+                        )}
+                        {(isBoard || isAdmin) && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ADVERTISEMENTS'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-orange-950/30 text-orange-400 border-orange-900/50' : 'bg-orange-50 text-orange-600 border-orange-100'}`}><Megaphone size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Partners</span>
+                          </div>
+                        )}
+                        {canAccessWorkspaceModules && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GAMIFICATION'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-yellow-950/30 text-yellow-400 border-yellow-900/50' : 'bg-yellow-50 text-yellow-600 border-yellow-100'}`}><Award size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Gamify</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* System section */}
+                  {(isBoard || isAdmin || isDeveloper) && (
+                    <div className="pt-4 border-t border-slate-700/50">
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-3 text-slate-500">System</p>
+                      <div className="grid grid-cols-5 gap-y-4 gap-x-1">
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('TEMPLATES'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><FileText size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Templates</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('REPORTS'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><BarChart3 size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Reports</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('DATA_IMPORT_EXPORT'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Database size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Data I/O</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('RADAR_IMPORTER'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Zap size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Radar</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('TOYYIB'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><CreditCard size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">ToyyibPay</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('WHAPI_CONFIG'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><MessageSquare size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Whapi API</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('MEMBERSHIP_CONFIG'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Users size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Mbr Config</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ACCESS_CONFIG'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Shield size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Access Cfg</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PUBLICATIONS'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><BookOpen size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Publications</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('AUTOMATION'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Activity size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Automation</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Logout */}
                   <div className={`mt-4 pt-4 border-t ${isBoard || isAdmin || isDeveloper ? 'border-slate-700/50' : 'border-slate-100'}`}>
@@ -4248,7 +3972,7 @@ export const JCIKLApp: React.FC = () => {
           </p>
         </div>
       </Modal>
-    </HelpModalProvider>
+    </>
   );
 };
 

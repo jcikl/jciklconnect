@@ -48,6 +48,22 @@ export const IntroducerManagement: React.FC<Props> = ({
     return ['all', ...Array.from(years).sort().reverse()];
   }, [members]);
 
+  // Helper to identify the type of introducer from the string value
+  const getIntroducerType = (introVal?: string) => {
+    if (!introVal || introVal.trim() === '') return 'None';
+    const cleanVal = introVal.trim();
+    if (cleanVal.toLowerCase() === 'friend') return 'Friend';
+    if (cleanVal.toLowerCase() === 'direct join') return 'Direct Join';
+    if (cleanVal.toLowerCase().startsWith('social media')) return 'Social Media';
+    if (cleanVal.toLowerCase().startsWith('event:')) return 'Event/Project';
+
+    // Check if it is a member ID
+    const foundMember = members.some(m => m.id === cleanVal);
+    if (foundMember) return 'JCI KL Member';
+
+    return 'Other Source';
+  };
+
   const filteredTopRecruiters = useMemo(() => {
     const counts: Record<string, number> = {};
     members.forEach(m => {
@@ -144,22 +160,6 @@ export const IntroducerManagement: React.FC<Props> = ({
       return shortName || fullName || 'Unnamed Member';
     }
     return introVal;
-  };
-
-  // Helper to identify the type of introducer from the string value
-  const getIntroducerType = (introVal?: string) => {
-    if (!introVal || introVal.trim() === '') return 'None';
-    const cleanVal = introVal.trim();
-    if (cleanVal.toLowerCase() === 'friend') return 'Friend';
-    if (cleanVal.toLowerCase() === 'direct join') return 'Direct Join';
-    if (cleanVal.toLowerCase().startsWith('social media')) return 'Social Media';
-    if (cleanVal.toLowerCase().startsWith('event:')) return 'Event/Project';
-
-    // Check if it is a member ID
-    const foundMember = members.some(m => m.id === cleanVal);
-    if (foundMember) return 'JCI KL Member';
-
-    return 'Other Source';
   };
 
   // Calculate high-level statistics
