@@ -499,48 +499,123 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {birthdayMembers.length > 0 && (
         <Card
           onClick={() => setShowBirthdayDrawer(true)}
-          className="p-4 bg-gradient-to-r from-pink-50/40 via-purple-50/20 to-white border border-slate-100 hover:border-pink-200 transition-all duration-300"
+          className="relative overflow-hidden p-5 bg-gradient-to-br from-pink-500/10 via-purple-500/5 to-transparent border border-pink-100 hover:border-pink-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group cursor-pointer"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Overlapping Avatars */}
-              <div className="flex -space-x-3 overflow-hidden">
-                {birthdayMembers.slice(0, 5).map((m, i) => (
-                  <img
-                    key={m.id}
-                    src={m.general?.avatarUrl || m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.general?.name || m.name || '')}&background=e0f2fe&color=0097D7`}
-                    alt={m.general?.name || m.name}
-                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm ring-2 ring-pink-100/40"
-                    style={{ zIndex: 5 - i }}
-                  />
-                ))}
-                {birthdayMembers.length > 5 && (
-                  <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shadow-sm z-0 ring-2 ring-pink-100/40">
-                    +{birthdayMembers.length - 5}
-                  </div>
-                )}
+          {/* Decorative Background Glows */}
+          <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-pink-400/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -left-10 -top-10 w-32 h-32 bg-purple-400/10 rounded-full blur-2xl pointer-events-none" />
+
+          <div className="flex items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+              {/* Birthday Icon / Visual */}
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20 text-2xl flex-shrink-0 transform group-hover:scale-110 transition-transform duration-300">
+                🎁
               </div>
 
               <div>
-                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                  <span>🎂</span> Birthdays This Month
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  {birthdayMembers.length} members in {now.toLocaleString('default', { month: 'long' })}
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-slate-800 text-sm md:text-base tracking-tight">
+                    Birthdays This Month
+                  </h3>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
+                    {now.toLocaleString('default', { month: 'long' })}
+                  </span>
+                </div>
+                
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  {birthdayMembers.length} members celebrate their birthday this month
                 </p>
-                {todayBirthdays.length > 0 && (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full animate-pulse">
-                      Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(' & ')} 🎈
+                
+                {todayBirthdays.length > 0 ? (
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-100 px-2.5 py-0.5 rounded-full shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping" />
+                      Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(' & ')} 🎂
                     </span>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                    <span>✨ Click to view all calendar dates</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Arrow/Chevron to show clickability */}
-            <div className="text-slate-400 group-hover:text-jci-blue transition-colors pr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            {/* Right Side: Avatar Stack + Chevron */}
+            <div className="flex items-center gap-3 ml-auto flex-shrink-0">
+              {/* Overlapping Avatars */}
+              <div className="flex items-center">
+                {birthdayMembers.slice(0, 4).map((m, i) => {
+                  const name = m.general?.name || m.name || '';
+                  const avatarUrl = m.general?.avatarUrl || m.avatar;
+                  
+                  if (avatarUrl) {
+                    return (
+                      <img
+                        key={m.id}
+                        src={avatarUrl}
+                        alt={name}
+                        className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5"
+                        style={{ 
+                          marginLeft: i > 0 ? '-10px' : '0px',
+                          zIndex: 10 - i 
+                        }}
+                      />
+                    );
+                  } else {
+                    const initials = name
+                      .split(' ')
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase();
+                    
+                    // Hash to get a consistent gradient
+                    let hash = 0;
+                    for (let j = 0; j < name.length; j++) {
+                      hash = name.charCodeAt(j) + ((hash << 5) - hash);
+                    }
+                    const gradients = [
+                      'from-pink-500 to-rose-500',
+                      'from-purple-500 to-indigo-500',
+                      'from-blue-500 to-sky-500',
+                      'from-teal-500 to-emerald-500',
+                      'from-amber-500 to-orange-500',
+                    ];
+                    const gradient = gradients[Math.abs(hash) % gradients.length];
+                    
+                    return (
+                      <div
+                        key={m.id}
+                        className={`w-9 h-9 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5`}
+                        style={{ 
+                          marginLeft: i > 0 ? '-10px' : '0px',
+                          zIndex: 10 - i 
+                        }}
+                      >
+                        {initials}
+                      </div>
+                    );
+                  }
+                })}
+                
+                {birthdayMembers.length > 4 && (
+                  <div 
+                    className="w-9 h-9 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm ring-1 ring-pink-100/30 flex-shrink-0"
+                    style={{ 
+                      marginLeft: '-10px',
+                      zIndex: 5 
+                    }}
+                  >
+                    +{birthdayMembers.length - 4}
+                  </div>
+                )}
+              </div>
+
+              {/* Chevron */}
+              <div className="text-slate-400 group-hover:text-pink-500 transition-colors pl-1 transform group-hover:translate-x-0.5 transition-transform duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </div>
             </div>
           </div>
         </Card>
