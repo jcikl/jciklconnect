@@ -3612,7 +3612,7 @@ export const JCIKLApp: React.FC = () => {
 
               <div className="relative z-10 space-y-6 max-w-7xl mx-auto">
                 {/* Top Row: Avatar & Status | Notifications */}
-                <div className="flex justify-between items-center">
+                <div className="flex justify-end items-center">
                   <div className="flex items-center">
                     {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
                       <div className="relative mr-2 z-30">
