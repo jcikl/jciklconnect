@@ -105,14 +105,28 @@ export class BusinessDirectoryService {
     await setDoc(listingRef, { ...profile, memberId, updatedAt: Timestamp.now() }, { merge: true });
   }
 
-  static async getAllBusinesses(): Promise<BusinessProfile[]> {
+  static async getAllBusinesses(publicOnly = false): Promise<BusinessProfile[]> {
     if (isDevMode()) {
       return MOCK_BUSINESSES;
     }
 
+    if (publicOnly) {
+      // Unauthenticated path: read from the public denormalised collection.
+      try {
+        const snapshot = await getDocs(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS));
+        return snapshot.docs
+          .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data() as Record<string, unknown>))
+          .filter((p) => p.companyName?.trim())
+          .sort((a, b) => a.companyName.localeCompare(b.companyName));
+      } catch (error) {
+        console.error('Error fetching public business listings:', error);
+        throw error;
+      }
+    }
+
     try {
-      // Read directly from members collection so all members with a companyName
-      // are included — not just those synced to the PUBLIC_BUSINESS_LISTINGS cache.
+      // Authenticated path: read directly from members so all members with a
+      // companyName are included — not just those synced to the public cache.
       const snapshot = await getDocs(collection(db, COLLECTIONS.MEMBERS));
       return snapshot.docs
         .map((docSnap) => mapMemberToBusinessProfile(docSnap.id, docSnap.data() as Record<string, unknown>))

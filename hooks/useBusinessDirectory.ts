@@ -9,14 +9,15 @@ export const useBusinessDirectory = () => {
   const [businesses, setBusinesses] = useState<BusinessProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { member } = useAuth();
+  const { member, user } = useAuth();
   const { showToast } = useToast();
 
   const loadBusinesses = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await BusinessDirectoryService.getAllBusinesses();
+      const publicOnly = !user;
+      const data = await BusinessDirectoryService.getAllBusinesses(publicOnly);
       setBusinesses(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load businesses';
