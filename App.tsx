@@ -3913,30 +3913,74 @@ export const JCIKLApp: React.FC = () => {
               >
                 <div className={`w-10 h-1 rounded-full mx-auto mb-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
                 <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => { handleViewChange('KNOWLEDGE'); setShowMobileMenu(false); }}
-                    className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 ${view === 'KNOWLEDGE' ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-slate-800 text-slate-200 active:bg-slate-700' : 'bg-slate-50 text-slate-700 active:bg-slate-100')}`}
+                <div className="grid grid-cols-4 gap-y-4 gap-x-2 my-2">
+                  {/* My Projects */}
+                  <div
+                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                    onClick={() => {
+                      setShowMobileMenu(false);
+                      if (member?.role === UserRole.GUEST) {
+                        setUpgradeModalOpen(true);
+                      } else {
+                        handleViewChange('PROJECTS');
+                      }
+                    }}
                   >
-                    <BookOpen size={20} />
-                    <span className="font-semibold text-sm">Knowledge</span>
-                  </button>
-                  {canViewEventsManagement && (
-                    <button
-                      onClick={() => { handleViewChange('PROJECTS'); setShowMobileMenu(false); }}
-                      className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 ${view === 'PROJECTS' ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-slate-800 text-slate-200 active:bg-slate-700' : 'bg-slate-50 text-slate-700 active:bg-slate-100')}`}
-                    >
-                      <FolderKanban size={20} />
-                      <span className="font-semibold text-sm">Event Management</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { handleViewChange('SURVEYS'); setShowMobileMenu(false); }}
-                    className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 ${view === 'SURVEYS' ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-slate-800 text-slate-200 active:bg-slate-700' : 'bg-slate-50 text-slate-700 active:bg-slate-100')}`}
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : (isBoard || isAdmin || isDeveloper ? 'bg-green-950/30 text-green-400 border-green-900/50' : 'bg-green-50 text-green-600 border-green-100')}`}>
+                      <Briefcase size={22} />
+                    </div>
+                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : (isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600')}`}>
+                      My Projects
+                    </span>
+                  </div>
+
+                  {/* Survey */}
+                  <div
+                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                    onClick={() => {
+                      handleViewChange('SURVEYS');
+                      setShowMobileMenu(false);
+                    }}
                   >
-                    <CheckSquare size={20} />
-                    <span className="font-semibold text-sm">Survey</span>
-                  </button>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-rose-950/30 text-rose-400 border-rose-900/50' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                      <CheckSquare size={22} />
+                    </div>
+                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
+                      Survey
+                    </span>
+                  </div>
+
+                  {/* Hobby Clubs */}
+                  <div
+                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                    onClick={() => {
+                      handleViewChange('CLUBS');
+                      setShowMobileMenu(false);
+                    }}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-pink-950/30 text-pink-400 border-pink-900/50' : 'bg-pink-50 text-pink-600 border-pink-100'}`}>
+                      <Heart size={22} />
+                    </div>
+                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
+                      Hobby Clubs
+                    </span>
+                  </div>
+
+                  {/* Knowledge */}
+                  <div
+                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                    onClick={() => {
+                      handleViewChange('KNOWLEDGE');
+                      setShowMobileMenu(false);
+                    }}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-indigo-950/30 text-indigo-400 border-indigo-900/50' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
+                      <BookOpen size={22} />
+                    </div>
+                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
+                      Knowledge
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
