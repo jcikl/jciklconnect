@@ -298,7 +298,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
             Join a global network of young active citizens creating positive change.
             Manage your growth, connect with mentors, and lead impactful projects.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-4 flex-wrap">
             <Button size="lg" onClick={onRegister}>
               Become a Member
             </Button>
@@ -310,6 +310,22 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
             >
               View Activity Calendar
             </Button>
+          </div>
+          <div className="flex justify-center items-center gap-8 mt-10 pt-8 border-t border-white/10">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white">1954</p>
+              <p className="text-[11px] text-blue-200 uppercase tracking-widest mt-0.5">Founded</p>
+            </div>
+            <div className="w-px h-8 bg-white/20"></div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white">200+</p>
+              <p className="text-[11px] text-blue-200 uppercase tracking-widest mt-0.5">Members</p>
+            </div>
+            <div className="w-px h-8 bg-white/20"></div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white">50+</p>
+              <p className="text-[11px] text-blue-200 uppercase tracking-widest mt-0.5">Events / Year</p>
+            </div>
           </div>
         </div>
       </section>
@@ -410,10 +426,10 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="events" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
+        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Upcoming Events</h1>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Upcoming Events</h1>
+            <p className="text-base text-blue-100 max-w-2xl mx-auto">
               Join us for exciting events, trainings, and networking opportunities.
             </p>
           </div>
@@ -745,10 +761,10 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="projects" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
+        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Flagship Projects</h1>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Flagship Projects</h1>
+            <p className="text-base text-blue-100 max-w-2xl mx-auto">
               Discover the impactful projects we're working on to create positive change in our community.
             </p>
           </div>
@@ -773,12 +789,12 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
                 <style>{`
                   .flip-card {
                     perspective: 1000px;
-                    height: 480px;
+                    height: 380px;
                     width: 100%;
                   }
                   @media (min-width: 768px) {
                     .flip-card {
-                      height: 320px;
+                      height: 300px;
                     }
                   }
                   .flip-card-inner {
@@ -1430,10 +1446,10 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="about" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
+        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">About JCI Kuala Lumpur</h1>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">About JCI Kuala Lumpur</h1>
+            <p className="text-base text-blue-100 max-w-2xl mx-auto">
               Empowering young active citizens to create positive change.
             </p>
           </div>
@@ -1459,8 +1475,12 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                   Contact Us
                 </Button>
               </div>
-              <div className="bg-slate-100 rounded-2xl p-8 h-96 flex items-center justify-center">
-                <Users size={120} className="text-slate-300" />
+              <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-2xl p-8 h-96 flex items-center justify-center">
+                <img
+                  src="/JCI Kuala Lumpur-transparent.png"
+                  alt="JCI Kuala Lumpur"
+                  className="max-w-full max-h-full object-contain opacity-90"
+                />
               </div>
             </div>
           </div>
@@ -1831,6 +1851,20 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
       }));
   }, [dbPublications, loadingPubs]);
 
+  // Year tab filter
+  const [activeYearTab, setActiveYearTab] = useState<string | null>(null);
+
+  // Initialize to latest year when newsletters load
+  React.useEffect(() => {
+    if (newsletters.length > 0 && !activeYearTab) {
+      setActiveYearTab(newsletters[0].year);
+    }
+  }, [newsletters]);
+
+  const displayedNewsletters = activeYearTab
+    ? newsletters.filter(g => g.year === activeYearTab)
+    : newsletters;
+
   // PDF Reader State
   const [selectedNewsletter, setSelectedNewsletter] = useState<{
     issue: string;
@@ -1899,17 +1933,11 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="enewsletters" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-20 bg-gradient-to-r from-jci-navy to-jci-blue text-white relative overflow-hidden" aria-label="Page header">
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
-          <div className="absolute -left-16 -top-16 w-64 h-64 bg-white/5 rounded-full blur-3xl"></div>
-          <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-sky-400/10 rounded-full blur-3xl"></div>
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-            <h1 className="text-4xl md:text-6xl font-extrabold mb-6 tracking-tight drop-shadow-sm">
-              E-Newsletters
-            </h1>
-            <p className="text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto font-light leading-relaxed">
-              Stay connected and inspired. Access our extensive digital repository of stories, developmental projects, achievements, and impact.
+        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">E-Newsletters</h1>
+            <p className="text-base text-blue-100 max-w-2xl mx-auto">
+              Stories, projects, achievements and impact from JCI Kuala Lumpur.
             </p>
           </div>
         </section>
@@ -1925,8 +1953,23 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                 </p>
               </div>
             ) : (
-              <div className="space-y-16">
-                {newsletters.map((yearGroup) => (
+              <div className="space-y-12">
+                {/* Year tab filter */}
+                {newsletters.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {newsletters.map(g => (
+                      <button
+                        key={g.year}
+                        onClick={() => setActiveYearTab(g.year)}
+                        className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex-shrink-0 ${activeYearTab === g.year ? 'bg-jci-blue text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-jci-blue hover:text-jci-blue'}`}
+                      >
+                        {g.year}
+                        <span className="ml-1.5 text-xs opacity-70">({g.items.length})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {displayedNewsletters.map((yearGroup) => (
                   <div key={yearGroup.year} className="animate-in fade-in slide-in-from-bottom-6 duration-500">
                     <div className="flex items-center gap-4 mb-8 pb-3 border-b border-slate-200">
                       <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -2258,10 +2301,10 @@ const GuestDirectoryPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="directory" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
+        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Business Directory</h1>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Business Directory</h1>
+            <p className="text-base text-blue-100 max-w-2xl mx-auto">
               Explore the businesses of our members and connect with the global JCI network.
             </p>
           </div>
@@ -2361,10 +2404,10 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="partnerships" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-16 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
+        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Merchant Partnerships</h1>
-            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Merchant Partnerships</h1>
+            <p className="text-base text-blue-100 max-w-2xl mx-auto">
               Exclusive discounts and rewards curated for JCI Kuala Lumpur members.
             </p>
           </div>
@@ -2390,22 +2433,15 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                 {partnerships.map(partner => (
                   <div
                     key={partner.id}
-                    className="flex flex-col h-full items-center justify-center bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+                    className="flex flex-col h-full items-center bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleCardClick(partner)}
                   >
-                    <div className="w-full h-32 relative flex items-center justify-center p-4">
+                    <div className="w-full h-28 relative flex items-center justify-center p-4">
                       {partner.banner ? (
                         <img
                           src={partner.banner}
                           alt={partner.name}
-                          className={`max-w-full max-h-full object-contain ${partner.redeemMethod?.startsWith('http') ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
-                          onClick={() => {
-                            if (partner.redeemMethod?.startsWith('http')) {
-                              if (partner.id && !partner.id.startsWith('mock')) {
-                                AdvertisementService.recordClick(partner.id).catch(console.error);
-                              }
-                              window.open(partner.redeemMethod, '_blank');
-                            }
-                          }}
+                          className="max-w-full max-h-full object-contain"
                           onError={(e) => {
                             const img = e.target as HTMLImageElement;
                             img.onerror = null;
@@ -2414,9 +2450,14 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center text-slate-300">
-                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
-                          <span className="text-xs mt-2 font-medium">No Logo</span>
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
                         </div>
+                      )}
+                    </div>
+                    <div className="w-full px-3 pb-3 border-t border-slate-50 pt-2">
+                      <p className="text-xs font-semibold text-slate-700 text-center truncate">{partner.name}</p>
+                      {partner.memberBenefits && (
+                        <p className="text-[11px] text-jci-blue text-center truncate mt-0.5">{partner.memberBenefits}</p>
                       )}
                     </div>
                   </div>
