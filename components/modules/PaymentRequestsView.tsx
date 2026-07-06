@@ -132,6 +132,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchRef, setSearchRef] = useState('');
   const [statusFilter, setStatusFilter] = useState<PaymentRequestStatus | ''>('');
 
@@ -147,19 +148,19 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     if (autoOpen === 'true') {
       const preselectedProj = sessionStorage.getItem('pr_preselected_project_id');
       const preselectedCat = sessionStorage.getItem('pr_preselected_category');
-      
+
       if (preselectedCat === 'projects_activities' || preselectedCat === 'administrative') {
         setFormCategory(preselectedCat as 'projects_activities' | 'administrative');
       }
       if (preselectedProj) {
         setFormActivityId(preselectedProj);
       }
-      
+
       // Clear the trigger and preselected values so they don't persist next time
       sessionStorage.removeItem('pr_auto_open_submit');
       sessionStorage.removeItem('pr_preselected_project_id');
       sessionStorage.removeItem('pr_preselected_category');
-      
+
       // Open the submit modal
       setSuccessRef(null);
       setSubmitModalOpen(true);
@@ -269,9 +270,9 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
   const filteredMyList = useMemo(() => {
     const term = (searchQuery || '').toLowerCase();
-    if (!term) return myList;
-
     return myList.filter(pr => {
+      if (statusFilter && pr.status !== statusFilter) return false;
+      if (!term) return true;
       const projectName = projects.find(p => p.id === pr.activityId)?.name || '';
       const adminAccountName = bankAccounts.find(b => b.id === pr.claimFromBankAccountId)?.name || '';
       return (
@@ -285,7 +286,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         pr.items?.some(item => (item.purpose ?? '').toLowerCase().includes(term))
       );
     });
-  }, [myList, searchQuery, projects, bankAccounts]);
+  }, [myList, searchQuery, statusFilter, projects, bankAccounts]);
 
   const filteredFinanceList = useMemo(() => {
     const term = (searchQuery || '').toLowerCase();
@@ -812,30 +813,36 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     }
   };
 
+  const ListSkeleton = () => (
+    <div className="space-y-3">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="h-[72px] bg-slate-100 rounded-xl animate-pulse" />
+      ))}
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-2">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Payment Requests</h2>
-          <p className="text-slate-500">Submit claims and manage reimbursement requests</p>
+          <p className="text-sm text-slate-500">Submit and track reimbursement claims</p>
         </div>
         {member && (
           <>
-            {/* Desktop Button */}
             <div className="hidden sm:block">
               <Button onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}>
-                <Plus size={18} className="mr-1" /> New Payment Request
+                <Plus size={16} className="mr-1.5" /> New Request
               </Button>
             </div>
-
-            {/* Mobile Floating Action Button (FAB) */}
-            <div className="sm:hidden fixed bottom-24 right-6 z-40">
+            <div className="sm:hidden fixed bottom-24 right-5 z-40">
               <button
                 onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}
-                className="w-14 h-14 rounded-full bg-jci-blue text-white shadow-[0_8px_30px_rgb(0,151,215,0.4)] flex items-center justify-center hover:scale-110 active:scale-90 transition-all duration-200 border-none outline-none"
+                className="w-14 h-14 rounded-full bg-jci-blue text-white shadow-[0_8px_30px_rgb(0,151,215,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-200 border-none"
                 aria-label="New Payment Request"
               >
-                <Plus size={28} />
+                <Plus size={26} />
               </button>
             </div>
           </>
@@ -843,275 +850,500 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       </div>
 
       {successRef && (
-        <Card className="p-4 bg-green-50 border-green-200">
-          <div className="flex items-center gap-2 mb-1">
-            <CheckCircle className="text-green-600" size={18} />
-            <p className="text-green-800 font-bold">Submitted Successfully</p>
+        <Card className="p-4 bg-emerald-50 border-emerald-200">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="text-emerald-600 shrink-0 mt-0.5" size={18} />
+            <div className="min-w-0 flex-1">
+              <p className="text-emerald-800 font-bold text-sm">Submitted Successfully</p>
+              <p className="text-emerald-700 text-sm mt-0.5">Reference: <span className="font-mono font-bold">{successRef}</span></p>
+              <p className="text-emerald-600 text-xs mt-1">Include this reference in your bank transfer memo.</p>
+            </div>
+            <button onClick={() => setSuccessRef(null)} className="text-emerald-400 hover:text-emerald-600 shrink-0">
+              <X size={16} />
+            </button>
           </div>
-          <p className="text-green-700 text-sm">Reference Number: <span className="font-mono font-bold">{successRef}</span></p>
-          <p className="text-green-600 text-xs mt-1 italic">Please include this reference in your bank transfer memo for faster reconciliation.</p>
         </Card>
       )}
-      {/* Stats Summary Panel */}
+
+      {/* Stats */}
       <Card noPadding className="bg-slate-50 border-slate-200/80">
-        <div className="grid grid-cols-3 divide-x divide-slate-200 text-center py-3">
-          <div className="px-1 sm:px-4">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Pending</p>
-            <h3 className="text-sm sm:text-lg md:text-xl font-bold text-amber-600 mt-1 truncate">{formatCurrency(stats.pendingAmount)}</h3>
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{stats.pendingCount} active</p>
+        <div className="grid grid-cols-3 divide-x divide-slate-200 py-3">
+          <div className="px-3 sm:px-5 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <Clock size={12} className="text-amber-500 shrink-0" />
+              <span className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Pending</span>
+            </div>
+            <p className="text-sm sm:text-lg font-bold text-amber-600 truncate">{formatCurrency(stats.pendingAmount)}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">{stats.pendingCount} request{stats.pendingCount !== 1 ? 's' : ''}</p>
           </div>
-          <div className="px-1 sm:px-4">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Approved</p>
-            <h3 className="text-sm sm:text-lg md:text-xl font-bold text-emerald-600 mt-1 truncate">{formatCurrency(stats.approvedAmount)}</h3>
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{stats.approvedCount} completed</p>
+          <div className="px-3 sm:px-5 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <CheckCircle size={12} className="text-emerald-500 shrink-0" />
+              <span className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Approved</span>
+            </div>
+            <p className="text-sm sm:text-lg font-bold text-emerald-600 truncate">{formatCurrency(stats.approvedAmount)}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">{stats.approvedCount} completed</p>
           </div>
-          <div className="px-1 sm:px-4">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">Rejected</p>
-            <h3 className="text-sm sm:text-lg md:text-xl font-bold text-slate-600 mt-1 truncate">{stats.rejectedCount}</h3>
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">Needs revision</p>
+          <div className="px-3 sm:px-5 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <XCircle size={12} className="text-slate-400 shrink-0" />
+              <span className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Rejected</span>
+            </div>
+            <p className="text-sm sm:text-lg font-bold text-slate-600">{stats.rejectedCount}</p>
+            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">Closed</p>
           </div>
         </div>
       </Card>
 
-      <Card noPadding>
-        <div className="p-4">
-          <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 border-b border-slate-100 pb-3 mb-4">
-            <div className="flex-1">
-              <Tabs
-                tabs={[
-                  { id: 'my', label: 'My Applications' },
-                  ...(canViewFinance ? [{ id: 'all', label: 'All Applications (Finance)' }] : []),
+      {/* Tabs + List */}
+      <div>
+        <div className="flex items-center justify-between gap-2 pb-2">
+          {/* Mobile: segmented control + filter on same row */}
+          <div className="md:hidden flex items-center gap-2 w-full p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <Tabs
+              variant="button"
+              fullWidth
+              tabs={[
+                { id: 'my', label: 'My Requests' },
+                ...(canViewFinance ? [{ id: 'all', label: 'All' }] : []),
+              ]}
+              activeTab={activeTab}
+              onTabChange={(id) => { setActiveTab(id as 'my' | 'all'); setExpandedId(null); }}
+            />
+            <div className="w-28 shrink-0">
+              <Select
+                label=""
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
+                options={[
+                  { value: '', label: 'All' },
+                  { value: 'submitted', label: 'Pending' },
+                  { value: 'approved', label: 'Approved' },
+                  { value: 'rejected', label: 'Rejected' },
+                  { value: 'cancelled', label: 'Cancelled' },
                 ]}
-                activeTab={activeTab}
-                onTabChange={(id) => setActiveTab(id as 'my' | 'all')}
               />
             </div>
-
-            {activeTab === 'all' && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Filter Status:</span>
-                <div className="w-40">
-                  <Select
-                    label=""
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
-                    options={[
-                      { value: '', label: 'All Statuses' },
-                      { value: 'submitted', label: 'Pending' },
-                      { value: 'approved', label: 'Approved' },
-                      { value: 'rejected', label: 'Rejected' },
-                    ]}
-                  />
-                </div>
-              </div>
-            )}
           </div>
+          {/* Desktop: underline tabs */}
+          <div className="hidden md:block">
+            <Tabs
+              tabs={[
+                { id: 'my', label: 'My Applications' },
+                ...(canViewFinance ? [{ id: 'all', label: 'All Applications' }] : []),
+              ]}
+              activeTab={activeTab}
+              onTabChange={(id) => { setActiveTab(id as 'my' | 'all'); setExpandedId(null); }}
+            />
+          </div>
+          {activeTab === 'all' && (
+            <div className="hidden md:block w-36">
+              <Select
+                label=""
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as PaymentRequestStatus | '')}
+                options={[
+                  { value: '', label: 'All Statuses' },
+                  { value: 'submitted', label: 'Pending' },
+                  { value: 'approved', label: 'Approved' },
+                  { value: 'rejected', label: 'Rejected' },
+                ]}
+              />
+            </div>
+          )}
+        </div>
 
-          <div className="mt-4">
-            {activeTab === 'my' ? (
-              loading ? <LoadingState loading={true}><span /></LoadingState> :
-                myList.length === 0 ? (
-                  <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                    <FileText className="mx-auto text-slate-300 mb-2" size={32} />
-                    <p className="text-slate-500 font-medium">No payment requests found</p>
-                    <Button variant="ghost" size="sm" onClick={() => setSubmitModalOpen(true)} className="mt-2">Create your first request</Button>
-                  </div>
-                ) : (
-                  <div className="grid gap-4">
-                    {filteredMyList.map((pr) => (
-                      <Card key={pr.id} noPadding className="border border-slate-150 p-4 hover:border-jci-blue/30 hover:shadow-sm transition-all duration-300 bg-white">
-                        <div className="flex flex-col md:flex-row justify-between gap-4">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2 justify-between">
-                              <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors">{pr.referenceNumber}</span>
-                              <StatusBadge status={pr.status} />
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-slate-800 text-base">{pr.purpose}</h4>
-                              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                                {pr.category === 'administrative' ? (
-                                  <>
-                                    <Building2 size={13} className="text-slate-400" />
-                                    <span>Admin Account: <strong className="text-slate-700">{pr.activityId || 'N/A'}</strong></span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Sparkles size={13} className="text-orange-400" />
-                                    <span>Project: <strong className="text-slate-700">{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || 'N/A'}</strong></span>
-                                  </>
-                                )}
-                              </p>
-                              {pr.bankName && (
-                                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                                  <Landmark size={12} className="text-slate-400" />
-                                  <span>Remit: {pr.bankName} ({pr.accountHolder}) - {pr.accountNumber}</span>
+        <div>
+          {activeTab === 'my' ? (
+            loading ? <ListSkeleton /> :
+              filteredMyList.length === 0 ? (
+                <div className="text-center py-14 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <FileText className="mx-auto text-slate-300 mb-3" size={36} />
+                  <p className="text-slate-600 font-semibold">No payment requests yet</p>
+                  <p className="text-slate-400 text-sm mt-1">Submit your first reimbursement claim</p>
+                  <Button variant="ghost" size="sm" onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }} className="mt-3">
+                    <Plus size={14} className="mr-1" /> Create Request
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100">
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reference</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Purpose / Project</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+                          <th className="text-center py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {filteredMyList.map((pr) => (
+                          <React.Fragment key={pr.id}>
+                            <tr
+                              className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
+                              onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
+                            >
+                              <td className="py-3 px-2">
+                                <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
+                              </td>
+                              <td className="py-3 px-2 max-w-[240px]">
+                                <p className="font-medium text-slate-800 truncate">{pr.purpose}</p>
+                                <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
+                                  {pr.category === 'administrative'
+                                    ? <><Building2 size={11} />{pr.activityId || '—'}</>
+                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '—'}</>
+                                  }
                                 </p>
-                              )}
-                              {pr.items && pr.items.length > 0 && (
-                                <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg mt-2 space-y-1 border border-slate-100">
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Items Summary:</span>
-                                  {pr.items.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between">
-                                      <span className="truncate max-w-[200px] sm:max-w-xs">{item.purpose}</span>
-                                      <span className="font-medium text-slate-700">{formatCurrency(item.amount)}</span>
+                              </td>
+                              <td className="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">{new Date(pr.createdAt).toLocaleDateString()}</td>
+                              <td className="py-3 px-2 text-right font-bold text-jci-blue whitespace-nowrap">{formatCurrency(pr.totalAmount || pr.amount)}</td>
+                              <td className="py-3 px-2 text-center"><StatusBadge status={pr.status} /></td>
+                              <td className="py-3 px-2">
+                                <div className="flex gap-1.5 justify-end">
+                                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
+                                    <Eye size={13} />
+                                  </Button>
+                                  {pr.status === 'submitted' && (
+                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCancel(pr.id); }} disabled={actioningId !== null} className="text-red-500 hover:bg-red-50" title="Cancel">
+                                      <X size={13} />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                            {expandedId === pr.id && (
+                              <tr className="bg-sky-50/30">
+                                <td colSpan={6} className="px-4 pb-4 pt-2">
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    {pr.items && pr.items.length > 0 && (
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Claim Items</p>
+                                        <div className="space-y-1">
+                                          {pr.items.map((item, i) => (
+                                            <div key={i} className="flex justify-between text-xs">
+                                              <span className="text-slate-600 truncate">{item.purpose}</span>
+                                              <span className="font-medium text-slate-700 ml-4 shrink-0">{formatCurrency(item.amount)}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {pr.bankName && (
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Remit To</p>
+                                        <p className="text-xs text-slate-600">{pr.bankName} · {pr.accountHolder}</p>
+                                        <p className="text-xs font-mono text-slate-700 mt-0.5">{pr.accountNumber}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
+                                    <p className="text-xs text-jci-blue mt-2.5 flex items-center gap-1">
+                                      <Paperclip size={11} />
+                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} — view in PDF
+                                    </p>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-2.5">
+                    {filteredMyList.map((pr) => (
+                      <div
+                        key={pr.id}
+                        className={`rounded-xl border overflow-hidden transition-all duration-200 ${expandedId === pr.id ? 'border-jci-blue/40 shadow-sm' : 'border-slate-200 bg-white'}`}
+                      >
+                        <button
+                          type="button"
+                          className="w-full text-left p-3.5 active:bg-slate-50"
+                          onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
+                            <StatusBadge status={pr.status} />
+                          </div>
+                          <div className="mt-2 flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-800 text-sm truncate">{pr.purpose}</p>
+                              <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
+                                {pr.category === 'administrative'
+                                  ? <><Building2 size={11} />{pr.activityId || '—'}</>
+                                  : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '—'}</>
+                                }
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-1">{new Date(pr.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <p className="text-lg font-bold text-jci-blue shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                          </div>
+                        </button>
+                        {expandedId === pr.id && (
+                          <div className="border-t border-slate-100 px-3.5 pb-3.5 pt-3 bg-slate-50/60">
+                            {pr.items && pr.items.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Items</p>
+                                <div className="space-y-1">
+                                  {pr.items.map((item, i) => (
+                                    <div key={i} className="flex justify-between text-xs">
+                                      <span className="text-slate-600 truncate">{item.purpose}</span>
+                                      <span className="font-medium text-slate-700 ml-4 shrink-0">{formatCurrency(item.amount)}</span>
                                     </div>
                                   ))}
                                 </div>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider pt-1">
-                              <span>Requested on {new Date(pr.createdAt).toLocaleDateString()}</span>
-                              {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
-                                <span className="flex items-center gap-0.5 text-jci-blue bg-sky-50 px-1.5 py-0.5 rounded">
-                                  <Paperclip size={10} />
-                                  {pr.attachmentUrls.length} Attachment{pr.attachmentUrls.length === 1 ? '' : 's'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
-                            <div className="text-right">
-                              <span className="block text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Amount</span>
-                              <span className="text-2xl font-bold text-jci-blue">{formatCurrency(pr.totalAmount || pr.amount)}</span>
-                            </div>
+                              </div>
+                            )}
+                            {pr.bankName && (
+                              <div className="mb-3">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Remit To</p>
+                                <p className="text-xs text-slate-600">{pr.bankName} · <span className="font-mono">{pr.accountNumber}</span></p>
+                                <p className="text-xs text-slate-500">{pr.accountHolder}</p>
+                              </div>
+                            )}
                             <div className="flex gap-2">
-                              <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)}>
-                                <Eye size={14} className="mr-1" /> View PDF
+                              <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)} className="flex-1">
+                                <Eye size={13} className="mr-1" /> View PDF
                               </Button>
                               {pr.status === 'submitted' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleCancel(pr.id)}
-                                  disabled={actioningId !== null}
-                                  className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                >
-                                  <X size={14} className="mr-1" /> Cancel
+                                <Button size="sm" variant="ghost" onClick={() => handleCancel(pr.id)} disabled={actioningId !== null} className="text-red-500 hover:bg-red-50">
+                                  <X size={13} className="mr-1" /> Cancel
                                 </Button>
                               )}
                             </div>
                           </div>
-                        </div>
-                      </Card>
+                        )}
+                      </div>
                     ))}
                   </div>
-                )
-            ) : (
-              financeLoading ? <LoadingState loading={true}><span /></LoadingState> :
-                financeList.length === 0 ? (
-                  <p className="text-center py-8 text-slate-500">No applications matching filters</p>
-                ) : (
-                  <div className="grid gap-3">
+                </>
+              )
+          ) : (
+            financeLoading ? <ListSkeleton /> :
+              filteredFinanceList.length === 0 ? (
+                <div className="text-center py-14 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <FileText className="mx-auto text-slate-300 mb-3" size={36} />
+                  <p className="text-slate-600 font-semibold">No applications found</p>
+                  <p className="text-slate-400 text-sm mt-1">Try adjusting your status filter</p>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100">
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reference</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Applicant</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Project / Account</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
+                          <th className="text-center py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {filteredFinanceList.map((pr) => (
+                          <React.Fragment key={pr.id}>
+                            <tr
+                              className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
+                              onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
+                            >
+                              <td className="py-3 px-2">
+                                <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
+                              </td>
+                              <td className="py-3 px-2">
+                                <p className="font-medium text-slate-800">{pr.applicantName || '—'}</p>
+                                <p className="text-xs text-slate-400">{pr.applicantPosition || ''}</p>
+                              </td>
+                              <td className="py-3 px-2 max-w-[180px]">
+                                <p className="text-xs text-slate-600 truncate flex items-center gap-1">
+                                  {pr.category === 'administrative'
+                                    ? <><Building2 size={11} />{pr.activityId || '—'}</>
+                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '—'}</>
+                                  }
+                                </p>
+                              </td>
+                              <td className="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">{new Date(pr.createdAt).toLocaleDateString()}</td>
+                              <td className="py-3 px-2 text-right font-bold text-jci-blue whitespace-nowrap">{formatCurrency(pr.totalAmount || pr.amount)}</td>
+                              <td className="py-3 px-2 text-center"><StatusBadge status={pr.status} /></td>
+                              <td className="py-3 px-2">
+                                <div className="flex gap-1.5 justify-end items-center">
+                                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
+                                    <Eye size={13} />
+                                  </Button>
+                                  {pr.status === 'submitted' && (
+                                    <>
+                                      <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'approved'); }} disabled={actioningId !== null} title="Approve">
+                                        <CheckCircle size={13} />
+                                      </Button>
+                                      <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'rejected'); }} disabled={actioningId !== null} title="Reject">
+                                        <XCircle size={13} />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                            {expandedId === pr.id && (
+                              <tr className="bg-sky-50/30">
+                                <td colSpan={7} className="px-4 pb-4 pt-2">
+                                  <div className="grid md:grid-cols-3 gap-4">
+                                    {pr.items && pr.items.length > 0 && (
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Claim Items</p>
+                                        <div className="space-y-1">
+                                          {pr.items.map((item, i) => (
+                                            <div key={i} className="flex justify-between text-xs">
+                                              <span className="text-slate-600 truncate">{item.purpose}</span>
+                                              <span className="font-medium ml-3 shrink-0">{formatCurrency(item.amount)}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {pr.bankName && (
+                                      <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bank Details</p>
+                                          <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All" />
+                                        </div>
+                                        <div className="space-y-1.5 text-xs">
+                                          <div className="flex justify-between items-center gap-2">
+                                            <span className="text-slate-400 shrink-0">Bank</span>
+                                            <span className="font-medium text-slate-700 flex items-center gap-1 truncate">{pr.bankName} <CopyButton text={pr.bankName || ''} /></span>
+                                          </div>
+                                          <div className="flex justify-between items-center gap-2">
+                                            <span className="text-slate-400 shrink-0">Holder</span>
+                                            <span className="font-medium text-slate-700 flex items-center gap-1 truncate">{pr.accountHolder} <CopyButton text={pr.accountHolder || ''} /></span>
+                                          </div>
+                                          <div className="flex justify-between items-center gap-2">
+                                            <span className="text-slate-400 shrink-0">A/C No</span>
+                                            <span className="font-mono font-bold text-slate-700 flex items-center gap-1">{pr.accountNumber} <CopyButton text={pr.accountNumber || ''} /></span>
+                                          </div>
+                                          <div className="flex justify-between items-center gap-2">
+                                            <span className="text-slate-400 shrink-0">Claim From</span>
+                                            <span className="font-medium text-slate-700 truncate">{bankAccounts.find(a => a.id === pr.claimFromBankAccountId)?.name || '—'}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {pr.remark && (
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Remark</p>
+                                        <p className="text-xs text-slate-600 whitespace-pre-wrap">{pr.remark}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
+                                    <p className="text-xs text-jci-blue mt-2.5 flex items-center gap-1">
+                                      <Paperclip size={11} />
+                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} — view in PDF
+                                    </p>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-2.5">
                     {filteredFinanceList.map((pr) => (
-                      <Card key={pr.id} noPadding className="p-4 border border-slate-150 hover:border-slate-305 hover:shadow-sm transition-all duration-300 bg-white">
-                        <div className="flex flex-col md:flex-row justify-between gap-4">
-                          <div className="min-w-0 flex-1 space-y-2">
-                            <div className="flex items-center gap-2 justify-between flex-wrap">
-                              <span className="font-mono font-bold text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
-                              <StatusBadge status={pr.status} />
-                            </div>
-                            <div>
-                              <h5 className="font-bold text-slate-800 text-base">{pr.purpose}</h5>
-                              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                                {pr.category === 'administrative' ? (
-                                  <>
-                                    <Building2 size={13} className="text-slate-400" />
-                                    <span>Admin Account: <strong className="text-slate-700">{pr.activityId || 'N/A'}</strong></span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Sparkles size={13} className="text-orange-400" />
-                                    <span>Project: <strong className="text-slate-700">{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || 'N/A'}</strong></span>
-                                  </>
-                                )}
-                              </p>
-                              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1.5">
-                                <User size={13} className="text-slate-400" />
-                                <span>Applicant: <strong className="text-slate-700">{pr.applicantName || 'Unknown'}</strong> ({pr.applicantPosition || 'N/A'})</span>
-                              </div>
-                            </div>
-
-                            {/* Bank Details section for easy copying */}
-                            {pr.bankName && (
-                              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60 mt-2 space-y-1.5">
-                                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider border-b border-slate-150 pb-1">
-                                  <span>Remittance Bank Details</span>
-                                  <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All Info" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                                  <div>
-                                    <span className="text-slate-400">Bank:</span>{' '}
-                                    <span className="font-medium text-slate-700">{pr.bankName}</span>
-                                    <span className="ml-1"><CopyButton text={pr.bankName || ''} /></span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-400">Claim From Account:</span>{' '}
-                                    <span className="font-medium text-slate-700">
-                                      {bankAccounts.find(a => a.id === pr.claimFromBankAccountId)?.name || 'N/A'}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-400">Holder:</span>{' '}
-                                    <span className="font-medium text-slate-700">{pr.accountHolder}</span>
-                                    <span className="ml-1"><CopyButton text={pr.accountHolder || ''} /></span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-400">A/C No:</span>{' '}
-                                    <span className="font-mono font-bold text-slate-700">{pr.accountNumber}</span>
-                                    <span className="ml-1"><CopyButton text={pr.accountNumber || ''} /></span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {pr.items && pr.items.length > 0 && (
-                              <div className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg mt-2 space-y-1 border border-slate-100">
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Items Summary:</span>
-                                {pr.items.map((item, idx) => (
-                                  <div key={idx} className="flex justify-between">
-                                    <span className="truncate max-w-[200px] sm:max-w-xs">{item.purpose}</span>
-                                    <span className="font-medium text-slate-700">{formatCurrency(item.amount)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider pt-1">
-                              <span>Requested on {new Date(pr.createdAt).toLocaleDateString()}</span>
-                              {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
-                                <span className="flex items-center gap-0.5 text-jci-blue bg-sky-50 px-1.5 py-0.5 rounded">
-                                  <Paperclip size={10} />
-                                  {pr.attachmentUrls.length} Attachment{pr.attachmentUrls.length === 1 ? '' : 's'}
-                                </span>
-                              )}
-                            </div>
+                      <div
+                        key={pr.id}
+                        className={`rounded-xl border overflow-hidden transition-all duration-200 ${expandedId === pr.id ? 'border-jci-blue/40 shadow-sm' : 'border-slate-200 bg-white'}`}
+                      >
+                        <button
+                          type="button"
+                          className="w-full text-left p-3.5 active:bg-slate-50"
+                          onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
+                            <StatusBadge status={pr.status} />
                           </div>
-                          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-4">
-                            <div className="text-right">
-                              <span className="block text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Amount</span>
-                              <span className="text-2xl font-bold text-jci-blue">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                          <div className="mt-2 flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-800 text-sm">{pr.applicantName || '—'}</p>
+                              <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
+                                {pr.category === 'administrative'
+                                  ? <><Building2 size={11} />{pr.activityId || '—'}</>
+                                  : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || '—'}</>
+                                }
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-1">{new Date(pr.createdAt).toLocaleDateString()}</p>
                             </div>
-                            <div className="flex gap-2 items-center">
-                              <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)} title="View PDF">
-                                <Eye size={14} className="mr-1" /> PDF
+                            <p className="text-lg font-bold text-jci-blue shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                          </div>
+                        </button>
+                        {expandedId === pr.id && (
+                          <div className="border-t border-slate-100 px-3.5 pb-3.5 pt-3 bg-slate-50/60">
+                            {pr.bankName && (
+                              <div className="mb-3">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bank Details</p>
+                                  <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All" />
+                                </div>
+                                <div className="bg-white rounded-lg border border-slate-200 p-2.5 space-y-1.5 text-xs">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-slate-400">Bank</span>
+                                    <span className="font-medium text-slate-700 flex items-center gap-1">{pr.bankName} <CopyButton text={pr.bankName || ''} /></span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-slate-400">Holder</span>
+                                    <span className="font-medium text-slate-700 flex items-center gap-1">{pr.accountHolder} <CopyButton text={pr.accountHolder || ''} /></span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-slate-400">A/C No</span>
+                                    <span className="font-mono font-bold text-slate-700 flex items-center gap-1">{pr.accountNumber} <CopyButton text={pr.accountNumber || ''} /></span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {pr.items && pr.items.length > 0 && (
+                              <div className="mb-3">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Items</p>
+                                <div className="space-y-1">
+                                  {pr.items.map((item, i) => (
+                                    <div key={i} className="flex justify-between text-xs">
+                                      <span className="text-slate-600 truncate">{item.purpose}</span>
+                                      <span className="font-medium ml-4 shrink-0">{formatCurrency(item.amount)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)}>
+                                <Eye size={13} className="mr-1" /> PDF
                               </Button>
                               {pr.status === 'submitted' && (
-                                <div className="flex gap-1.5">
-                                  <Button size="sm" variant="success" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null}>Approve</Button>
-                                  <Button size="sm" variant="danger" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null}>Reject</Button>
-                                </div>
+                                <>
+                                  <Button size="sm" variant="success" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null} className="flex-1">Approve</Button>
+                                  <Button size="sm" variant="danger" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null} className="flex-1">Reject</Button>
+                                </>
                               )}
                             </div>
                           </div>
-                        </div>
-                      </Card>
+                        )}
+                      </div>
                     ))}
                   </div>
-                )
-            )}
-          </div>
+                </>
+              )
+          )}
         </div>
-      </Card>
+      </div>
 
       <Modal
         isOpen={submitModalOpen}

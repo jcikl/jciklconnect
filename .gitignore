@@ -1,5 +1,9 @@
 # Dependencies
 node_modules/
+
+# Service account credentials — never commit
+scripts/serviceAccount.json
+**/serviceAccount.json
 /.pnp
 .pnp.js
 

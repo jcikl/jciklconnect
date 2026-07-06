@@ -96,35 +96,71 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
           onEventUpdate={updateEvent}
         />
       ) : (
-        <Card noPadding className="overflow-hidden">
-          <div className="px-4 md:px-6 pt-4">
+        <div className="space-y-4">
+          {/* Mobile: segmented control in white bordered container */}
+          <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
             <Tabs
+              variant="button"
+              fullWidth
               tabs={['Upcoming', 'Completed']}
               activeTab={activeTab}
               onTabChange={setActiveTab}
             />
           </div>
 
-          <LoadingState
-            loading={loading}
-            error={error}
-            empty={filteredEvents.length === 0}
-            emptyMessage="No events found in this category."
-          >
-            <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredEvents.map(event => (
-                <EventRow
-                  key={event.id}
-                  event={event}
-                  member={member}
-                  onRegister={() => member && registerForEvent(event.id, member.id)}
-                  onCheckIn={() => member && markAttendance(event.id, member.id)}
-                  onClick={() => setSelectedEvent(event)}
-                />
-              ))}
+          {/* Desktop: card with underline tabs + list */}
+          <Card noPadding className="hidden md:block overflow-hidden">
+            <div className="px-6 pt-4">
+              <Tabs
+                tabs={['Upcoming', 'Completed']}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
             </div>
-          </LoadingState>
-        </Card>
+            <LoadingState
+              loading={loading}
+              error={error}
+              empty={filteredEvents.length === 0}
+              emptyMessage="No events found in this category."
+            >
+              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredEvents.map(event => (
+                  <EventRow
+                    key={event.id}
+                    event={event}
+                    member={member}
+                    onRegister={() => member && registerForEvent(event.id, member.id)}
+                    onCheckIn={() => member && markAttendance(event.id, member.id)}
+                    onClick={() => setSelectedEvent(event)}
+                  />
+                ))}
+              </div>
+            </LoadingState>
+          </Card>
+
+          {/* Mobile: list without card wrapper */}
+          <div className="md:hidden">
+            <LoadingState
+              loading={loading}
+              error={error}
+              empty={filteredEvents.length === 0}
+              emptyMessage="No events found in this category."
+            >
+              <div className="grid grid-cols-1 gap-4">
+                {filteredEvents.map(event => (
+                  <EventRow
+                    key={event.id}
+                    event={event}
+                    member={member}
+                    onRegister={() => member && registerForEvent(event.id, member.id)}
+                    onCheckIn={() => member && markAttendance(event.id, member.id)}
+                    onClick={() => setSelectedEvent(event)}
+                  />
+                ))}
+              </div>
+            </LoadingState>
+          </div>
+        </div>
       )}
 
       {/* Event Detail Modal */}

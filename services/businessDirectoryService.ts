@@ -111,14 +111,13 @@ export class BusinessDirectoryService {
     }
 
     try {
-      const q = query(
-        collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS),
-        orderBy('companyName', 'asc')
-      );
-      const snapshot = await getDocs(q);
+      // Read directly from members collection so all members with a companyName
+      // are included — not just those synced to the PUBLIC_BUSINESS_LISTINGS cache.
+      const snapshot = await getDocs(collection(db, COLLECTIONS.MEMBERS));
       return snapshot.docs
-        .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data()))
-        .filter((profile) => profile.companyName.trim().length > 0);
+        .map((docSnap) => mapMemberToBusinessProfile(docSnap.id, docSnap.data() as Record<string, unknown>))
+        .filter((profile): profile is BusinessProfile => profile !== null)
+        .sort((a, b) => a.companyName.localeCompare(b.companyName));
     } catch (error) {
       console.error('Error fetching business profiles:', error);
       throw error;

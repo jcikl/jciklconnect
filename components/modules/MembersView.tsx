@@ -2067,8 +2067,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         const contribList: any[] = [];
         contributionsSnap.forEach((doc) => {
           const data = doc.data();
-          const rawDateVal = typeof data.eventDate === 'string' 
-            ? data.eventDate.trim().substring(0, 11) 
+          const rawDateVal = typeof data.eventDate === 'string'
+            ? data.eventDate.trim().substring(0, 11)
             : (data.eventDate || data.createdAt?.toDate?.() || data.createdAt || '');
           contribList.push({
             id: doc.id,
@@ -2296,20 +2296,37 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               />
             </div>
 
-            <div className="flex-1 text-center md:text-left space-y-3">
-              <div className="flex flex-col md:flex-row items-center gap-3">
+            <div className="flex-1 text-center md:text-left space-y-2">
+              <div className="flex flex-col md:flex-row items-center md:items-baseline gap-2">
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight break-words">{member.name}</h1>
                 <Badge variant={member.tier.toLowerCase() as any} className="px-3 py-0.5 text-xs font-bold uppercase tracking-wider">{member.tier}</Badge>
               </div>
 
-              <div className="flex flex-wrap justify-center md:justify-start gap-y-2 gap-x-4 text-sm font-medium text-slate-500">
-                <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100"><Mail size={14} className="text-jci-blue" />{member.email}</span>
-                {member.phone && <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100"><Phone size={14} className="text-jci-blue" />{member.phone}</span>}
-                <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100"><Briefcase size={14} className="text-jci-blue" />{member.role}</span>
+              {/* Company / Position subtitle */}
+              {(member.companyName || member.departmentAndPosition) && (
+                <p className="text-sm font-semibold text-slate-500 flex items-center justify-center md:justify-start gap-1.5">
+                  <Briefcase size={13} className="text-slate-400 shrink-0" />
+                  {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
+                </p>
+              )}
+
+              <div className="flex flex-wrap justify-center md:justify-start gap-y-1.5 gap-x-2 text-sm font-medium text-slate-500">
+                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Mail size={12} className="text-jci-blue" />{member.email}</span>
+                {member.phone && <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Phone size={12} className="text-jci-blue" />{member.phone}</span>}
+                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Shield size={12} className="text-jci-blue" />{member.role}</span>
                 {member.introducer && (
-                  <span className="flex items-center gap-2 px-2 py-1 bg-blue-50 text-jci-blue rounded-lg border border-blue-100">
-                    <UserPlus size={14} />
-                    Introduced by: {resolveIntroducerDisplay(member.introducer)}
+                  <span className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-jci-blue rounded-lg border border-blue-100 text-xs">
+                    <UserPlus size={12} />
+                    {resolveIntroducerDisplay(member.introducer)}
+                  </span>
+                )}
+                {/* Social links inline */}
+                {(member.linkedin || member.facebook || member.instagram || member.wechat) && (
+                  <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
+                    {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#0077B5] transition-colors"><Linkedin size={14} /></a>}
+                    {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#1877F2] transition-colors"><Facebook size={14} /></a>}
+                    {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#E1306C] transition-colors"><Instagram size={14} /></a>}
+                    {member.wechat && <span className="text-slate-400 flex items-center gap-1 text-xs"><MessageCircle size={14} />{member.wechat}</span>}
                   </span>
                 )}
               </div>
@@ -2344,21 +2361,33 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-t border-slate-100 divide-x divide-slate-100 bg-slate-50/50">
-          <div className="p-6 text-center hover:bg-white transition-colors">
-            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Total Points</p>
+        <div className="grid grid-cols-4 gap-0 border-t border-slate-100 divide-x divide-slate-100 bg-slate-50/50">
+          <div className="p-4 text-center hover:bg-white transition-colors group">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <Coins size={12} className="text-jci-blue" />
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Total Points</p>
+            </div>
             <p className="text-2xl font-black text-jci-blue">{member.points.toLocaleString()}</p>
           </div>
-          <div className="p-6 text-center hover:bg-white transition-colors">
-            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Join Date</p>
-            <p className="text-2xl font-black text-slate-900">{formatDateToDDMMMYYYY(member.joinDate)}</p>
+          <div className="p-4 text-center hover:bg-white transition-colors">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <Calendar size={12} className="text-slate-400" />
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Join Date</p>
+            </div>
+            <p className="text-base font-black text-slate-900 leading-snug">{formatDateToDDMMMYYYY(member.joinDate)}</p>
           </div>
-          <div className="p-6 text-center hover:bg-white transition-colors">
-            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Attendance</p>
+          <div className="p-4 text-center hover:bg-white transition-colors">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <CalendarCheck size={12} className="text-slate-400" />
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Attendance</p>
+            </div>
             <p className="text-2xl font-black text-slate-900">{member.attendanceRate}%</p>
           </div>
-          <div className="p-6 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
-            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">Dues Status ({new Date().getFullYear()})</p>
+          <div className="p-4 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
+            <div className="flex items-center justify-center gap-1.5 mb-2">
+              <CheckCircle size={12} className="text-slate-400" />
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Dues {new Date().getFullYear()}</p>
+            </div>
             <Badge
               variant={
                 (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
@@ -2374,7 +2403,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       </section>
 
       {/* NEW: Wolf-like Persona & Ambition Visualizer (Phase 1) */}
-      <div className="grid md:grid-cols-2 gap-6">
+      {canEditMembers && <div className="grid md:grid-cols-2 gap-6">
         <Card className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white border-none shadow-xl overflow-hidden relative">
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Target size={120} />
@@ -2452,7 +2481,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             </div>
           </div>
         </Card>
-      </div>
+      </div>}
 
       {/* Tab Selector */}
       <div className="border-b border-slate-200 mb-6">
@@ -2473,562 +2502,571 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         <div className="grid lg:grid-cols-3 gap-6">
           {activeDetailTab !== 'professional' && (
             <div className="space-y-6">
-            {activeDetailTab === 'basic' && (
-              <>
-                <Card
-                  title="Basic Information"
+              {activeDetailTab === 'basic' && (
+                <>
+                  <Card
+                    title="Basic Information"
+                    action={
+                      (canEditMembers || isSelfView) && activeInlineEditCard !== 'basic' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
+                          onClick={() => startInlineEdit('basic')}
+                          title="Edit Basic Info"
+                        >
+                          <Edit size={14} />
+                        </Button>
+                      )
+                    }
+                  >
+                    {activeInlineEditCard === 'basic' && inlineValues ? (
+                      <div className="space-y-4 text-sm">
+                        <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-blue-50 shadow-sm shrink-0">
+                            {inlineValues.avatar ? (
+                              <img src={inlineValues.avatar} alt={inlineValues.name || member.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xl font-black text-jci-blue">
+                                {(inlineValues.name || member.name || 'M').charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-3">
+                            <div>
+                              <p className="font-bold text-slate-900">Member Avatar</p>
+                              <p className="text-xs text-slate-500 mt-0.5">Upload a profile photo for member-facing pages.</p>
+                            </div>
+                            {avatarUploading && (
+                              <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                                <div className="h-full bg-jci-blue transition-all" style={{ width: `${avatarUploadProgress}%` }} />
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                              <label className={`inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-bold transition-colors ${avatarUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-jci-blue text-white hover:bg-jci-navy cursor-pointer'}`}>
+                                {avatarUploading ? 'Uploading...' : 'Upload'}
+                                <input type="file" accept="image/*" className="hidden" disabled={avatarUploading} onChange={handleInlineAvatarUpload} />
+                              </label>
+                              {inlineValues.avatar && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={avatarUploading}
+                                  className="text-red-600 border-red-200 hover:bg-red-50"
+                                  onClick={() => setInlineValues({ ...inlineValues, avatar: '' })}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name (Short)<span className="text-red-500 ml-1">*</span></label>
+                            <input
+                              type="text"
+                              value={inlineValues.name}
+                              onChange={e => setInlineValues({ ...inlineValues, name: e.target.value })}
+                              required
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name (ID)</label>
+                            <input
+                              type="text"
+                              value={inlineValues.fullName}
+                              onChange={e => setInlineValues({ ...inlineValues, fullName: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
+                            <input
+                              type="text"
+                              value={inlineValues.idNumber}
+                              onChange={e => setInlineValues({ ...inlineValues, idNumber: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
+                            <input
+                              type="date"
+                              value={inlineValues.dateOfBirth}
+                              onChange={e => setInlineValues({ ...inlineValues, dateOfBirth: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
+                            <select
+                              value={inlineValues.gender}
+                              onChange={e => setInlineValues({ ...inlineValues, gender: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                            >
+                              <option value="">Select Gender</option>
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ethnicity</label>
+                            <select
+                              value={inlineValues.ethnicity}
+                              onChange={e => setInlineValues({ ...inlineValues, ethnicity: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                            >
+                              <option value="">Select Ethnicity</option>
+                              <option value="Chinese">Chinese</option>
+                              <option value="Malay">Malay</option>
+                              <option value="Indian">Indian</option>
+                              <option value="Others">Others</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
+                            <input
+                              type="text"
+                              value={inlineValues.nationality}
+                              onChange={e => setInlineValues({ ...inlineValues, nationality: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
+                            <IntroducerSelector
+                              value={inlineValues.introducer || ''}
+                              onChange={val => setInlineValues({ ...inlineValues, introducer: val })}
+                              members={members}
+                              projects={allProjects}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
+                          <textarea
+                            value={inlineValues.bio}
+                            onChange={e => setInlineValues({ ...inlineValues, bio: e.target.value })}
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y"
+                          />
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Hobbies</label>
+                          <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-lg bg-slate-50">
+                            {HOBBY_OPTIONS.map(opt => {
+                              const isChecked = inlineValues.hobbies.includes(opt);
+                              return (
+                                <label key={opt} className="cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={e => {
+                                      const newHobbies = e.target.checked
+                                        ? [...inlineValues.hobbies, opt]
+                                        : inlineValues.hobbies.filter((h: string) => h !== opt);
+                                      setInlineValues({ ...inlineValues, hobbies: newHobbies });
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <span className={`inline-block px-2 py-1 rounded text-[10px] font-semibold border ${isChecked
+                                    ? 'bg-jci-blue text-white border-jci-blue'
+                                    : 'bg-white text-slate-600 border-slate-300 hover:border-jci-blue'
+                                    }`}>
+                                    {opt}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Skills</label>
+                          <input
+                            type="text"
+                            value={inlineValues.skills}
+                            onChange={e => setInlineValues({ ...inlineValues, skills: e.target.value })}
+                            placeholder="e.g. Public Speaking, Event Management (comma separated)"
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t">
+                          <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
+                          <Button variant="primary" size="sm" onClick={async () => {
+                            const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+                            const saved = await handleInlineSave('basic', {
+                              avatar: inlineValues.avatar || '',
+                              avatarUrl: inlineValues.avatar || '',
+                              name: inlineValues.name,
+                              fullName: inlineValues.fullName,
+                              idNumber: inlineValues.idNumber,
+                              dateOfBirth: inlineValues.dateOfBirth,
+                              gender: inlineValues.gender,
+                              ethnicity: inlineValues.ethnicity,
+                              nationality: inlineValues.nationality,
+                              introducer: inlineValues.introducer,
+                              bio: inlineValues.bio,
+                              hobbies: inlineValues.hobbies,
+                              skills: skillsArr,
+                            });
+                            const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+                            if (saved && originalAvatar && originalAvatar !== inlineValues.avatar) {
+                              deleteFromCloudinary(originalAvatar).catch((err) => {
+                                console.error('Failed to delete previous member avatar from Cloudinary:', err);
+                              });
+                            }
+                          }}>Save</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Full Name (ID)</span>
+                            <p className="font-medium text-slate-900">{member.fullName || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">ID Number</span>
+                            <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Gender</span>
+                            <p className="font-medium text-slate-900">{member.gender || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
+                            <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
+                            <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
+                            <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
+                          <p className="text-sm font-medium text-slate-900">{resolveIntroducerDisplay(member.introducer)}</p>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</span>
+                          <p className="text-sm text-slate-600 line-clamp-4 italic">
+                            {member.bio || 'No biography provided.'}
+                          </p>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Hobbies</span>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.isArray(member.hobbies) && member.hobbies.length > 0 ? (
+                              member.hobbies.map(hobby => (
+                                <Badge key={hobby} variant="neutral" className="text-[10px]">{hobby}</Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">No hobbies listed</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-3">
+                          <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Skills</span>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.isArray(member.skills) && member.skills.length > 0 ? (
+                              member.skills.map(skill => (
+                                <Badge key={skill} variant="neutral" className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100">{skill}</Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">No skills listed</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+
+                  {(isAdmin || isDeveloper) && (
+                    <Button variant="outline" size="sm" className="w-full" onClick={handleAnalyzeChurn} isLoading={loadingChurnPrediction}>
+                      <Sparkles size={14} className="mr-2" /> Analyze Churn Risk
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {activeDetailTab === 'career' && (
+                <Card title="Mentorship & Growth">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
+                      {mentor ? (
+                        <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
+                          <img src={mentor.avatar || undefined} className="w-10 h-10 rounded-full" alt="" />
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{mentor.name}</p>
+                            <p className="text-xs text-slate-500">{mentor.role}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
+                          <p className="text-sm text-slate-500 mb-2">No mentor assigned</p>
+                          <Button size="sm" variant="outline" onClick={handleFindMentors} isLoading={loadingMatches}>
+                            <Zap size={14} className="mr-2" /> Find Mentor
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {mentees.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Mentees</h4>
+                        <div className="space-y-2">
+                          {mentees.map(m => (
+                            <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
+                              <img src={m.avatar || undefined} className="w-8 h-8 rounded-full" alt="" />
+                              <span className="text-sm font-medium">{m.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {activeDetailTab === 'basic' && (
+                <Card title="Hobby Clubs">
+                  {loadingClubs ? (
+                    <div className="text-center py-4 text-slate-400 text-sm">Loading clubs...</div>
+                  ) : memberClubs.length > 0 ? (
+                    <div className="space-y-2">
+                      {memberClubs.map(club => (
+                        <div key={club.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-slate-900">{club.name}</p>
+                            <p className="text-xs text-slate-500">{club.category}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-slate-400 text-sm">Not a member of any clubs</div>
+                  )}
+                </Card>
+              )}
+
+              {activeDetailTab === 'career' && (
+                <Card title="Membership & Dues"
                   action={
-                    (canEditMembers || isSelfView) && activeInlineEditCard !== 'basic' && (
+                    (canEditMembers) && activeInlineEditCard !== 'career' && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                        onClick={() => startInlineEdit('basic')}
-                        title="Edit Basic Info"
+                        onClick={() => startInlineEdit('career')}
+                        title="Edit Membership & Senatorship"
                       >
                         <Edit size={14} />
                       </Button>
                     )
                   }
                 >
-                  {activeInlineEditCard === 'basic' && inlineValues ? (
+                  {activeInlineEditCard === 'career' && inlineValues ? (
                     <div className="space-y-4 text-sm">
-                      <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-blue-50 shadow-sm shrink-0">
-                          {inlineValues.avatar ? (
-                            <img src={inlineValues.avatar} alt={inlineValues.name || member.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xl font-black text-jci-blue">
-                              {(inlineValues.name || member.name || 'M').charAt(0)}
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Senatorship Number</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 12345"
+                            value={inlineValues.senatorshipId}
+                            onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                          />
+                        </div>
+                        <div className="flex items-center gap-4 py-1">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={inlineValues.senatorCertified}
+                              onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
+                              className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                            />
+                            <span className="text-sm font-medium text-slate-700">Senator Certified</span>
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-4 py-1">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={inlineValues.senatorshipBoardValidated}
+                              onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
+                              className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                            />
+                            <span className="text-sm font-medium text-slate-700">Board Validated</span>
+                          </label>
+                        </div>
+                        {inlineValues.senatorshipBoardValidated && (
+                          <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                            <div>
+                              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
+                              <input
+                                type="text"
+                                value={inlineValues.senatorshipValidatedBy}
+                                onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                              />
                             </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-3">
-                          <div>
-                            <p className="font-bold text-slate-900">Member Avatar</p>
-                            <p className="text-xs text-slate-500 mt-0.5">Upload a profile photo for member-facing pages.</p>
-                          </div>
-                          {avatarUploading && (
-                            <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                              <div className="h-full bg-jci-blue transition-all" style={{ width: `${avatarUploadProgress}%` }} />
+                            <div>
+                              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
+                              <input
+                                type="date"
+                                value={inlineValues.senatorshipValidatedAt}
+                                onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                              />
                             </div>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            <label className={`inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-bold transition-colors ${avatarUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-jci-blue text-white hover:bg-jci-navy cursor-pointer'}`}>
-                              {avatarUploading ? 'Uploading...' : 'Upload'}
-                              <input type="file" accept="image/*" className="hidden" disabled={avatarUploading} onChange={handleInlineAvatarUpload} />
-                            </label>
-                            {inlineValues.avatar && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={avatarUploading}
-                                className="text-red-600 border-red-200 hover:bg-red-50"
-                                onClick={() => setInlineValues({ ...inlineValues, avatar: '' })}
-                              >
-                                Remove
-                              </Button>
-                            )}
                           </div>
-                        </div>
+                        )}
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name (Short)<span className="text-red-500 ml-1">*</span></label>
-                          <input
-                            type="text"
-                            value={inlineValues.name}
-                            onChange={e => setInlineValues({ ...inlineValues, name: e.target.value })}
-                            required
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name (ID)</label>
-                          <input
-                            type="text"
-                            value={inlineValues.fullName}
-                            onChange={e => setInlineValues({ ...inlineValues, fullName: e.target.value })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
-                          <input
-                            type="text"
-                            value={inlineValues.idNumber}
-                            onChange={e => setInlineValues({ ...inlineValues, idNumber: e.target.value })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
-                          <input
-                            type="date"
-                            value={inlineValues.dateOfBirth}
-                            onChange={e => setInlineValues({ ...inlineValues, dateOfBirth: e.target.value })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
-                          <select
-                            value={inlineValues.gender}
-                            onChange={e => setInlineValues({ ...inlineValues, gender: e.target.value })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
-                          >
-                            <option value="">Select Gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ethnicity</label>
-                          <select
-                            value={inlineValues.ethnicity}
-                            onChange={e => setInlineValues({ ...inlineValues, ethnicity: e.target.value })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
-                          >
-                            <option value="">Select Ethnicity</option>
-                            <option value="Chinese">Chinese</option>
-                            <option value="Malay">Malay</option>
-                            <option value="Indian">Indian</option>
-                            <option value="Others">Others</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
-                          <input
-                            type="text"
-                            value={inlineValues.nationality}
-                            onChange={e => setInlineValues({ ...inlineValues, nationality: e.target.value })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
-                          <IntroducerSelector
-                            value={inlineValues.introducer || ''}
-                            onChange={val => setInlineValues({ ...inlineValues, introducer: val })}
-                            members={members}
-                            projects={allProjects}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
-                        <textarea
-                          value={inlineValues.bio}
-                          onChange={e => setInlineValues({ ...inlineValues, bio: e.target.value })}
-                          rows={2}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y"
-                        />
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Hobbies</label>
-                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 border border-slate-200 rounded-lg bg-slate-50">
-                          {HOBBY_OPTIONS.map(opt => {
-                            const isChecked = inlineValues.hobbies.includes(opt);
-                            return (
-                              <label key={opt} className="cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={e => {
-                                    const newHobbies = e.target.checked
-                                      ? [...inlineValues.hobbies, opt]
-                                      : inlineValues.hobbies.filter((h: string) => h !== opt);
-                                    setInlineValues({ ...inlineValues, hobbies: newHobbies });
-                                  }}
-                                  className="hidden"
-                                />
-                                <span className={`inline-block px-2 py-1 rounded text-[10px] font-semibold border ${isChecked
-                                  ? 'bg-jci-blue text-white border-jci-blue'
-                                  : 'bg-white text-slate-600 border-slate-300 hover:border-jci-blue'
-                                  }`}>
-                                  {opt}
-                                </span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Skills</label>
-                        <input
-                          type="text"
-                          value={inlineValues.skills}
-                          onChange={e => setInlineValues({ ...inlineValues, skills: e.target.value })}
-                          placeholder="e.g. Public Speaking, Event Management (comma separated)"
-                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                        />
-                      </div>
-
                       <div className="flex justify-end gap-2 pt-3 border-t">
                         <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                        <Button variant="primary" size="sm" onClick={async () => {
-                          const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-                          const saved = await handleInlineSave('basic', {
-                            avatar: inlineValues.avatar || '',
-                            avatarUrl: inlineValues.avatar || '',
-                            name: inlineValues.name,
-                            fullName: inlineValues.fullName,
-                            idNumber: inlineValues.idNumber,
-                            dateOfBirth: inlineValues.dateOfBirth,
-                            gender: inlineValues.gender,
-                            ethnicity: inlineValues.ethnicity,
-                            nationality: inlineValues.nationality,
-                            introducer: inlineValues.introducer,
-                            bio: inlineValues.bio,
-                            hobbies: inlineValues.hobbies,
-                            skills: skillsArr,
+                        <Button variant="primary" size="sm" onClick={() => {
+                          handleInlineSave('career', {
+                            senatorshipId: inlineValues.senatorshipId !== undefined ? inlineValues.senatorshipId.trim() : undefined,
+                            senatorCertified: inlineValues.senatorCertified,
+                            senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
+                            senatorshipValidatedBy: inlineValues.senatorshipValidatedBy !== undefined ? inlineValues.senatorshipValidatedBy.trim() : undefined,
+                            senatorshipValidatedAt: inlineValues.senatorshipValidatedAt !== undefined ? inlineValues.senatorshipValidatedAt.trim() : undefined,
                           });
-                          const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
-                          if (saved && originalAvatar && originalAvatar !== inlineValues.avatar) {
-                            deleteFromCloudinary(originalAvatar).catch((err) => {
-                              console.error('Failed to delete previous member avatar from Cloudinary:', err);
-                            });
-                          }
                         }}>Save</Button>
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                         <div>
-                          <span className="text-slate-500 block text-xs uppercase font-medium">Full Name (ID)</span>
-                          <p className="font-medium text-slate-900">{member.fullName || 'Not provided'}</p>
+                          <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
+                          <MembershipTypeDisplay
+                            member={{
+                              nationality: member.nationality,
+                              dateOfBirth: member.dateOfBirth,
+                              senatorCertified: member.senatorCertified,
+                              senatorshipId: member.senatorshipId,
+                              role: member.role,
+                              membershipType: member.membershipType,
+                            }}
+                          />
                         </div>
-                        <div>
-                          <span className="text-slate-500 block text-xs uppercase font-medium">ID Number</span>
-                          <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block text-xs uppercase font-medium">Gender</span>
-                          <p className="font-medium text-slate-900">{member.gender || 'Not provided'}</p>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
-                          <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
-                          <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
-                          <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
-                        </div>
+                        {member.senatorCertified && (
+                          <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
+                        )}
                       </div>
 
-                      <div className="border-t pt-3">
-                        <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
-                        <p className="text-sm font-medium text-slate-900">{resolveIntroducerDisplay(member.introducer)}</p>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</span>
-                        <p className="text-sm text-slate-600 line-clamp-4 italic">
-                          {member.bio || 'No biography provided.'}
-                        </p>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Hobbies</span>
-                        <div className="flex flex-wrap gap-1">
-                          {Array.isArray(member.hobbies) && member.hobbies.length > 0 ? (
-                            member.hobbies.map(hobby => (
-                              <Badge key={hobby} variant="neutral" className="text-[10px]">{hobby}</Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-slate-400 italic">No hobbies listed</span>
-                          )}
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
+                          <Badge
+                            variant={
+                              (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
+                                member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
+                                member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+                            }
+                            className="capitalize"
+                          >
+                            {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
+                          </Badge>
                         </div>
-                      </div>
-
-                      <div className="border-t pt-3">
-                        <span className="text-slate-500 block text-xs uppercase font-medium mb-2">Skills</span>
-                        <div className="flex flex-wrap gap-1">
-                          {Array.isArray(member.skills) && member.skills.length > 0 ? (
-                            member.skills.map(skill => (
-                              <Badge key={skill} variant="neutral" className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100">{skill}</Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-slate-400 italic">No skills listed</span>
-                          )}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Last Payment Amount:</span>
+                          <span className="font-bold">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</span>
                         </div>
-                      </div>
-                    </div>
-                  )}
-                </Card>
-
-                <Card title="Quick Stats">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-50 rounded-lg text-center">
-                      <span className="block text-2xl font-bold text-slate-900">{member.points}</span>
-                      <span className="text-xs text-slate-500 uppercase">Points</span>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-lg text-center">
-                      <span className="block text-2xl font-bold text-slate-900">{member.attendanceRate}%</span>
-                      <span className="text-xs text-slate-500 uppercase">Attendance</span>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <Button variant="outline" size="sm" className="w-full" onClick={handleAnalyzeChurn} isLoading={loadingChurnPrediction}>
-                      <Sparkles size={14} className="mr-2" /> Analyze Churn Risk
-                    </Button>
-                  </div>
-                </Card>
-              </>
-            )}
-
-            {activeDetailTab === 'career' && (
-              <Card title="Mentorship & Growth">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
-                    {mentor ? (
-                      <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                        <img src={mentor.avatar || undefined} className="w-10 h-10 rounded-full" alt="" />
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{mentor.name}</p>
-                          <p className="text-xs text-slate-500">{mentor.role}</p>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Last Payment Date:</span>
+                          <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</span>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
-                        <p className="text-sm text-slate-500 mb-2">No mentor assigned</p>
-                        <Button size="sm" variant="outline" onClick={handleFindMentors} isLoading={loadingMatches}>
-                          <Zap size={14} className="mr-2" /> Find Mentor
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowPaymentHistoryModal(true)}
+                          className="mt-2 w-full font-bold text-slate-700 hover:text-jci-blue border-slate-200 hover:border-jci-blue flex items-center justify-center gap-1.5"
+                        >
+                          <Clock size={12} /> View Payment History
                         </Button>
                       </div>
-                    )}
-                  </div>
 
-                  {mentees.length > 0 && (
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Mentees</h4>
-                      <div className="space-y-2">
-                        {mentees.map(m => (
-                          <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
-                            <img src={m.avatar || undefined} className="w-8 h-8 rounded-full" alt="" />
-                            <span className="text-sm font-medium">{m.name}</span>
+                      {/* Senator Details Section */}
+                      <div className="border-t pt-4 space-y-3">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Senatorship Details</h4>
+                        <div className="grid grid-cols-1 gap-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Certified Senator:</span>
+                            <Badge variant={member.senatorCertified ? 'success' : 'neutral'}>
+                              {member.senatorCertified ? 'Yes' : 'No'}
+                            </Badge>
                           </div>
-                        ))}
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Senator Number:</span>
+                            <span className="font-semibold text-slate-900">{member.senatorshipId || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Board Validated:</span>
+                            <Badge variant={member.senatorshipBoardValidated ? 'success' : 'neutral'}>
+                              {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
+                            </Badge>
+                          </div>
+                          {member.senatorshipBoardValidated && member.senatorshipValidatedBy && (
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                              <span>Validated By:</span>
+                              <span className="font-medium">{member.senatorshipValidatedBy}</span>
+                            </div>
+                          )}
+                          {member.senatorshipBoardValidated && member.senatorshipValidatedAt && (
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                              <span>Validated At:</span>
+                              <span className="font-medium">{formatDateToDDMMMYYYY(member.senatorshipValidatedAt)}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
-                </div>
-              </Card>
-            )}
-
-            {activeDetailTab === 'basic' && (
-              <Card title="Hobby Clubs">
-                {loadingClubs ? (
-                  <div className="text-center py-4 text-slate-400 text-sm">Loading clubs...</div>
-                ) : memberClubs.length > 0 ? (
-                  <div className="space-y-2">
-                    {memberClubs.map(club => (
-                      <div key={club.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-900">{club.name}</p>
-                          <p className="text-xs text-slate-500">{club.category}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-slate-400 text-sm">Not a member of any clubs</div>
-                )}
-              </Card>
-            )}
-
-            {activeDetailTab === 'career' && (
-              <Card title="Membership & Dues"
-                action={
-                  (canEditMembers) && activeInlineEditCard !== 'career' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                      onClick={() => startInlineEdit('career')}
-                      title="Edit Membership & Senatorship"
-                    >
-                      <Edit size={14} />
-                    </Button>
-                  )
-                }
-              >
-                {activeInlineEditCard === 'career' && inlineValues ? (
-                  <div className="space-y-4 text-sm">
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Senatorship Number</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 12345"
-                          value={inlineValues.senatorshipId}
-                          onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                        />
-                      </div>
-                      <div className="flex items-center gap-4 py-1">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={inlineValues.senatorCertified}
-                            onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                          />
-                          <span className="text-sm font-medium text-slate-700">Senator Certified</span>
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-4 py-1">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={inlineValues.senatorshipBoardValidated}
-                            onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
-                            className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                          />
-                          <span className="text-sm font-medium text-slate-700">Board Validated</span>
-                        </label>
-                      </div>
-                      {inlineValues.senatorshipBoardValidated && (
-                        <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
-                          <div>
-                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
-                            <input
-                              type="text"
-                              value={inlineValues.senatorshipValidatedBy}
-                              onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
-                            <input
-                              type="date"
-                              value={inlineValues.senatorshipValidatedAt}
-                              onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex justify-end gap-2 pt-3 border-t">
-                      <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                      <Button variant="primary" size="sm" onClick={() => {
-                        handleInlineSave('career', {
-                          senatorshipId: inlineValues.senatorshipId !== undefined ? inlineValues.senatorshipId.trim() : undefined,
-                          senatorCertified: inlineValues.senatorCertified,
-                          senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
-                          senatorshipValidatedBy: inlineValues.senatorshipValidatedBy !== undefined ? inlineValues.senatorshipValidatedBy.trim() : undefined,
-                          senatorshipValidatedAt: inlineValues.senatorshipValidatedAt !== undefined ? inlineValues.senatorshipValidatedAt.trim() : undefined,
-                        });
-                      }}>Save</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <div>
-                        <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
-                        <MembershipTypeDisplay
-                          member={{
-                            nationality: member.nationality,
-                            dateOfBirth: member.dateOfBirth,
-                            senatorCertified: member.senatorCertified,
-                            senatorshipId: member.senatorshipId,
-                            role: member.role,
-                            membershipType: member.membershipType,
-                          }}
-                        />
-                      </div>
-                      {member.senatorCertified && (
-                        <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
-                        <Badge
-                          variant={
-                            (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
-                              member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
-                              member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
-                          }
-                          className="capitalize"
-                        >
-                          {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-500">Last Payment Amount:</span>
-                        <span className="font-bold">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-500">Last Payment Date:</span>
-                        <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</span>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setShowPaymentHistoryModal(true)}
-                        className="mt-2 w-full font-bold text-slate-700 hover:text-jci-blue border-slate-200 hover:border-jci-blue flex items-center justify-center gap-1.5"
-                      >
-                        <Clock size={12} /> View Payment History
-                      </Button>
-                    </div>
-
-                    {/* Senator Details Section */}
-                    <div className="border-t pt-4 space-y-3">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Senatorship Details</h4>
-                      <div className="grid grid-cols-1 gap-2 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500">Certified Senator:</span>
-                          <Badge variant={member.senatorCertified ? 'success' : 'neutral'}>
-                            {member.senatorCertified ? 'Yes' : 'No'}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500">Senator Number:</span>
-                          <span className="font-semibold text-slate-900">{member.senatorshipId || 'N/A'}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500">Board Validated:</span>
-                          <Badge variant={member.senatorshipBoardValidated ? 'success' : 'neutral'}>
-                            {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
-                          </Badge>
-                        </div>
-                        {member.senatorshipBoardValidated && member.senatorshipValidatedBy && (
-                          <div className="flex items-center justify-between text-xs text-slate-500">
-                            <span>Validated By:</span>
-                            <span className="font-medium">{member.senatorshipValidatedBy}</span>
-                          </div>
-                        )}
-                        {member.senatorshipBoardValidated && member.senatorshipValidatedAt && (
-                          <div className="flex items-center justify-between text-xs text-slate-500">
-                            <span>Validated At:</span>
-                            <span className="font-medium">{formatDateToDDMMMYYYY(member.senatorshipValidatedAt)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            )}
+                </Card>
+              )}
             </div>
           )}
 
           <div className={`${activeDetailTab === 'professional' ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-6`}>
+            {activeDetailTab === 'professional' && (member.companyName || member.industry) && activeInlineEditCard !== 'professional' && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">{[member.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  {member.industry && (
+                    <span className="px-3 py-1 rounded-full bg-blue-50 text-jci-blue text-xs font-bold border border-blue-100">{member.industry}</span>
+                  )}
+                  {member.acceptInternationalBusiness && member.acceptInternationalBusiness !== 'No' && (
+                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
+                  )}
+                  {member.companyWebsite && (
+                    <a href={member.companyWebsite} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
+                      <ArrowUpRight size={11} /> Website
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
             {activeDetailTab === 'professional' && (
               <Card
                 title="Professional & Business"

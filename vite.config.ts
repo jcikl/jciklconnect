@@ -49,6 +49,21 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+              'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/messaging'],
+              'vendor-charts': ['recharts'],
+              'vendor-pdf': ['jspdf', 'pdf-lib'],
+              'vendor-excel': ['xlsx'],
+              'vendor-calendar': ['react-big-calendar'],
+              'vendor-motion': ['framer-motion'],
+            },
+          },
+        },
+      },
     };
 });

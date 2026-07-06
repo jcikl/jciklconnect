@@ -357,25 +357,25 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Name<span className="text-red-500 ml-1">*</span></label>
-                <input name="name" value={formValues.name} onChange={(e) => handleChange('name', e.target.value)} required className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name<span className="text-red-500 ml-1">*</span></label>
+                <input name="name" value={formValues.name} onChange={(e) => handleChange('name', e.target.value)} required className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Full Name</label>
-                <input name="fullName" value={formValues.fullName} onChange={(e) => handleChange('fullName', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name</label>
+                <input name="fullName" value={formValues.fullName} onChange={(e) => handleChange('fullName', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">ID Number</label>
-                <input name="idNumber" value={formValues.idNumber} onChange={(e) => handleChange('idNumber', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
+                <input name="idNumber" value={formValues.idNumber} onChange={(e) => handleChange('idNumber', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Date of Birth</label>
-                <input name="dateOfBirth" type="date" value={formValues.dateOfBirth} onChange={(e) => handleChange('dateOfBirth', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
+                <input name="dateOfBirth" type="date" value={formValues.dateOfBirth} onChange={(e) => handleChange('dateOfBirth', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Gender</label>
-                <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
+                <div className="flex w-full rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
                   {['Male', 'Female'].map((opt) => (
                     <label key={opt} className="cursor-pointer flex-1 flex">
                       <input type="radio" name="gender" value={opt} checked={formValues.gender === opt} onChange={(e) => handleChange('gender', e.target.value)} className="hidden" />
@@ -384,20 +384,20 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   ))}
                 </div>
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Nationality</label>
-                <select name="nationality" value={formValues.nationality} onChange={(e) => handleChange('nationality', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white">
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
+                <select name="nationality" value={formValues.nationality} onChange={(e) => handleChange('nationality', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white">
                   {nationalityOptionsForValue(formValues.nationality).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Introducer</label>
-                <input name="introducer" value={formValues.introducer} onChange={(e) => handleChange('introducer', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
+                <input name="introducer" value={formValues.introducer} onChange={(e) => handleChange('introducer', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
             </div>
-            <div className="flex flex-row items-center gap-3">
-              <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Ethnicity</label>
-              <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
+            <div>
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ethnicity</label>
+              <div className="flex w-full rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
                 {['Chinese', 'Malay', 'Indian', 'Others'].map((opt) => (
                   <label key={opt} className="cursor-pointer flex-1 flex">
                     <input type="radio" name="ethnicity" value={opt} checked={formValues.ethnicity === opt} onChange={(e) => handleChange('ethnicity', e.target.value)} className="hidden" />
@@ -406,13 +406,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 ))}
               </div>
             </div>
-            <div className="flex flex-col md:flex-row md:items-start gap-1.5 md:gap-3">
-              <label className="md:w-40 md:shrink-0 text-sm font-semibold md:font-medium text-slate-700 md:pt-2">Personal Biography</label>
-              <textarea name="bio" value={formValues.bio} onChange={(e) => handleChange('bio', e.target.value)} rows={3} className="flex-1 rounded-lg border border-slate-300 px-3 py-2.5 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y min-h-[100px]" />
+            <div>
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
+              <textarea name="bio" value={formValues.bio} onChange={(e) => handleChange('bio', e.target.value)} rows={3} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y min-h-[100px]" />
             </div>
-            <div className="flex flex-col md:flex-row md:items-start gap-1.5 md:gap-3">
-              <label className="md:w-40 md:shrink-0 text-sm font-semibold md:font-medium text-slate-700 md:pt-2">Hobbies</label>
-              <div className="flex-1 flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 border border-slate-200 rounded-lg bg-slate-50/30">
+            <div>
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Hobbies</label>
+              <div className="flex flex-wrap gap-2 p-2 border border-slate-200 rounded-lg bg-slate-50/30">
                 {HOBBY_OPTIONS.map(opt => (
                   <label key={opt} className="cursor-pointer">
                     <input
@@ -429,9 +429,9 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 ))}
               </div>
             </div>
-            <div className="flex flex-row items-center gap-3">
-              <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Skills</label>
-              <input name="skills" value={formValues.skills} onChange={(e) => handleChange('skills', e.target.value)} placeholder="e.g., Public Speaking, Management" className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+            <div>
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Skills</label>
+              <input name="skills" value={formValues.skills} onChange={(e) => handleChange('skills', e.target.value)} placeholder="e.g., Public Speaking, Management" className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
             </div>
           </div>
         )}
@@ -439,26 +439,26 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         {activeTab === 'membership' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">Current Role</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Current Role</label>
                 <select
                   name="role"
                   value={formValues.role}
                   onChange={(e) => handleChange('role', e.target.value)}
                   disabled={!canEditSystemStatus}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  className={`w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 >
                   {[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">Member Tier</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Member Tier</label>
                 <select
                   name="tier"
                   value={formValues.tier}
                   onChange={(e) => handleChange('tier', e.target.value)}
                   disabled={!canEditSystemStatus}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  className={`w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 >
                   {['Bronze', 'Silver', 'Gold', 'Platinum'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -472,7 +472,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                     value={formValues.membershipYear}
                     onChange={(e) => handleChange('membershipYear', parseInt(e.target.value))}
                     disabled={!canEditSystemStatus}
-                    className={`flex-1 rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-2.5 md:py-2 text-sm font-bold text-amber-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 ${!canEditSystemStatus ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    className={`w-full rounded-lg border-2 border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 ${!canEditSystemStatus ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
                     {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 2 - i).map(y => (
                       <option key={y} value={y}>{y}</option>
@@ -482,26 +482,24 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               )}
 
               <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-                <div className="flex flex-row items-center gap-3 min-w-0">
-                  <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">
                     Membership Type
                   </label>
-                  <div className="flex-1 min-w-0">
-                    <MembershipTypeDisplay member={membershipTypePreview} showDetails={false} />
-                  </div>
+                  <MembershipTypeDisplay member={membershipTypePreview} showDetails={false} />
                 </div>
-                <div className="flex flex-row items-start gap-3 min-w-0">
-                  <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700 md:pt-2">
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">
                     Senatorship Number
                   </label>
-                  <div className="flex-1 min-w-0 space-y-1">
+                  <div className="space-y-1">
                     <input
                       name="senatorshipId"
                       value={formValues.senatorshipId}
                       onChange={(e) => handleChange('senatorshipId', e.target.value)}
                       disabled={member.senatorshipBoardValidated === true}
                       placeholder="e.g. 12345"
-                      className={`w-full rounded-lg border px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${member.senatorshipBoardValidated
+                      className={`w-full rounded-lg border px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${member.senatorshipBoardValidated
                           ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed'
                           : 'border-slate-300 bg-white'
                         }`}
@@ -522,26 +520,26 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 </div>
               </div>
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Attendance (%)</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Attendance (%)</label>
                 <input
                   name="attendanceRate"
                   type="number"
                   value={String(formValues.attendanceRate)}
                   onChange={(e) => { const v = parseInt(e.target.value, 10); handleChange('attendanceRate', isNaN(v) ? 0 : v); }}
                   disabled={!canEditSystemStatus}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  className={`w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 />
               </div>
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">Churn Risk</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Churn Risk</label>
                 <select
                   name="churnRisk"
                   value={formValues.churnRisk}
                   onChange={(e) => handleChange('churnRisk', e.target.value)}
                   disabled={!canEditSystemStatus}
-                  className={`flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
+                  className={`w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white ${!canEditSystemStatus ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                 >
                   {['Low', 'Medium', 'High'].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -555,23 +553,23 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-8 md:gap-y-3">
             {/* Left Column - Main Fields */}
             <div className="space-y-4">
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-32 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Company</label>
-                <input name="companyName" value={formValues.companyName} onChange={(e) => handleChange('companyName', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company</label>
+                <input name="companyName" value={formValues.companyName} onChange={(e) => handleChange('companyName', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-32 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Website</label>
-                <input name="companyWebsite" type="text" placeholder="https://..." value={formValues.companyWebsite} onChange={(e) => handleChange('companyWebsite', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Website</label>
+                <input name="companyWebsite" type="text" placeholder="https://..." value={formValues.companyWebsite} onChange={(e) => handleChange('companyWebsite', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-32 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Industry</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Industry</label>
                 <select
                   name="industry"
                   value={formValues.industry}
                   onChange={(e) => handleChange('industry', e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
                 >
                   <option value="">Select...</option>
                   {INDUSTRY_OPTIONS.map(opt => (
@@ -580,18 +578,18 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 </select>
               </div>
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-32 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Position</label>
-                <input name="departmentAndPosition" value={formValues.departmentAndPosition} onChange={(e) => handleChange('departmentAndPosition', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position</label>
+                <input name="departmentAndPosition" value={formValues.departmentAndPosition} onChange={(e) => handleChange('departmentAndPosition', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-32 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Level of Mgmt</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Level of Mgmt</label>
                 <select
                   name="levelOfManagement"
                   value={formValues.levelOfManagement}
                   onChange={(e) => handleChange('levelOfManagement', e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
                 >
                   <option value="">Select Level</option>
                   <option value="Top">Top</option>
@@ -600,8 +598,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 </select>
               </div>
 
-              <div className="flex flex-col gap-1 mt-2">
-                <label className="text-sm font-semibold md:font-medium text-slate-700 leading-tight">Ideal Referral Industry</label>
+              <div className="mt-2">
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral Industry</label>
                 <MultiSelectDropdown
                   options={INDUSTRY_OPTIONS}
                   selected={formValues.idealReferralIndustry ? formValues.idealReferralIndustry.split(', ').filter(Boolean) : []}
@@ -610,8 +608,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 />
               </div>
 
-              <div className="flex flex-col gap-1 mt-2">
-                <label className="text-sm font-semibold md:font-medium text-slate-700 leading-tight">Ideal Referral</label>
+              <div className="mt-2">
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral</label>
                 <MultiSelectDropdown
                   options={IDEAL_REFERRAL_OPTIONS.map(opt => opt.label)}
                   selected={formValues.idealReferral ? formValues.idealReferral.split(', ').filter(Boolean) : []}
@@ -622,21 +620,21 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
             </div>
 
             {/* Right Column - Description */}
-            <div className="flex flex-col gap-1.5 mt-2 md:mt-0">
-              <label className="text-sm font-semibold md:font-medium text-slate-700">Company Description</label>
+            <div className="mt-2 md:mt-0">
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
               <textarea
                 name="companyDescription"
                 value={formValues.companyDescription}
                 onChange={(e) => handleChange('companyDescription', e.target.value)}
-                className="flex-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-none min-h-[120px] md:min-h-[150px]"
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-none min-h-[120px]"
                 placeholder="Tell us more about your business..."
               />
             </div>
 
             {/* Bottom Row - Full Width */}
-            <div className="col-span-1 md:col-span-2 flex flex-row items-center gap-3 pt-2">
-              <label className="w-28 md:w-32 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">International</label>
-              <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 bg-white">
+            <div className="col-span-1 md:col-span-2 pt-2">
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">International</label>
+              <div className="flex w-full rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 bg-white">
                 {['Yes', 'No', 'Explore'].map(opt => (
                   <label key={opt} className="cursor-pointer flex-1 flex">
                     <input type="radio" name="acceptInternationalBusiness" value={opt} checked={formValues.acceptInternationalBusiness === (opt === 'Explore' ? 'Willing to Explore' : opt)} onChange={(e) => handleChange('acceptInternationalBusiness', opt === 'Explore' ? 'Willing to Explore' : opt)} className="hidden" />
@@ -684,8 +682,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 </div>
               </div>
             )}
-            <div className="flex flex-col gap-1.5 md:gap-3 col-span-1 md:col-span-2 pt-2">
-              <label className="text-sm font-semibold md:font-medium text-slate-700">Business Category</label>
+            <div className="col-span-1 md:col-span-2 pt-2">
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Category</label>
               <MultiSelectDropdown
                 options={BUSINESS_CATEGORIES_OPTIONS}
                 selected={formValues.businessCategory}
@@ -693,9 +691,9 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 placeholder="Select categories..."
               />
             </div>
-            <div className="flex flex-col md:flex-row md:items-start gap-1.5 md:gap-3 col-span-1 md:col-span-2 pt-2">
-              <label className="md:w-40 md:shrink-0 text-sm font-semibold md:font-medium text-slate-700 md:pt-2">Interested Industries</label>
-              <div className="flex-1 flex flex-wrap gap-2 p-2 border border-slate-200 rounded-lg bg-slate-50/30">
+            <div className="col-span-1 md:col-span-2 pt-2">
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Interested Industries</label>
+              <div className="flex flex-wrap gap-2 p-2 border border-slate-200 rounded-lg bg-slate-50/30">
                 {INDUSTRY_OPTIONS.map(opt => (
                   <label key={opt} className="cursor-pointer">
                     <input
@@ -725,17 +723,17 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 Personal Contact
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Phone</label>
-                  <input name="phone" type="tel" value={formValues.phone} onChange={(e) => handleChange('phone', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
+                  <input name="phone" type="tel" value={formValues.phone} onChange={(e) => handleChange('phone', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Alt. Phone</label>
-                  <input name="alternatePhone" type="tel" value={formValues.alternatePhone} onChange={(e) => handleChange('alternatePhone', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Alt. Phone</label>
+                  <input name="alternatePhone" type="tel" value={formValues.alternatePhone} onChange={(e) => handleChange('alternatePhone', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">WhatsApp</label>
-                  <div className="flex-1 py-1">
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WhatsApp</label>
+                  <div className="py-1">
                     {formValues.whatsappGroup ? (
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold border border-green-200">
                         Joined
@@ -747,13 +745,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                     )}
                   </div>
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Email<span className="text-red-500 ml-1">*</span></label>
-                  <input name="email" type="email" value={formValues.email} onChange={(e) => handleChange('email', e.target.value)} required className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Email<span className="text-red-500 ml-1">*</span></label>
+                  <input name="email" type="email" value={formValues.email} onChange={(e) => handleChange('email', e.target.value)} required className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-col md:flex-row md:items-start gap-1.5 md:gap-3 col-span-1 md:col-span-2">
-                  <label className="md:w-40 md:shrink-0 text-sm font-semibold md:font-medium text-slate-700 md:pt-2">Address</label>
-                  <textarea name="address" value={formValues.address} onChange={(e) => handleChange('address', e.target.value)} rows={3} className="flex-1 rounded-lg border border-slate-300 px-3 py-2.5 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y min-h-[80px]" />
+                <div className=" col-span-1 md:col-span-2">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
+                  <textarea name="address" value={formValues.address} onChange={(e) => handleChange('address', e.target.value)} rows={3} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y min-h-[80px]" />
                 </div>
               </div>
             </div>
@@ -764,21 +762,21 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 Social Media
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">LinkedIn</label>
-                  <input name="linkedin" type="url" value={formValues.linkedin} onChange={(e) => handleChange('linkedin', e.target.value)} placeholder="https://..." className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">LinkedIn</label>
+                  <input name="linkedin" type="url" value={formValues.linkedin} onChange={(e) => handleChange('linkedin', e.target.value)} placeholder="https://..." className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Facebook</label>
-                  <input name="facebook" type="url" value={formValues.facebook} onChange={(e) => handleChange('facebook', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Facebook</label>
+                  <input name="facebook" type="url" value={formValues.facebook} onChange={(e) => handleChange('facebook', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Instagram</label>
-                  <input name="instagram" type="url" value={formValues.instagram} onChange={(e) => handleChange('instagram', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Instagram</label>
+                  <input name="instagram" type="url" value={formValues.instagram} onChange={(e) => handleChange('instagram', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">WeChat</label>
-                  <input name="wechat" value={formValues.wechat} onChange={(e) => handleChange('wechat', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WeChat</label>
+                  <input name="wechat" value={formValues.wechat} onChange={(e) => handleChange('wechat', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
               </div>
             </div>
@@ -789,17 +787,17 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 Emergency Contact
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Name</label>
-                  <input name="emergencyContactName" value={formValues.emergencyContactName} onChange={(e) => handleChange('emergencyContactName', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name</label>
+                  <input name="emergencyContactName" value={formValues.emergencyContactName} onChange={(e) => handleChange('emergencyContactName', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Phone</label>
-                  <input name="emergencyContactPhone" type="tel" value={formValues.emergencyContactPhone} onChange={(e) => handleChange('emergencyContactPhone', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
+                  <input name="emergencyContactPhone" type="tel" value={formValues.emergencyContactPhone} onChange={(e) => handleChange('emergencyContactPhone', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
-                <div className="flex flex-row items-center gap-3">
-                  <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Relationship</label>
-                  <input name="emergencyContactRelationship" value={formValues.emergencyContactRelationship} onChange={(e) => handleChange('emergencyContactRelationship', e.target.value)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <div>
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Relationship</label>
+                  <input name="emergencyContactRelationship" value={formValues.emergencyContactRelationship} onChange={(e) => handleChange('emergencyContactRelationship', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                 </div>
               </div>
             </div>
@@ -809,9 +807,9 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         {activeTab === 'apparel' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700">Cut Style</label>
-                <div className="flex-1 flex rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 bg-white">
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Cut Style</label>
+                <div className="flex w-full rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200 bg-white">
                   {['Unisex', 'Lady Cut'].map(opt => (
                     <label key={opt} className="cursor-pointer flex-1 flex">
                       <input type="radio" name="cutStyle" value={opt} checked={formValues.cutStyle === opt} onChange={(e) => handleChange('cutStyle', e.target.value)} className="hidden" />
@@ -820,20 +818,20 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   ))}
                 </div>
               </div>
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-sm md:text-sm font-semibold md:font-medium text-slate-700 leading-tight">Emb. Name</label>
-                <input name="embroideredName" value={formValues.embroideredName} onChange={(e) => handleChange('embroideredName', e.target.value)} placeholder="Uniform name..." className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Emb. Name</label>
+                <input name="embroideredName" value={formValues.embroideredName} onChange={(e) => handleChange('embroideredName', e.target.value)} placeholder="Uniform name..." className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">T-Shirt Size</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">T-Shirt Size</label>
                 <select
                   name="tshirtSize"
                   value={formValues.tshirtSize}
                   onChange={(e) => handleChange('tshirtSize', e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
                 >
                   <option value="">Select size...</option>
                   {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(opt => (
@@ -842,13 +840,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 </select>
               </div>
 
-              <div className="flex flex-row items-center gap-3">
-                <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">Jacket Size</label>
+              <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Jacket Size</label>
                 <select
                   name="jacketSize"
                   value={formValues.jacketSize}
                   onChange={(e) => handleChange('jacketSize', e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
                 >
                   <option value="">Select size...</option>
                   {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(opt => (
@@ -858,13 +856,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               </div>
             </div>
 
-            <div className="flex flex-row items-center gap-3">
-              <label className="w-28 md:w-40 shrink-0 text-[11px] md:text-sm font-semibold md:font-medium text-slate-700">Status</label>
+            <div>
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Status</label>
               <select
                 name="tshirtStatus"
                 value={formValues.tshirtStatus}
                 onChange={(e) => handleChange('tshirtStatus', e.target.value)}
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 md:py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
               >
                 {['NA', 'Requested', 'Sent', 'Delivered', 'Received'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>

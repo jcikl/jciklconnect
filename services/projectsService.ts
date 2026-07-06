@@ -19,33 +19,42 @@ import { COLLECTIONS } from '../config/constants';
 import { Project, Task } from '../types';
 import { PointsService } from './pointsService';
 import { isDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
 import { MOCK_PROJECTS, MOCK_TASKS } from './mockData';
 
+const CACHE_KEY_ALL_PROJECTS = 'projects:all';
+const PROJECTS_TTL = 3 * 60 * 1000; // 3 minutes
+
 export class ProjectsService {
+  static invalidateProjectsCache(): void {
+    apiCache.delete(CACHE_KEY_ALL_PROJECTS);
+  }
+
   // Get all projects (includes all statuses - no filtering)
   static async getAllProjects(): Promise<Project[]> {
     if (isDevMode()) {
       return MOCK_PROJECTS;
     }
 
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
-      );
-      // Return all projects regardless of status
-      return snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() ?? d.data().createdAt,
-        updatedAt: d.data().updatedAt?.toDate?.()?.toISOString?.() ?? d.data().updatedAt,
-      } as Project));
-    } catch (error) {
-      if (isDevMode()) {
-        return MOCK_PROJECTS;
+    return apiCache.getOrSet(CACHE_KEY_ALL_PROJECTS, async () => {
+      try {
+        const snapshot = await getDocs(
+          query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
+        );
+        return snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data(),
+          createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() ?? d.data().createdAt,
+          updatedAt: d.data().updatedAt?.toDate?.()?.toISOString?.() ?? d.data().updatedAt,
+        } as Project));
+      } catch (error) {
+        if (isDevMode()) {
+          return MOCK_PROJECTS;
+        }
+        console.error('Error fetching projects:', error);
+        throw error;
       }
-      console.error('Error fetching projects:', error);
-      throw error;
-    }
+    }, PROJECTS_TTL);
   }
 
   // Get project by ID
@@ -102,6 +111,7 @@ export class ProjectsService {
       if (projectData.galleryUrls != null) payload.galleryUrls = projectData.galleryUrls;
 
       const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
+      this.invalidateProjectsCache();
       return docRef.id;
     } catch (error) {
       console.error('Error creating project:', error);
@@ -156,6 +166,7 @@ export class ProjectsService {
         }
       });
       await updateDoc(projectRef, updateData);
+      this.invalidateProjectsCache();
 
       // Recalculate radar stats for affected members
       if (memberIdsToRecalculate.size > 0) {
@@ -194,6 +205,7 @@ export class ProjectsService {
       }
 
       await deleteDoc(projectRef);
+      this.invalidateProjectsCache();
 
       // Recalculate radar stats for affected members (revocation)
       if (memberIdsToRecalculate.size > 0) {

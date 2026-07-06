@@ -20,10 +20,18 @@ import { Event } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
 import { PointsService } from './pointsService';
 import { isDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
+
+const CACHE_KEY_ALL_EVENTS = 'events:all';
+const EVENTS_TTL = 3 * 60 * 1000; // 3 minutes
 
 export class EventsService {
   private static mockEvents: Event[] = [...MOCK_EVENTS];
+
+  static invalidateEventsCache(): void {
+    apiCache.delete(CACHE_KEY_ALL_EVENTS);
+  }
 
   private static projectDocToEvent(d: { id: string; data: () => Record<string, unknown> }): Event {
     const data = d.data() ?? {};
@@ -65,36 +73,35 @@ export class EventsService {
       return [...this.mockEvents];
     }
 
-    try {
-      // Only fetch projects with status='Active' (published by member)
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.PROJECTS),
-          where('status', '==', 'Active')
-        )
-      );
+    return apiCache.getOrSet(CACHE_KEY_ALL_EVENTS, async () => {
+      try {
+        const snapshot = await getDocs(
+          query(
+            collection(db, COLLECTIONS.PROJECTS),
+            where('status', '==', 'Active')
+          )
+        );
 
-      // Filter to ones that have an eventStartDate/date and map to Event
-      const events = snapshot.docs
-        .filter(d => {
-          const data = d.data();
-          return data.eventStartDate != null || data.date != null;
-        })
-        .map(d => this.projectDocToEvent({ id: d.id, data: () => d.data() }));
+        const events = snapshot.docs
+          .filter(d => {
+            const data = d.data();
+            return data.eventStartDate != null || data.date != null;
+          })
+          .map(d => this.projectDocToEvent({ id: d.id, data: () => d.data() }));
 
-      // Sort in-memory by date descending so UI is stable
-      return events.sort((a, b) => {
-        const da = a.date ? new Date(a.date).getTime() : 0;
-        const db = b.date ? new Date(b.date).getTime() : 0;
-        return db - da;
-      });
-    } catch (error) {
-      if (isDevMode()) {
-        return [...this.mockEvents];
+        return events.sort((a, b) => {
+          const da = a.date ? new Date(a.date).getTime() : 0;
+          const db = b.date ? new Date(b.date).getTime() : 0;
+          return db - da;
+        });
+      } catch (error) {
+        if (isDevMode()) {
+          return [...this.mockEvents];
+        }
+        console.error('Error fetching events:', error);
+        throw error;
       }
-      console.error('Error fetching events:', error);
-      throw error;
-    }
+    }, EVENTS_TTL);
   }
 
   // Get event by ID (from projects collection)
@@ -157,6 +164,7 @@ export class EventsService {
       payload.type = eventData.type;
 
       const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
+      this.invalidateEventsCache();
       return docRef.id;
     } catch (error) {
       console.error('Error creating event:', error);
@@ -187,6 +195,7 @@ export class EventsService {
       }
 
       await updateDoc(eventRef, updateData);
+      this.invalidateEventsCache();
     } catch (error) {
       console.error('Error updating event:', error);
       throw error;
@@ -202,6 +211,7 @@ export class EventsService {
 
     try {
       await deleteDoc(doc(db, COLLECTIONS.PROJECTS, eventId));
+      this.invalidateEventsCache();
     } catch (error) {
       console.error('Error deleting event:', error);
       throw error;

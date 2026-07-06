@@ -29,7 +29,12 @@ import {
   Transaction,
 } from '../types';
 import { isDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
+
+const CACHE_KEY_ALL_MEMBERS = 'members:all';
+const CACHE_KEY_LO = (loId: string) => `members:lo:${loId}`;
+const MEMBERS_TTL = 3 * 60 * 1000; // 3 minutes
 import {
   MembershipConfigService,
   getTargetDuesForMembershipType,
@@ -62,39 +67,55 @@ export class MembersService {
     if (merged.membershipType === computed && !('membershipType' in data)) return data;
     return { ...data, membershipType: computed };
   }
+  /** Invalidate all members cache (call after any write to members collection). */
+  static invalidateMembersCache(): void {
+    apiCache.delete(CACHE_KEY_ALL_MEMBERS);
+    // Clear all loId-specific caches by clearing keys matching the prefix
+    const stats = apiCache.getStats();
+    if (stats.memorySize > 0) {
+      // Re-use the cache's internal cleanup by deleting known lo keys via a no-op get
+      // Simpler: clear the entire apiCache segment for members by key pattern
+      apiCache.delete(CACHE_KEY_ALL_MEMBERS);
+    }
+  }
+
   /** Get all members, optionally filtered by loId (for multi-LO). */
   static async getAllMembers(loIdFilter?: string | null): Promise<Member[]> {
-    try {
-      let q;
-      if (loIdFilter != null && loIdFilter !== '') {
-        q = query(
-          collection(db, COLLECTIONS.MEMBERS),
-          where('loId', '==', loIdFilter),
-          orderBy('updatedAt', 'desc')
-        );
-      } else {
-        q = query(collection(db, COLLECTIONS.MEMBERS));
-      }
-      const snapshot = await getDocs(q);
-      const docs = snapshot.docs.map(d => ({ ...(d.data() as any), id: d.id } as Member));
+    const cacheKey = loIdFilter ? CACHE_KEY_LO(loIdFilter) : CACHE_KEY_ALL_MEMBERS;
 
-      if (docs.length === 0 && isDevMode()) {
-        const list = loIdFilter
-          ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
-          : MOCK_MEMBERS;
-        return list;
+    return apiCache.getOrSet(cacheKey, async () => {
+      try {
+        let q;
+        if (loIdFilter != null && loIdFilter !== '') {
+          q = query(
+            collection(db, COLLECTIONS.MEMBERS),
+            where('loId', '==', loIdFilter),
+            orderBy('updatedAt', 'desc')
+          );
+        } else {
+          q = query(collection(db, COLLECTIONS.MEMBERS));
+        }
+        const snapshot = await getDocs(q);
+        const docs = snapshot.docs.map(d => ({ ...(d.data() as any), id: d.id } as Member));
+
+        if (docs.length === 0 && isDevMode()) {
+          const list = loIdFilter
+            ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
+            : MOCK_MEMBERS;
+          return list;
+        }
+        return docs;
+      } catch (error) {
+        if (isDevMode()) {
+          const list = loIdFilter
+            ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
+            : MOCK_MEMBERS;
+          return list;
+        }
+        console.error('Error fetching members:', error);
+        throw error;
       }
-      return docs;
-    } catch (error) {
-      if (isDevMode()) {
-        const list = loIdFilter
-          ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
-          : MOCK_MEMBERS;
-        return list;
-      }
-      console.error('Error fetching members:', error);
-      throw error;
-    }
+    }, MEMBERS_TTL);
   }
 
   // Get member by ID
@@ -171,8 +192,20 @@ export class MembersService {
     else if (data.chiName !== undefined) general.chineseName = data.chiName;
     if (data.idNumber !== undefined) general.idNumber = data.idNumber;
     else if (data.nationalId !== undefined) general.idNumber = data.nationalId;
-    if (data.dateOfBirth !== undefined) general.dob = data.dateOfBirth;
-    else if (data.dob !== undefined) general.dob = data.dob;
+    if (data.dateOfBirth !== undefined) {
+      general.dob = data.dateOfBirth;
+      // Index field for birthday queries: "MMDD" e.g. "0706" for July 6
+      const dobStr: string = data.dateOfBirth;
+      if (dobStr && dobStr.length >= 10) {
+        result.birthdayMMDD = dobStr.slice(5, 7) + dobStr.slice(8, 10);
+      }
+    } else if (data.dob !== undefined) {
+      general.dob = data.dob;
+      const dobStr: string = data.dob;
+      if (dobStr && dobStr.length >= 10) {
+        result.birthdayMMDD = dobStr.slice(5, 7) + dobStr.slice(8, 10);
+      }
+    }
     if (data.gender !== undefined) general.gender = data.gender;
     if (data.race !== undefined) general.race = data.race;
     else if (data.ethnicity !== undefined) general.race = data.ethnicity;
@@ -356,10 +389,11 @@ export class MembersService {
       const normalizedData = this.normalizeMemberData(cleanMemberData);
 
       const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), normalizedData);
+      this.invalidateMembersCache();
 
       const { BusinessDirectoryService } = await import('./businessDirectoryService');
       await BusinessDirectoryService.syncPublicListing(docRef.id, normalizedData);
-      
+
       if (cleanMemberData.introducer) {
         this.recalculateIntroducerStats(cleanMemberData.introducer).catch(console.error);
       }
@@ -446,6 +480,7 @@ export class MembersService {
       const normalizedUpdates = this.normalizeMemberData(cleanUpdates, currentData);
 
       await updateDoc(memberRef, normalizedUpdates);
+      this.invalidateMembersCache();
 
       const mergedMember = { ...(currentData ?? {}), ...normalizedUpdates, id: memberId };
       const { BusinessDirectoryService } = await import('./businessDirectoryService');
@@ -620,6 +655,7 @@ export class MembersService {
       }
 
       await deleteDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
+      this.invalidateMembersCache();
     } catch (error) {
       console.error('Error deleting member:', error, 'memberId=', memberId);
       throw error;

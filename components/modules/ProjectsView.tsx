@@ -146,9 +146,9 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
   }
 
   // 2. Get Title
-  const title = doc.querySelector('.col-md-7 h3')?.textContent?.trim() || 
-                doc.querySelector('h3')?.textContent?.trim() || 
-                doc.querySelector('title')?.textContent?.split('|')[0].trim() || '';
+  const title = doc.querySelector('.col-md-7 h3')?.textContent?.trim() ||
+    doc.querySelector('h3')?.textContent?.trim() ||
+    doc.querySelector('title')?.textContent?.split('|')[0].trim() || '';
 
   // 3. Get Description in Paragraph Format
   const cardTexts = Array.from(doc.querySelectorAll('.col-md-7 p.card-text, p.card-text'));
@@ -247,7 +247,7 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
     };
     const mKey = monthStr.toLowerCase().slice(0, 3);
     const month = months[mKey] || '01';
-    
+
     const formattedDay = day.padStart(2, '0');
     const formattedDate = (year && month && formattedDay) ? `${year}-${month}-${formattedDay}` : '';
 
@@ -292,12 +292,12 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
 
   badges.forEach(badge => {
     const lower = badge.toLowerCase();
-    
+
     if (lower === 'national') level = 'National';
     else if (lower === 'jci') level = 'JCI';
     else if (lower.includes('area')) level = 'Area';
     else if (lower.includes('local')) level = 'Local';
-    
+
     if (lower === 'event') type = 'event';
     else if (lower === 'program') type = 'program';
     else if (lower === 'project') type = 'project';
@@ -358,10 +358,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const [activeTab, setActiveTab] = useState<'projects' | 'past-projects' | 'templates'>('projects');
   const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EventTemplate | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<EventTemplate | null>(null);
   const [templateSearchTerm, setTemplateSearchTerm] = useState('');
   const [templateFilterType, setTemplateFilterType] = useState<string>('all');
-  
+
   // States for Create Project Form
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -381,7 +382,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const { isBoard, isAdmin, isDeveloper } = usePermissions();
   const isPrivileged = isBoard || isAdmin || isDeveloper;
   const { showToast } = useToast();
-  
+
   useEffect(() => {
     if (isProposalModalOpen) {
       setNewRoadmapUrl('');
@@ -422,7 +423,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       if (details.eventEndDate) setNewEventEndDate(details.eventEndDate);
       if (details.eventStartTime) setNewEventStartTime(details.eventStartTime);
       if (details.eventEndTime) setNewEventEndTime(details.eventEndTime);
-      
+
       showToast('Successfully synchronized event details!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to sync event details', 'error');
@@ -741,8 +742,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div>
           {selectedProject ? (
             <div className="flex items-center gap-2">
@@ -759,20 +760,22 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         <div className="flex gap-2">
           {!selectedProject && (
             <>
-              {/* Create New Project button - always visible */}
-              <Button onClick={() => setProposalModalOpen(true)}>
-                <Plus size={16} className="mr-2" /> Start New Project
-              </Button>
-              {(isBoard || isAdmin) && (
-                <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-                  <Copy size={16} className="mr-2" /> Paste Import
+              {/* Desktop buttons */}
+              <div className="hidden md:flex gap-2">
+                <Button onClick={() => setProposalModalOpen(true)}>
+                  <Plus size={16} className="mr-2" /> New Project
                 </Button>
-              )}
-              {activeTab === 'templates' && (isBoard || isAdmin) && (
-                <Button onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}>
-                  <Plus size={16} className="mr-2" /> Create Template
-                </Button>
-              )}
+                {(isBoard || isAdmin) && (
+                  <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+                    <Copy size={16} className="mr-2" /> Paste Import
+                  </Button>
+                )}
+                {activeTab === 'templates' && (isBoard || isAdmin) && (
+                  <Button onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}>
+                    <Plus size={16} className="mr-2" /> Create Template
+                  </Button>
+                )}
+              </div>
             </>
           )}
           {selectedProject && (
@@ -868,37 +871,36 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       </div>
 
       {!selectedProject ? (
-        <Card noPadding>
-          <div className="px-4 md:px-6 pt-4 flex flex-col md:flex-row justify-between items-stretch md:items-end gap-3 border-b border-slate-100">
-            <div className="flex-1 min-w-0">
-              <Tabs
-                tabs={['Ongoing Events', 'Past Events', 'Templates']}
-                activeTab={activeTab === 'projects' ? 'Ongoing Events' : activeTab === 'past-projects' ? 'Past Events' : 'Templates'}
-                onTabChange={(tab) => {
-                  if (tab === 'Ongoing Events') setActiveTab('projects');
-                  else if (tab === 'Past Events') setActiveTab('past-projects');
-                  else setActiveTab('templates');
-                  setSelectedProjectId(null);
-                }}
-                className="border-b-0"
-              />
-            </div>
+        <div className="space-y-2">
+          {/* Mobile: segmented control + year filter standalone */}
+          <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+            <Tabs
+              variant="button"
+              fullWidth
+              tabs={['Ongoing', 'Past', 'Templates']}
+              activeTab={activeTab === 'projects' ? 'Ongoing' : activeTab === 'past-projects' ? 'Past' : 'Templates'}
+              onTabChange={(tab) => {
+                if (tab === 'Ongoing') setActiveTab('projects');
+                else if (tab === 'Past') setActiveTab('past-projects');
+                else setActiveTab('templates');
+                setSelectedProjectId(null);
+              }}
+            />
             {activeTab !== 'templates' && (
-              <div className="flex items-center gap-2 pb-2 self-start md:self-auto">
-                <span className="text-xs font-semibold text-slate-500">Year:</span>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-jci-blue focus:border-jci-blue bg-white shadow-sm outline-none transition-all cursor-pointer"
-                >
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="shrink-0 text-xs font-bold border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-jci-blue focus:border-jci-blue bg-white outline-none transition-all cursor-pointer"
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
             )}
           </div>
-          <div className="p-4">
+
+          {/* Mobile: content without card wrapper */}
+          <div className="md:hidden">
             {(activeTab === 'projects' || activeTab === 'past-projects') ? (
               <ProjectGrid
                 projects={displayedProjects}
@@ -922,7 +924,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                 projectTrackerTransactions={projectTrackerTransactions}
               />
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
@@ -1006,7 +1008,147 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
               </div>
             )}
           </div>
-        </Card>
+
+          {/* Desktop: card with underline tabs + content */}
+          <Card noPadding className="hidden md:block">
+            <div className="px-6 pt-4 flex flex-row justify-between items-end gap-3 border-b border-slate-100">
+              <div className="flex-1 min-w-0">
+                <Tabs
+                  tabs={['Ongoing Events', 'Past Events', 'Templates']}
+                  activeTab={activeTab === 'projects' ? 'Ongoing Events' : activeTab === 'past-projects' ? 'Past Events' : 'Templates'}
+                  onTabChange={(tab) => {
+                    if (tab === 'Ongoing Events') setActiveTab('projects');
+                    else if (tab === 'Past Events') setActiveTab('past-projects');
+                    else setActiveTab('templates');
+                    setSelectedProjectId(null);
+                  }}
+                  className="border-b-0"
+                />
+              </div>
+              {activeTab !== 'templates' && (
+                <div className="flex items-center gap-2 pb-2">
+                  <span className="text-xs font-semibold text-slate-500">Year:</span>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    className="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-jci-blue focus:border-jci-blue bg-white shadow-sm outline-none transition-all cursor-pointer"
+                  >
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="p-6">
+              {(activeTab === 'projects' || activeTab === 'past-projects') ? (
+                <ProjectGrid
+                  projects={displayedProjects}
+                  loading={loading}
+                  error={error}
+                  onSelect={setSelectedProjectId}
+                  onNewProposal={() => setProposalModalOpen(true)}
+                  onImport={() => setImportModalOpen(true)}
+                  isAdminOrBoard={isBoard || isAdmin}
+                  selectedIds={selectedProjectIds}
+                  onToggleSelection={(id) => {
+                    setSelectedProjectIds(prev => {
+                      const next = new Set(prev);
+                      if (next.has(id)) next.delete(id);
+                      else next.add(id);
+                      return next;
+                    });
+                  }}
+                  onSelectAll={handleSelectAll}
+                  projectAccounts={projectAccounts}
+                  projectTrackerTransactions={projectTrackerTransactions}
+                />
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                      <input
+                        type="text"
+                        placeholder="Search templates..."
+                        value={templateSearchTerm}
+                        onChange={(e) => setTemplateSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-jci-blue"
+                      />
+                    </div>
+                    <Select
+                      value={templateFilterType}
+                      onChange={(e) => setTemplateFilterType(e.target.value)}
+                      options={[
+                        { label: 'All Types', value: 'all' },
+                        { label: 'Meeting', value: 'Meeting' },
+                        { label: 'Training', value: 'Training' },
+                        { label: 'Social', value: 'Social' },
+                        { label: 'Project', value: 'Project' },
+                        { label: 'International', value: 'International' },
+                      ]}
+                      className="w-48"
+                    />
+                  </div>
+                  <LoadingState
+                    loading={templatesLoading}
+                    error={null}
+                    empty={eventTemplates.length === 0}
+                    emptyMessage="No templates created yet. Create your first template to streamline event planning."
+                  >
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {eventTemplates
+                        .filter(template => {
+                          const matchesSearch = !templateSearchTerm ||
+                            template.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) ||
+                            (template.description?.toLowerCase().includes(templateSearchTerm.toLowerCase()) ?? false);
+                          const matchesType = templateFilterType === 'all' || template.type === templateFilterType;
+                          return matchesSearch && matchesType;
+                        })
+                        .map(template => (
+                          <Card key={template.id} className="hover:shadow-lg transition-all cursor-pointer group">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-900 group-hover:text-jci-blue transition-colors">{template.name}</h3>
+                                <Badge variant="neutral" className="mt-1">{template.type}</Badge>
+                              </div>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewTemplate(template); }} title="Preview Template">
+                                  <Eye size={14} />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }} title="Use Template">
+                                  <Copy size={14} />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit Template">
+                                  <Edit size={14} />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={async (e) => { e.stopPropagation(); if (window.confirm('Are you sure you want to delete this template?')) { await deleteEventTemplate(template.id!); } }} className="text-red-500 hover:text-red-700" title="Delete Template">
+                                  <Trash2 size={14} />
+                                </Button>
+                              </div>
+                            </div>
+                            {template.description && <p className="text-sm text-slate-600 mb-3 line-clamp-2">{template.description}</p>}
+                            <div className="space-y-2 text-xs text-slate-500">
+                              {template.estimatedDuration && <div className="flex items-center gap-1"><Clock size={12} /><span>{template.estimatedDuration} hours</span></div>}
+                              {template.defaultBudget && <div className="flex items-center gap-1"><DollarSign size={12} /><span>{formatCurrency(template.defaultBudget)}</span></div>}
+                              {template.checklist && template.checklist.length > 0 && <div className="flex items-center gap-1"><CheckCircle size={12} /><span>{template.checklist.length} checklist items</span></div>}
+                              {template.requiredResources && template.requiredResources.length > 0 && <div className="flex items-center gap-1"><FileText size={12} /><span>{template.requiredResources.length} resources</span></div>}
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-slate-100">
+                              <Button variant="outline" size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }}>
+                                <Copy size={14} className="mr-2" />
+                                Use This Template
+                              </Button>
+                            </div>
+                          </Card>
+                        ))}
+                    </div>
+                  </LoadingState>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       ) : (
         <>
           <ProjectDetailTabs
@@ -1072,13 +1214,55 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         </div>
       )}
 
+      {/* Mobile FAB: New Project / Paste Import / Create Template */}
+      {!selectedProject && (
+        <div className="md:hidden fixed bottom-24 right-4 z-50 flex flex-col-reverse items-end gap-2">
+          {fabOpen && (
+            <>
+              <button
+                type="button"
+                onClick={() => { setFabOpen(false); setProposalModalOpen(true); }}
+                className="flex items-center gap-2 bg-white text-slate-800 text-sm font-semibold px-4 py-2.5 rounded-full shadow-lg border border-slate-200 active:bg-slate-50 transition-all animate-in slide-in-from-bottom-2"
+              >
+                <Plus size={15} className="text-jci-blue" /> New Project
+              </button>
+              {(isBoard || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={() => { setFabOpen(false); setImportModalOpen(true); }}
+                  className="flex items-center gap-2 bg-white text-slate-800 text-sm font-semibold px-4 py-2.5 rounded-full shadow-lg border border-slate-200 active:bg-slate-50 transition-all animate-in slide-in-from-bottom-2"
+                >
+                  <Copy size={15} className="text-jci-blue" /> Paste Import
+                </button>
+              )}
+              {(isBoard || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={() => { setFabOpen(false); setSelectedTemplate(null); setTemplateModalOpen(true); }}
+                  className="flex items-center gap-2 bg-white text-slate-800 text-sm font-semibold px-4 py-2.5 rounded-full shadow-lg border border-slate-200 active:bg-slate-50 transition-all animate-in slide-in-from-bottom-2"
+                >
+                  <Plus size={15} className="text-jci-blue" /> Create Template
+                </button>
+              )}
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => setFabOpen(v => !v)}
+            className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 ${fabOpen ? 'bg-slate-700 rotate-45' : 'bg-jci-blue'}`}
+          >
+            <Plus size={24} className="text-white" />
+          </button>
+        </div>
+      )}
+
       {/* Project Creation Modal */}
       <Modal
         isOpen={isProposalModalOpen}
         onClose={() => {
           setProposalModalOpen(false);
         }}
-        title="Start New Project"
+        title="New Project"
         size="lg"
         drawerOnMobile
         footer={
@@ -1423,7 +1607,7 @@ const ProjectGrid: React.FC<{
             className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors h-full min-h-[300px] cursor-pointer"
           >
             <Zap size={32} className="mb-3" />
-            <span className="font-medium">Start New Project</span>
+            <span className="font-medium">New Project</span>
             <span className="text-xs mt-1">or submit an activity plan</span>
             {isAdminOrBoard && (
               <div className="mt-4 pt-4 border-t border-slate-200 w-full flex justify-center">
@@ -1624,7 +1808,7 @@ const ProjectAIPredictions: React.FC<{ projectId: string }> = ({ projectId }) =>
       {activeTab === 'success' ? (
         <LoadingState loading={isLoadingPrediction} error={null} empty={!successPrediction} emptyMessage="No prediction available">
           {successPrediction && (
-            <div className="space-y-6">
+            <div className="space-y-2">
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="font-semibold text-slate-900">Project Success Probability</h4>
@@ -4413,7 +4597,7 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
       if (details.eventEndDate) setEditEventEndDate(details.eventEndDate);
       if (details.eventStartTime) setEditEventStartTime(details.eventStartTime);
       if (details.eventEndTime) setEditEventEndTime(details.eventEndTime);
-      
+
       showToast('Successfully synchronized event details!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to sync event details', 'error');

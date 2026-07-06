@@ -53,38 +53,35 @@ export const handler = async () => {
     const todayMonth = now.getMonth() + 1;
     const todayDay = now.getDate();
 
-    console.log(`Checking birthdays for ${todayDay}/${todayMonth}`);
+    // "MMDD" index — e.g. July 6 → "0706"
+    const todayMMDD = String(todayMonth).padStart(2, '0') + String(todayDay).padStart(2, '0');
+    console.log(`Checking birthdays for ${todayMMDD}`);
 
-    // Query all active members
-    const membersSnap = await db.collection('members')
+    // Precise query: only birthday members (typically 0-3 reads)
+    const birthdaySnap = await db.collection('members')
       .where('status', '==', 'active')
+      .where('birthdayMMDD', '==', todayMMDD)
       .get();
 
-    if (membersSnap.empty) {
-      return { statusCode: 200, body: 'No members found.' };
-    }
-
-    const birthdayMembers = [];
-
-    for (const doc of membersSnap.docs) {
-      const m = doc.data();
-      if (!m.dateOfBirth) continue;
-      const parts = m.dateOfBirth.split('-');
-      if (parts.length < 3) continue;
-      if (parseInt(parts[1], 10) === todayMonth && parseInt(parts[2], 10) === todayDay) {
-        const firstName = (m.name || '').split(' ')[0] || m.name;
-        birthdayMembers.push({ id: doc.id, name: firstName });
-      }
-    }
-
-    if (birthdayMembers.length === 0) {
+    if (birthdaySnap.empty) {
       console.log('No birthdays today.');
       return { statusCode: 200, body: 'No birthdays today.' };
     }
 
+    const birthdayMembers = birthdaySnap.docs.map(doc => {
+      const m = doc.data();
+      const firstName = (m.name || '').split(' ')[0] || m.name;
+      return { id: doc.id, name: firstName };
+    });
+
+    // Fetch all other active members for announcements
+    const allSnap = await db.collection('members')
+      .where('status', '==', 'active')
+      .select('__name__')
+      .get();
+
     const birthdayIds = new Set(birthdayMembers.map(m => m.id));
-    const allMemberIds = membersSnap.docs.map(d => d.id);
-    const otherMemberIds = allMemberIds.filter(id => !birthdayIds.has(id));
+    const otherMemberIds = allSnap.docs.map(d => d.id).filter(id => !birthdayIds.has(id));
     const birthdayNames = birthdayMembers.map(m => m.name).join(' & ');
 
     const tasks = [

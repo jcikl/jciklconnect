@@ -35,6 +35,7 @@ interface TabsProps {
   onTabChange: (tab: string) => void;
   className?: string;
   variant?: 'underline' | 'button';
+  fullWidth?: boolean;
 }
 
 interface DrawerProps {
@@ -239,7 +240,7 @@ export const StatCardsContainer: React.FC<{ children: React.ReactNode; className
   </div>
 );
 
-export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '', variant = 'underline' }) => {
+export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, className = '', variant = 'underline', fullWidth = false }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
@@ -280,7 +281,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
 
   if (variant === 'button') {
     return (
-      <div className={`relative ${className}`}>
+      <div className={`relative ${fullWidth ? 'flex-1 min-w-0' : ''} ${className}`}>
         {showLeftArrow && (
           <button
             onClick={scrollLeft}
@@ -292,11 +293,11 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
         )}
 
         <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="overflow-x-auto no-scrollbar scroll-smooth py-1"
+          ref={fullWidth ? undefined : scrollContainerRef}
+          onScroll={fullWidth ? undefined : handleScroll}
+          className={fullWidth ? 'py-1' : 'overflow-x-auto no-scrollbar scroll-smooth py-1'}
         >
-          <nav className="flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl w-max" aria-label="Tabs">
+          <nav className={`flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl ${fullWidth ? 'w-full' : 'w-max'}`} aria-label="Tabs">
             {tabs.map((tab) => {
               const id = typeof tab === 'string' ? tab : tab.id;
               const label = typeof tab === 'string' ? tab : tab.label;
@@ -309,7 +310,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
                     onTabChange(id);
                   }}
                   className={`
-                    whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex-shrink-0
+                    whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all ${fullWidth ? 'flex-1' : 'flex-shrink-0'}
                     ${activeTab === id
                       ? 'bg-jci-blue text-white shadow-sm border border-slate-200/20'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}

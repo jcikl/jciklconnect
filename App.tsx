@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -14,7 +14,7 @@ import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
 import { UserRole, Notification, Event, Project } from './types';
-import { EventCalendarView } from './components/modules/EventCalendarView';
+const EventCalendarView = lazy(() => import('./components/modules/EventCalendarView').then(m => ({ default: m.EventCalendarView })));
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { usePermissions } from './hooks/usePermissions';
 import { useMembers } from './hooks/useMembers';
@@ -39,38 +39,39 @@ import { MembersService } from './services/membersService';
 import { registerPushNotifications, unregisterPushNotifications, onForegroundMessage } from './services/notificationService';
 import { DEFAULT_LO_ID } from './config/constants';
 
-// Module Imports
-import { FinanceView } from './components/modules/FinanceView';
-import { PaymentRequestsView } from './components/modules/PaymentRequestsView';
-import { GamificationView } from './components/modules/GamificationView';
-import { EventsView } from './components/modules/EventsView';
-import { MembersView } from './components/modules/MembersView';
-import { ProjectsView } from './components/modules/ProjectsView';
-import { FlagshipProjectsManagementView } from './components/modules/FlagshipProjectsManagementView';
-import { InventoryView } from './components/modules/InventoryView';
-import { BusinessDirectoryView } from './components/modules/BusinessDirectoryView';
-import { AutomationStudio } from './components/modules/AutomationStudio';
-import { KnowledgeView } from './components/modules/KnowledgeView';
-import { CommunicationView } from './components/modules/CommunicationView';
-import { HobbyClubsView } from './components/modules/HobbyClubsView';
-import { SurveysView } from './components/modules/SurveysView';
-import { MemberBenefitsView } from './components/modules/MemberBenefitsView';
-import { DataImportExportView } from './components/modules/DataImportExportView';
-import { AdvertisementsView } from './components/modules/AdvertisementsView';
-import { AIInsightsView } from './components/modules/AIInsightsView';
-import { TemplatesView } from './components/modules/TemplatesView';
-import { ActivityPlansView } from './components/modules/ActivityPlansView';
-import { ReportsView } from './components/modules/ReportsView';
-import { RoleSimulator } from './components/dev/RoleSimulator';
-import { BoardDashboard } from './components/dashboard/BoardDashboard';
-import { DashboardHome } from './components/dashboard/DashboardHome';
-import { CanvaView } from './components/modules/CanvaView';
-import { DeveloperInterface } from './components/modules/DeveloperInterface';
-import { ToyyibView } from './components/modules/ToyyibView';
-import { WhapiConfigView } from './components/modules/WhapiConfigView';
-import { MembershipConfigView } from './components/modules/MembershipConfigView';
-import { AccessConfigView } from './components/modules/AccessConfigView';
-import { PublicationsView } from './components/modules/PublicationsView';
+// Module Imports — lazy-loaded for code splitting (each view is a separate chunk)
+const FinanceView = lazy(() => import('./components/modules/FinanceView').then(m => ({ default: m.FinanceView })));
+const PaymentRequestsView = lazy(() => import('./components/modules/PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
+const GamificationView = lazy(() => import('./components/modules/GamificationView').then(m => ({ default: m.GamificationView })));
+const EventsView = lazy(() => import('./components/modules/EventsView').then(m => ({ default: m.EventsView })));
+const MembersView = lazy(() => import('./components/modules/MembersView').then(m => ({ default: m.MembersView })));
+const ProjectsView = lazy(() => import('./components/modules/ProjectsView').then(m => ({ default: m.ProjectsView })));
+const FlagshipProjectsManagementView = lazy(() => import('./components/modules/FlagshipProjectsManagementView').then(m => ({ default: m.FlagshipProjectsManagementView })));
+const InventoryView = lazy(() => import('./components/modules/InventoryView').then(m => ({ default: m.InventoryView })));
+const BusinessDirectoryView = lazy(() => import('./components/modules/BusinessDirectoryView').then(m => ({ default: m.BusinessDirectoryView })));
+const AutomationStudio = lazy(() => import('./components/modules/AutomationStudio').then(m => ({ default: m.AutomationStudio })));
+const KnowledgeView = lazy(() => import('./components/modules/KnowledgeView').then(m => ({ default: m.KnowledgeView })));
+const CommunicationView = lazy(() => import('./components/modules/CommunicationView').then(m => ({ default: m.CommunicationView })));
+const HobbyClubsView = lazy(() => import('./components/modules/HobbyClubsView').then(m => ({ default: m.HobbyClubsView })));
+const SurveysView = lazy(() => import('./components/modules/SurveysView').then(m => ({ default: m.SurveysView })));
+const MemberBenefitsView = lazy(() => import('./components/modules/MemberBenefitsView').then(m => ({ default: m.MemberBenefitsView })));
+const DataImportExportView = lazy(() => import('./components/modules/DataImportExportView').then(m => ({ default: m.DataImportExportView })));
+const AdvertisementsView = lazy(() => import('./components/modules/AdvertisementsView').then(m => ({ default: m.AdvertisementsView })));
+const AIInsightsView = lazy(() => import('./components/modules/AIInsightsView').then(m => ({ default: m.AIInsightsView })));
+const TemplatesView = lazy(() => import('./components/modules/TemplatesView').then(m => ({ default: m.TemplatesView })));
+const ActivityPlansView = lazy(() => import('./components/modules/ActivityPlansView').then(m => ({ default: m.ActivityPlansView })));
+const ReportsView = lazy(() => import('./components/modules/ReportsView').then(m => ({ default: m.ReportsView })));
+const RoleSimulator = lazy(() => import('./components/dev/RoleSimulator').then(m => ({ default: m.RoleSimulator })));
+const BoardDashboard = lazy(() => import('./components/dashboard/BoardDashboard').then(m => ({ default: m.BoardDashboard })));
+const DashboardHome = lazy(() => import('./components/dashboard/DashboardHome').then(m => ({ default: m.DashboardHome })));
+const CanvaView = lazy(() => import('./components/modules/CanvaView').then(m => ({ default: m.CanvaView })));
+const DeveloperInterface = lazy(() => import('./components/modules/DeveloperInterface').then(m => ({ default: m.DeveloperInterface })));
+const ToyyibView = lazy(() => import('./components/modules/ToyyibView').then(m => ({ default: m.ToyyibView })));
+const WhapiConfigView = lazy(() => import('./components/modules/WhapiConfigView').then(m => ({ default: m.WhapiConfigView })));
+const MembershipConfigView = lazy(() => import('./components/modules/MembershipConfigView').then(m => ({ default: m.MembershipConfigView })));
+const AccessConfigView = lazy(() => import('./components/modules/AccessConfigView').then(m => ({ default: m.AccessConfigView })));
+const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
+const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
 import { HelpModalProvider } from './contexts/HelpModalContext';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
@@ -79,7 +80,6 @@ import { Partnership, FlagshipProject } from './types';
 import { AdvertisementService } from './services/advertisementService';
 
 // --- View Definitions ---
-import { RadarDataImporter } from './components/admin/RadarDataImporter';
 
 type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'CANVA' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
 
@@ -3707,7 +3707,16 @@ export const JCIKLApp: React.FC = () => {
 
           {/* Scrollable Area */}
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-32 md:pb-4 px-5 sm:px-8 ">
-            {renderCurrentView(scrollContainerRef)}
+            <Suspense fallback={
+              <div className="flex flex-col gap-4 animate-pulse pt-2">
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />
+                <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+                <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+                <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+              </div>
+            }>
+              {renderCurrentView(scrollContainerRef)}
+            </Suspense>
           </div>
         </main>
 

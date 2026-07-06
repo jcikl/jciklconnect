@@ -1,5 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift, SlidersHorizontal } from 'lucide-react';
+import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift, SlidersHorizontal, CheckSquare, Square } from 'lucide-react';
+
+const BUSINESS_CATEGORIES = [
+  'Service Provider',
+  'Retailer / E-Commerce',
+  'Manufacturer / Producer',
+  'Distributor / Exporter / Importer',
+];
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
@@ -100,13 +107,14 @@ const MOCK_SISTER_CHAPTER_MEMBERS = [
 export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<'directory' | 'international'>('directory');
-  const [selectedIndustry, setSelectedIndustry] = useState<string>('All');
+  const [activeTab, setActiveTab] = useState<'local' | 'international'>('local');
+  const [selectedIndustries, setSelectedIndustries] = useState<Set<string>>(new Set());
   const [selectedInterestedIndustry, setSelectedInterestedIndustry] = useState<string>('All');
   const [selectedIntlBiz, setSelectedIntlBiz] = useState<string>('All');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [selectedIdealReferral, setSelectedIdealReferral] = useState<string>('All');
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [showDealsOnly, setShowDealsOnly] = useState(false);
 
   // Sister Chapter Filters States
   const [selectedSisterChapter, setSelectedSisterChapter] = useState<string>('All');
@@ -126,6 +134,8 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     return count;
   }, [selectedSisterChapter, selectedSisterCountry, selectedSisterIndustry]);
 
+  const [detailBiz, setDetailBiz] = useState<BusinessProfile | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isInquiryModalOpen, setInquiryModalOpen] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
     name: '',
@@ -173,11 +183,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     return ['All', ...Array.from(industries).sort()];
   }, [businesses]);
 
-  const uniqueCategories = useMemo(() => {
-    const categories = new Set(businesses.map(b => b.businessCategory).filter(Boolean));
-    return ['All', ...Array.from(categories).sort()];
-  }, [businesses]);
-
   const uniqueIdealReferrals = useMemo(() => {
     const referrals = new Set<string>();
     businesses.forEach(b => {
@@ -190,18 +195,19 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (selectedIndustry !== 'All') count++;
+    count += selectedIndustries.size;
     if (selectedInterestedIndustry !== 'All') count++;
     if (selectedIntlBiz !== 'All') count++;
-    if (selectedCategory !== 'All') count++;
+    count += selectedCategories.size;
     if (selectedIdealReferral !== 'All') count++;
+    if (showDealsOnly) count++;
     return count;
-  }, [selectedIndustry, selectedInterestedIndustry, selectedIntlBiz, selectedCategory, selectedIdealReferral]);
+  }, [selectedIndustries, selectedInterestedIndustry, selectedIntlBiz, selectedCategories, selectedIdealReferral, showDealsOnly]);
 
   const filteredBusinesses = useMemo(() => {
     let filtered = businesses;
-    if (selectedIndustry !== 'All') {
-      filtered = filtered.filter(biz => biz.industry === selectedIndustry);
+    if (selectedIndustries.size > 0) {
+      filtered = filtered.filter(biz => selectedIndustries.has(biz.industry));
     }
     if (selectedInterestedIndustry !== 'All') {
       filtered = filtered.filter(biz =>
@@ -223,8 +229,11 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         return true;
       });
     }
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter(biz => biz.businessCategory === selectedCategory);
+    if (selectedCategories.size > 0) {
+      filtered = filtered.filter(biz => {
+        const bizCats = (biz.businessCategory || '').split(',').map(c => c.trim());
+        return [...selectedCategories].some(sc => bizCats.includes(sc));
+      });
     }
     if (selectedIdealReferral !== 'All') {
       filtered = filtered.filter(biz =>
@@ -232,11 +241,16 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       );
     }
 
+    if (showDealsOnly) {
+      filtered = filtered.filter(biz => !!biz.offer);
+    }
+
     const term = (searchQuery || searchTerm).toLowerCase();
     if (!term) return filtered;
 
     return filtered.filter(biz =>
       (biz.companyName ?? '').toLowerCase().includes(term) ||
+      (biz.ownerName ?? '').toLowerCase().includes(term) ||
       (biz.industry ?? '').toLowerCase().includes(term) ||
       (biz.description ?? '').toLowerCase().includes(term) ||
       (biz.businessCategory ?? '').toLowerCase().includes(term)
@@ -245,11 +259,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     businesses,
     searchTerm,
     searchQuery,
-    selectedIndustry,
+    selectedIndustries,
     selectedInterestedIndustry,
     selectedIntlBiz,
-    selectedCategory,
-    selectedIdealReferral
+    selectedCategories,
+    selectedIdealReferral,
+    showDealsOnly
   ]);
 
   const handleContact = () => {
@@ -289,7 +304,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Member Business Directory</h2>
@@ -298,12 +313,23 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       </div>
 
       <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 mb-4">
-          <div className="flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          {/* Mobile: segmented control in white bordered container */}
+          <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
             <Tabs
-              tabs={['Business Directory', 'International Network']}
-              activeTab={activeTab === 'directory' ? 'Business Directory' : 'International Network'}
-              onTabChange={(tab) => setActiveTab(tab === 'Business Directory' ? 'directory' : 'international')}
+              variant="button"
+              fullWidth
+              tabs={['Local Businesses', 'International Network']}
+              activeTab={activeTab === 'local' ? 'Local Businesses' : 'International Network'}
+              onTabChange={(tab) => setActiveTab(tab === 'Local Businesses' ? 'local' : 'international')}
+            />
+          </div>
+          {/* Desktop: underline tabs */}
+          <div className="hidden md:block flex-shrink-0">
+            <Tabs
+              tabs={['Local Businesses', 'International Network']}
+              activeTab={activeTab === 'local' ? 'Local Businesses' : 'International Network'}
+              onTabChange={(tab) => setActiveTab(tab === 'Local Businesses' ? 'local' : 'international')}
               className="border-none"
             />
           </div>
@@ -312,174 +338,207 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         </div>
 
         <div className="bg-transparent">
-          {activeTab === 'directory' ? (
-            <div className="space-y-3">
-              {/* Search & Filter Row */}
-              <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-2">
-                <div className="relative flex-1">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search local businesses..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                  />
+          {activeTab === 'local' ? (
+            <>
+              {/* ── Mobile: compact list rows ── */}
+              <div className="md:hidden space-y-2">
+                <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                  <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search local businesses..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  </div>
+                  <Button
+                    variant={activeFiltersCount > 0 ? "secondary" : "outline"}
+                    size="sm"
+                    className="flex items-center gap-2 h-9 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
+                    onClick={() => setIsFilterDrawerOpen(true)}
+                  >
+                    <SlidersHorizontal size={14} className={activeFiltersCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
+                    <span>Filters</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="flex items-center justify-center bg-jci-blue text-white text-[10px] font-bold rounded-full w-5 h-5 ml-1">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  variant={activeFiltersCount > 0 ? "secondary" : "outline"}
-                  size="sm"
-                  className="flex items-center gap-2 h-9 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
-                  onClick={() => setIsFilterDrawerOpen(true)}
-                >
-                  <SlidersHorizontal size={14} className={activeFiltersCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
-                  <span>Filters</span>
-                  {activeFiltersCount > 0 && (
-                    <span className="flex items-center justify-center bg-jci-blue text-white text-[10px] font-bold rounded-full w-5 h-5 ml-1">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </Button>
+                <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
+                  <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    {filteredBusinesses.map(biz => {
+                      const ownerMember = members.find(m => m.id === biz.memberId);
+                      const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
+                      const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
+                      const position = ownerMember?.business?.title || 'Representative';
+                      const intlStatus = biz.acceptsInternationalBusiness;
+                      return (
+                        <button key={biz.id} type="button"
+                          className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                          onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
+                          <img src={avatarUrl} alt={biz.ownerName} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
+                              {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{biz.industry}</span>}
+                              {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                              {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
+                            </div>
+                          </div>
+                          <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </LoadingState>
               </div>
 
-              <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filteredBusinesses.map(biz => {
-                    return (
-                      <Card key={biz.id} noPadding className="hover:shadow-md transition-shadow flex flex-col h-full bg-white border border-slate-100 p-4">
-                        {(() => {
-                          const ownerMember = members.find(m => m.id === biz.memberId);
-                          const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
-                          const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
-                          const position = ownerMember?.business?.title || 'Representative';
+              {/* ── Desktop: sidebar + card grid ── */}
+              <div className="hidden md:flex gap-6 pt-2 items-start">
+                {/* Left sidebar */}
+                <aside className="w-52 shrink-0 space-y-3 sticky top-4">
+                  {/* Stats card */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-4">
+                    <p className="text-3xl font-black text-slate-900">{filteredBusinesses.length}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {filteredBusinesses.length === businesses.length ? 'local businesses' : `of ${businesses.length} businesses`}
+                    </p>
+                    {activeFiltersCount > 0 && (
+                      <button
+                        onClick={() => { setSelectedIndustries(new Set()); setSelectedIntlBiz('All'); setSelectedCategories(new Set()); setSelectedInterestedIndustry('All'); setSelectedIdealReferral('All'); setShowDealsOnly(false); }}
+                        className="mt-2 text-[10px] font-bold text-jci-blue hover:underline"
+                      >
+                        Clear {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
+                      </button>
+                    )}
+                  </div>
 
-                          return (
-                            <div className="flex gap-3 items-center border-b border-slate-50 pb-3">
-                              <img
-                                src={avatarUrl}
-                                alt={biz.ownerName}
-                                className="w-12 h-12 rounded-full object-cover border border-slate-200 flex-shrink-0 shadow-sm"
-                              />
+                  {/* Quick filters */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Filters</p>
+                    <button
+                      onClick={() => setSelectedIntlBiz(selectedIntlBiz === 'Yes' ? 'All' : 'Yes')}
+                      className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-center gap-2 font-semibold transition-colors ${selectedIntlBiz === 'Yes' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
+                    >
+                      <Globe size={12} /> International
+                    </button>
+                    <button
+                      onClick={() => setShowDealsOnly(v => !v)}
+                      className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-center gap-2 font-semibold transition-colors ${showDealsOnly ? 'bg-amber-50 text-amber-700 border-amber-200' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
+                    >
+                      <Gift size={12} /> Has Member Deal
+                    </button>
+                  </div>
+
+                  {/* Industry filter */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Industry</p>
+                      {selectedIndustries.size > 0 && (
+                        <button onClick={() => setSelectedIndustries(new Set())} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
+                      )}
+                    </div>
+                    <div className="space-y-0.5 max-h-72 overflow-y-auto">
+                      {uniqueIndustries.filter(i => i !== 'All').map(ind => {
+                        const active = selectedIndustries.has(ind);
+                        return (
+                          <button key={ind}
+                            onClick={() => setSelectedIndustries(prev => { const n = new Set(prev); if (n.has(ind)) n.delete(ind); else n.add(ind); return n; })}
+                            className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${active ? 'bg-jci-blue text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                            {active && <CheckSquare size={11} className="shrink-0" />}
+                            {ind}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </aside>
+
+                {/* Main content */}
+                <div className="flex-1 min-w-0 space-y-4">
+                  {/* Search bar */}
+                  <div className="flex gap-3 items-center bg-white p-3 rounded-xl border border-slate-200">
+                    <Search size={15} className="text-slate-400 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Search by name, company, industry…"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400"
+                    />
+                    {searchTerm && (
+                      <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>
+                    )}
+                  </div>
+
+                  {/* Card grid */}
+                  <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this filter">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredBusinesses.map(biz => {
+                        const ownerMember = members.find(m => m.id === biz.memberId);
+                        const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
+                        const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
+                        const position = ownerMember?.business?.title || 'Representative';
+                        const intlStatus = biz.acceptsInternationalBusiness;
+                        return (
+                          <div key={biz.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
+                            onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
+                            {/* Card header */}
+                            <div className="p-4 flex gap-3 items-start border-b border-slate-50">
+                              <img src={avatarUrl} alt={biz.ownerName} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 justify-between">
-                                  <h3 className="text-sm font-bold text-slate-900 truncate">
-                                    {biz.ownerName} {chineseName && <span className="text-xs text-slate-500 font-medium">({chineseName})</span>}
-                                  </h3>
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                    Malaysia
-                                  </span>
+                                <p className="font-bold text-sm text-slate-900 truncate leading-tight">{biz.ownerName}</p>
+                                {chineseName && <p className="text-[11px] text-slate-400 truncate">{chineseName}</p>}
+                                <p className="text-xs text-slate-500 truncate mt-0.5">{position}</p>
+                                <p className="text-xs font-semibold text-slate-700 truncate">{biz.companyName}</p>
+                              </div>
+                            </div>
+                            {/* Card body */}
+                            <div className="p-4 flex-1 flex flex-col gap-3">
+                              <div className="flex flex-wrap gap-1.5">
+                                {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{biz.industry}</span>}
+                                {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
+                                {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                              </div>
+                              {biz.description ? (
+                                <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{biz.description}</p>
+                              ) : (
+                                <p className="text-xs text-slate-300 italic flex-1">No description yet.</p>
+                              )}
+                              {biz.offer && (
+                                <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                                  <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Member Deal</p>
+                                  <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{biz.offer}</p>
                                 </div>
-                                <p className="text-xs text-slate-500 truncate mt-0.5">{position} at {biz.companyName}</p>
-                                <p className="text-[10px] text-jci-blue font-bold truncate mt-0.5">JCI Kuala Lumpur</p>
-                              </div>
+                              )}
                             </div>
-                          );
-                        })()}
-
-                        {/* Card Body */}
-                        <div className="flex-1 flex flex-col">
-                          {/* Industry Tag */}
-                          <div className="mb-2">
-                            {biz.industry ? (
-                              <Badge variant="info" className="text-[10px] px-2 py-0.5">
-                                {biz.industry}
-                              </Badge>
-                            ) : (
-                              <Badge variant="neutral" className="text-[10px] px-2 py-0.5 border border-slate-200 border-dashed bg-slate-50 text-slate-400">
-                                No Industry Specified
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* International Biz Tag */}
-                          <div className="mb-3">
-                            {(() => {
-                              const status = biz.acceptsInternationalBusiness;
-                              if (status === 'Yes' || status === true) {
-                                return <Badge variant="success" className="text-[10px] px-2 py-0.5">Accepts International Business</Badge>;
-                              }
-                              if (status === 'Willing to Explore') {
-                                return <Badge variant="warning" className="text-[10px] px-2 py-0.5">Exploring International Business</Badge>;
-                              }
-                              return (
-                                <Badge variant="neutral" className="text-[10px] px-2 py-0.5 border border-slate-200 border-dashed bg-slate-50 text-slate-400">
-                                  Local Business Only
-                                </Badge>
-                              );
-                            })()}
-                          </div>
-
-                          {biz.description ? (
-                            <p className="text-[11px] text-slate-600 line-clamp-3 mb-4 leading-relaxed">
-                              {biz.description}
-                            </p>
-                          ) : (
-                            <p className="text-[11px] text-slate-400 italic mb-4 leading-relaxed">
-                              No company description provided yet.
-                            </p>
-                          )}
-
-                          {/* Ideal Referral / Interested Industries */}
-                          {biz.idealReferralTypes && biz.idealReferralTypes.length > 0 && (
-                            <div className="mb-4">
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block mb-1">Ideal Referral</span>
-                              <div className="flex flex-wrap gap-1">
-                                {biz.idealReferralTypes.map(ref => (
-                                  <span key={ref} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold border border-blue-100">
-                                    {ref}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Special Offer / Member Deal */}
-                          {biz.offer && (
-                            <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-100 mb-4 mt-auto">
-                              <span className="text-[9px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1">
-                                <Gift size={11} /> JCI Member Deal
-                              </span>
-                              <p className="text-[11px] font-semibold text-amber-900 leading-snug">{biz.offer}</p>
-                            </div>
-                          )}
-
-                          <div className="flex gap-2 mt-auto pt-2">
-                            {biz.website && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 text-slate-600 border-slate-200 hover:bg-slate-50"
-                                onClick={() => window.open(biz.website.startsWith('http') ? biz.website : `https://${biz.website}`, '_blank')}
+                            {/* Card footer */}
+                            <div className="px-4 pb-4">
+                              <button
+                                className="w-full bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5"
+                                onClick={(e) => { e.stopPropagation(); setDetailBiz(biz); setIsDetailOpen(true); }}
                               >
-                                <Globe size={14} className="mr-2" /> Website
-                              </Button>
-                            )}
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              className="flex-1 bg-jci-blue text-white hover:bg-jci-blue/90"
-                              onClick={() => {
-                                setSelectedBiz(biz);
-                                handleContact();
-                              }}
-                            >
-                              Contact
-                            </Button>
+                                <Send size={11} /> Contact
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  </LoadingState>
                 </div>
-              </LoadingState>
-            </div>
+              </div>
+            </>
           ) : (
             <InternationalNetworkTab
-              selectedChapter={selectedSisterChapter}
-              selectedCountry={selectedSisterCountry}
-              selectedIndustry={selectedSisterIndustry}
-              sisterFiltersCount={sisterFiltersCount}
-              onOpenFilters={() => setIsFilterDrawerOpen(true)}
               onContact={(biz) => {
                 setSelectedBiz(biz);
                 setInquiryForm({
@@ -497,6 +556,105 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       </div>
 
 
+
+      {/* Business Detail Drawer */}
+      {detailBiz && (
+        <Modal
+          isOpen={isDetailOpen}
+          onClose={() => setIsDetailOpen(false)}
+          title={detailBiz.companyName}
+          drawerOnMobile
+          size="lg"
+          footer={
+            <div className="flex gap-3 w-full">
+              {detailBiz.website && (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => window.open(detailBiz.website.startsWith('http') ? detailBiz.website : `https://${detailBiz.website}`, '_blank')}
+                >
+                  <Globe size={14} className="mr-2" /> Website
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                className="flex-1 bg-jci-blue text-white"
+                onClick={() => {
+                  setIsDetailOpen(false);
+                  setSelectedBiz(detailBiz);
+                  setInquiryForm({ name: currentUser?.name || '', company: currentUser?.companyName || '', phone: currentUser?.phone || '', requirements: '' });
+                  setInquiryErrors({});
+                  setInquiryModalOpen(true);
+                }}
+              >
+                <Send size={14} className="mr-2" /> Contact
+              </Button>
+            </div>
+          }
+        >
+          {(() => {
+            const biz = detailBiz;
+            const ownerMember = members.find(m => m.id === biz.memberId);
+            const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
+            const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
+            const position = ownerMember?.business?.title || 'Representative';
+            const intlStatus = biz.acceptsInternationalBusiness;
+            return (
+              <div className="space-y-5">
+                {/* Header */}
+                <div className="flex items-center gap-4">
+                  <img src={avatarUrl} alt={biz.ownerName} className="w-16 h-16 rounded-full object-cover border border-slate-200 flex-shrink-0 shadow-sm" />
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-slate-900">{biz.ownerName}{chineseName && <span className="text-sm text-slate-400 font-normal ml-1">({chineseName})</span>}</h3>
+                    <p className="text-sm text-slate-500">{position} · {biz.companyName}</p>
+                    <p className="text-xs text-jci-blue font-bold mt-0.5">JCI Kuala Lumpur</p>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-wrap gap-2">
+                  {biz.industry && <Badge variant="info" className="text-xs">{biz.industry}</Badge>}
+                  {(intlStatus === 'Yes') && <Badge variant="success" className="text-xs">Accepts International Business</Badge>}
+                  {intlStatus === 'Willing to Explore' && <Badge variant="warning" className="text-xs">Exploring International Business</Badge>}
+                  {(!intlStatus || intlStatus === 'No') && <Badge variant="neutral" className="text-xs">Local Business Only</Badge>}
+                </div>
+
+                {/* Description */}
+                {biz.description ? (
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">About</p>
+                    <p className="text-sm text-slate-600 leading-relaxed">{biz.description}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">No company description provided yet.</p>
+                )}
+
+                {/* Ideal Referral */}
+                {biz.idealReferralTypes && biz.idealReferralTypes.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Ideal Referral</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {biz.idealReferralTypes.map(ref => (
+                        <span key={ref} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-100">{ref}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Member Deal */}
+                {biz.offer && (
+                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                      <Gift size={11} /> JCI Member Deal
+                    </p>
+                    <p className="text-sm font-semibold text-amber-900 leading-snug">{biz.offer}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
 
       {/* Inquiry Form Modal / Business Profile */}
       <Modal
@@ -684,22 +842,22 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       {/* Filter Drawer Overlay */}
       {isFilterDrawerOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 transition-opacity duration-300"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] transition-opacity duration-300"
           onClick={() => setIsFilterDrawerOpen(false)}
         />
       )}
 
       {/* Filter Drawer Content */}
-      <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ${isFilterDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+      <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[60] flex flex-col transform transition-transform duration-300 ${isFilterDrawerOpen ? 'translate-x-0' : 'translate-x-full'
         }`}>
         {/* Drawer Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h3 className="font-bold text-slate-800 text-lg">
-              {activeTab === 'directory' ? 'Filter Directory' : 'Filter Sister Chapters'}
+              {activeTab === 'local' ? 'Filter Local Businesses' : 'Filter Sister Chapters'}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              {activeTab === 'directory' ? 'Narrow down member business listings' : 'Narrow down sister chapter members'}
+              {activeTab === 'local' ? 'Narrow down member business listings' : 'Narrow down sister chapter members'}
             </p>
           </div>
           <button
@@ -711,226 +869,207 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         </div>
 
         {/* Drawer Body (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {activeTab === 'directory' ? (
-            <>
-              {/* Industry Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 size={13} className="text-slate-400" />
-                  Industry
-                </label>
-                <Select
-                  value={selectedIndustry}
-                  onChange={(e) => setSelectedIndustry(e.target.value)}
-                  options={uniqueIndustries.map(ind => {
-                    const count = ind === 'All'
-                      ? businesses.length
-                      : businesses.filter(b => b.industry === ind).length;
-                    return {
-                      value: ind,
-                      label: `${ind === 'All' ? 'All Industries' : ind} (${count})`
-                    };
-                  })}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === 'local' ? (
+            <div className="p-5 space-y-6">
+
+              {/* Quick Toggles */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Filters</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => setSelectedIntlBiz(v => v === 'Yes' ? 'All' : 'Yes')}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${selectedIntlBiz === 'Yes' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-600 border-slate-200'}`}
+                  >
+                    <Globe size={13} /> International
+                  </button>
+                  <button
+                    onClick={() => setSelectedIntlBiz(v => v === 'Willing to Explore' ? 'All' : 'Willing to Explore')}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${selectedIntlBiz === 'Willing to Explore' ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-slate-600 border-slate-200'}`}
+                  >
+                    <Globe size={13} /> Exploring
+                  </button>
+                  <button
+                    onClick={() => setShowDealsOnly(v => !v)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${showDealsOnly ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200'}`}
+                  >
+                    <Gift size={13} /> Has Deal
+                  </button>
+                </div>
               </div>
 
-              {/* Intl. Business Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Globe size={13} className="text-slate-400" />
-                  Intl. Business
-                </label>
-                <Select
-                  value={selectedIntlBiz}
-                  onChange={(e) => setSelectedIntlBiz(e.target.value)}
-                  options={[
-                    { value: 'All', label: `All Statuses (${businesses.length})` },
-                    {
-                      value: 'Yes',
-                      label: `Accepts International Business (${businesses.filter(b => b.acceptsInternationalBusiness === 'Yes' || b.acceptsInternationalBusiness === true).length})`
-                    },
-                    {
-                      value: 'Willing to Explore',
-                      label: `Exploring International Business (${businesses.filter(b => b.acceptsInternationalBusiness === 'Willing to Explore').length})`
-                    },
-                    {
-                      value: 'No',
-                      label: `Local Business Only (${businesses.filter(b => b.acceptsInternationalBusiness === 'No' || b.acceptsInternationalBusiness === false || !b.acceptsInternationalBusiness).length})`
-                    }
-                  ]}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
+              {/* Industry — multi-select pills */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Industry</p>
+                  {selectedIndustries.size > 0 && (
+                    <button onClick={() => setSelectedIndustries(new Set())} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {uniqueIndustries.filter(i => i !== 'All').map(ind => {
+                    const count = businesses.filter(b => b.industry === ind).length;
+                    const active = selectedIndustries.has(ind);
+                    return (
+                      <button key={ind} onClick={() => setSelectedIndustries(prev => { const n = new Set(prev); if (n.has(ind)) n.delete(ind); else n.add(ind); return n; })}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                        {ind}
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Business Categories Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Network size={13} className="text-slate-400" />
-                  Business Categories
-                </label>
-                <Select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  options={uniqueCategories.map(cat => {
-                    const count = cat === 'All'
-                      ? businesses.length
-                      : businesses.filter(b => b.businessCategory === cat).length;
-                    return {
-                      value: cat,
-                      label: `${cat === 'All' ? 'All Categories' : cat} (${count})`
-                    };
+              {/* Business Category — multi-select pills */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Business Category</p>
+                  {selectedCategories.size > 0 && (
+                    <button onClick={() => setSelectedCategories(new Set())} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {BUSINESS_CATEGORIES.map(cat => {
+                    const count = businesses.filter(b =>
+                      (b.businessCategory || '').split(',').map(c => c.trim()).includes(cat)
+                    ).length;
+                    const active = selectedCategories.has(cat);
+                    return (
+                      <button key={cat} onClick={() => setSelectedCategories(prev => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                        {cat}
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                      </button>
+                    );
                   })}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
+                </div>
               </div>
 
-              {/* Ideal Referral Industry Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Search size={13} className="text-slate-400" />
-                  Ideal Referral Industry
-                </label>
-                <Select
-                  value={selectedInterestedIndustry}
-                  onChange={(e) => setSelectedInterestedIndustry(e.target.value)}
-                  options={uniqueInterestedIndustries.map(ind => {
-                    const count = ind === 'All'
-                      ? businesses.length
-                      : businesses.filter(b => b.interestedIndustries && b.interestedIndustries.includes(ind)).length;
-                    return {
-                      value: ind,
-                      label: `${ind === 'All' ? 'All Interested Industries' : ind} (${count})`
-                    };
-                  })}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
-              </div>
+              {/* Ideal Referral Industry — radio list */}
+              {uniqueInterestedIndustries.length > 1 && (
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ideal Referral Industry</p>
+                  <div className="space-y-1">
+                    {uniqueInterestedIndustries.map(ind => {
+                      const count = ind === 'All' ? businesses.length : businesses.filter(b => b.interestedIndustries?.includes(ind)).length;
+                      const active = selectedInterestedIndustry === ind;
+                      return (
+                        <button key={ind} onClick={() => setSelectedInterestedIndustry(ind)}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm border transition-colors ${active ? 'bg-sky-500 text-white border-sky-500 font-bold' : 'bg-white text-slate-700 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
+                          <span>{ind === 'All' ? 'All Industries' : ind}</span>
+                          <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-              {/* Ideal Referral Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Gift size={13} className="text-slate-400" />
-                  Ideal Referral
-                </label>
-                <Select
-                  value={selectedIdealReferral}
-                  onChange={(e) => setSelectedIdealReferral(e.target.value)}
-                  options={uniqueIdealReferrals.map(ref => {
-                    const count = ref === 'All'
-                      ? businesses.length
-                      : businesses.filter(b => b.idealReferralTypes && b.idealReferralTypes.includes(ref)).length;
-                    return {
-                      value: ref,
-                      label: `${ref === 'All' ? 'All Referrals' : ref} (${count})`
-                    };
-                  })}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
-              </div>
-            </>
+              {/* Ideal Referral Type — radio list */}
+              {uniqueIdealReferrals.length > 1 && (
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ideal Referral Type</p>
+                  <div className="space-y-1">
+                    {uniqueIdealReferrals.map(ref => {
+                      const count = ref === 'All' ? businesses.length : businesses.filter(b => b.idealReferralTypes?.includes(ref)).length;
+                      const active = selectedIdealReferral === ref;
+                      return (
+                        <button key={ref} onClick={() => setSelectedIdealReferral(ref)}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm border transition-colors ${active ? 'bg-rose-500 text-white border-rose-500 font-bold' : 'bg-white text-slate-700 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
+                          <span>{ref === 'All' ? 'All Types' : ref}</span>
+                          <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
-            <>
-              {/* JCI Chapter Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 size={13} className="text-slate-400" />
-                  JCI Chapter
-                </label>
-                <Select
-                  value={selectedSisterChapter}
-                  onChange={(e) => setSelectedSisterChapter(e.target.value)}
-                  options={sisterChapters.map(ch => {
-                    const count = ch === 'All'
-                      ? MOCK_SISTER_CHAPTER_MEMBERS.length
-                      : MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.jciChapter === ch).length;
-                    return {
-                      value: ch,
-                      label: `${ch === 'All' ? 'All Chapters' : ch} (${count})`
-                    };
+            <div className="p-5 space-y-6">
+              {/* Country — pill buttons */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Country</p>
+                <div className="flex gap-2 flex-wrap">
+                  {sisterCountries.map(c => {
+                    const count = c === 'All' ? MOCK_SISTER_CHAPTER_MEMBERS.length : MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.country === c).length;
+                    const active = selectedSisterCountry === c;
+                    return (
+                      <button key={c} onClick={() => setSelectedSisterCountry(c)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                        {c === 'All' ? 'All' : c}
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                      </button>
+                    );
                   })}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
+                </div>
               </div>
 
-              {/* Country Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Globe size={13} className="text-slate-400" />
-                  Country
-                </label>
-                <Select
-                  value={selectedSisterCountry}
-                  onChange={(e) => setSelectedSisterCountry(e.target.value)}
-                  options={sisterCountries.map(c => {
-                    const count = c === 'All'
-                      ? MOCK_SISTER_CHAPTER_MEMBERS.length
-                      : MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.country === c).length;
-                    return {
-                      value: c,
-                      label: `${c === 'All' ? 'All Countries' : c} (${count})`
-                    };
+              {/* Chapter — radio list */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">JCI Chapter</p>
+                <div className="space-y-1">
+                  {sisterChapters.map(ch => {
+                    const count = ch === 'All' ? MOCK_SISTER_CHAPTER_MEMBERS.length : MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.jciChapter === ch).length;
+                    const active = selectedSisterChapter === ch;
+                    return (
+                      <button key={ch} onClick={() => setSelectedSisterChapter(ch)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue font-bold' : 'bg-white text-slate-700 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
+                        <span>{ch === 'All' ? 'All Chapters' : ch}</span>
+                        <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                      </button>
+                    );
                   })}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
+                </div>
               </div>
 
-              {/* Industry Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 size={13} className="text-slate-400" />
-                  Industry
-                </label>
-                <Select
-                  value={selectedSisterIndustry}
-                  onChange={(e) => setSelectedSisterIndustry(e.target.value)}
-                  options={sisterIndustries.map(ind => {
-                    const count = ind === 'All'
-                      ? MOCK_SISTER_CHAPTER_MEMBERS.length
-                      : MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.industry === ind).length;
-                    return {
-                      value: ind,
-                      label: `${ind === 'All' ? 'All Industries' : ind} (${count})`
-                    };
+              {/* Industry — radio list */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Industry</p>
+                <div className="space-y-1">
+                  {sisterIndustries.map(ind => {
+                    const count = ind === 'All' ? MOCK_SISTER_CHAPTER_MEMBERS.length : MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.industry === ind).length;
+                    const active = selectedSisterIndustry === ind;
+                    return (
+                      <button key={ind} onClick={() => setSelectedSisterIndustry(ind)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue font-bold' : 'bg-white text-slate-700 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
+                        <span>{ind === 'All' ? 'All Industries' : ind}</span>
+                        <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                      </button>
+                    );
                   })}
-                  className="bg-white border-slate-200 shadow-sm text-xs"
-                />
+                </div>
               </div>
-            </>
+            </div>
           )}
         </div>
 
         {/* Drawer Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 text-slate-600 border-slate-200 hover:bg-slate-100 bg-white"
-            onClick={() => {
-              if (activeTab === 'directory') {
-                setSelectedIndustry('All');
-                setSelectedInterestedIndustry('All');
-                setSelectedIntlBiz('All');
-                setSelectedCategory('All');
-                setSelectedIdealReferral('All');
-              } else {
-                setSelectedSisterChapter('All');
-                setSelectedSisterCountry('All');
-                setSelectedSisterIndustry('All');
-              }
-            }}
-          >
-            Reset All
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            className="flex-1 bg-jci-blue text-white hover:bg-jci-blue/90"
-            onClick={() => setIsFilterDrawerOpen(false)}
-          >
-            Apply Filters
-          </Button>
+        <div className="shrink-0 bg-white border-t border-slate-100">
+          <div className="px-5 pt-4 pb-10">
+            <button
+              onClick={() => setIsFilterDrawerOpen(false)}
+              className="w-full bg-jci-blue text-white font-black py-4 rounded-2xl text-sm shadow-lg shadow-jci-blue/25 active:scale-[0.98] transition-transform"
+            >
+              Show {filteredBusinesses.length} {filteredBusinesses.length === 1 ? 'Business' : 'Businesses'}
+            </button>
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedIndustries(new Set());
+                  setSelectedInterestedIndustry('All');
+                  setSelectedIntlBiz('All');
+                  setSelectedCategories(new Set());
+                  setSelectedIdealReferral('All');
+                  setShowDealsOnly(false);
+                }}
+                className="w-full mt-3 text-slate-400 text-xs font-semibold hover:text-slate-600 transition-colors py-1"
+              >
+                Reset all {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -940,180 +1079,420 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
 // International Network Tab Component
 interface InternationalNetworkTabProps {
-  selectedChapter: string;
-  selectedCountry: string;
-  selectedIndustry: string;
-  sisterFiltersCount: number;
-  onOpenFilters: () => void;
   onContact: (biz: BusinessProfile) => void;
 }
 
-const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({
-  selectedChapter,
-  selectedCountry,
-  selectedIndustry,
-  sisterFiltersCount,
-  onOpenFilters,
-  onContact
-}) => {
+const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onContact }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedChapter, setSelectedChapter] = useState('All');
+  const [selectedCountry, setSelectedCountry] = useState('All');
+  const [selectedIndustry, setSelectedIndustry] = useState('All');
+  const [showDealsOnly, setShowDealsOnly] = useState(false);
+  const [detailMember, setDetailMember] = useState<typeof MOCK_SISTER_CHAPTER_MEMBERS[0] | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  // Filter members list
+  const allChapters = useMemo(() => ['All', ...Array.from(new Set(MOCK_SISTER_CHAPTER_MEMBERS.map(m => m.jciChapter)))], []);
+  const allCountries = useMemo(() => ['All', ...Array.from(new Set(MOCK_SISTER_CHAPTER_MEMBERS.map(m => m.country)))], []);
+  const allIndustries = useMemo(() => ['All', ...Array.from(new Set(MOCK_SISTER_CHAPTER_MEMBERS.map(m => m.industry)))], []);
+
+  const activeFiltersCount = useMemo(() => {
+    let n = 0;
+    if (selectedChapter !== 'All') n++;
+    if (selectedCountry !== 'All') n++;
+    if (selectedIndustry !== 'All') n++;
+    if (showDealsOnly) n++;
+    return n;
+  }, [selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
+
+  const clearFilters = () => { setSelectedChapter('All'); setSelectedCountry('All'); setSelectedIndustry('All'); setShowDealsOnly(false); };
+
   const filteredMembers = useMemo(() => {
     return MOCK_SISTER_CHAPTER_MEMBERS.filter(member => {
-      const matchesSearch =
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (member.chineseName && member.chineseName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        member.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.jciChapter.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.businessCategory.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesChapter = selectedChapter === 'All' || member.jciChapter === selectedChapter;
-      const matchesCountry = selectedCountry === 'All' || member.country === selectedCountry;
-      const matchesIndustry = selectedIndustry === 'All' || member.industry === selectedIndustry;
-
-      return matchesSearch && matchesChapter && matchesCountry && matchesIndustry;
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = !term ||
+        member.name.toLowerCase().includes(term) ||
+        (member.chineseName && member.chineseName.toLowerCase().includes(term)) ||
+        member.companyName.toLowerCase().includes(term) ||
+        member.jciChapter.toLowerCase().includes(term) ||
+        member.description.toLowerCase().includes(term) ||
+        member.businessCategory.toLowerCase().includes(term);
+      return matchesSearch &&
+        (selectedChapter === 'All' || member.jciChapter === selectedChapter) &&
+        (selectedCountry === 'All' || member.country === selectedCountry) &&
+        (selectedIndustry === 'All' || member.industry === selectedIndustry) &&
+        (!showDealsOnly || !!member.specialOffer);
     });
-  }, [searchTerm, selectedChapter, selectedCountry, selectedIndustry]);
+  }, [searchTerm, selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
+
+  const getMappedBiz = (member: typeof MOCK_SISTER_CHAPTER_MEMBERS[0]): BusinessProfile => ({
+    id: member.id, memberId: member.id,
+    ownerName: member.chineseName ? `${member.name} (${member.chineseName})` : member.name,
+    companyName: member.companyName,
+    industry: `${member.jciChapter} (${member.country})`,
+    description: member.description, website: member.email,
+    offer: member.specialOffer || '', logo: member.avatarUrl,
+    internationalPartnershipTypes: member.collaborationNeeds,
+    businessCategory: member.businessCategory, acceptsInternationalBusiness: 'Yes'
+  });
 
   return (
-    <div className="space-y-3">
-      {/* Search & Filter Row */}
-      <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-2">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search sister chapter members..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-          />
+    <div className="space-y-2">
+      {/* ── Mobile layout ── */}
+      <div className="md:hidden space-y-2">
+        <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input type="text" placeholder="Search sister chapter members..."
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+          </div>
+          <Button variant={activeFiltersCount > 0 ? "secondary" : "outline"} size="sm"
+            className="flex items-center gap-2 h-9 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
+            onClick={() => setIsMobileFilterOpen(true)}>
+            <SlidersHorizontal size={14} className={activeFiltersCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
+            <span>Filters</span>
+            {activeFiltersCount > 0 && <span className="flex items-center justify-center bg-jci-blue text-white text-[10px] font-bold rounded-full w-5 h-5 ml-1">{activeFiltersCount}</span>}
+          </Button>
         </div>
-        <Button
-          variant={sisterFiltersCount > 0 ? "secondary" : "outline"}
-          size="sm"
-          className="flex items-center gap-2 h-9 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
-          onClick={onOpenFilters}
-        >
-          <SlidersHorizontal size={14} className={sisterFiltersCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
-          <span>Filters</span>
-          {sisterFiltersCount > 0 && (
-            <span className="flex items-center justify-center bg-jci-blue text-white text-[10px] font-bold rounded-full w-5 h-5 ml-1">
-              {sisterFiltersCount}
-            </span>
-          )}
-        </Button>
+        {filteredMembers.length === 0 ? (
+          <div className="text-center py-16 bg-white border border-slate-100 shadow-sm rounded-xl">
+            <Network size={48} className="mx-auto mb-4 text-slate-300" />
+            <h4 className="text-lg font-bold text-slate-900 mb-2">No Members Found</h4>
+            <p className="text-slate-500 text-sm">Try adjusting your filters.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+            {filteredMembers.map(member => (
+              <button key={member.id} type="button"
+                className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                onClick={() => { setDetailMember(member); setIsDetailOpen(true); }}>
+                <img src={member.avatarUrl} alt={member.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-slate-900 truncate">{member.name}</span>
+                    {member.chineseName && member.chineseName !== member.name && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({member.chineseName})</span>}
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">{member.position} · {member.companyName}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{member.businessCategory}</span>
+                    {member.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                    <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">{member.country}</span>
+                  </div>
+                </div>
+                <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Grid List */}
-      {filteredMembers.length === 0 ? (
-        <div className="text-center py-16 bg-white border border-slate-100 shadow-sm rounded-xl">
-          <Network size={48} className="mx-auto mb-4 text-slate-300" />
-          <h4 className="text-lg font-bold text-slate-900 mb-2">No Sister Chapter Members Found</h4>
-          <p className="text-slate-500 mb-4 text-sm max-w-sm mx-auto">No members match your search criteria. Try adjusting your filters.</p>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredMembers.map(member => {
-            const mappedBiz: BusinessProfile = {
-              id: member.id,
-              memberId: member.id,
-              ownerName: member.chineseName ? `${member.name} (${member.chineseName})` : member.name,
-              companyName: member.companyName,
-              industry: `${member.jciChapter} (${member.country})`,
-              description: member.description,
-              website: member.email,
-              offer: member.specialOffer || '',
-              logo: member.avatarUrl,
-              internationalPartnershipTypes: member.collaborationNeeds,
-              businessCategory: member.businessCategory,
-              acceptsInternationalBusiness: 'Yes'
-            };
+      {/* ── Desktop: sidebar + card grid ── */}
+      <div className="hidden md:flex gap-6 pt-2 items-start">
+        {/* Sidebar */}
+        <aside className="w-52 shrink-0 space-y-3 sticky top-4">
+          {/* Stats */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <p className="text-3xl font-black text-slate-900">{filteredMembers.length}</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {filteredMembers.length === MOCK_SISTER_CHAPTER_MEMBERS.length ? 'international partners' : `of ${MOCK_SISTER_CHAPTER_MEMBERS.length} partners`}
+            </p>
+            {activeFiltersCount > 0 && (
+              <button onClick={clearFilters} className="mt-2 text-[10px] font-bold text-jci-blue hover:underline">
+                Clear {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
 
-            return (
-              <Card key={member.id} noPadding className="hover:shadow-md transition-shadow flex flex-col h-full bg-white border border-slate-100 p-4">
-                <div className="flex gap-3 items-center border-b border-slate-50 pb-3">
-                  <img
-                    src={member.avatarUrl}
-                    alt={member.name}
-                    className="w-12 h-12 rounded-full object-cover border border-slate-200 flex-shrink-0 shadow-sm"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 justify-between">
-                      <h3 className="text-sm font-bold text-slate-900 truncate">
-                        {member.name} {member.chineseName && <span className="text-xs text-slate-500 font-medium">({member.chineseName})</span>}
-                      </h3>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                        {member.country}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">{member.position} at {member.companyName}</p>
-                    <p className="text-[10px] text-jci-blue font-bold truncate mt-0.5">{member.jciChapter}</p>
-                  </div>
-                </div>
+          {/* Quick filters */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Filters</p>
+            <button onClick={() => setShowDealsOnly(v => !v)}
+              className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-center gap-2 font-semibold transition-colors ${showDealsOnly ? 'bg-amber-50 text-amber-700 border-amber-200' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
+              <Gift size={12} /> Has Sister Deal
+            </button>
+          </div>
 
-                {/* Card Body */}
-                <div className="flex-1 flex flex-col">
-                  {/* Industry / Category Tag */}
-                  <div className="mb-2">
-                    <Badge variant="info" className="text-[10px] px-2 py-0.5">
-                      {member.businessCategory}
-                    </Badge>
-                  </div>
+          {/* Country filter */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Country</p>
+            <div className="space-y-0.5">
+              {allCountries.map(c => (
+                <button key={c} onClick={() => setSelectedCountry(c)}
+                  className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors ${selectedCountry === c ? 'bg-jci-blue text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                  <p className="text-[11px] text-slate-600 line-clamp-3 mb-4 leading-relaxed">
-                    {member.description}
-                  </p>
+          {/* Industry filter */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Industry</p>
+            <div className="space-y-0.5 max-h-48 overflow-y-auto">
+              {allIndustries.map(ind => (
+                <button key={ind} onClick={() => setSelectedIndustry(ind)}
+                  className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors ${selectedIndustry === ind ? 'bg-jci-blue text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  {ind}
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
 
-                  {/* Collaboration Needs */}
-                  {member.collaborationNeeds.length > 0 && (
-                    <div className="mb-4">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block mb-1">Collaboration Needs</span>
-                      <div className="flex flex-wrap gap-1">
-                        {member.collaborationNeeds.map(need => (
-                          <span key={need} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold border border-blue-100">
-                            {need}
-                          </span>
-                        ))}
+        {/* Main content */}
+        <div className="flex-1 min-w-0 space-y-4">
+          <div className="flex gap-3 items-center bg-white p-3 rounded-xl border border-slate-200">
+            <Search size={15} className="text-slate-400 shrink-0" />
+            <input type="text" placeholder="Search by name, company, chapter, industry…"
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400" />
+            {searchTerm && <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>}
+          </div>
+
+          {filteredMembers.length === 0 ? (
+            <div className="text-center py-20 bg-white border border-slate-100 rounded-xl">
+              <Network size={48} className="mx-auto mb-4 text-slate-300" />
+              <h4 className="text-lg font-bold text-slate-900 mb-2">No Members Found</h4>
+              <p className="text-slate-500 text-sm">Try adjusting your filters.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredMembers.map(member => (
+                <div key={member.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
+                  onClick={() => { setDetailMember(member); setIsDetailOpen(true); }}>
+                  {/* Header */}
+                  <div className="p-4 flex gap-3 items-start border-b border-slate-50">
+                    <img src={member.avatarUrl} alt={member.name} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-1">
+                        <p className="font-bold text-sm text-slate-900 truncate leading-tight">{member.name}</p>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded shrink-0">{member.country}</span>
                       </div>
+                      {member.chineseName && member.chineseName !== member.name && <p className="text-[11px] text-slate-400 truncate">{member.chineseName}</p>}
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{member.position}</p>
+                      <p className="text-xs font-semibold text-slate-700 truncate">{member.companyName}</p>
+                      <p className="text-[10px] text-jci-blue font-bold truncate mt-0.5">{member.jciChapter}</p>
                     </div>
-                  )}
-
-                  {/* Special Offer */}
-                  {member.specialOffer && (
-                    <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-100 mb-4 mt-auto">
-                      <span className="text-[9px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1">
-                        <Gift size={11} /> Sister Chapter Deal
-                      </span>
-                      <p className="text-[11px] font-semibold text-amber-900 leading-snug">{member.specialOffer}</p>
+                  </div>
+                  {/* Body */}
+                  <div className="p-4 flex-1 flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{member.businessCategory}</span>
+                      {member.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
                     </div>
-                  )}
-
-                  <div className="flex gap-2 mt-auto pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-slate-600 border-slate-200 hover:bg-slate-50"
-                      onClick={() => window.open(`mailto:${member.email}?subject=JCI KL Collaboration Inquiry`, '_blank')}
-                    >
-                      <Globe size={14} className="mr-2" /> Email
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="flex-1 bg-jci-blue text-white hover:bg-jci-blue/90"
-                      onClick={() => onContact(mappedBiz)}
-                    >
-                      Contact
-                    </Button>
+                    <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{member.description}</p>
+                    {member.collaborationNeeds.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Seeking</p>
+                        <div className="flex flex-wrap gap-1">
+                          {member.collaborationNeeds.map(need => (
+                            <span key={need} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold border border-blue-100">{need}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {member.specialOffer && (
+                      <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                        <p className="text-[9px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Sister Deal</p>
+                        <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{member.specialOffer}</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* Footer */}
+                  <div className="px-4 pb-4 flex gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); window.open(`mailto:${member.email}?subject=JCI KL Collaboration Inquiry`, '_blank'); }}
+                      className="flex-1 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
+                      <Globe size={11} /> Email
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); onContact(getMappedBiz(member)); }}
+                      className="flex-1 bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5">
+                      <Send size={11} /> Contact
+                    </button>
                   </div>
                 </div>
-              </Card>
-            );
-          })}
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Mobile filter drawer */}
+      {isMobileFilterOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60]" onClick={() => setIsMobileFilterOpen(false)} />
+      )}
+      <div className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-[60] flex flex-col transform transition-transform duration-300 ${isMobileFilterOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h3 className="font-bold text-slate-800 text-lg">Filter Sister Chapters</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Narrow down sister chapter members</p>
+          </div>
+          <button onClick={() => setIsMobileFilterOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-50 rounded-full text-xl font-bold">&times;</button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-5 space-y-6">
+            {/* Quick Filters */}
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Filters</p>
+              <button onClick={() => setShowDealsOnly(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${showDealsOnly ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200'}`}>
+                <Gift size={13} /> Has Sister Deal
+              </button>
+            </div>
+
+            {/* Country — pill group */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Country</p>
+                {selectedCountry !== 'All' && (
+                  <button onClick={() => setSelectedCountry('All')} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {allCountries.filter(c => c !== 'All').map(c => {
+                  const count = MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.country === c).length;
+                  const active = selectedCountry === c;
+                  return (
+                    <button key={c} onClick={() => setSelectedCountry(active ? 'All' : c)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                      {c}
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Chapter — pill group */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">JCI Chapter</p>
+                {selectedChapter !== 'All' && (
+                  <button onClick={() => setSelectedChapter('All')} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {allChapters.filter(c => c !== 'All').map(c => {
+                  const count = MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.jciChapter === c).length;
+                  const active = selectedChapter === c;
+                  return (
+                    <button key={c} onClick={() => setSelectedChapter(active ? 'All' : c)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                      {c}
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Industry — pill group */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Industry</p>
+                {selectedIndustry !== 'All' && (
+                  <button onClick={() => setSelectedIndustry('All')} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {allIndustries.filter(i => i !== 'All').map(i => {
+                  const count = MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.industry === i).length;
+                  const active = selectedIndustry === i;
+                  return (
+                    <button key={i} onClick={() => setSelectedIndustry(active ? 'All' : i)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                      {i}
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="shrink-0 bg-white border-t border-slate-100">
+          <div className="px-5 pt-4 pb-10">
+            <button
+              onClick={() => setIsMobileFilterOpen(false)}
+              className="w-full bg-jci-blue text-white font-black py-4 rounded-2xl text-sm shadow-lg shadow-jci-blue/25 active:scale-[0.98] transition-transform"
+            >
+              Show {filteredMembers.length} {filteredMembers.length === 1 ? 'Member' : 'Members'}
+            </button>
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={() => { clearFilters(); }}
+                className="w-full mt-3 text-slate-400 text-xs font-semibold hover:text-slate-600 transition-colors py-1"
+              >
+                Reset all {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* International member detail drawer (mobile) */}
+      {detailMember && (
+        <Modal
+          isOpen={isDetailOpen}
+          onClose={() => setIsDetailOpen(false)}
+          title={detailMember.companyName}
+          drawerOnMobile
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <img src={detailMember.avatarUrl} alt={detailMember.name} className="w-14 h-14 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+              <div>
+                <div className="font-bold text-slate-900">{detailMember.name}{detailMember.chineseName && detailMember.chineseName !== detailMember.name && <span className="text-sm text-slate-500 font-normal ml-1">({detailMember.chineseName})</span>}</div>
+                <div className="text-sm text-slate-500">{detailMember.position} · {detailMember.companyName}</div>
+                <div className="text-xs text-jci-blue font-bold mt-0.5">{detailMember.jciChapter} · {detailMember.country}</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-1 rounded-full">{detailMember.businessCategory}</span>
+              {detailMember.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+            </div>
+            {detailMember.description && <p className="text-sm text-slate-600 leading-relaxed">{detailMember.description}</p>}
+            {detailMember.collaborationNeeds.length > 0 && (
+              <div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">Collaboration Needs</span>
+                <div className="flex flex-wrap gap-1">
+                  {detailMember.collaborationNeeds.map(need => (
+                    <span key={need} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold border border-blue-100">{need}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {detailMember.specialOffer && (
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
+                <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1"><Gift size={11} /> Sister Chapter Deal</span>
+                <p className="text-sm font-semibold text-amber-900 leading-snug">{detailMember.specialOffer}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 pt-4 border-t border-slate-100 mt-4">
+            <Button variant="outline" size="sm" className="flex-1"
+              onClick={() => window.open(`mailto:${detailMember.email}?subject=JCI KL Collaboration Inquiry`, '_blank')}>
+              <Globe size={14} className="mr-2" /> Email
+            </Button>
+            <Button variant="primary" size="sm" className="flex-1 bg-jci-blue text-white"
+              onClick={() => {
+                setIsDetailOpen(false);
+                const mappedBiz: BusinessProfile = {
+                  id: detailMember.id, memberId: detailMember.id,
+                  ownerName: detailMember.chineseName ? `${detailMember.name} (${detailMember.chineseName})` : detailMember.name,
+                  companyName: detailMember.companyName,
+                  industry: `${detailMember.jciChapter} (${detailMember.country})`,
+                  description: detailMember.description, website: detailMember.email,
+                  offer: detailMember.specialOffer || '', logo: detailMember.avatarUrl,
+                  internationalPartnershipTypes: detailMember.collaborationNeeds,
+                  businessCategory: detailMember.businessCategory, acceptsInternationalBusiness: 'Yes'
+                };
+                onContact(mappedBiz);
+              }}>
+              <Send size={14} className="mr-2" /> Contact
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
