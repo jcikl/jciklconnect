@@ -3948,66 +3948,6 @@ export const JCIKLApp: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Board Metrics Grid */}
-                  {(isBoard || isAdmin || isDeveloper) && (
-                    <div className="mb-6">
-                      <p className="text-xs font-bold uppercase tracking-widest mb-3 text-slate-400">Board Overview</p>
-                      <div className="grid grid-cols-4 gap-2 bg-slate-800/40 p-2 rounded-xl border border-slate-800/60">
-                        {/* Total Members */}
-                        <div
-                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
-                          onClick={() => {
-                            handleViewChange('MEMBERS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <Users size={16} className="text-blue-400 mb-1" />
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Members</span>
-                          <span className="text-sm font-black text-white mt-0.5">{metrics.totalMembers}</span>
-                        </div>
-
-                        {/* Active Members */}
-                        <div
-                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
-                          onClick={() => {
-                            handleViewChange('MEMBERS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <CheckCircle size={16} className="text-green-400 mb-1" />
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Active</span>
-                          <span className="text-sm font-black text-white mt-0.5">{metrics.activeMembers}</span>
-                        </div>
-
-                        {/* Upcoming Events */}
-                        <div
-                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
-                          onClick={() => {
-                            handleViewChange('EVENTS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <Calendar size={16} className="text-purple-400 mb-1" />
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Events</span>
-                          <span className="text-sm font-black text-white mt-0.5">{metrics.upcomingEvents}</span>
-                        </div>
-
-                        {/* Active Projects */}
-                        <div
-                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
-                          onClick={() => {
-                            handleViewChange('PROJECTS');
-                            setShowMobileMenu(false);
-                          }}
-                        >
-                          <Briefcase size={16} className="text-amber-400 mb-1" />
-                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Projects</span>
-                          <span className="text-sm font-black text-white mt-0.5">{metrics.activeProjects}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
                   <div className="grid grid-cols-4 gap-y-4 gap-x-1 my-2">
                     {(isBoard || isAdmin || isDeveloper) ? (

@@ -541,6 +541,52 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       <div>
         {activeTab === 'overview' && (
           <>
+            {/* Member Metrics Row */}
+            <Card noPadding className="mb-4 overflow-hidden">
+              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
+                <div className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative" onClick={() => onNavigate?.('MEMBERS')}>
+                  <div className="absolute top-4 right-4 p-2 bg-blue-50 text-jci-blue rounded-lg group-hover:bg-jci-blue group-hover:text-white transition-colors">
+                    <Users size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Members</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.totalMembers}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">{metrics.newMembersThisMonth} new this month</span>
+                  </div>
+                </div>
+                <div className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative" onClick={() => onNavigate?.('MEMBERS')}>
+                  <div className="absolute top-4 right-4 p-2 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors">
+                    <CheckCircle size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Members</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.activeMembers}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">{Math.round((metrics.activeMembers / Math.max(metrics.totalMembers, 1)) * 100)}% engagement</span>
+                  </div>
+                </div>
+                <div className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative" onClick={() => onNavigate?.('EVENTS')}>
+                  <div className="absolute top-4 right-4 p-2 bg-purple-50 text-purple-600 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                    <Calendar size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Upcoming Events</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.upcomingEvents}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">Scheduled activities</span>
+                  </div>
+                </div>
+                <div className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group relative" onClick={() => onNavigate?.('PROJECTS')}>
+                  <div className="absolute top-4 right-4 p-2 bg-amber-50 text-amber-600 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                    <Briefcase size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Projects</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.activeProjects}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">{metrics.completedProjects} completed</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
             {/* Financial Overview */}
             {loadingFinance ? (
               <Card noPadding noHeaderPadding className="mb-4" title={<div className="px-4 py-3">Financial Overview</div>}>
