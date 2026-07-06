@@ -21,7 +21,7 @@ import { ActivityRecommendationService } from '../../services/activityRecommenda
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { MEMBER_TIERS, MEMBER_PRIVILEGES, BOUNTY_STATUS } from '../../config/constants';
 import { ContractService, CommitmentContract } from '../../services/contractService';
-import { PromotionService } from '../../services/promotionService';
+import { PromotionService, type MemberEngagementProgressSummary, type EngagementYear } from '../../services/promotionService';
 import { MembersService } from '../../services/membersService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 import type { Event, MemberPromotionProgress } from '../../types';
@@ -175,6 +175,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [promoSavingField, setPromoSavingField] = useState<string | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
+  // Membership Journey modal state
+  const [showJourneyModal, setShowJourneyModal] = useState(false);
+  const [journeyActiveTab, setJourneyActiveTab] = useState<'probation' | 'firstYear' | 'secondYear'>('probation');
+  const [engagementFirst, setEngagementFirst] = useState<MemberEngagementProgressSummary | null>(null);
+  const [engagementSecond, setEngagementSecond] = useState<MemberEngagementProgressSummary | null>(null);
+  const [engagementLoading, setEngagementLoading] = useState(false);
+  const [engEditValues, setEngEditValues] = useState<Record<string, { detail: string; date: string }>>({});
+  const [engSavingKey, setEngSavingKey] = useState<string | null>(null);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
   const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
@@ -288,6 +296,35 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     }
   };
 
+  // Load Engagement Progress for Full members
+  useEffect(() => {
+    if (!member || member.membershipType !== 'Full') return;
+    const loadEngagement = async () => {
+      setEngagementLoading(true);
+      try {
+        const memberData = await MembersService.getMemberById(member.id);
+        if (!memberData) return;
+        const first = PromotionService.buildEngagementProgress(memberData, 'firstYear');
+        const second = PromotionService.buildEngagementProgress(memberData, 'secondYear');
+        setEngagementFirst(first);
+        setEngagementSecond(second);
+        const vals: Record<string, { detail: string; date: string }> = {};
+        first.requirements.forEach(req => {
+          vals[`firstYear_${req.key}`] = { detail: req.progress.detail || '', date: req.progress.date || '' };
+        });
+        second.requirements.forEach(req => {
+          vals[`secondYear_${req.key}`] = { detail: req.progress.detail || '', date: req.progress.date || '' };
+        });
+        setEngEditValues(vals);
+      } catch (err) {
+        console.error('Failed to load engagement progress', err);
+      } finally {
+        setEngagementLoading(false);
+      }
+    };
+    loadEngagement();
+  }, [member]);
+
   // Load member's event registrations (for guest dashboard: Activity Timeline + Upcoming Registered)
   useEffect(() => {
     const load = async () => {
@@ -304,6 +341,44 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     };
     load();
   }, [member]);
+
+  const openJourneyModal = () => {
+    if (!member) return;
+    if (member.membershipType === 'Probation') {
+      setJourneyActiveTab('probation');
+    } else {
+      const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
+      const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
+      const yearsIn = joinYear ? new Date().getFullYear() - joinYear : 0;
+      setJourneyActiveTab(yearsIn >= 1 ? 'secondYear' : 'firstYear');
+    }
+    setShowJourneyModal(true);
+  };
+
+  const handleSaveEngagement = async (year: EngagementYear, reqKey: string) => {
+    if (!member) return;
+    const editKey = `${year}_${reqKey}`;
+    const vals = engEditValues[editKey] || { detail: '', date: '' };
+    setEngSavingKey(editKey);
+    try {
+      await PromotionService.saveEngagementRequirement(member.id, year, reqKey, {
+        detail: vals.detail,
+        date: vals.date,
+      });
+      const memberData = await MembersService.getMemberById(member.id);
+      if (memberData) {
+        const first = PromotionService.buildEngagementProgress(memberData, 'firstYear');
+        const second = PromotionService.buildEngagementProgress(memberData, 'secondYear');
+        setEngagementFirst(first);
+        setEngagementSecond(second);
+      }
+      showToast('Progress saved!', 'success');
+    } catch (err) {
+      showToast('Failed to save progress', 'error');
+    } finally {
+      setEngSavingKey(null);
+    }
+  };
 
   // Load personalized recommendations
   useEffect(() => {
@@ -407,6 +482,25 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     return <div className="text-center py-10 text-slate-400">Loading member data...</div>;
   }
 
+  const isProbationMember = member.membershipType === 'Probation';
+  const isFullMember = member.membershipType === 'Full';
+  const showJourneyCard = isProbationMember || isFullMember;
+  const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
+  const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
+  const yearsInMembership = joinYear ? new Date().getFullYear() - joinYear : 0;
+  const activeEngSummary = yearsInMembership >= 1 ? engagementSecond : engagementFirst;
+  const journeyProgress = isProbationMember
+    ? (promotionProgress?.overallProgress || 0)
+    : (activeEngSummary?.overallProgress || 0);
+  const journeyLabel = isProbationMember
+    ? `${promotionProgress?.requirements?.filter((r: any) => r.isCompleted).length || 0}/4 · Probation`
+    : activeEngSummary
+      ? `${activeEngSummary.completedCount}/${activeEngSummary.totalCount} · ${yearsInMembership >= 1 ? '2nd Year' : '1st Year'}`
+      : '...';
+  const journeyIsComplete = isProbationMember
+    ? promotionProgress?.isEligibleForPromotion
+    : activeEngSummary?.isCompleted;
+
   return (
     <div className="space-y-4">
 
@@ -462,28 +556,28 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       )}
 
 
-      {/* Promotion Progress Card (Probation Members Only) — Minimalist */}
-      {member.membershipType === 'Probation' && (
+      {/* Membership Journey Card — Probation & Full Members */}
+      {showJourneyCard && (
         <div
           className="flex items-center gap-4 p-4 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-white cursor-pointer hover:shadow-md transition-all group"
-          onClick={() => setShowPromoModal(true)}
+          onClick={openJourneyModal}
         >
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md flex-shrink-0">
             <TrendingUp size={20} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1.5">
-              <h3 className="font-bold text-sm text-slate-900">Promotion Progress</h3>
+              <h3 className="font-bold text-sm text-slate-900">Membership Journey</h3>
               <span className="text-xs font-bold text-amber-700">
-                {promoLoading ? '...' : `${promotionProgress?.requirements?.filter((r: any) => r.isCompleted).length || 0}/4 completed`}
+                {(isProbationMember ? promoLoading : engagementLoading) ? '...' : journeyLabel}
               </span>
             </div>
             <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${promotionProgress?.overallProgress || 0}%` }}
+                animate={{ width: `${journeyProgress}%` }}
                 transition={{ duration: 1, ease: 'easeOut' }}
-                className={`h-full rounded-full ${promotionProgress?.isEligibleForPromotion
+                className={`h-full rounded-full ${journeyIsComplete
                   ? 'bg-gradient-to-r from-green-500 to-emerald-400'
                   : 'bg-gradient-to-r from-amber-400 to-orange-500'
                   }`}
@@ -493,9 +587,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <Button
             size="sm"
             className="flex-shrink-0 text-xs h-8 px-4 bg-amber-500 hover:bg-amber-600 border-none text-white font-bold"
-            onClick={(e) => { e.stopPropagation(); setShowPromoModal(true); }}
+            onClick={(e) => { e.stopPropagation(); openJourneyModal(); }}
           >
-            Update
+            View
           </Button>
         </div>
       )}
@@ -793,111 +887,277 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         </div>
       )}
 
-      {/* Promotion Progress Modal / Bottom Drawer */}
-      {showPromoModal && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center md:justify-center" onClick={() => setShowPromoModal(false)}>
-          <div className="bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[85vh] md:max-h-[90vh] flex flex-col md:mx-4 animate-slide-up md:animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            {/* Drag Handle (mobile only) */}
+      {/* Membership Journey Modal — 3-tab: Probation / 1st Year / 2nd Year */}
+      {showJourneyModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center md:justify-center" onClick={() => setShowJourneyModal(false)}>
+          <div className="bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up md:animate-fade-in" onClick={(e) => e.stopPropagation()}>
+
+            {/* Drag Handle */}
             <div className="flex justify-center pt-3 pb-1 md:hidden">
-              <div className="w-10 h-1 rounded-full bg-slate-300"></div>
+              <div className="w-10 h-1 rounded-full bg-slate-300" />
             </div>
+
             {/* Header */}
-            <div className="px-5 pt-2 pb-4 md:p-5 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 pt-2 pb-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md">
                   <TrendingUp size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Update Promotion Progress</h3>
-                  <p className="text-xs text-slate-500">Fill in and save each requirement</p>
+                  <h3 className="font-bold text-slate-900">Membership Journey</h3>
+                  <p className="text-xs text-slate-500">Track your progress at each stage</p>
                 </div>
               </div>
-              <button onClick={() => setShowPromoModal(false)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <button onClick={() => setShowJourneyModal(false)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
 
-            {/* Body */}
+            {/* Stage Tabs */}
+            <div className="flex border-b border-slate-100 flex-shrink-0">
+              {/* Probation tab */}
+              <button
+                className={`flex-1 py-2.5 px-1 text-[11px] font-bold flex flex-col items-center gap-1 border-b-2 transition-all ${
+                  journeyActiveTab === 'probation'
+                    ? 'text-amber-700 border-amber-500 bg-amber-50/40'
+                    : isFullMember
+                      ? 'text-emerald-700 border-transparent hover:bg-slate-50'
+                      : 'text-slate-500 border-transparent'
+                }`}
+                onClick={() => setJourneyActiveTab('probation')}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black leading-none ${
+                  journeyActiveTab === 'probation' ? 'bg-amber-500 text-white'
+                  : isFullMember ? 'bg-emerald-500 text-white'
+                  : 'bg-slate-200 text-slate-500'
+                }`}>
+                  {isFullMember ? '✓' : 'P'}
+                </div>
+                Probation
+              </button>
+
+              {/* 1st Year tab */}
+              <button
+                className={`flex-1 py-2.5 px-1 text-[11px] font-bold flex flex-col items-center gap-1 border-b-2 transition-all ${
+                  journeyActiveTab === 'firstYear'
+                    ? 'text-blue-700 border-blue-500 bg-blue-50/40'
+                    : isProbationMember
+                      ? 'text-slate-300 border-transparent cursor-not-allowed'
+                      : engagementFirst?.isCompleted
+                        ? 'text-emerald-700 border-transparent hover:bg-slate-50'
+                        : 'text-slate-500 border-transparent hover:bg-slate-50'
+                }`}
+                onClick={() => !isProbationMember && setJourneyActiveTab('firstYear')}
+                disabled={isProbationMember}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black leading-none ${
+                  journeyActiveTab === 'firstYear' ? 'bg-blue-500 text-white'
+                  : isProbationMember ? 'bg-slate-200 text-slate-400'
+                  : engagementFirst?.isCompleted ? 'bg-emerald-500 text-white'
+                  : 'bg-slate-200 text-slate-500'
+                }`}>
+                  {isProbationMember ? '—' : engagementFirst?.isCompleted ? '✓' : '1'}
+                </div>
+                1st Year
+              </button>
+
+              {/* 2nd Year tab */}
+              <button
+                className={`flex-1 py-2.5 px-1 text-[11px] font-bold flex flex-col items-center gap-1 border-b-2 transition-all ${
+                  journeyActiveTab === 'secondYear'
+                    ? 'text-indigo-700 border-indigo-500 bg-indigo-50/40'
+                    : isProbationMember
+                      ? 'text-slate-300 border-transparent cursor-not-allowed'
+                      : engagementSecond?.isCompleted
+                        ? 'text-emerald-700 border-transparent hover:bg-slate-50'
+                        : 'text-slate-500 border-transparent hover:bg-slate-50'
+                }`}
+                onClick={() => !isProbationMember && setJourneyActiveTab('secondYear')}
+                disabled={isProbationMember}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black leading-none ${
+                  journeyActiveTab === 'secondYear' ? 'bg-indigo-500 text-white'
+                  : isProbationMember ? 'bg-slate-200 text-slate-400'
+                  : engagementSecond?.isCompleted ? 'bg-emerald-500 text-white'
+                  : 'bg-slate-200 text-slate-500'
+                }`}>
+                  {isProbationMember ? '—' : engagementSecond?.isCompleted ? '✓' : '2'}
+                </div>
+                2nd Year
+              </button>
+            </div>
+
+            {/* Tab Body */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
-              {/* Progress Summary */}
-              {promotionProgress && (
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-slate-700">
-                    {promotionProgress.requirements?.filter((r: any) => r.isCompleted).length || 0} of 4 completed
-                  </span>
-                  <span className="text-sm font-bold text-amber-600">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
-                </div>
-              )}
-              {promotionProgress && (
-                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-4">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${promotionProgress.isEligibleForPromotion
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-400'
-                      : 'bg-gradient-to-r from-amber-400 to-orange-500'
-                      }`}
-                    style={{ width: `${promotionProgress.overallProgress || 0}%` }}
-                  />
-                </div>
+
+              {/* ── Probation Tab ── */}
+              {journeyActiveTab === 'probation' && (
+                <>
+                  {promotionProgress && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-700">
+                        {promotionProgress.requirements?.filter((r: any) => r.isCompleted).length || 0} of 4 completed
+                      </span>
+                      <span className="text-sm font-bold text-amber-600">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
+                    </div>
+                  )}
+                  {promotionProgress && (
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${promotionProgress.isEligibleForPromotion ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`}
+                        style={{ width: `${promotionProgress.overallProgress || 0}%` }}
+                      />
+                    </div>
+                  )}
+                  {promoLoading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <RefreshCw className="animate-spin text-amber-500" size={24} />
+                    </div>
+                  ) : promotionProgress?.requirements ? (
+                    promotionProgress.requirements.map((req: any) => (
+                      <div key={req.id} className={`p-4 rounded-xl border-2 transition-all ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
+                              {req.isCompleted ? <CheckCircle size={18} /> : <Clock size={18} />}
+                            </div>
+                            <span className="font-semibold text-sm text-slate-900">{req.name}</span>
+                          </div>
+                          {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
+                        </div>
+                        <p className="text-xs text-slate-500 mb-3 pl-6">{req.description}</p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
+                            placeholder={PROMO_PLACEHOLDER[req.type] || 'Enter details...'}
+                            value={promoEditValues[req.type] || ''}
+                            onChange={(e) => setPromoEditValues(prev => ({ ...prev, [req.type]: e.target.value }))}
+                          />
+                          <button
+                            className={`p-2 rounded-lg border transition-all ${promoEditValues[req.type]?.trim() ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-200'}`}
+                            onClick={() => handleSavePromotionField(req.type)}
+                            disabled={promoSavingField === req.type}
+                            title="Save"
+                          >
+                            {promoSavingField === req.type ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-slate-400 text-sm">
+                      <AlertTriangle size={24} className="mx-auto mb-2" />
+                      Unable to load promotion requirements.
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Requirements */}
-              {promoLoading ? (
-                <div className="flex items-center justify-center py-10">
-                  <RefreshCw className="animate-spin text-amber-500" size={24} />
-                </div>
-              ) : promotionProgress?.requirements ? (
-                promotionProgress.requirements.map((req: any) => (
-                  <div
-                    key={req.id}
-                    className={`p-4 rounded-xl border-2 transition-all ${req.isCompleted
-                      ? 'border-green-200 bg-green-50/60'
-                      : 'border-slate-200 bg-white'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`${req.isCompleted ? 'text-green-500' : 'text-slate-300'}`}>
-                          {req.isCompleted ? <CheckCircle size={18} /> : <Clock size={18} />}
-                        </div>
-                        <span className="font-semibold text-sm text-slate-900">{req.name}</span>
-                      </div>
-                      {req.isCompleted && (
-                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mb-3 pl-6">{req.description}</p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
-                        placeholder={PROMO_PLACEHOLDER[req.type] || 'Enter details...'}
-                        value={promoEditValues[req.type] || ''}
-                        onChange={(e) => setPromoEditValues(prev => ({ ...prev, [req.type]: e.target.value }))}
-                      />
-                      <button
-                        className={`rounded-lg border transition-all ${promoEditValues[req.type]?.trim()
-                          ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-sm'
-                          : 'bg-slate-50 text-slate-400 border-slate-200'
-                          }`}
-                        onClick={() => handleSavePromotionField(req.type)}
-                        disabled={promoSavingField === req.type}
-                        title="Save"
-                      >
-                        {promoSavingField === req.type ? (
-                          <RefreshCw size={14} className="animate-spin" />
-                        ) : (
-                          <Save size={14} />
-                        )}
-                      </button>
-                    </div>
+              {/* ── 1st / 2nd Year Engagement Tab (shared renderer) ── */}
+              {(journeyActiveTab === 'firstYear' || journeyActiveTab === 'secondYear') && (() => {
+                const yearKey: EngagementYear = journeyActiveTab === 'firstYear' ? 'firstYear' : 'secondYear';
+                const summary = journeyActiveTab === 'firstYear' ? engagementFirst : engagementSecond;
+                const accentRing = journeyActiveTab === 'firstYear' ? 'focus:ring-blue-400' : 'focus:ring-indigo-400';
+                const accentBar = journeyActiveTab === 'firstYear' ? 'from-blue-400 to-blue-600' : 'from-indigo-400 to-indigo-600';
+                const accentBtn = journeyActiveTab === 'firstYear'
+                  ? 'bg-blue-500 border-blue-500 hover:bg-blue-600'
+                  : 'bg-indigo-500 border-indigo-500 hover:bg-indigo-600';
+                const accentPct = journeyActiveTab === 'firstYear' ? 'text-blue-600' : 'text-indigo-600';
+
+                if (engagementLoading) return (
+                  <div className="flex items-center justify-center py-10">
+                    <RefreshCw className={`animate-spin ${journeyActiveTab === 'firstYear' ? 'text-blue-500' : 'text-indigo-500'}`} size={24} />
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8 text-slate-400 text-sm">
-                  <AlertTriangle size={24} className="mx-auto mb-2" />
-                  Unable to load promotion requirements.
-                </div>
-              )}
+                );
+                if (!summary) return (
+                  <div className="text-center py-8 text-slate-400 text-sm">
+                    <AlertTriangle size={24} className="mx-auto mb-2" />
+                    Unable to load engagement progress.
+                  </div>
+                );
+
+                return (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-700">{summary.completedCount} of {summary.totalCount} completed</span>
+                      <span className={`text-sm font-bold ${accentPct}`}>{summary.overallProgress.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${summary.isCompleted ? 'bg-gradient-to-r from-green-500 to-emerald-400' : `bg-gradient-to-r ${accentBar}`}`}
+                        style={{ width: `${summary.overallProgress}%` }}
+                      />
+                    </div>
+
+                    {(['Leadership Experience', 'Skills Development', 'JCI Experience'] as const).map(group => {
+                      const groupReqs = summary.requirements.filter(r => r.group === group);
+                      if (groupReqs.length === 0) return null;
+                      return (
+                        <div key={group}>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 mt-2">{group}</p>
+                          <div className="space-y-3">
+                            {groupReqs.map(req => {
+                              const editKey = `${yearKey}_${req.key}`;
+                              const editVal = engEditValues[editKey] || { detail: req.progress.detail || '', date: req.progress.date || '' };
+                              return (
+                                <div key={req.key} className={`p-4 rounded-xl border-2 transition-all ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
+                                        {req.isCompleted ? <CheckCircle size={16} /> : <Clock size={16} />}
+                                      </div>
+                                      <span className="font-semibold text-sm text-slate-900">{req.title}</span>
+                                    </div>
+                                    {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
+                                  </div>
+                                  <p className="text-xs text-slate-500 mb-3 pl-6">{req.description}</p>
+                                  <div className="space-y-2 pl-6">
+                                    {req.inputType === 'select' && req.options ? (
+                                      <select
+                                        className={`w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 ${accentRing} focus:border-transparent bg-white`}
+                                        value={editVal.detail}
+                                        onChange={(e) => setEngEditValues(prev => ({ ...prev, [editKey]: { ...editVal, detail: e.target.value } }))}
+                                      >
+                                        <option value="">Select option...</option>
+                                        {req.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        className={`w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 ${accentRing} focus:border-transparent bg-white`}
+                                        placeholder="Enter details..."
+                                        value={editVal.detail}
+                                        onChange={(e) => setEngEditValues(prev => ({ ...prev, [editKey]: { ...editVal, detail: e.target.value } }))}
+                                      />
+                                    )}
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="date"
+                                        className={`flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 ${accentRing} focus:border-transparent bg-white`}
+                                        value={editVal.date}
+                                        onChange={(e) => setEngEditValues(prev => ({ ...prev, [editKey]: { ...editVal, date: e.target.value } }))}
+                                      />
+                                      <button
+                                        className={`px-3 py-2 rounded-lg border transition-all flex items-center gap-1 text-xs font-bold ${editVal.detail?.trim() && editVal.date?.trim() ? `${accentBtn} text-white shadow-sm` : 'bg-slate-50 text-slate-400 border-slate-200'}`}
+                                        onClick={() => handleSaveEngagement(yearKey, req.key)}
+                                        disabled={engSavingKey === editKey}
+                                      >
+                                        {engSavingKey === editKey ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                                        Save
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Footer */}
