@@ -2308,7 +2308,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   }, [radarData]);
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-right duration-300">
+    <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20 md:pb-0">
       {!isSelfView && (
         <Button variant="ghost" onClick={onBack} className="text-slate-500">
           <ArrowLeft size={16} className="mr-2" /> Back to Directory
@@ -2317,13 +2317,106 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
       {/* Header Card */}
       <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md group">
-        <div className="h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
+
+        {/* ── MOBILE hero ── */}
+        <div className="md:hidden bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy px-4 pt-4 pb-3 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+          <div className="relative flex items-center gap-3">
+            {/* Avatar */}
+            <div className="relative shrink-0">
+              <div className="p-0.5 bg-white/30 rounded-full shadow-lg">
+                <img
+                  src={member.avatar || undefined}
+                  className="w-16 h-16 rounded-full border-2 border-white/50 bg-slate-200 object-cover"
+                  alt={member.name}
+                />
+              </div>
+              <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-jci-navy shadow ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-400' : member.role === UserRole.PROBATION ? 'bg-amber-400' : 'bg-slate-400'}`} title={member.role} />
+            </div>
+            {/* Name + meta */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-white font-black text-xl leading-tight">{member.name}</h1>
+                <Badge variant={member.tier.toLowerCase() as any} className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shrink-0">{member.tier}</Badge>
+              </div>
+              {(member.companyName || member.departmentAndPosition) && (
+                <p className="text-white/70 text-xs mt-0.5 truncate">
+                  <Briefcase size={10} className="inline mr-1 opacity-70" />
+                  {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
+                </p>
+              )}
+              <div className="flex items-center gap-3 mt-1 text-white/60 text-[10px] flex-wrap">
+                <span className="flex items-center gap-1"><Shield size={9} />{member.role}</span>
+                {member.phone && <span className="flex items-center gap-1"><Phone size={9} />{member.phone}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── MOBILE contact + actions strip ── */}
+        <div className="md:hidden px-4 py-3 space-y-2.5 border-b border-slate-100">
+          <div className="flex flex-wrap gap-1.5">
+            <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 max-w-full truncate">
+              <Mail size={10} className="text-jci-blue shrink-0" />{member.email}
+            </span>
+            {member.introducer && (
+              <span className="flex items-center gap-1 text-[11px] text-jci-blue bg-blue-50 border border-blue-100 rounded-lg px-2 py-1">
+                <UserPlus size={10} />{resolveIntroducerDisplay(member.introducer)}
+              </span>
+            )}
+            {(member.linkedin || member.facebook || member.instagram || member.wechat) && (
+              <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg">
+                {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#0077B5]"><Linkedin size={13} /></a>}
+                {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#1877F2]"><Facebook size={13} /></a>}
+                {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#E1306C]"><Instagram size={13} /></a>}
+                {member.wechat && <span className="text-slate-400 flex items-center gap-1 text-[10px]"><MessageCircle size={13} />{member.wechat}</span>}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {isEditMode ? (
+              <>
+                <Button variant="primary" size="sm" onClick={handleGlobalSave} className="flex-1 h-9 font-bold">Save Changes</Button>
+                <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-1 h-9 font-bold">Cancel</Button>
+              </>
+            ) : (
+              <>
+                {(canEditMembers || isSelfView) && (
+                  <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-1 h-9 font-bold">Edit Profile</Button>
+                )}
+                {(isAdmin || isDeveloper) && !isSelfView && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`flex-1 h-9 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
+                    onClick={async () => {
+                      const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
+                      try {
+                        await updateMember(member.id, { role: newRole });
+                        showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
+                      } catch (err) {
+                        showToast('Failed to update member status', 'error');
+                      }
+                    }}
+                  >
+                    {member.role === UserRole.INACTIVE ? 'Activate' : 'Set Inactive'}
+                  </Button>
+                )}
+                {isDeveloper && !isSelfView && (
+                  <Button variant="outline" size="sm" className="h-9 px-3 text-red-500 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── DESKTOP hero (unchanged) ── */}
+        <div className="hidden md:block h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
           <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
         </div>
-
-        <div className="px-6 pb-6">
-          <div className="flex flex-col md:flex-row items-center md:items-end gap-6 -mt-16 relative z-10">
+        <div className="hidden md:block px-6 pb-6">
+          <div className="flex flex-row items-end gap-6 -mt-16 relative z-10">
             <div className="relative">
               <div className="p-1 bg-white rounded-full shadow-xl">
                 <img
@@ -2332,38 +2425,28 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   alt={member.name}
                 />
               </div>
-              <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' :
-                member.role === UserRole.PROBATION ? 'bg-amber-500' : 'bg-slate-500'
-                }`}
-                title={member.role}
-              />
+              <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' : member.role === UserRole.PROBATION ? 'bg-amber-500' : 'bg-slate-500'}`} title={member.role} />
             </div>
-
-            <div className="flex-1 text-center md:text-left space-y-2">
-              <div className="flex flex-col md:flex-row items-center md:items-baseline gap-2">
+            <div className="flex-1 text-left space-y-2">
+              <div className="flex flex-row items-baseline gap-2">
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight break-words">{member.name}</h1>
                 <Badge variant={member.tier.toLowerCase() as any} className="px-3 py-0.5 text-xs font-bold uppercase tracking-wider">{member.tier}</Badge>
               </div>
-
-              {/* Company / Position subtitle */}
               {(member.companyName || member.departmentAndPosition) && (
-                <p className="text-sm font-semibold text-slate-500 flex items-center justify-center md:justify-start gap-1.5">
+                <p className="text-sm font-semibold text-slate-500 flex items-center gap-1.5">
                   <Briefcase size={13} className="text-slate-400 shrink-0" />
                   {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
-
-              <div className="flex flex-wrap justify-center md:justify-start gap-y-1.5 gap-x-2 text-sm font-medium text-slate-500">
+              <div className="flex flex-wrap gap-y-1.5 gap-x-2 text-sm font-medium text-slate-500">
                 <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Mail size={12} className="text-jci-blue" />{member.email}</span>
                 {member.phone && <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Phone size={12} className="text-jci-blue" />{member.phone}</span>}
                 <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Shield size={12} className="text-jci-blue" />{member.role}</span>
                 {member.introducer && (
                   <span className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-jci-blue rounded-lg border border-blue-100 text-xs">
-                    <UserPlus size={12} />
-                    {resolveIntroducerDisplay(member.introducer)}
+                    <UserPlus size={12} />{resolveIntroducerDisplay(member.introducer)}
                   </span>
                 )}
-                {/* Social links inline */}
                 {(member.linkedin || member.facebook || member.instagram || member.wechat) && (
                   <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
                     {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#0077B5] transition-colors"><Linkedin size={14} /></a>}
@@ -2374,23 +2457,22 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 )}
               </div>
             </div>
-
-            <div className="flex gap-2 w-full md:w-auto flex-wrap">
+            <div className="flex gap-2 w-auto flex-wrap">
               {isEditMode ? (
                 <>
-                  <Button variant="primary" size="sm" onClick={handleGlobalSave} className="flex-1 md:flex-none h-10 px-6 font-bold">Save Changes</Button>
-                  <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-1 md:flex-none h-10 px-6 font-bold">Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={handleGlobalSave} className="flex-none h-10 px-6 font-bold">Save Changes</Button>
+                  <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-none h-10 px-6 font-bold">Cancel</Button>
                 </>
               ) : (
                 <>
                   {(canEditMembers || isSelfView) && (
-                    <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-1 md:flex-none h-10 px-6 font-bold">Edit Profile</Button>
+                    <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-none h-10 px-6 font-bold">Edit Profile</Button>
                   )}
                   {(isAdmin || isDeveloper) && !isSelfView && (
                     <Button
                       variant="outline"
                       size="sm"
-                      className={`flex-1 md:flex-none h-10 px-6 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
+                      className={`flex-none h-10 px-6 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
                       onClick={async () => {
                         const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
                         try {
@@ -2405,7 +2487,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                     </Button>
                   )}
                   {isDeveloper && !isSelfView && (
-                    <Button variant="outline" size="sm" className="flex-1 md:flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
+                    <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
                   )}
                 </>
               )}
@@ -2414,28 +2496,28 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         </div>
 
         <div className="grid grid-cols-4 gap-0 border-t border-slate-100 divide-x divide-slate-100 bg-slate-50/50">
-          <div className="p-4 text-center hover:bg-white transition-colors group">
+          <div className="p-2 md:p-4 text-center hover:bg-white transition-colors group">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Coins size={12} className="text-jci-blue" />
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Total Points</p>
             </div>
-            <p className="text-2xl font-black text-jci-blue">{member.points.toLocaleString()}</p>
+            <p className="text-lg md:text-2xl font-black text-jci-blue">{member.points.toLocaleString()}</p>
           </div>
-          <div className="p-4 text-center hover:bg-white transition-colors">
+          <div className="p-2 md:p-4 text-center hover:bg-white transition-colors">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Calendar size={12} className="text-slate-400" />
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Join Date</p>
             </div>
-            <p className="text-base font-black text-slate-900 leading-snug">{formatDateToDDMMMYYYY(member.joinDate)}</p>
+            <p className="text-xs md:text-base font-black text-slate-900 leading-snug">{formatDateToDDMMMYYYY(member.joinDate)}</p>
           </div>
-          <div className="p-4 text-center hover:bg-white transition-colors">
+          <div className="p-2 md:p-4 text-center hover:bg-white transition-colors">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <CalendarCheck size={12} className="text-slate-400" />
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Attendance</p>
             </div>
-            <p className="text-2xl font-black text-slate-900">{member.attendanceRate}%</p>
+            <p className="text-lg md:text-2xl font-black text-slate-900">{member.attendanceRate}%</p>
           </div>
-          <div className="p-4 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
+          <div className="p-2 md:p-4 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
             <div className="flex items-center justify-center gap-1.5 mb-2">
               <CheckCircle size={12} className="text-slate-400" />
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Dues {new Date().getFullYear()}</p>
