@@ -747,44 +747,103 @@ export const IntroducerManagement: React.FC<Props> = ({
       )}
 
       {/* Batch group reassign modal */}
-      {isBatchGroupEditing && (
-        <Modal
-          isOpen={isBatchGroupEditing}
-          onClose={() => setIsBatchGroupEditing(false)}
-          title={`Batch Reassign — ${selectedGroupValues.size} Group${selectedGroupValues.size !== 1 ? 's' : ''}`}
-          size="md"
-          footer={
-            <div className="flex gap-3 w-full">
-              <Button variant="outline" className="flex-1" onClick={() => setIsBatchGroupEditing(false)} disabled={isSavingBatchGroup}>
-                Cancel
-              </Button>
-              <Button variant="primary" className="flex-1" onClick={handleSaveBatchGroup} isLoading={isSavingBatchGroup} disabled={isSavingBatchGroup}>
-                Reassign All ({introducersList.filter(g => selectedGroupValues.has(g.value)).reduce((s, g) => s + g.invitees.length, 0)} members)
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-4">
-            <div className="bg-slate-50 p-3 border border-slate-100 rounded-xl space-y-1.5">
-              {introducersList.filter(g => selectedGroupValues.has(g.value)).map(g => (
-                <div key={g.value} className="flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-800 truncate">{g.name}</span>
-                  <span className="text-xs font-bold text-slate-400 shrink-0 ml-2">{g.invitees.length} member{g.invitees.length !== 1 ? 's' : ''}</span>
+      {isBatchGroupEditing && (() => {
+        const selectedGroups = introducersList.filter(g => selectedGroupValues.has(g.value));
+        const totalMembers = selectedGroups.reduce((s, g) => s + g.invitees.length, 0);
+        const PREVIEW_LIMIT = 4;
+        const [showAllGroups, setShowAllGroups] = React.useState(false);
+        const visibleGroups = showAllGroups ? selectedGroups : selectedGroups.slice(0, PREVIEW_LIMIT);
+        return (
+          <Modal
+            isOpen={isBatchGroupEditing}
+            onClose={() => setIsBatchGroupEditing(false)}
+            title="Batch Reassign Introducer"
+            size="md"
+            footer={
+              <div className="flex gap-3 w-full">
+                <Button variant="outline" className="flex-1" onClick={() => setIsBatchGroupEditing(false)} disabled={isSavingBatchGroup}>
+                  Cancel
+                </Button>
+                <Button variant="primary" className="flex-1" onClick={handleSaveBatchGroup} isLoading={isSavingBatchGroup} disabled={isSavingBatchGroup}>
+                  Confirm Reassign · {totalMembers} Members
+                </Button>
+              </div>
+            }
+          >
+            <div className="space-y-5">
+              {/* Summary banner */}
+              <div className="bg-gradient-to-r from-jci-blue to-sky-500 rounded-2xl p-4 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Reassigning</div>
+                    <div className="text-2xl font-black">{selectedGroups.length} Group{selectedGroups.length !== 1 ? 's' : ''}</div>
+                  </div>
+                  <div className="w-px h-10 bg-white/20" />
+                  <div className="text-right">
+                    <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Total Affected</div>
+                    <div className="text-2xl font-black">{totalMembers} Member{totalMembers !== 1 ? 's' : ''}</div>
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Step 1: Review groups */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-xs font-black flex items-center justify-center shrink-0">1</span>
+                  <span className="text-sm font-bold text-slate-700">Groups being reassigned</span>
+                </div>
+                <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100">
+                  {visibleGroups.map(g => (
+                    <div key={g.value} className="flex items-center justify-between px-3 py-2.5 bg-white">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge
+                          variant={g.type === 'JCI KL Member' ? 'success' : g.type === 'Event/Project' ? 'info' : g.type === 'Social Media' ? 'warning' : 'neutral'}
+                          className="text-[10px] shrink-0"
+                        >
+                          {g.type}
+                        </Badge>
+                        <span className="text-sm font-semibold text-slate-800 truncate">{g.name}</span>
+                      </div>
+                      <span className="text-xs font-black text-slate-400 shrink-0 ml-2 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {g.invitees.length}
+                      </span>
+                    </div>
+                  ))}
+                  {selectedGroups.length > PREVIEW_LIMIT && (
+                    <button
+                      onClick={() => setShowAllGroups(v => !v)}
+                      className="w-full py-2 text-xs font-bold text-jci-blue hover:bg-slate-50 transition-colors"
+                    >
+                      {showAllGroups ? 'Show less ↑' : `Show ${selectedGroups.length - PREVIEW_LIMIT} more ↓`}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Arrow divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-slate-100" />
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">↓ Reassign to</span>
+                <div className="flex-1 h-px bg-slate-100" />
+              </div>
+
+              {/* Step 2: New introducer */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-xs font-black flex items-center justify-center shrink-0">2</span>
+                  <span className="text-sm font-bold text-slate-700">Select new introducer / channel</span>
+                </div>
+                <IntroducerSelector
+                  value={batchGroupIntroducerVal}
+                  onChange={setBatchGroupIntroducerVal}
+                  members={members}
+                  projects={allProjects}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-bold text-slate-700">Reassign all to</label>
-              <IntroducerSelector
-                value={batchGroupIntroducerVal}
-                onChange={setBatchGroupIntroducerVal}
-                members={members}
-                projects={allProjects}
-              />
-            </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {/* Aggregation group reassign modal */}
       {editingGroup && (
