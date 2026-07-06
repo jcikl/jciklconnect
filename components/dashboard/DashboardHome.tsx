@@ -371,6 +371,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     });
   }, [birthdayMembers, currentDay]);
 
+  const nextBirthdayMember = React.useMemo(() => {
+    const nextBirthdays = birthdayMembers.filter(m => {
+      const dob = getDob(m);
+      if (!dob) return false;
+      const d = new Date(dob);
+      return d.getDate() > currentDay;
+    });
+    return nextBirthdays.length > 0 ? nextBirthdays[0] : null;
+  }, [birthdayMembers, currentDay]);
+
   if (!member) {
     return <div className="text-center py-10 text-slate-400">Loading member data...</div>;
   }
@@ -499,50 +509,58 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {birthdayMembers.length > 0 && (
         <Card
           onClick={() => setShowBirthdayDrawer(true)}
-          className="relative overflow-hidden p-5 bg-gradient-to-br from-pink-500/10 via-purple-500/5 to-transparent border border-pink-100 hover:border-pink-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group cursor-pointer"
+          className="relative overflow-hidden p-4 bg-gradient-to-r from-rose-50/60 via-fuchsia-50/40 to-indigo-50/20 dark:from-rose-950/10 dark:via-fuchsia-950/5 dark:to-transparent border border-rose-100/80 hover:border-rose-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group cursor-pointer"
         >
           {/* Decorative Background Glows */}
           <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-pink-400/10 rounded-full blur-2xl pointer-events-none" />
           <div className="absolute -left-10 -top-10 w-32 h-32 bg-purple-400/10 rounded-full blur-2xl pointer-events-none" />
 
-          <div className="flex items-center justify-between gap-4 relative z-10">
-            <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center justify-between gap-3 relative z-10">
+            <div className="flex items-center gap-3 min-w-0">
               {/* Birthday Icon / Visual */}
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20 text-2xl flex-shrink-0 transform group-hover:scale-110 transition-transform duration-300">
-                🎁
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20 text-xl flex-shrink-0 transform group-hover:scale-105 transition-transform duration-300">
+                🎂
               </div>
 
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-slate-800 text-sm md:text-base tracking-tight">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="font-extrabold text-slate-800 text-sm tracking-tight truncate">
                     Birthdays This Month
                   </h3>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
+                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-pink-600 bg-pink-50 px-1.5 py-0.5 rounded-full border border-pink-100 flex-shrink-0">
                     {now.toLocaleString('default', { month: 'long' })}
                   </span>
                 </div>
                 
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  {birthdayMembers.length} members celebrate their birthday this month
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
+                  {birthdayMembers.length} members celebrate birthdays
                 </p>
                 
                 {todayBirthdays.length > 0 ? (
-                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-100 px-2.5 py-0.5 rounded-full shadow-sm">
-                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping" />
-                      Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(' & ')} 🎂
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                      <span className="w-1 h-1 rounded-full bg-orange-500" />
+                      Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(', ')} 🎉
+                    </span>
+                  </div>
+                ) : nextBirthdayMember ? (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 bg-purple-50/50 border border-purple-100/50 px-2 py-0.5 rounded-full">
+                      📅 Next: {nextBirthdayMember.general?.name?.split(' ')[0] || nextBirthdayMember.name?.split(' ')[0]} ({new Date(getDob(nextBirthdayMember)!).getDate()} {now.toLocaleString('default', { month: 'short' })})
                     </span>
                   </div>
                 ) : (
-                  <div className="mt-2 text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                    <span>✨ Click to view all calendar dates</span>
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">
+                      ✨ Click to view calendar
+                    </span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Right Side: Avatar Stack + Chevron */}
-            <div className="flex items-center gap-3 ml-auto flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
               {/* Overlapping Avatars */}
               <div className="flex items-center">
                 {birthdayMembers.slice(0, 4).map((m, i) => {
@@ -555,8 +573,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         key={m.id}
                         src={avatarUrl}
                         alt={name}
-                        className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5"
+                        className="rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5"
                         style={{ 
+                          width: '34px',
+                          height: '34px',
                           marginLeft: i > 0 ? '-10px' : '0px',
                           zIndex: 10 - i 
                         }}
@@ -570,7 +590,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       .join('')
                       .toUpperCase();
                     
-                    // Hash to get a consistent gradient
                     let hash = 0;
                     for (let j = 0; j < name.length; j++) {
                       hash = name.charCodeAt(j) + ((hash << 5) - hash);
@@ -587,8 +606,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     return (
                       <div
                         key={m.id}
-                        className={`w-9 h-9 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5`}
+                        className={`rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5`}
                         style={{ 
+                          width: '34px',
+                          height: '34px',
                           marginLeft: i > 0 ? '-10px' : '0px',
                           zIndex: 10 - i 
                         }}
@@ -601,8 +622,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 
                 {birthdayMembers.length > 4 && (
                   <div 
-                    className="w-9 h-9 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm ring-1 ring-pink-100/30 flex-shrink-0"
+                    className="rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm ring-1 ring-pink-100/30 flex-shrink-0"
                     style={{ 
+                      width: '34px',
+                      height: '34px',
                       marginLeft: '-10px',
                       zIndex: 5 
                     }}
@@ -613,8 +636,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </div>
 
               {/* Chevron */}
-              <div className="text-slate-400 group-hover:text-pink-500 transition-colors pl-1 transform group-hover:translate-x-0.5 transition-transform duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              <div className="text-slate-400 group-hover:text-pink-500 transition-colors pl-0.5 transform group-hover:translate-x-0.5 transition-transform duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
               </div>
             </div>
           </div>
