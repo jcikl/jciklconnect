@@ -4,7 +4,7 @@ import {
   Calendar, Briefcase, Award, Sparkles, AlertTriangle, CheckCircle,
   TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
   CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift,
-  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, Save, RefreshCw
+  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, RefreshCw
 } from 'lucide-react';
 import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,7 +24,7 @@ import { ContractService, CommitmentContract } from '../../services/contractServ
 import { PromotionService, type MemberEngagementProgressSummary, type EngagementYear } from '../../services/promotionService';
 import { MembersService } from '../../services/membersService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
-import type { Event, MemberPromotionProgress } from '../../types';
+import type { Event } from '../../types';
 import { UserRole } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
@@ -171,8 +171,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
   // Promotion Progress state (for Probation members)
   const [promotionProgress, setPromotionProgress] = useState<any>(null);
-  const [promoEditValues, setPromoEditValues] = useState<Record<string, string>>({});
-  const [promoSavingField, setPromoSavingField] = useState<string | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const [showPromoModal, setShowPromoModal] = useState(false);
   // Membership Journey modal state
@@ -181,8 +179,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [engagementFirst, setEngagementFirst] = useState<MemberEngagementProgressSummary | null>(null);
   const [engagementSecond, setEngagementSecond] = useState<MemberEngagementProgressSummary | null>(null);
   const [engagementLoading, setEngagementLoading] = useState(false);
-  const [engEditValues, setEngEditValues] = useState<Record<string, { detail: string; date: string }>>({});
-  const [engSavingKey, setEngSavingKey] = useState<string | null>(null);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
   const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
@@ -197,19 +193,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     }
   }, [radarYear, member]);
 
-  const PROMO_FIELD_MAP: Record<string, 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted'> = {
-    'bod_meeting_attendance': 'bodMeetingAttended',
-    'event_organizing_committee': 'eventOrganizerParticipation',
-    'event_participation': 'eventParticipation',
-    'jci_inspire_completion': 'jciInspireCompleted'
-  };
-
-  const PROMO_PLACEHOLDER: Record<string, string> = {
-    'bod_meeting_attendance': 'e.g. 2026-03-15 BOD Meeting #3',
-    'event_organizing_committee': 'e.g. Charity Fundraiser 2026 - Logistics',
-    'event_participation': 'e.g. Event A, Event B (min 2 events, separated by commas)',
-    'jci_inspire_completion': 'e.g. JCIM Inspire 2026 OR NMO 2026'
-  };
 
   const handleRestrictedAction = (viewType: string) => {
     if (member?.role === UserRole.GUEST) {
@@ -261,15 +244,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       try {
         const progress = await PromotionService.getPromotionProgress(member.id);
         setPromotionProgress(progress);
-        // Load existing edit values from member record
-        const memberData = await MembersService.getMemberById(member.id);
-        const pp = (memberData?.promotionProgress || {}) as Partial<MemberPromotionProgress>;
-        setPromoEditValues({
-          'bod_meeting_attendance': pp.bodMeetingAttended || '',
-          'event_organizing_committee': pp.eventOrganizerParticipation || '',
-          'event_participation': pp.eventParticipation || '',
-          'jci_inspire_completion': pp.jciInspireCompleted || ''
-        });
       } catch (err) {
         console.error('Failed to load promotion progress:', err);
       } finally {
@@ -278,23 +252,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     };
     loadPromotion();
   }, [member]);
-
-  const handleSavePromotionField = async (reqType: string) => {
-    if (!member) return;
-    const field = PROMO_FIELD_MAP[reqType];
-    if (!field) return;
-    setPromoSavingField(reqType);
-    try {
-      await PromotionService.savePromotionProgressField(member.id, field, promoEditValues[reqType] || '');
-      const progress = await PromotionService.getPromotionProgress(member.id);
-      setPromotionProgress(progress);
-      showToast('Progress saved! BOD will review your submission.', 'success');
-    } catch (err) {
-      showToast('Failed to save progress', 'error');
-    } finally {
-      setPromoSavingField(null);
-    }
-  };
 
   // Load Engagement Progress for Full members
   useEffect(() => {
@@ -308,14 +265,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const second = PromotionService.buildEngagementProgress(memberData, 'secondYear');
         setEngagementFirst(first);
         setEngagementSecond(second);
-        const vals: Record<string, { detail: string; date: string }> = {};
-        first.requirements.forEach(req => {
-          vals[`firstYear_${req.key}`] = { detail: req.progress.detail || '', date: req.progress.date || '' };
-        });
-        second.requirements.forEach(req => {
-          vals[`secondYear_${req.key}`] = { detail: req.progress.detail || '', date: req.progress.date || '' };
-        });
-        setEngEditValues(vals);
       } catch (err) {
         console.error('Failed to load engagement progress', err);
       } finally {
@@ -353,31 +302,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       setJourneyActiveTab(yearsIn >= 1 ? 'secondYear' : 'firstYear');
     }
     setShowJourneyModal(true);
-  };
-
-  const handleSaveEngagement = async (year: EngagementYear, reqKey: string) => {
-    if (!member) return;
-    const editKey = `${year}_${reqKey}`;
-    const vals = engEditValues[editKey] || { detail: '', date: '' };
-    setEngSavingKey(editKey);
-    try {
-      await PromotionService.saveEngagementRequirement(member.id, year, reqKey, {
-        detail: vals.detail,
-        date: vals.date,
-      });
-      const memberData = await MembersService.getMemberById(member.id);
-      if (memberData) {
-        const first = PromotionService.buildEngagementProgress(memberData, 'firstYear');
-        const second = PromotionService.buildEngagementProgress(memberData, 'secondYear');
-        setEngagementFirst(first);
-        setEngagementSecond(second);
-      }
-      showToast('Progress saved!', 'success');
-    } catch (err) {
-      showToast('Failed to save progress', 'error');
-    } finally {
-      setEngSavingKey(null);
-    }
   };
 
   // Load personalized recommendations
@@ -987,7 +911,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </button>
             </div>
 
-            {/* Tab Body */}
+            {/* Tab Body — read-only */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
 
               {/* ── Probation Tab ── */}
@@ -1015,8 +939,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     </div>
                   ) : promotionProgress?.requirements ? (
                     promotionProgress.requirements.map((req: any) => (
-                      <div key={req.id} className={`p-4 rounded-xl border-2 transition-all ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
-                        <div className="flex items-center justify-between mb-2">
+                      <div key={req.id} className={`p-4 rounded-xl border-2 ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
                               {req.isCompleted ? <CheckCircle size={18} /> : <Clock size={18} />}
@@ -1025,24 +949,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           </div>
                           {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
                         </div>
-                        <p className="text-xs text-slate-500 mb-3 pl-6">{req.description}</p>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
-                            placeholder={PROMO_PLACEHOLDER[req.type] || 'Enter details...'}
-                            value={promoEditValues[req.type] || ''}
-                            onChange={(e) => setPromoEditValues(prev => ({ ...prev, [req.type]: e.target.value }))}
-                          />
-                          <button
-                            className={`p-2 rounded-lg border transition-all ${promoEditValues[req.type]?.trim() ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-sm' : 'bg-slate-50 text-slate-400 border-slate-200'}`}
-                            onClick={() => handleSavePromotionField(req.type)}
-                            disabled={promoSavingField === req.type}
-                            title="Save"
-                          >
-                            {promoSavingField === req.type ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-                          </button>
-                        </div>
+                        <p className="text-xs text-slate-500 mt-1 pl-6">{req.description}</p>
+                        {req.isCompleted && req.completionDetails && (
+                          <p className="text-xs text-green-700 font-medium mt-1.5 pl-6">
+                            {Object.values(req.completionDetails)[0] as string}
+                          </p>
+                        )}
                       </div>
                     ))
                   ) : (
@@ -1054,15 +966,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 </>
               )}
 
-              {/* ── 1st / 2nd Year Engagement Tab (shared renderer) ── */}
+              {/* ── 1st / 2nd Year Engagement Tab (shared renderer, read-only) ── */}
               {(journeyActiveTab === 'firstYear' || journeyActiveTab === 'secondYear') && (() => {
-                const yearKey: EngagementYear = journeyActiveTab === 'firstYear' ? 'firstYear' : 'secondYear';
                 const summary = journeyActiveTab === 'firstYear' ? engagementFirst : engagementSecond;
-                const accentRing = journeyActiveTab === 'firstYear' ? 'focus:ring-blue-400' : 'focus:ring-indigo-400';
                 const accentBar = journeyActiveTab === 'firstYear' ? 'from-blue-400 to-blue-600' : 'from-indigo-400 to-indigo-600';
-                const accentBtn = journeyActiveTab === 'firstYear'
-                  ? 'bg-blue-500 border-blue-500 hover:bg-blue-600'
-                  : 'bg-indigo-500 border-indigo-500 hover:bg-indigo-600';
                 const accentPct = journeyActiveTab === 'firstYear' ? 'text-blue-600' : 'text-indigo-600';
 
                 if (engagementLoading) return (
@@ -1097,60 +1004,26 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         <div key={group}>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 mt-2">{group}</p>
                           <div className="space-y-3">
-                            {groupReqs.map(req => {
-                              const editKey = `${yearKey}_${req.key}`;
-                              const editVal = engEditValues[editKey] || { detail: req.progress.detail || '', date: req.progress.date || '' };
-                              return (
-                                <div key={req.key} className={`p-4 rounded-xl border-2 transition-all ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2">
-                                      <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
-                                        {req.isCompleted ? <CheckCircle size={16} /> : <Clock size={16} />}
-                                      </div>
-                                      <span className="font-semibold text-sm text-slate-900">{req.title}</span>
+                            {groupReqs.map(req => (
+                              <div key={req.key} className={`p-4 rounded-xl border-2 ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
+                                      {req.isCompleted ? <CheckCircle size={16} /> : <Clock size={16} />}
                                     </div>
-                                    {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
+                                    <span className="font-semibold text-sm text-slate-900">{req.title}</span>
                                   </div>
-                                  <p className="text-xs text-slate-500 mb-3 pl-6">{req.description}</p>
-                                  <div className="space-y-2 pl-6">
-                                    {req.inputType === 'select' && req.options ? (
-                                      <select
-                                        className={`w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 ${accentRing} focus:border-transparent bg-white`}
-                                        value={editVal.detail}
-                                        onChange={(e) => setEngEditValues(prev => ({ ...prev, [editKey]: { ...editVal, detail: e.target.value } }))}
-                                      >
-                                        <option value="">Select option...</option>
-                                        {req.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                      </select>
-                                    ) : (
-                                      <input
-                                        type="text"
-                                        className={`w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 ${accentRing} focus:border-transparent bg-white`}
-                                        placeholder="Enter details..."
-                                        value={editVal.detail}
-                                        onChange={(e) => setEngEditValues(prev => ({ ...prev, [editKey]: { ...editVal, detail: e.target.value } }))}
-                                      />
-                                    )}
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="date"
-                                        className={`flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 ${accentRing} focus:border-transparent bg-white`}
-                                        value={editVal.date}
-                                        onChange={(e) => setEngEditValues(prev => ({ ...prev, [editKey]: { ...editVal, date: e.target.value } }))}
-                                      />
-                                      <button
-                                        className={`px-3 py-2 rounded-lg border transition-all flex items-center gap-1 text-xs font-bold ${editVal.detail?.trim() && editVal.date?.trim() ? `${accentBtn} text-white shadow-sm` : 'bg-slate-50 text-slate-400 border-slate-200'}`}
-                                        onClick={() => handleSaveEngagement(yearKey, req.key)}
-                                        disabled={engSavingKey === editKey}
-                                      >
-                                        {engSavingKey === editKey ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
-                                        Save
-                                      </button>
-                                    </div>
-                                  </div>
+                                  {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
                                 </div>
-                              );
-                            })}
+                                <p className="text-xs text-slate-500 mt-1 pl-6">{req.description}</p>
+                                {req.isCompleted && (req.progress.detail || req.progress.date) && (
+                                  <div className="mt-1.5 pl-6 flex items-center gap-2 text-xs">
+                                    {req.progress.detail && <span className="text-green-700 font-medium">{req.progress.detail}</span>}
+                                    {req.progress.date && <span className="text-slate-400">{req.progress.date}</span>}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
                       );
@@ -1158,13 +1031,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   </>
                 );
               })()}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
-              <p className="text-[11px] text-slate-500 text-center">
-                Your submissions will be reviewed and approved by the <strong>Board of Directors</strong>.
-              </p>
             </div>
           </div>
         </div>
