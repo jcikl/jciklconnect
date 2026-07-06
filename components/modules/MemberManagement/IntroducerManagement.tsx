@@ -22,7 +22,7 @@ export const IntroducerManagement: React.FC<Props> = ({
 }) => {
   const { showToast } = useToast();
   const { member: currentUser } = useAuth();
-  
+
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'assignment'>('overview');
   const [memberSearch, setMemberSearch] = useState('');
   const [introducerSearch, setIntroducerSearch] = useState('');
@@ -105,7 +105,7 @@ export const IntroducerManagement: React.FC<Props> = ({
     if (cleanVal.toLowerCase() === 'direct join') return 'Direct Join';
     if (cleanVal.toLowerCase().startsWith('social media')) return 'Social Media';
     if (cleanVal.toLowerCase().startsWith('event:')) return 'Event/Project';
-    
+
     // Check if it is a member ID
     const foundMember = members.some(m => m.id === cleanVal);
     if (foundMember) return 'JCI KL Member';
@@ -139,7 +139,7 @@ export const IntroducerManagement: React.FC<Props> = ({
         breakdown['Direct Join']++;
         return;
       }
-      
+
       const type = getIntroducerType(m.introducer);
       if (breakdown[type] !== undefined) {
         breakdown[type]++;
@@ -211,7 +211,7 @@ export const IntroducerManagement: React.FC<Props> = ({
     return Object.values(agg)
       .filter(item => {
         if (!introducerSearch.trim()) return true;
-        return item.name.toLowerCase().includes(introducerSearch.toLowerCase()) || 
+        return item.name.toLowerCase().includes(introducerSearch.toLowerCase()) ||
                item.type.toLowerCase().includes(introducerSearch.toLowerCase());
       })
       .sort((a, b) => b.invitees.length - a.invitees.length);
@@ -224,7 +224,7 @@ export const IntroducerManagement: React.FC<Props> = ({
       const introducerName = resolveIntroducerDisplay(m.introducer);
 
       // 1. Search Query filter
-      const matchesSearch = memberSearch.trim() === '' || 
+      const matchesSearch = memberSearch.trim() === '' ||
         (m.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
         (m.fullName || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
         (m.email || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
@@ -260,7 +260,7 @@ export const IntroducerManagement: React.FC<Props> = ({
   return (
     <div className="space-y-6">
       {/* 1. Header Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-jci-blue to-sky-500 text-white border-none shadow-lg">
           <div className="p-2">
             <span className="text-white/80 text-xs font-bold uppercase tracking-wider block mb-1">Introducer Penetration</span>
@@ -364,7 +364,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                   <th className="px-6 py-3">Introducer / Channel</th>
                   <th className="px-6 py-3">Type</th>
                   <th className="px-6 py-3 text-center">Introduced Count</th>
-                  <th className="px-6 py-3">Introduced Members</th>
+                  <th className="px-6 py-3 hidden md:table-cell">Introduced Members</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
@@ -397,7 +397,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                           {intro.invitees.length}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 hidden md:table-cell">
                         <div className="flex flex-wrap gap-1.5 max-w-xl">
                           {intro.invitees.slice(0, 3).map(inv => {
                             const displayName = inv.fullName && inv.fullName !== inv.name
@@ -418,7 +418,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                             );
                           })}
                           {intro.invitees.length > 3 && (
-                            <div 
+                            <div
                               className="inline-flex items-center px-2.5 py-0.5 bg-slate-50 text-slate-500 rounded-md border border-slate-200 text-xs font-bold cursor-help"
                               title={intro.invitees.slice(3).map(inv => inv.fullName ? `${inv.name} (${inv.fullName})` : inv.name).join(', ')}
                             >
@@ -443,7 +443,7 @@ export const IntroducerManagement: React.FC<Props> = ({
               <h3 className="font-bold text-slate-800">Assign Member Introducers</h3>
               <p className="text-xs text-slate-500">Quickly update member introducers to ensure data formatting is unified.</p>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative">
                 <Select

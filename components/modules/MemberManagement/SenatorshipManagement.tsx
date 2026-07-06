@@ -78,10 +78,10 @@ export const SenatorshipManagement: React.FC<Props> = ({
   const renderRow = (member: Member, mode: 'pending' | 'validated') => (
     <div
       key={member.id}
-      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 rounded-lg border border-slate-100"
+      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white rounded-xl border border-slate-100 hover:border-jci-blue/20 hover:shadow-sm transition-all"
     >
       <div className="flex items-start gap-3 min-w-0">
-        <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold shrink-0 text-sm">
           {(member.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2)}
         </div>
         <div className="min-w-0">
@@ -163,37 +163,39 @@ export const SenatorshipManagement: React.FC<Props> = ({
         </div>
       </Card>
 
-      <Card
-        title={
-          <span className="flex items-center gap-2">
-            <Clock size={18} className="text-amber-600" />
-            Pending validation
-            <Badge variant="warning">{pending.length}</Badge>
-          </span>
-        }
-      >
-        {pending.length === 0 ? (
-          <p className="text-sm text-slate-500 py-4 text-center">No pending senatorship numbers.</p>
-        ) : (
-          <div className="space-y-3">{pending.map((m) => renderRow(m, 'pending'))}</div>
-        )}
-      </Card>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <Clock size={18} className="text-amber-600" />
+              Pending validation
+              <Badge variant="warning">{pending.length}</Badge>
+            </span>
+          }
+        >
+          {pending.length === 0 ? (
+            <p className="text-sm text-slate-500 py-4 text-center">No pending senatorship numbers.</p>
+          ) : (
+            <div className="space-y-3">{pending.map((m) => renderRow(m, 'pending'))}</div>
+          )}
+        </Card>
 
-      <Card
-        title={
-          <span className="flex items-center gap-2">
-            <CheckCircle size={18} className="text-green-600" />
-            Validated senators
-            <Badge variant="success">{validated.length}</Badge>
-          </span>
-        }
-      >
-        {validated.length === 0 ? (
-          <p className="text-sm text-slate-500 py-4 text-center">No validated senators yet.</p>
-        ) : (
-          <div className="space-y-3">{validated.map((m) => renderRow(m, 'validated'))}</div>
-        )}
-      </Card>
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <CheckCircle size={18} className="text-green-600" />
+              Validated senators
+              <Badge variant="success">{validated.length}</Badge>
+            </span>
+          }
+        >
+          {validated.length === 0 ? (
+            <p className="text-sm text-slate-500 py-4 text-center">No validated senators yet.</p>
+          ) : (
+            <div className="space-y-3">{validated.map((m) => renderRow(m, 'validated'))}</div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 };

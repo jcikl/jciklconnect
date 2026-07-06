@@ -418,7 +418,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   if (loading && !statistics) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="animate-spin text-blue-600" size={32} />
+        <RefreshCw className="animate-spin text-jci-blue" size={32} />
       </div>
     );
   }
@@ -537,10 +537,10 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
               {filteredProbationMembers.map(member => (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                  className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 hover:border-jci-blue/20 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                    <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold text-sm shrink-0">
                       {member.name.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div>
@@ -586,11 +586,11 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
               return (
                 <div
                   key={member.id}
-                  className="p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                  className="p-3 bg-white rounded-xl border border-slate-100 hover:border-jci-blue/20 hover:shadow-sm transition-all"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                      <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold text-sm shrink-0">
                         {(member.fullName || member.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                       </div>
                       <div>

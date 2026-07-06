@@ -172,10 +172,10 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
     return (
       <div className="max-w-6xl mx-auto p-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
+          <div className="h-8 bg-slate-200 rounded w-1/3 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+              <div key={i} className="h-32 bg-slate-200 rounded"></div>
             ))}
           </div>
         </div>
@@ -190,7 +190,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
         {onClose && (
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            className="px-4 py-2 bg-slate-600 text-white rounded-xl hover:bg-slate-700 transition-colors"
           >
             Close
           </button>
@@ -203,11 +203,11 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="w-6 h-6 text-blue-600" />
+                <Users className="w-6 h-6 text-jci-blue" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Active Mentorships</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-slate-600">Active Mentorships</p>
+                <p className="text-2xl font-bold text-slate-900">
                   {mentorshipStats.totalMentorships}
                 </p>
               </div>
@@ -220,8 +220,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 <UserCheck className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Active Mentors</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-slate-600">Active Mentors</p>
+                <p className="text-2xl font-bold text-slate-900">
                   {mentorshipStats.activeMentors}
                 </p>
               </div>
@@ -234,8 +234,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 <Clock className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Unassigned Mentees</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-slate-600">Unassigned Mentees</p>
+                <p className="text-2xl font-bold text-slate-900">
                   {mentorshipStats.unassignedMentees}
                 </p>
               </div>
@@ -248,8 +248,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 <TrendingUp className="w-6 h-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Success Rate</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-slate-600">Success Rate</p>
+                <p className="text-2xl font-bold text-slate-900">
                   {mentorshipStats.successRate}%
                 </p>
               </div>
@@ -260,7 +260,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-gray-200">
+        <div className="border-b border-slate-200">
           <nav className="flex space-x-8 px-6">
             {[
               { id: 'overview', label: 'Overview', icon: BarChart3 },
@@ -271,8 +271,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 key={id}
                 onClick={() => setActiveTab(id as any)}
                 className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-b-2 border-jci-blue text-jci-blue'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
                   }`}
               >
                 <Icon size={16} />
@@ -298,7 +298,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 </div>
                 <button
                   onClick={loadData}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-jci-blue text-white rounded-xl hover:bg-jci-navy transition-colors"
                 >
                   Refresh
                 </button>
@@ -307,20 +307,20 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
               {/* Unassigned Mentees */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">
+                  <h3 className="text-lg font-medium text-slate-900">
                     Unassigned Mentees ({filteredUnassignedMentees.length})
                   </h3>
                 </div>
 
                 {filteredUnassignedMentees.length === 0 ? (
                   <div className="text-center py-12">
-                    <UserCheck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">All mentees have been assigned mentors</p>
+                    <UserCheck className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-500">All mentees have been assigned mentors</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredUnassignedMentees.map((mentee) => (
-                      <div key={mentee.id} className="border border-gray-200 rounded-lg p-4">
+                      <div key={mentee.id} className="border border-slate-100 rounded-2xl p-4">
                         <div className="flex items-center gap-3 mb-3">
                           <img
                             src={mentee.avatar || undefined}
@@ -328,12 +328,12 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                             className="w-10 h-10 rounded-full"
                           />
                           <div>
-                            <h4 className="font-medium text-gray-900">{mentee.name}</h4>
-                            <p className="text-sm text-gray-500">{mentee.profession}</p>
+                            <h4 className="font-medium text-slate-900">{mentee.name}</h4>
+                            <p className="text-sm text-slate-500">{mentee.profession}</p>
                           </div>
                         </div>
 
-                        <div className="space-y-2 text-sm text-gray-600 mb-4">
+                        <div className="space-y-2 text-sm text-slate-600 mb-4">
                           <div className="flex justify-between">
                             <span>Points:</span>
                             <span>{mentee.points}</span>
@@ -347,12 +347,12 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                               <span>Skills:</span>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {mentee.skills.slice(0, 3).map((skill, index) => (
-                                  <span key={index} className="px-2 py-1 bg-gray-100 text-xs rounded">
+                                  <span key={index} className="px-2 py-1 bg-slate-100 text-xs rounded">
                                     {skill}
                                   </span>
                                 ))}
                                 {mentee.skills.length > 3 && (
-                                  <span className="px-2 py-1 bg-gray-100 text-xs rounded">
+                                  <span className="px-2 py-1 bg-slate-100 text-xs rounded">
                                     +{mentee.skills.length - 3}
                                   </span>
                                 )}
@@ -364,14 +364,14 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleFindMatches(mentee)}
-                            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-1"
+                            className="flex-1 px-3 py-2 bg-jci-blue text-white rounded-xl text-sm hover:bg-jci-navy transition-colors flex items-center justify-center gap-1"
                           >
                             <Search size={14} />
                             Find Matches
                           </button>
                           <button
                             onClick={() => handleAutoMatch(mentee.id)}
-                            className="flex-1 px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                            className="flex-1 px-3 py-2 bg-green-600 text-white rounded-xl text-sm hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
                           >
                             <Zap size={14} />
                             Auto Match
@@ -391,7 +391,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
               {selectedMentee ? (
                 <>
                   {/* Mentee Info */}
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-slate-50 rounded-2xl p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <img
@@ -400,8 +400,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                           className="w-12 h-12 rounded-full"
                         />
                         <div>
-                          <h3 className="font-medium text-gray-900">Finding matches for {selectedMentee.name}</h3>
-                          <p className="text-sm text-gray-500">{selectedMentee.profession}</p>
+                          <h3 className="font-medium text-slate-900">Finding matches for {selectedMentee.name}</h3>
+                          <p className="text-sm text-slate-500">{selectedMentee.profession}</p>
                         </div>
                       </div>
                       <button
@@ -410,7 +410,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                           setPotentialMatches([]);
                           setActiveTab('overview');
                         }}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-slate-400 hover:text-slate-600"
                       >
                         <X size={20} />
                       </button>
@@ -418,8 +418,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                   </div>
 
                   {/* Matching Criteria */}
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-3">Matching Criteria</h4>
+                  <div className="bg-white border border-slate-100 rounded-2xl p-4">
+                    <h4 className="font-medium text-slate-900 mb-3">Matching Criteria</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Forms.Select
                         label="Experience Level"
@@ -464,7 +464,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                       <button
                         onClick={() => handleFindMatches(selectedMentee)}
                         disabled={matchingLoading}
-                        className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        className="mt-6 px-4 py-2 bg-jci-blue text-white rounded-xl hover:bg-jci-navy transition-colors disabled:opacity-50"
                       >
                         {matchingLoading ? 'Searching...' : 'Update Matches'}
                       </button>
@@ -473,24 +473,24 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
 
                   {/* Potential Matches */}
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-4">
+                    <h4 className="font-medium text-slate-900 mb-4">
                       Potential Mentors ({potentialMatches.length})
                     </h4>
 
                     {matchingLoading ? (
                       <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                        <p className="text-gray-500 mt-2">Finding the best matches...</p>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-jci-blue mx-auto"></div>
+                        <p className="text-slate-500 mt-2">Finding the best matches...</p>
                       </div>
                     ) : potentialMatches.length === 0 ? (
                       <div className="text-center py-8">
-                        <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500">No potential matches found</p>
+                        <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <p className="text-slate-500">No potential matches found</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
                         {potentialMatches.map((match, index) => (
-                          <div key={match.mentor.id} className="border border-gray-200 rounded-lg p-4">
+                          <div key={match.mentor.id} className="border border-slate-100 rounded-2xl p-4">
                             <div className="flex items-start justify-between">
                               <div className="flex items-start gap-4">
                                 <img
@@ -500,14 +500,14 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                                 />
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <h5 className="font-medium text-gray-900">{match.mentor.name}</h5>
+                                    <h5 className="font-medium text-slate-900">{match.mentor.name}</h5>
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${getScoreColor(match.matchScore)}`}>
                                       {match.matchScore}% {getScoreLabel(match.matchScore)}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-gray-600 mb-2">{match.mentor.profession}</p>
+                                  <p className="text-sm text-slate-600 mb-2">{match.mentor.profession}</p>
 
-                                  <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                                  <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 mb-3">
                                     <div>
                                       <span className="font-medium">Points:</span> {match.mentor.points}
                                     </div>
@@ -523,10 +523,10 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                                   </div>
 
                                   <div className="mb-3">
-                                    <p className="text-sm font-medium text-gray-700 mb-1">Matching Factors:</p>
+                                    <p className="text-sm font-medium text-slate-700 mb-1">Matching Factors:</p>
                                     <div className="flex flex-wrap gap-1">
                                       {match.reasons.map((reason, idx) => (
-                                        <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                        <span key={idx} className="px-2 py-1 bg-jci-blue/10 text-jci-blue text-xs rounded-full">
                                           {reason}
                                         </span>
                                       ))}
@@ -543,7 +543,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                                     match.matchScore,
                                     match.reasons
                                   )}
-                                  className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors flex items-center gap-1"
+                                  className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm hover:bg-green-700 transition-colors flex items-center gap-1"
                                 >
                                   <CheckCircle size={14} />
                                   Create Match
@@ -558,8 +558,8 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 </>
               ) : (
                 <div className="text-center py-12">
-                  <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">Select a mentee from the Overview tab to find matches</p>
+                  <Target className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">Select a mentee from the Overview tab to find matches</p>
                 </div>
               )}
             </div>
@@ -569,9 +569,9 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
           {activeTab === 'relationships' && (
             <div className="space-y-6">
               <div className="text-center py-12">
-                <Heart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">Relationship management coming soon</p>
-                <p className="text-sm text-gray-400">Track active mentorships, feedback, and outcomes</p>
+                <Heart className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500">Relationship management coming soon</p>
+                <p className="text-sm text-slate-400">Track active mentorships, feedback, and outcomes</p>
               </div>
             </div>
           )}

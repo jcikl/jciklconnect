@@ -765,7 +765,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           {showTabSheet && (
             <>
               <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setShowTabSheet(false)} />
-              <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white rounded-t-3xl shadow-2xl pb-safe">
+              <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white rounded-t-3xl shadow-2xl pb-24">
                 <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-4" />
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest px-6 mb-2">Switch View</p>
                 <div className="divide-y divide-slate-50 pb-6">
@@ -4854,8 +4854,12 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
 
   return (
     <div className="space-y-6">
-      {/* Guests Section - Rendered directly without outer Card wrapper */}
-      <div className="space-y-4">
+      {/* Guests Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Guests Pending Approval</h3>
+          <span className="bg-slate-100 text-slate-600 text-xs font-black px-2.5 py-1 rounded-full">{guests.length}</span>
+        </div>
         {guests.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
             {canApprove && (
@@ -4952,6 +4956,64 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
           <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
             <Users className="mx-auto text-slate-300 mb-3" size={32} />
             <p className="text-slate-500 font-medium">No guests pending approval</p>
+          </div>
+        )}
+      </div>
+
+      {/* Probation Members Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Probation Members</h3>
+          <span className="bg-amber-100 text-amber-700 text-xs font-black px-2.5 py-1 rounded-full">{probationMembers.length}</span>
+        </div>
+        {probationMembers.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3">
+            {probationMembers.map(member => {
+              const tasks = member.probationTasks || [];
+              const completed = tasks.filter(t => t.status === 'Completed' || t.status === 'Verified').length;
+              const total = tasks.length;
+              const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+              return (
+                <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="relative shrink-0">
+                      <img src={member.avatar || undefined} className="w-10 h-10 rounded-full border border-slate-100" alt={member.name} />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 border-2 border-white rounded-full" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-900 text-sm truncate">{member.name}</div>
+                      <div className="text-xs text-slate-500 truncate">{member.email}</div>
+                      {total > 0 && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-[80px]">
+                            <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400">{completed}/{total} tasks</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => onSelect(member.id)}
+                      className="h-8 px-3 rounded-lg text-slate-600 hover:text-jci-blue hover:border-jci-blue hover:bg-jci-blue/5 text-xs">
+                      <FileText size={12} className="mr-1.5" />Review
+                    </Button>
+                    {canApprove && (
+                      <Button size="sm"
+                        onClick={() => { setSelectedProbationMember(member); setShowProbationTasksModal(true); }}
+                        className="h-8 px-3 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 text-white text-xs">
+                        <CheckCircle size={12} className="mr-1.5" />Tasks
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-6 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+            <Users className="mx-auto text-slate-300 mb-2" size={28} />
+            <p className="text-slate-500 font-medium text-sm">No probation members</p>
           </div>
         )}
       </div>
