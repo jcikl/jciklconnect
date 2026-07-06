@@ -3613,25 +3613,6 @@ export const JCIKLApp: React.FC = () => {
               <div className="relative z-10 space-y-6 max-w-7xl mx-auto">
                 {/* Top Row: Avatar & Status | Notifications */}
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-3 sm:space-x-4">
-                    <div className="relative">
-                      <img
-                        src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=ffffff&color=0097D7`}
-                        alt="Avatar"
-                        className="w-12 h-12 rounded-full border-2 border-white/30 shadow-lg object-cover"
-                      />
-                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-jci-navy rounded-full"></div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-blue-100 text-lg font-bold">{member.name}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <p className="font-medium text-sm tracking-wide text-blue-200">{member.role}</p>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="flex items-center">
                     {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
                       <div className="relative mr-2 z-30">
