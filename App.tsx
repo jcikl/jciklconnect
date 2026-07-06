@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -3234,8 +3234,8 @@ export const JCIKLApp: React.FC = () => {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             scrollRef={scrollRef}
-           
-           
+
+
           />;
         }
         return <DashboardHome
@@ -3629,8 +3629,8 @@ export const JCIKLApp: React.FC = () => {
                         {isSimulateDropdownOpen && (
                           <>
                             {/* Backdrop click outside capture */}
-                            <div 
-                              className="fixed inset-0 z-40" 
+                            <div
+                              className="fixed inset-0 z-40"
                               onClick={() => setIsSimulateDropdownOpen(false)}
                             />
                             {/* Popover Dropdown Menu */}
@@ -3651,11 +3651,10 @@ export const JCIKLApp: React.FC = () => {
                                       showToast(val ? `Simulating ${val} role` : 'Reset to Admin role', 'info');
                                       setIsSimulateDropdownOpen(false);
                                     }}
-                                    className={`w-full text-left px-3 py-2 rounded-lg text-[11px] transition-all flex flex-col gap-0.5 ${
-                                      isSelected 
-                                        ? 'bg-blue-600 text-white font-bold' 
+                                    className={`w-full text-left px-3 py-2 rounded-lg text-[11px] transition-all flex flex-col gap-0.5 ${isSelected
+                                        ? 'bg-blue-600 text-white font-bold'
                                         : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                                    }`}
+                                      }`}
                                   >
                                     <div className="flex items-center justify-between">
                                       <span>{opt.label}</span>
@@ -3856,135 +3855,155 @@ export const JCIKLApp: React.FC = () => {
       {
         (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
           <>
-          <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
-            <button
-              onClick={() => handleViewChange('DASHBOARD')}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <LayoutDashboard size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
-            </button>
-
-            <button
-              onClick={() => {
-                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                else handleViewChange('DIRECTORY');
-              }}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <Building2 size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
-            </button>
-            <button
-              onClick={() => {
-                if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                else handleViewChange('BENEFITS');
-              }}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <Gift size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
-            </button>
-
-            <button
-              onClick={() => setShowMobileMenu(true)}
-              className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}
-            >
-              <div className={`p-2 rounded-2xl transition-all duration-300 ${showMobileMenu ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                <Menu size={20} />
-              </div>
-              <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}>Menu</span>
-            </button>
-          </div>
-
-          {/* Mobile Menu Bottom Drawer */}
-          {showMobileMenu && (
-            <div className="md:hidden fixed inset-0 z-[60]" onClick={() => setShowMobileMenu(false)}>
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-              <div
-                className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-10 pt-4 shadow-2xl`}
-                onClick={e => e.stopPropagation()}
+            <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
+              <button
+                onClick={() => handleViewChange('DASHBOARD')}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
               >
-                <div className={`w-10 h-1 rounded-full mx-auto mb-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
-                <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
-                <div className="grid grid-cols-4 gap-y-4 gap-x-2 my-2">
-                  {/* My Projects */}
-                  <div
-                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                    onClick={() => {
-                      setShowMobileMenu(false);
-                      if (member?.role === UserRole.GUEST) {
-                        setUpgradeModalOpen(true);
-                      } else {
-                        handleViewChange('PROJECTS');
-                      }
-                    }}
-                  >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : (isBoard || isAdmin || isDeveloper ? 'bg-green-950/30 text-green-400 border-green-900/50' : 'bg-green-50 text-green-600 border-green-100')}`}>
-                      <Briefcase size={22} />
-                    </div>
-                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : (isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600')}`}>
-                      My Projects
-                    </span>
-                  </div>
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <LayoutDashboard size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
+              </button>
 
-                  {/* Survey */}
-                  <div
-                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                    onClick={() => {
-                      handleViewChange('SURVEYS');
-                      setShowMobileMenu(false);
-                    }}
-                  >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-rose-950/30 text-rose-400 border-rose-900/50' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                      <CheckSquare size={22} />
-                    </div>
-                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
-                      Survey
-                    </span>
-                  </div>
+              <button
+                onClick={() => {
+                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                  else handleViewChange('DIRECTORY');
+                }}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <Building2 size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
+                  else handleViewChange('BENEFITS');
+                }}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <Gift size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
+              </button>
 
-                  {/* Hobby Clubs */}
-                  <div
-                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                    onClick={() => {
-                      handleViewChange('CLUBS');
-                      setShowMobileMenu(false);
-                    }}
-                  >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-pink-950/30 text-pink-400 border-pink-900/50' : 'bg-pink-50 text-pink-600 border-pink-100'}`}>
-                      <Heart size={22} />
-                    </div>
-                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
-                      Hobby Clubs
-                    </span>
-                  </div>
+              <button
+                onClick={() => setShowMobileMenu(true)}
+                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}
+              >
+                <div className={`p-2 rounded-2xl transition-all duration-300 ${showMobileMenu ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
+                  <Menu size={20} />
+                </div>
+                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}>Menu</span>
+              </button>
+            </div>
 
-                  {/* Knowledge */}
-                  <div
-                    className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                    onClick={() => {
-                      handleViewChange('KNOWLEDGE');
-                      setShowMobileMenu(false);
-                    }}
-                  >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-indigo-950/30 text-indigo-400 border-indigo-900/50' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
-                      <BookOpen size={22} />
+            {/* Mobile Menu Bottom Drawer */}
+            {showMobileMenu && (
+              <div className="md:hidden fixed inset-0 z-[60]" onClick={() => setShowMobileMenu(false)}>
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                <div
+                  className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-10 pt-4 shadow-2xl`}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className={`w-10 h-1 rounded-full mx-auto mb-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                  <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
+                  <div className="grid grid-cols-4 gap-y-4 gap-x-1 my-2">
+                    {/* My Projects */}
+                    <div
+                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                      onClick={() => {
+                        setShowMobileMenu(false);
+                        if (member?.role === UserRole.GUEST) {
+                          setUpgradeModalOpen(true);
+                        } else {
+                          handleViewChange('PROJECTS');
+                        }
+                      }}
+                    >
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : (isBoard || isAdmin || isDeveloper ? 'bg-green-950/30 text-green-400 border-green-900/50' : 'bg-green-50 text-green-600 border-green-100')}`}>
+                        <Briefcase size={22} />
+                      </div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : (isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600')}`}>
+                        My Projects
+                      </span>
                     </div>
-                    <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
-                      Knowledge
-                    </span>
+
+                    {/* Survey */}
+                    <div
+                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                      onClick={() => {
+                        handleViewChange('SURVEYS');
+                        setShowMobileMenu(false);
+                      }}
+                    >
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-rose-950/30 text-rose-400 border-rose-900/50' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                        <CheckSquare size={22} />
+                      </div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Survey
+                      </span>
+                    </div>
+
+                    {/* Hobby Clubs */}
+                    <div
+                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                      onClick={() => {
+                        handleViewChange('CLUBS');
+                        setShowMobileMenu(false);
+                      }}
+                    >
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-pink-950/30 text-pink-400 border-pink-900/50' : 'bg-pink-50 text-pink-600 border-pink-100'}`}>
+                        <Heart size={22} />
+                      </div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Hobby Clubs
+                      </span>
+                    </div>
+
+                    {/* Knowledge */}
+                    <div
+                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                      onClick={() => {
+                        handleViewChange('KNOWLEDGE');
+                        setShowMobileMenu(false);
+                      }}
+                    >
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-indigo-950/30 text-indigo-400 border-indigo-900/50' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
+                        <BookOpen size={22} />
+                      </div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
+                        Knowledge
+                      </span>
+                    </div>
+
+                    {/* Claim */}
+                    <div
+                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                      onClick={() => {
+                        setShowMobileMenu(false);
+                        if (member?.role === UserRole.GUEST) {
+                          setUpgradeModalOpen(true);
+                        } else {
+                          handleViewChange('PAYMENT_REQUESTS');
+                        }
+                      }}
+                    >
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : (isBoard || isAdmin || isDeveloper ? 'bg-amber-950/30 text-amber-400 border-amber-900/50' : 'bg-amber-50 text-amber-600 border-amber-100')}`}>
+                        <CreditCard size={22} />
+                      </div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : (isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600')}`}>
+                        Claim
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </>
         )
       }
