@@ -1365,119 +1365,102 @@ const MemberStatisticsView: React.FC<{
 
   const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5', '#A5B4FC', '#F472B6'];
 
+  const DonutChart: React.FC<{ data: { name: string; value: number }[]; colorOffset?: number }> = ({ data, colorOffset = 0 }) => {
+    const total = data.reduce((s, d) => s + d.value, 0);
+    return (
+      <ResponsiveContainer width="100%" height={isMobile ? 300 : 260}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={isMobile ? 48 : 55}
+            outerRadius={isMobile ? 75 : 85}
+            paddingAngle={2}
+            dataKey="value"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[(index + colorOffset) % COLORS.length]} />
+            ))}
+          </Pie>
+          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-900" style={{ fontSize: 22, fontWeight: 900 }}>{total}</text>
+          <Tooltip formatter={(value: number, name: string) => [`${value} (${total > 0 ? ((value / total) * 100).toFixed(0) : 0}%)`, name]} />
+          <Legend verticalAlign="bottom" height={isMobile ? 56 : 48} iconSize={10} wrapperStyle={{ fontSize: 11, fontWeight: 600 }} />
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Mobile: Combined Card for all 4 stats (Single Row) */}
-        <Card className="md:hidden">
-          <div className="grid grid-cols-4 divide-x divide-slate-100 -m-4">
-            <div className="p-1 text-center">
-              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Total</div>
-              <div className="text-sm font-bold text-slate-900">{statistics.totalMembers}</div>
+      {/* KPI Cards — 2×2 on mobile, 4-col on desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Members',   value: statistics.totalMembers,       color: 'text-slate-900',  bg: 'bg-slate-100',  icon: Users },
+          { label: 'Active Members',  value: statistics.activeMembers,      color: 'text-green-600',  bg: 'bg-green-50',   icon: CheckCircle },
+          { label: 'New This Month',  value: statistics.newMembersThisMonth, color: 'text-jci-blue',  bg: 'bg-blue-50',    icon: UserPlus },
+          { label: 'Avg Points',      value: statistics.averagePoints,      color: 'text-amber-600',  bg: 'bg-amber-50',   icon: Star },
+        ].map(({ label, value, color, bg, icon: Icon }) => (
+          <Card key={label}>
+            <div className="flex items-start gap-3">
+              <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+                <Icon className={`w-4 h-4 ${color}`} />
+              </div>
+              <div className="min-w-0">
+                <div className={`text-2xl font-black ${color} leading-none`}>{value}</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-tight">{label}</div>
+              </div>
             </div>
-            <div className="p-1 text-center">
-              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Active</div>
-              <div className="text-sm font-bold text-green-600">{statistics.activeMembers}</div>
-            </div>
-            <div className="p-1 text-center">
-              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">New</div>
-              <div className="text-sm font-bold text-blue-600">{statistics.newMembersThisMonth}</div>
-            </div>
-            <div className="p-1 text-center">
-              <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Avg Pts</div>
-              <div className="text-sm font-bold text-amber-600">{statistics.averagePoints}</div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Desktop: Separate Cards */}
-        <Card className="hidden md:block">
-          <div className="text-sm text-slate-500 mb-1">Total Members</div>
-          <div className="text-2xl font-bold text-slate-900">{statistics.totalMembers}</div>
-        </Card>
-        <Card className="hidden md:block">
-          <div className="text-sm text-slate-500 mb-1">Active Members</div>
-          <div className="text-2xl font-bold text-green-600">{statistics.activeMembers}</div>
-        </Card>
-        <Card className="hidden md:block">
-          <div className="text-sm text-slate-500 mb-1">New This Month</div>
-          <div className="text-2xl font-bold text-blue-600">{statistics.newMembersThisMonth}</div>
-        </Card>
-        <Card className="hidden md:block">
-          <div className="text-sm text-slate-500 mb-1">Average Points</div>
-          <div className="text-2xl font-bold text-amber-600">{statistics.averagePoints}</div>
-        </Card>
+          </Card>
+        ))}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card title="Age Demographics">
-          <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
-            <PieChart>
-              <Pie
-                data={ageData}
-                cx="50%"
-                cy="50%"
-                labelLine={!isMobile}
-                label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={isMobile ? 70 : 80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {ageData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              {isMobile && <Legend verticalAlign="bottom" height={36} />}
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card title="Gender Demographics">
-          <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
-            <PieChart>
-              <Pie
-                data={genderData}
-                cx="50%"
-                cy="50%"
-                labelLine={!isMobile}
-                label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={isMobile ? 70 : 80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {genderData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              {isMobile && <Legend verticalAlign="bottom" height={36} />}
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
+      {/* Engagement Overview — segmented bar */}
       <Card title="Member Engagement Overview">
-        <div className="grid grid-cols-3 divide-x divide-slate-100 -m-4 border-t border-slate-50 bg-slate-50/30">
-          <div className="p-2 text-center">
-            <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Highly</div>
-            <div className="text-3xl font-black text-green-600">{statistics.engagementMetrics.highlyEngaged}</div>
-            <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">&gt;80% Engagement</p>
-          </div>
-          <div className="p-2 text-center">
-            <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Moderate</div>
-            <div className="text-3xl font-black text-amber-500">{statistics.engagementMetrics.moderatelyEngaged}</div>
-            <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">50-80% Engagement</p>
-          </div>
-          <div className="p-2 text-center">
-            <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Low</div>
-            <div className="text-3xl font-black text-red-500">{statistics.engagementMetrics.lowEngaged}</div>
-            <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">&lt;50% Engagement</p>
-          </div>
-        </div>
+        {(() => {
+          const high = statistics.engagementMetrics.highlyEngaged;
+          const mod  = statistics.engagementMetrics.moderatelyEngaged;
+          const low  = statistics.engagementMetrics.lowEngaged;
+          const total = high + mod + low || 1;
+          const highPct = Math.round((high / total) * 100);
+          const modPct  = Math.round((mod  / total) * 100);
+          const lowPct  = 100 - highPct - modPct;
+          return (
+            <div className="space-y-3">
+              <div className="flex h-4 rounded-full overflow-hidden gap-0.5">
+                {highPct > 0 && <div className="bg-green-500 transition-all" style={{ width: `${highPct}%` }} />}
+                {modPct  > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${modPct}%` }} />}
+                {lowPct  > 0 && <div className="bg-red-400  transition-all" style={{ width: `${lowPct}%` }} />}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Highly Engaged',    value: high, pct: highPct, color: 'text-green-600', dot: 'bg-green-500', sub: '>80%' },
+                  { label: 'Moderately Engaged', value: mod,  pct: modPct,  color: 'text-amber-500', dot: 'bg-amber-400', sub: '50–80%' },
+                  { label: 'Low Engaged',        value: low,  pct: lowPct,  color: 'text-red-500',   dot: 'bg-red-400',   sub: '<50%' },
+                ].map(({ label, value, pct, color, dot, sub }) => (
+                  <div key={label} className="text-center">
+                    <div className={`text-2xl font-black ${color}`}>{value}</div>
+                    <div className="flex items-center justify-center gap-1 mt-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{sub}</span>
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">{pct}% · {label.split(' ')[0]}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </Card>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      {/* 2×2 donut chart grid */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card title="Age Demographics">
+          <DonutChart data={ageData} colorOffset={0} />
+        </Card>
+        <Card title="Gender Demographics">
+          <DonutChart data={genderData} colorOffset={2} />
+        </Card>
         <Card title="Membership Type Breakdown">
           {(() => {
             const types = ['Full', 'Probation', 'Guest', 'Senator', 'Honorary'];
@@ -1485,31 +1468,9 @@ const MemberStatisticsView: React.FC<{
             const data = types
               .map(key => ({ name: labels[key], value: members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length }))
               .filter(d => d.value > 0);
-            return (
-              <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
-                <PieChart>
-                  <Pie
-                    data={data}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={!isMobile}
-                    label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={isMobile ? 70 : 80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {data.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  {isMobile && <Legend verticalAlign="bottom" height={36} />}
-                </PieChart>
-              </ResponsiveContainer>
-            );
+            return <DonutChart data={data} colorOffset={0} />;
           })()}
         </Card>
-
         <Card title="Level of Management">
           {(() => {
             const activeMembers = members.filter(m => m.membershipType !== 'Guest');
@@ -1524,28 +1485,7 @@ const MemberStatisticsView: React.FC<{
               ...Object.keys(counts).filter(k => !knownOrder.includes(k) && k !== 'Not Specified').sort().map(k => ({ name: k, value: counts[k] })),
               ...(counts['Not Specified'] ? [{ name: 'Not Specified', value: counts['Not Specified'] }] : []),
             ];
-            return (
-              <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
-                <PieChart>
-                  <Pie
-                    data={data}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={!isMobile}
-                    label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={isMobile ? 70 : 80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {data.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  {isMobile && <Legend verticalAlign="bottom" height={36} />}
-                </PieChart>
-              </ResponsiveContainer>
-            );
+            return <DonutChart data={data} colorOffset={1} />;
           })()}
         </Card>
       </div>
