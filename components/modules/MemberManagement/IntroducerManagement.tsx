@@ -36,6 +36,42 @@ export const IntroducerManagement: React.FC<Props> = ({
   const [newGroupIntroducerVal, setNewGroupIntroducerVal] = useState('');
   const [isSavingGroup, setIsSavingGroup] = useState(false);
 
+  // Top Recruiters year filter
+  const [recruiterYear, setRecruiterYear] = useState<string>('all');
+
+  const recruiterYears = useMemo(() => {
+    const years = new Set<string>();
+    members.forEach(m => {
+      const y = (m.joinDate || '').substring(0, 4);
+      if (/^\d{4}$/.test(y)) years.add(y);
+    });
+    return ['all', ...Array.from(years).sort().reverse()];
+  }, [members]);
+
+  const filteredTopRecruiters = useMemo(() => {
+    const counts: Record<string, number> = {};
+    members.forEach(m => {
+      if (!m.introducer || m.introducer.trim() === '') return;
+      if (getIntroducerType(m.introducer) !== 'JCI KL Member') return;
+      if (recruiterYear !== 'all') {
+        const y = (m.joinDate || '').substring(0, 4);
+        if (y !== recruiterYear) return;
+      }
+      const id = m.introducer.trim();
+      counts[id] = (counts[id] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([id, count]) => {
+        const obj = members.find(m => m.id === id);
+        const short = obj?.name || '';
+        const full = obj?.fullName || '';
+        const name = short && full && short !== full ? `${short} (${full})` : short || full || 'Unknown Member';
+        return { id, name, count, avatar: obj?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff` };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [members, recruiterYear]);
+
   // Aggregation sort + batch selection
   const [aggSort, setAggSort] = useState<'count' | 'name'>('count');
   const [selectedGroupValues, setSelectedGroupValues] = useState<Set<string>>(new Set());
@@ -337,19 +373,33 @@ export const IntroducerManagement: React.FC<Props> = ({
           </div>
         </Card>
 
-        <Card title="Top Recruiters (JCI KL)" className="flex flex-col justify-between">
-          <div className="space-y-2 mt-1">
-            {stats.topRecruiters.length === 0 ? (
-              <p className="text-sm text-slate-500 italic py-2 text-center">No member referrals registered yet.</p>
+        <Card className="flex flex-col">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-slate-800">Top Recruiters (JCI KL)</span>
+            <select
+              value={recruiterYear}
+              onChange={e => setRecruiterYear(e.target.value)}
+              className="text-xs font-bold border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue"
+            >
+              {recruiterYears.map(y => (
+                <option key={y} value={y}>{y === 'all' ? 'All Years' : y}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2 flex-1">
+            {filteredTopRecruiters.length === 0 ? (
+              <p className="text-sm text-slate-400 italic py-2 text-center">
+                {recruiterYear === 'all' ? 'No member referrals registered yet.' : `No referrals in ${recruiterYear}.`}
+              </p>
             ) : (
-              stats.topRecruiters.map((recruiter, idx) => (
+              filteredTopRecruiters.map((recruiter, idx) => (
                 <div key={recruiter.id} className="flex items-center justify-between text-sm py-1 border-b border-slate-100 last:border-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-slate-400 w-4">#{idx + 1}</span>
                     <img src={recruiter.avatar} alt="" className="w-6 h-6 rounded-full" />
-                    <span className="font-semibold text-slate-800 truncate max-w-[150px]">{recruiter.name}</span>
+                    <span className="font-semibold text-slate-800 truncate max-w-[140px]">{recruiter.name}</span>
                   </div>
-                  <Badge variant="success" className="font-black text-xs">{recruiter.count} members</Badge>
+                  <Badge variant="success" className="font-black text-xs shrink-0">{recruiter.count} recruited</Badge>
                 </div>
               ))
             )}
