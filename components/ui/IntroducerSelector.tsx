@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { Member, Project } from '../../types';
 
@@ -25,9 +26,27 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
   const [eventOpen, setEventOpen] = useState(false);
   const [memberHighlight, setMemberHighlight] = useState(0);
   const [eventHighlight, setEventHighlight] = useState(0);
+  const [memberDropdownRect, setMemberDropdownRect] = useState<DOMRect | null>(null);
+  const [eventDropdownRect, setEventDropdownRect] = useState<DOMRect | null>(null);
 
   const memberContainerRef = useRef<HTMLDivElement>(null);
   const eventContainerRef = useRef<HTMLDivElement>(null);
+
+  const openMemberDropdown = () => {
+    if (memberContainerRef.current) {
+      setMemberDropdownRect(memberContainerRef.current.getBoundingClientRect());
+    }
+    setMemberOpen(true);
+    setMemberSearch('');
+  };
+
+  const openEventDropdown = () => {
+    if (eventContainerRef.current) {
+      setEventDropdownRect(eventContainerRef.current.getBoundingClientRect());
+    }
+    setEventOpen(true);
+    setEventSearch('');
+  };
 
   // Click outside to close
   useEffect(() => {
@@ -191,21 +210,22 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
               value={memberOpen ? memberSearch : (selectedMember ? (selectedMember.name || selectedMember.fullName) : '')}
               onChange={(e) => {
                 setMemberSearch(e.target.value);
+                if (memberContainerRef.current) setMemberDropdownRect(memberContainerRef.current.getBoundingClientRect());
                 setMemberOpen(true);
                 setMemberHighlight(0);
               }}
-              onFocus={() => {
-                setMemberOpen(true);
-                setMemberSearch('');
-              }}
+              onFocus={openMemberDropdown}
               className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
               <ChevronDown size={16} />
             </div>
           </div>
-          {memberOpen && (
-            <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+          {memberOpen && memberDropdownRect && createPortal(
+            <ul
+              style={{ position: 'fixed', top: memberDropdownRect.bottom + 4, left: memberDropdownRect.left, width: memberDropdownRect.width, zIndex: 9999 }}
+              className="max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1"
+            >
               {filteredMembers.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-slate-500">No members found</li>
               ) : (
@@ -216,7 +236,8 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
                       i === memberHighlight ? 'bg-jci-blue/10 text-jci-navy' : 'text-slate-700 hover:bg-slate-50'
                     } ${detail === m.id ? 'font-bold' : ''}`}
                     onMouseEnter={() => setMemberHighlight(i)}
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
                       handleDetailChange(m.id);
                       setMemberOpen(false);
                       setMemberSearch('');
@@ -226,7 +247,8 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
                   </li>
                 ))
               )}
-            </ul>
+            </ul>,
+            document.body
           )}
         </div>
       )}
@@ -240,21 +262,22 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
               value={eventOpen ? eventSearch : detail}
               onChange={(e) => {
                 setEventSearch(e.target.value);
+                if (eventContainerRef.current) setEventDropdownRect(eventContainerRef.current.getBoundingClientRect());
                 setEventOpen(true);
                 setEventHighlight(0);
               }}
-              onFocus={() => {
-                setEventOpen(true);
-                setEventSearch('');
-              }}
+              onFocus={openEventDropdown}
               className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
               <ChevronDown size={16} />
             </div>
           </div>
-          {eventOpen && (
-            <ul className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+          {eventOpen && eventDropdownRect && createPortal(
+            <ul
+              style={{ position: 'fixed', top: eventDropdownRect.bottom + 4, left: eventDropdownRect.left, width: eventDropdownRect.width, zIndex: 9999 }}
+              className="max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1"
+            >
               {filteredProjects.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-slate-500">No events found</li>
               ) : (
@@ -265,7 +288,8 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
                       i === eventHighlight ? 'bg-jci-blue/10 text-jci-navy' : 'text-slate-700 hover:bg-slate-50'
                     } ${detail === p.name ? 'font-bold' : ''}`}
                     onMouseEnter={() => setEventHighlight(i)}
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault();
                       handleDetailChange(p.name);
                       setEventOpen(false);
                       setEventSearch('');
@@ -275,7 +299,8 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
                   </li>
                 ))
               )}
-            </ul>
+            </ul>,
+            document.body
           )}
         </div>
       )}
