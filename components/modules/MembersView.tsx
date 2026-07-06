@@ -1477,29 +1477,73 @@ const MemberStatisticsView: React.FC<{
         </div>
       </Card>
 
-      <Card title="Membership Type Breakdown">
-        <div className="space-y-2.5">
-          {[
-            { label: 'Full Member', key: 'Full', color: 'bg-jci-blue' },
-            { label: 'Probation', key: 'Probation', color: 'bg-amber-400' },
-            { label: 'Guest', key: 'Guest', color: 'bg-slate-400' },
-            { label: 'Senator', key: 'Senator', color: 'bg-purple-500' },
-            { label: 'Honorary', key: 'Honorary', color: 'bg-green-500' },
-          ].map(({ label, key, color }) => {
-            const count = members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length;
-            const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
-            return (
-              <div key={key} className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-slate-600 w-24 shrink-0">{label}</span>
-                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card title="Membership Type Breakdown">
+          <div className="space-y-2.5">
+            {[
+              { label: 'Full Member', key: 'Full', color: 'bg-jci-blue' },
+              { label: 'Probation', key: 'Probation', color: 'bg-amber-400' },
+              { label: 'Guest', key: 'Guest', color: 'bg-slate-400' },
+              { label: 'Senator', key: 'Senator', color: 'bg-purple-500' },
+              { label: 'Honorary', key: 'Honorary', color: 'bg-green-500' },
+            ].map(({ label, key, color }) => {
+              const count = members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length;
+              const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
+              return (
+                <div key={key} className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-slate-600 w-24 shrink-0">{label}</span>
+                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-xs font-black text-slate-700 w-8 text-right">{count}</span>
                 </div>
-                <span className="text-xs font-black text-slate-700 w-8 text-right">{count}</span>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card title="Level of Management">
+          {(() => {
+            const levels: Record<string, { color: string }> = {
+              'Top Management': { color: 'bg-jci-blue' },
+              'Senior Management': { color: 'bg-indigo-500' },
+              'Middle Management': { color: 'bg-violet-500' },
+              'Junior Management': { color: 'bg-cyan-500' },
+              'Non-Management': { color: 'bg-slate-400' },
+            };
+            const activeMembers = members.filter(m => m.membershipType !== 'Guest');
+            const counts: Record<string, number> = {};
+            activeMembers.forEach(m => {
+              const lvl = m.levelOfManagement?.trim() || 'Not Specified';
+              counts[lvl] = (counts[lvl] || 0) + 1;
+            });
+            const knownOrder = Object.keys(levels);
+            const entries = [
+              ...knownOrder.filter(k => counts[k]).map(k => ({ label: k, count: counts[k], color: levels[k].color })),
+              ...Object.keys(counts).filter(k => !levels[k] && k !== 'Not Specified').sort().map(k => ({ label: k, count: counts[k], color: 'bg-teal-500' })),
+              ...(counts['Not Specified'] ? [{ label: 'Not Specified', count: counts['Not Specified'], color: 'bg-slate-200' }] : []),
+            ];
+            const max = Math.max(...entries.map(e => e.count), 1);
+            return (
+              <div className="space-y-2.5">
+                {entries.map(({ label, count, color }) => {
+                  const pct = Math.round((count / max) * 100);
+                  return (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-slate-600 w-32 shrink-0 truncate">{label}</span>
+                      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs font-black text-slate-700 w-8 text-right">{count}</span>
+                    </div>
+                  );
+                })}
+                {entries.length === 0 && <p className="text-xs text-slate-400 text-center py-4">No data available</p>}
               </div>
             );
-          })}
-        </div>
-      </Card>
+          })()}
+        </Card>
+      </div>
     </div>
   );
 };
