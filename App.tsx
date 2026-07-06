@@ -3933,8 +3933,14 @@ export const JCIKLApp: React.FC = () => {
                 onClick={() => setShowMobileMenu(true)}
                 className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}
               >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${showMobileMenu ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <Menu size={20} />
+                <div className={`rounded-2xl transition-all duration-300 overflow-hidden ${showMobileMenu ? 'ring-2 ring-jci-blue ring-offset-1 shadow-lg shadow-jci-blue/30' : 'ring-2 ring-transparent'}`}>
+                  {member?.avatar ? (
+                    <img src={member.avatar} alt={member?.name || 'Me'} className="w-9 h-9 rounded-2xl object-cover" />
+                  ) : (
+                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-sm font-black ${showMobileMenu ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-600')}`}>
+                      {(member?.name || 'M').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}>Menu</span>
               </button>
@@ -3948,7 +3954,35 @@ export const JCIKLApp: React.FC = () => {
                   className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-10 pt-4 shadow-2xl`}
                   onClick={e => e.stopPropagation()}
                 >
-                  <div className={`w-10 h-1 rounded-full mx-auto mb-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                  <div className={`w-10 h-1 rounded-full mx-auto mb-4 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
+
+                  {/* Profile Card */}
+                  <div
+                    className={`flex items-center gap-3 p-3 rounded-2xl mb-4 cursor-pointer active:scale-[0.98] transition-all ${isBoard || isAdmin || isDeveloper ? 'bg-slate-800/60 border border-slate-700/50 hover:bg-slate-800' : 'bg-slate-50 border border-slate-100 hover:bg-slate-100'}`}
+                    onClick={() => { handleViewChange('MEMBERS', member?.id); setShowMobileMenu(false); }}
+                  >
+                    <div className="relative shrink-0">
+                      {member?.avatar ? (
+                        <img src={member.avatar} alt={member?.name || ''} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
+                      ) : (
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-black ${isBoard || isAdmin || isDeveloper ? 'bg-jci-blue text-white' : 'bg-slate-200 text-slate-600'}`}>
+                          {(member?.name || 'M').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-black text-sm leading-tight truncate ${isBoard || isAdmin || isDeveloper ? 'text-white' : 'text-slate-900'}`}>{member?.name || 'Member'}</p>
+                      <p className={`text-xs truncate mt-0.5 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-500'}`}>{member?.email || ''}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isBoard || isAdmin || isDeveloper ? 'bg-jci-blue/20 text-jci-blue' : 'bg-slate-200 text-slate-600'}`}>{member?.tier || 'Member'}</span>
+                        <span className={`text-[10px] font-bold ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>{member?.points ?? 0} pts</span>
+                      </div>
+                    </div>
+                    <div className={`text-xs font-bold shrink-0 ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>
+                      View Profile →
+                    </div>
+                  </div>
 
                   {/* Board Metrics Grid */}
                   {(isBoard || isAdmin || isDeveloper) && (
@@ -4265,6 +4299,17 @@ export const JCIKLApp: React.FC = () => {
                         </div>
                       </>
                     )}
+                  </div>
+
+                  {/* Logout */}
+                  <div className={`mt-4 pt-4 border-t ${isBoard || isAdmin || isDeveloper ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                    <button
+                      onClick={() => { setShowMobileMenu(false); handleLogout(); }}
+                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] ${isBoard || isAdmin || isDeveloper ? 'bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-950/50' : 'bg-red-50 text-red-500 border border-red-100 hover:bg-red-100'}`}
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
                   </div>
                 </div>
               </div>
