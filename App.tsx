@@ -3625,16 +3625,6 @@ export const JCIKLApp: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-blue-100 text-lg font-bold">{member.name}</p>
-                        <button
-                          onClick={() => {
-                            setInitialSelectedMemberId(member.id);
-                            setView('MEMBERS');
-                          }}
-                          className="p-0 h-7 w-7 min-h-0 min-w-0 text-white/60 hover:text-white transition-colors flex items-center justify-center"
-                          title="Edit Profile"
-                        >
-                          <Edit3 size={16} />
-                        </button>
                       </div>
                       <div className="flex items-center space-x-2">
                         <p className="font-medium text-sm tracking-wide text-blue-200">{member.role}</p>
@@ -3721,13 +3711,6 @@ export const JCIKLApp: React.FC = () => {
                       )}
                     </button>
 
-                    <button
-                      onClick={handleLogout}
-                      className="p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
-                      title="Sign Out"
-                    >
-                      <LogOut size={20} className="group-hover:scale-110 transition-transform" />
-                    </button>
                   </div>
                 </div>
               </div>
