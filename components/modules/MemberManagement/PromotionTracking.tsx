@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, CheckCircle, Clock, Award, AlertCircle,
-  Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3
+  Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown
 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, Modal, useToast } from '../../ui/Common';
 import {
@@ -176,6 +176,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [engagementEditValues, setEngagementEditValues] = useState<Record<string, { detail: string; date: string }>>({});
   const [savingField, setSavingField] = useState<string | null>(null);
   const [savingEngagementKey, setSavingEngagementKey] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -535,42 +536,49 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
           <Card title="Probation Members">
             <div className="space-y-3">
               {filteredProbationMembers.map(member => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 hover:border-jci-blue/20 hover:shadow-sm transition-all"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                      {member.name.split(' ').map((n: string) => n[0]).join('')}
-                    </div>
-                    <div>
-                      {member.fullName && (
-                        <div className="font-medium text-slate-900">{member.fullName}</div>
-                      )}
-                      <div className={member.fullName ? "text-sm text-slate-600" : "font-medium text-slate-900"}>{member.name}</div>
-                      <div className="text-xs text-slate-500">Joined: {member.joinDate}</div>
-                      <div className="mt-1">
-                        <MembershipTypeDisplay
-                          member={{
-                            nationality: member.nationality,
-                            dateOfBirth: member.dateOfBirth,
-                            senatorCertified: member.senatorCertified,
-                            senatorshipId: member.senatorshipId,
-                            role: member.role,
-                            membershipType: member.membershipType as any,
-                          }}
-                          showDetails={false}
-                        />
+                <div key={member.id} className="border border-slate-100 rounded-xl overflow-hidden hover:border-jci-blue/20 transition-all">
+                  <div className="flex items-center justify-between p-3 bg-white">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                        {member.name.split(' ').map((n: string) => n[0]).join('')}
+                      </div>
+                      <div>
+                        {member.fullName && (
+                          <div className="font-medium text-slate-900">{member.fullName}</div>
+                        )}
+                        <div className={member.fullName ? "text-sm text-slate-600" : "font-medium text-slate-900"}>{member.name}</div>
+                        <div className="text-xs text-slate-500">Joined: {member.joinDate}</div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleViewProgress(member.id, member)}>
+                        Full View
+                      </Button>
+                      <button
+                        onClick={() => setExpandedId(expandedId === member.id ? null : member.id)}
+                        className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-jci-blue transition-colors"
+                      >
+                        <ChevronDown size={16} className={expandedId === member.id ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                      </button>
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewProgress(member.id, member)}
-                  >
-                    View Progress
-                  </Button>
+                  {expandedId === member.id && (
+                    <div className="px-4 pb-4 pt-2 bg-slate-50/50 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      {[
+                        { label: 'BOD Meeting', done: !!member.promotionProgress?.bodMeetingAttended },
+                        { label: 'Event Organizer', done: !!member.promotionProgress?.eventOrganizerParticipation },
+                        { label: 'Event Participation', done: !!member.promotionProgress?.eventParticipation },
+                        { label: 'JCI Inspire', done: !!member.promotionProgress?.jciInspireCompleted },
+                      ].map(req => (
+                        <div key={req.label} className={`flex items-center gap-2 p-2 rounded-lg ${req.done ? 'bg-green-50 border border-green-100' : 'bg-white border border-slate-100'}`}>
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${req.done ? 'bg-green-500' : 'bg-slate-200'}`}>
+                            {req.done && <Check size={10} className="text-white" />}
+                          </div>
+                          <span className={`font-semibold ${req.done ? 'text-green-700' : 'text-slate-500'}`}>{req.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

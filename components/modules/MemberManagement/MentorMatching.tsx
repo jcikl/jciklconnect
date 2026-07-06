@@ -320,7 +320,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredUnassignedMentees.map((mentee) => (
-                      <div key={mentee.id} className="border border-slate-100 rounded-2xl p-4">
+                      <div key={mentee.id} className="border border-slate-100 rounded-2xl p-4 hover:shadow-sm hover:border-jci-blue/20 transition-all">
                         <div className="flex items-center gap-3 mb-3">
                           <img
                             src={mentee.avatar || undefined}
@@ -567,12 +567,38 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
 
           {/* Relationships Tab */}
           {activeTab === 'relationships' && (
-            <div className="space-y-6">
-              <div className="text-center py-12">
-                <Heart className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">Relationship management coming soon</p>
-                <p className="text-sm text-slate-400">Track active mentorships, feedback, and outcomes</p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {members.filter(m => m.mentorId).slice(0, 8).map(mentee => {
+                  const mentor = members.find(m => m.id === mentee.mentorId);
+                  return (
+                    <div key={mentee.id} className="flex items-center gap-3 p-3 border border-slate-100 rounded-2xl hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <img src={mentor?.avatar || undefined} className="w-8 h-8 rounded-full bg-jci-blue/20" alt="" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Mentor</p>
+                          <p className="text-sm font-bold text-slate-800 truncate">{mentor?.name || 'Unknown'}</p>
+                        </div>
+                      </div>
+                      <Heart size={14} className="text-jci-blue/40 shrink-0" />
+                      <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                        <div className="min-w-0 text-right">
+                          <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Mentee</p>
+                          <p className="text-sm font-bold text-slate-800 truncate">{mentee.name}</p>
+                        </div>
+                        <img src={mentee.avatar || undefined} className="w-8 h-8 rounded-full bg-slate-200 shrink-0" alt="" />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+              {members.filter(m => m.mentorId).length === 0 && (
+                <div className="text-center py-12 bg-slate-50 rounded-2xl">
+                  <Heart className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 font-semibold">No active mentorships yet</p>
+                  <p className="text-sm text-slate-400 mt-1">Use Smart Matching to create mentor pairs</p>
+                </div>
+              )}
             </div>
           )}
         </div>

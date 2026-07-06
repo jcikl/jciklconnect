@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Shield, CheckCircle, Clock, RefreshCw, XCircle } from 'lucide-react';
+import { Shield, CheckCircle, Clock, RefreshCw, XCircle, Search } from 'lucide-react';
 import { Card, Button, Badge, useToast } from '../../ui/Common';
 import { Member } from '../../../types';
 import { MembersService } from '../../../services/membersService';
@@ -22,8 +22,10 @@ export const SenatorshipManagement: React.FC<Props> = ({
   const { showToast } = useToast();
   const { member: currentUser } = useAuth();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [localSearch, setLocalSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
 
-  const term = searchQuery.toLowerCase().trim();
+  const term = (searchQuery || localSearch).toLowerCase().trim();
 
   const { pending, validated } = useMemo(() => {
     const withNumber = members.filter((m) => m.senatorshipId?.trim());
@@ -34,11 +36,20 @@ export const SenatorshipManagement: React.FC<Props> = ({
       (m.fullName ?? '').toLowerCase().includes(term) ||
       (m.senatorshipId ?? '').toLowerCase().includes(term);
 
-    return {
-      pending: withNumber.filter((m) => !m.senatorshipBoardValidated && matches(m)),
-      validated: withNumber.filter((m) => m.senatorshipBoardValidated && matches(m)),
+    const sortFn = (a: Member, b: Member) => {
+      if (sortBy === 'date') {
+        const dateA = a.senatorshipValidatedAt ? new Date(a.senatorshipValidatedAt).getTime() : 0;
+        const dateB = b.senatorshipValidatedAt ? new Date(b.senatorshipValidatedAt).getTime() : 0;
+        return dateB - dateA;
+      }
+      return (a.name || '').localeCompare(b.name || '');
     };
-  }, [members, term]);
+
+    return {
+      pending: withNumber.filter((m) => !m.senatorshipBoardValidated && matches(m)).sort(sortFn),
+      validated: withNumber.filter((m) => m.senatorshipBoardValidated && matches(m)).sort(sortFn),
+    };
+  }, [members, term, sortBy]);
 
   const handleValidate = async (member: Member) => {
     if (!canValidate) return;
@@ -162,6 +173,28 @@ export const SenatorshipManagement: React.FC<Props> = ({
           </div>
         </div>
       </Card>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by name or senator number..."
+            value={localSearch}
+            onChange={e => setLocalSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue bg-white"
+          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold text-slate-500">Sort:</span>
+          {(['name', 'date'] as const).map(s => (
+            <button key={s} onClick={() => setSortBy(s)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${sortBy === s ? 'bg-jci-blue text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+              {s === 'name' ? 'Name' : 'Date'}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card

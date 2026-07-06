@@ -504,7 +504,34 @@ export const IntroducerManagement: React.FC<Props> = ({
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          {/* Mobile card list */}
+          <div className="md:hidden divide-y divide-slate-100">
+            {filteredMembersForAssignment.map(member => {
+              const introDisplay = resolveIntroducerDisplay(member.introducer);
+              const introType = getIntroducerType(member.introducer);
+              return (
+                <div key={member.id} className="py-3 px-1 flex items-center gap-3">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {selectedMemberIds.size > 0 && (
+                      <input type="checkbox" checked={selectedMemberIds.has(member.id)} onChange={() => toggleSelectMember(member.id)}
+                        className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue shrink-0" />
+                    )}
+                    <img src={member.avatar || undefined} className="w-9 h-9 rounded-full bg-slate-200 shrink-0" alt="" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{member.name}</p>
+                      <p className="text-xs text-slate-500 truncate">{introDisplay}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { setEditingMember(member); setNewIntroducerVal(member.introducer || ''); }}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-jci-blue/10 hover:text-jci-blue text-slate-500 transition-colors shrink-0">
+                    <Edit2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100 text-slate-500 text-xs uppercase tracking-wider font-bold">

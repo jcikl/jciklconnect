@@ -1461,19 +1461,43 @@ const MemberStatisticsView: React.FC<{
         <div className="grid grid-cols-3 divide-x divide-slate-100 -m-4 border-t border-slate-50 bg-slate-50/30">
           <div className="p-2 text-center">
             <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Highly</div>
-            <div className="text-2xl font-black text-green-600">{statistics.engagementMetrics.highlyEngaged}</div>
+            <div className="text-3xl font-black text-green-600">{statistics.engagementMetrics.highlyEngaged}</div>
             <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">&gt;80% Engagement</p>
           </div>
           <div className="p-2 text-center">
             <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Moderate</div>
-            <div className="text-2xl font-black text-amber-500">{statistics.engagementMetrics.moderatelyEngaged}</div>
+            <div className="text-3xl font-black text-amber-500">{statistics.engagementMetrics.moderatelyEngaged}</div>
             <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">50-80% Engagement</p>
           </div>
           <div className="p-2 text-center">
             <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">Low</div>
-            <div className="text-2xl font-black text-red-500">{statistics.engagementMetrics.lowEngaged}</div>
+            <div className="text-3xl font-black text-red-500">{statistics.engagementMetrics.lowEngaged}</div>
             <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">&lt;50% Engagement</p>
           </div>
+        </div>
+      </Card>
+
+      <Card title="Membership Type Breakdown">
+        <div className="space-y-2.5">
+          {[
+            { label: 'Full Member', key: 'Full', color: 'bg-jci-blue' },
+            { label: 'Probation', key: 'Probation', color: 'bg-amber-400' },
+            { label: 'Guest', key: 'Guest', color: 'bg-slate-400' },
+            { label: 'Senator', key: 'Senator', color: 'bg-purple-500' },
+            { label: 'Honorary', key: 'Honorary', color: 'bg-green-500' },
+          ].map(({ label, key, color }) => {
+            const count = members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length;
+            const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
+            return (
+              <div key={key} className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-slate-600 w-24 shrink-0">{label}</span>
+                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-xs font-black text-slate-700 w-8 text-right">{count}</span>
+              </div>
+            );
+          })}
         </div>
       </Card>
     </div>
@@ -4861,9 +4885,9 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
           <span className="bg-slate-100 text-slate-600 text-xs font-black px-2.5 py-1 rounded-full">{guests.length}</span>
         </div>
         {guests.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {canApprove && (
-              <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl lg:col-span-2">
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
