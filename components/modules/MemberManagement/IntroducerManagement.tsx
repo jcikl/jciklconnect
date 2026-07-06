@@ -31,6 +31,11 @@ export const IntroducerManagement: React.FC<Props> = ({
   const [newIntroducerVal, setNewIntroducerVal] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Aggregation group editing
+  const [editingGroup, setEditingGroup] = useState<{ value: string; name: string; invitees: Member[] } | null>(null);
+  const [newGroupIntroducerVal, setNewGroupIntroducerVal] = useState('');
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
+
   // Batch selection states
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [isBatchEditing, setIsBatchEditing] = useState(false);
@@ -242,6 +247,25 @@ export const IntroducerManagement: React.FC<Props> = ({
     });
   }, [members, memberSearch, statusFilter]);
 
+  const handleSaveIntroducerGroup = async () => {
+    if (!editingGroup) return;
+    setIsSavingGroup(true);
+    try {
+      const ids = editingGroup.invitees.map(m => m.id);
+      if (onBatchUpdateMembers) {
+        await onBatchUpdateMembers(ids, { introducer: newGroupIntroducerVal });
+      } else {
+        await Promise.all(ids.map(id => onUpdateMember(id, { introducer: newGroupIntroducerVal })));
+      }
+      showToast(`Updated introducer for ${ids.length} member${ids.length !== 1 ? 's' : ''}`, 'success');
+      setEditingGroup(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update group introducer', 'error');
+    } finally {
+      setIsSavingGroup(false);
+    }
+  };
+
   // Save the updated introducer for a member
   const handleSaveIntroducer = async () => {
     if (!editingMember) return;
@@ -365,12 +389,13 @@ export const IntroducerManagement: React.FC<Props> = ({
                   <th className="px-6 py-3">Type</th>
                   <th className="px-6 py-3 text-center">Introduced Count</th>
                   <th className="px-6 py-3 hidden md:table-cell">Introduced Members</th>
+                  <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {introducersList.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-8 text-slate-400">
+                    <td colSpan={5} className="text-center py-8 text-slate-400">
                       No introducers found matching query.
                     </td>
                   </tr>
@@ -426,6 +451,17 @@ export const IntroducerManagement: React.FC<Props> = ({
                             </div>
                           )}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setEditingGroup(intro); setNewGroupIntroducerVal(intro.value); }}
+                          className="inline-flex items-center gap-1.5"
+                        >
+                          <Edit2 size={13} />
+                          <span>Edit</span>
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -629,6 +665,41 @@ export const IntroducerManagement: React.FC<Props> = ({
             </table>
           </div>
         </Card>
+      )}
+
+      {/* Aggregation group reassign modal */}
+      {editingGroup && (
+        <Modal
+          isOpen={!!editingGroup}
+          onClose={() => setEditingGroup(null)}
+          title={`Reassign "${editingGroup.name}" (${editingGroup.invitees.length} member${editingGroup.invitees.length !== 1 ? 's' : ''})`}
+          size="md"
+          footer={
+            <div className="flex gap-3 w-full">
+              <Button variant="outline" className="flex-1" onClick={() => setEditingGroup(null)} disabled={isSavingGroup}>
+                Cancel
+              </Button>
+              <Button variant="primary" className="flex-1" onClick={handleSaveIntroducerGroup} isLoading={isSavingGroup} disabled={isSavingGroup}>
+                Save ({editingGroup.invitees.length} members)
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-slate-50 p-3 border border-slate-100 rounded-lg text-xs text-slate-600">
+              All <span className="font-bold text-slate-800">{editingGroup.invitees.length}</span> member{editingGroup.invitees.length !== 1 ? 's' : ''} currently listed under <span className="font-bold text-slate-800">{editingGroup.name}</span> will be updated to the new introducer.
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-slate-700">New Introducer / Channel</label>
+              <IntroducerSelector
+                value={newGroupIntroducerVal}
+                onChange={setNewGroupIntroducerVal}
+                members={members}
+                projects={allProjects}
+              />
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* 4. Update Introducer Modal */}
