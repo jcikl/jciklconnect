@@ -1479,27 +1479,35 @@ const MemberStatisticsView: React.FC<{
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card title="Membership Type Breakdown">
-          <div className="space-y-2.5">
-            {[
-              { label: 'Full Member', key: 'Full', color: 'bg-jci-blue' },
-              { label: 'Probation', key: 'Probation', color: 'bg-amber-400' },
-              { label: 'Guest', key: 'Guest', color: 'bg-slate-400' },
-              { label: 'Senator', key: 'Senator', color: 'bg-purple-500' },
-              { label: 'Honorary', key: 'Honorary', color: 'bg-green-500' },
-            ].map(({ label, key, color }) => {
-              const count = members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length;
-              const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
-              return (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-slate-600 w-24 shrink-0">{label}</span>
-                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-xs font-black text-slate-700 w-8 text-right">{count}</span>
-                </div>
-              );
-            })}
-          </div>
+          {(() => {
+            const types = ['Full', 'Probation', 'Guest', 'Senator', 'Honorary'];
+            const labels: Record<string, string> = { Full: 'Full Member', Probation: 'Probation', Guest: 'Guest', Senator: 'Senator', Honorary: 'Honorary' };
+            const data = types
+              .map(key => ({ name: labels[key], value: members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length }))
+              .filter(d => d.value > 0);
+            return (
+              <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
+                <PieChart>
+                  <Pie
+                    data={data}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={!isMobile}
+                    label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={isMobile ? 70 : 80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {data.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  {isMobile && <Legend verticalAlign="bottom" height={36} />}
+                </PieChart>
+              </ResponsiveContainer>
+            );
+          })()}
         </Card>
 
         <Card title="Level of Management">
