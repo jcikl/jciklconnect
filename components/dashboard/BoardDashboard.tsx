@@ -467,18 +467,18 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   }, [currentMonthIndex]);
 
   return (
-    <div className="space-y-2 pb-24">
+    <div className="space-y-4 pb-24">
 
-      {/* Homepage Advertisements Banner (Swiper) */}
-      {homepageAds.length > 0 && (
+      {/* Homepage Advertisements Banner (Swiper) — inside Overview only, shown here as persistent strip */}
+      {homepageAds.length > 0 && activeTab === 'overview' && (
         <div className="w-full">
           <Swiper
             modules={[Autoplay, Pagination]}
-            spaceBetween={16}
-            slidesPerView={1.65}
+            spaceBetween={12}
+            slidesPerView={2.2}
             breakpoints={{
-              640: { slidesPerView: 3.15 },
-              1024: { slidesPerView: 4.15 },
+              640: { slidesPerView: 3.5 },
+              1024: { slidesPerView: 5.5 },
             }}
             autoplay={{ delay: 3000, disableOnInteraction: false }}
             pagination={{ clickable: true, dynamicBullets: true }}
@@ -497,7 +497,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             {homepageAds.map((ad, idx) => (
               <SwiperSlide key={ad.id || idx}>
                 <div
-                  className="h-36 sm:h-40 w-full rounded-2xl overflow-hidden relative shadow-md cursor-pointer group transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
+                  className="h-24 w-full rounded-xl overflow-hidden relative shadow-sm cursor-pointer group transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
                   onClick={() => {
                     if (ad.id) AdvertisementService.recordClick(ad.id);
                     setSelectedAdForDetail(ad);
@@ -524,11 +524,11 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
 
       <Tabs
-        tabs={['Overview', 'Analytics', 'Reports', 'Member Insights']}
+        tabs={['Overview', 'Analytics', 'Reports', 'Insights']}
         activeTab={
           activeTab === 'overview' ? 'Overview' :
             activeTab === 'analytics' ? 'Analytics' :
-              activeTab === 'reports' ? 'Reports' : 'Member Insights'
+              activeTab === 'reports' ? 'Reports' : 'Insights'
         }
         onTabChange={(tab) => {
           if (tab === 'Overview') setActiveTab('overview');
@@ -652,9 +652,26 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
               </Card>
             ) : null}
 
-            {/* Main Content Grid */}
-            <div className="grid lg:grid-cols-3 gap-2">
-              <div className="lg:col-span-2 space-y-2">
+            {/* Quick Actions Bar */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
+              {[
+                { label: 'Financial Report', icon: FileText, action: () => { setSelectedReportType('financial'); setIsReportModalOpen(true); } },
+                { label: 'Members', icon: Users, action: () => onNavigate?.('MEMBERS') },
+                { label: 'Inventory', icon: Package, action: () => onNavigate?.('INVENTORY') },
+                { label: 'Finance', icon: DollarSign, action: () => onNavigate?.('FINANCE') },
+                { label: 'Clubs', icon: Heart, action: () => onNavigate?.('CLUBS') },
+                { label: 'Directory', icon: Building2, action: () => onNavigate?.('DIRECTORY') },
+              ].map(({ label, icon: Icon, action }) => (
+                <button key={label} onClick={action}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-white border border-slate-100 hover:border-jci-blue/30 hover:bg-jci-blue/5 hover:shadow-sm transition-all group">
+                  <Icon size={18} className="text-slate-400 group-hover:text-jci-blue transition-colors" />
+                  <span className="text-[10px] font-bold text-slate-500 group-hover:text-jci-blue text-center leading-tight">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Main Content */}
+            <div className="space-y-4">
                 {/* Member Engagement */}
                 <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Member Engagement & Celebrations</div>}>
                   <div className="p-4">
@@ -952,68 +969,10 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                     </div>
                   </Card>
                 </div>
-              </div>
+            </div>
 
-              <div className="space-y-2">
-                {/* Quick Actions */}
-                <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Quick Actions</div>}>
-                  <div className="p-4">
-                    <div className="space-y-2">
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => {
-                          setSelectedReportType('financial');
-                          setIsReportModalOpen(true);
-                        }}
-                      >
-                        <FileText size={16} className="mr-2" />
-                        Generate Financial Report
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('MEMBERS')}
-                      >
-                        <Users size={16} className="mr-2" />
-                        Member Analytics
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('INVENTORY')}
-                      >
-                        <Package size={16} className="mr-2" />
-                        Inventory Management
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('FINANCE')}
-                      >
-                        <DollarSign size={16} className="mr-2" />
-                        Financial Management
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('CLUBS')}
-                      >
-                        <Heart size={16} className="mr-2" />
-                        Hobby Clubs
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => onNavigate?.('DIRECTORY')}
-                      >
-                        <Building2 size={16} className="mr-2" />
-                        Business Directory
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-
+            {/* AI Insights + Top Performers */}
+            <div className="grid md:grid-cols-2 gap-4">
                 {/* AI Insights & Predictions */}
                 <Card noPadding noHeaderPadding className="mb-6 border-l-4 border-l-purple-500" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">AI Insights & Predictions</div>}>
                   <div className="p-4">
@@ -1132,13 +1091,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                     </div>
                   </div>
                 </Card>
-              </div>
             </div>
           </>
         )}
 
         {activeTab === 'analytics' && (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="grid lg:grid-cols-2 gap-4">
               <MemberGrowthChart members={members} />
               <PointsDistributionChart pointHistory={pointHistory} />
@@ -1198,7 +1156,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
         )}
 
         {activeTab === 'reports' && (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-2">
               <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setSelectedReportType('financial'); setIsReportModalOpen(true); }}>
                 <div className="text-center">
