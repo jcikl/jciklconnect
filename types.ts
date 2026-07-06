@@ -517,6 +517,7 @@ export interface Member {
   senatorCertified?: boolean;
   senatorshipBoardValidated?: boolean;
   isDuesPaidCurrentYear?: boolean;
+  duesYear?: number;
   trainingSummary?: string[];
   projectSummary?: string[];
   bodSummary?: string[];
