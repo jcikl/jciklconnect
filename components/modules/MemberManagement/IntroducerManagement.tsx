@@ -42,6 +42,7 @@ export const IntroducerManagement: React.FC<Props> = ({
   const [isBatchGroupEditing, setIsBatchGroupEditing] = useState(false);
   const [batchGroupIntroducerVal, setBatchGroupIntroducerVal] = useState('');
   const [isSavingBatchGroup, setIsSavingBatchGroup] = useState(false);
+  const [showAllGroups, setShowAllGroups] = useState(false);
 
   // Batch selection states
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -751,7 +752,6 @@ export const IntroducerManagement: React.FC<Props> = ({
         const selectedGroups = introducersList.filter(g => selectedGroupValues.has(g.value));
         const totalMembers = selectedGroups.reduce((s, g) => s + g.invitees.length, 0);
         const PREVIEW_LIMIT = 4;
-        const [showAllGroups, setShowAllGroups] = React.useState(false);
         const visibleGroups = showAllGroups ? selectedGroups : selectedGroups.slice(0, PREVIEW_LIMIT);
         return (
           <Modal
