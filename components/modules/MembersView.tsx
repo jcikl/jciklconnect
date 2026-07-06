@@ -6,7 +6,8 @@ import {
   TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw,
   Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
   Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog,
-  Target, Coins, ArrowUpRight, Edit
+  Target, Coins, ArrowUpRight, Edit, MoreHorizontal, Star, TrendingDown,
+  BookOpen, Trophy, Network, ChevronRight, LayoutList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs } from '../ui/Common';
@@ -255,6 +256,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [addModalIntroducer, setAddModalIntroducer] = useState('');
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
+  const [showTabSheet, setShowTabSheet] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [roleFilters, setRoleFilters] = useState<UserRole[]>([]);
   const [membershipTypeFilters, setMembershipTypeFilters] = useState<MembershipType[]>([]);
   const [membershipRules, setMembershipRules] = useState<
@@ -640,49 +643,155 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     );
   }
 
+  const TAB_CONFIG = [
+    { id: 'directory',          label: 'Directory',   short: 'Directory',  icon: Users },
+    { id: 'guest',              label: 'Guests',      short: 'Guests',     icon: UserCheck },
+    { id: 'statistics',         label: 'Statistics',  short: 'Stats',      icon: BarChart3 },
+    { id: 'board-of-directors', label: 'Board',       short: 'Board',      icon: Shield },
+    { id: 'mentorship',         label: 'Mentorship',  short: 'Mentors',    icon: BookOpen },
+    { id: 'promotion-tracking', label: 'Promotions',  short: 'Promotions', icon: TrendingUp },
+    { id: 'senatorship',        label: 'Senatorship', short: 'Senators',   icon: Trophy },
+    { id: 'introducer',         label: 'Introducer',  short: 'Introducers',icon: Network },
+  ] as const;
+
+  const activeTabConfig = TAB_CONFIG.find(t => t.id === activeTab) ?? TAB_CONFIG[0];
+
   return (
-    <div className="space-y-6 pb-40 md:pb-0">
+    <div className="space-y-0 pb-24 md:pb-0">
       {!selectedMember ? (
         <>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          {/* ── PAGE HEADER ── */}
+          <div className="flex items-center justify-between gap-3 mb-4">
+            {/* Left: title */}
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">Member Directory</h2>
-              <p className="text-slate-500">Manage membership, tiers, and engagement.</p>
+              <h2 className="text-xl font-black text-slate-900 leading-tight">Member Directory</h2>
+              <p className="text-slate-400 text-xs mt-0.5 hidden sm:block">Manage membership, tiers, and engagement.</p>
             </div>
-            <div className="flex space-x-2">
-              {canManageMembers && (
-                <>
-                  <Button variant="outline" onClick={() => setIsExportModalOpen(true)}>
-                    <Download size={16} className="mr-2" /> Export
+            {/* Right: actions */}
+            {canManageMembers && (
+              <div className="flex items-center gap-2">
+                {/* Desktop: full buttons */}
+                <div className="hidden sm:flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
+                    <Download size={14} className="mr-1.5" /> Export
                   </Button>
-                  <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
-                    <Upload size={16} className="mr-2" /> Import
+                  <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
+                    <Upload size={14} className="mr-1.5" /> Import
                   </Button>
-                  <Button onClick={() => setAddModalOpen(true)}><UserPlus size={16} className="mr-2" /> Add Member</Button>
-                </>
-              )}
-            </div>
+                  <Button size="sm" onClick={() => setAddModalOpen(true)}>
+                    <UserPlus size={14} className="mr-1.5" /> Add Member
+                  </Button>
+                </div>
+                {/* Mobile: Add + overflow menu */}
+                <div className="flex sm:hidden items-center gap-2">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowActionsMenu(v => !v)}
+                      className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors"
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
+                    {showActionsMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} />
+                        <div className="absolute right-0 top-10 z-50 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 min-w-[160px]">
+                          <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                            onClick={() => { setIsExportModalOpen(true); setShowActionsMenu(false); }}>
+                            <Download size={15} className="text-slate-400" /> Export
+                          </button>
+                          <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                            onClick={() => { setIsImportModalOpen(true); setShowActionsMenu(false); }}>
+                            <Upload size={15} className="text-slate-400" /> Import
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setAddModalOpen(true)}
+                    className="h-8 px-3 flex items-center gap-1.5 bg-jci-blue text-white rounded-xl text-sm font-bold shadow-sm"
+                  >
+                    <UserPlus size={14} /> Add
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <div>
-              <Tabs
-                variant="button"
-                tabs={[
-                  { id: 'directory', label: 'Directory' },
-                  { id: 'guest', label: 'Guest' },
-                  { id: 'statistics', label: 'Statistics' },
-                  { id: 'board-of-directors', label: 'Board of Directors' },
-                  { id: 'mentorship', label: 'Mentorship' },
-                  { id: 'promotion-tracking', label: 'Promotion Tracking' },
-                  { id: 'senatorship', label: 'Senatorship' },
-                  { id: 'introducer', label: 'Introducer' }
-                ]}
-                activeTab={activeTab}
-                onTabChange={(tabId) => setActiveTab(tabId as any)}
-              />
-            </div>
-            <div>
+          {/* ── TAB NAVIGATION ── */}
+          {/* Desktop: scrollable icon+label tabs */}
+          <div className="hidden md:flex items-center gap-1 overflow-x-auto pb-1 mb-4 scrollbar-none border-b border-slate-100">
+            {TAB_CONFIG.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-t-xl text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-[1px] ${
+                    isActive
+                      ? 'text-jci-blue border-jci-blue bg-jci-blue/5'
+                      : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-50'
+                  }`}
+                >
+                  <Icon size={15} />
+                  {tab.label}
+                  {isActive && tab.id === 'directory' && (
+                    <span className="ml-1 bg-jci-blue text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                      {filteredMembers.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Mobile: current tab pill → tap → bottom sheet */}
+          <div className="md:hidden mb-4">
+            <button
+              onClick={() => setShowTabSheet(true)}
+              className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm w-full"
+            >
+              {React.createElement(activeTabConfig.icon, { size: 16, className: 'text-jci-blue shrink-0' })}
+              <span className="font-bold text-slate-800 flex-1 text-left text-sm">{activeTabConfig.label}</span>
+              {activeTab === 'directory' && (
+                <span className="bg-jci-blue/10 text-jci-blue text-xs font-black px-2 py-0.5 rounded-full">{filteredMembers.length}</span>
+              )}
+              <ChevronDown size={16} className="text-slate-400 shrink-0" />
+            </button>
+          </div>
+
+          {/* Mobile tab bottom sheet */}
+          {showTabSheet && (
+            <>
+              <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setShowTabSheet(false)} />
+              <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white rounded-t-3xl shadow-2xl pb-safe">
+                <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-4" />
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest px-6 mb-2">Switch View</p>
+                <div className="divide-y divide-slate-50 pb-6">
+                  {TAB_CONFIG.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => { setActiveTab(tab.id as any); setShowTabSheet(false); }}
+                        className={`w-full flex items-center gap-4 px-6 py-3.5 transition-colors ${isActive ? 'bg-jci-blue/5' : 'hover:bg-slate-50'}`}
+                      >
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isActive ? 'bg-jci-blue text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <Icon size={17} />
+                        </div>
+                        <span className={`font-semibold text-sm flex-1 text-left ${isActive ? 'text-jci-blue' : 'text-slate-700'}`}>{tab.label}</span>
+                        {isActive && <CheckCircle size={16} className="text-jci-blue" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div>
               {activeTab === 'directory' && (
                 <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
                   <MemberTable
@@ -754,7 +863,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 />
               )}
             </div>
-          </div>
         </>
       ) : (
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} />
@@ -1603,71 +1711,74 @@ const MemberTable: React.FC<{
           {members.map(member => {
             const displayType = getDisplayMembershipType(member);
             const isBoard = member.role === UserRole.BOARD;
+            const tierColor = member.tier === 'Platinum'
+              ? 'bg-purple-500' : member.tier === 'Gold'
+              ? 'bg-amber-400' : member.tier === 'Silver'
+              ? 'bg-slate-400' : 'bg-jci-blue';
+            const riskHigh = member.churnRisk === 'High';
+            const riskMed = member.churnRisk === 'Medium';
 
             return (
               <div
                 key={member.id}
                 onClick={() => onSelect(member.id)}
-                className={`p-4 hover:bg-slate-50/50 transition-colors cursor-pointer relative flex flex-col gap-3 ${selectedIds.has(member.id) ? 'bg-blue-50/40' : ''
-                  }`}
+                className={`flex items-stretch gap-0 hover:bg-slate-50/60 active:bg-slate-100/60 transition-colors cursor-pointer ${selectedIds.has(member.id) ? 'bg-blue-50/40' : ''}`}
               >
-                {/* Top Row: Checkbox, Avatar, Name Info, and Role/Status Badges */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
+                {/* Tier accent bar */}
+                <div className={`w-1 shrink-0 rounded-none ${tierColor} opacity-70`} />
+
+                <div className="flex-1 px-3 py-3 flex items-center gap-3 min-w-0">
+                  {/* Checkbox */}
+                  <div onClick={(e) => e.stopPropagation()} className="shrink-0">
                     <input
                       type="checkbox"
-                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue w-4 h-4 shrink-0"
+                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue w-4 h-4"
                       checked={selectedIds.has(member.id)}
                       onChange={() => onToggleSelection(member.id)}
                     />
-                    <img
-                      src={member.avatar || undefined}
-                      alt={member.name}
-                      className="w-11 h-11 rounded-xl object-cover bg-slate-200 border border-slate-100 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="font-bold text-slate-800 text-sm leading-snug truncate flex items-center gap-1.5">
-                        {member.name}
-                        {isBoard && (
-                          <span className="bg-blue-50 text-blue-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-100 shrink-0">
-                            BOD
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-400 truncate leading-normal">{member.email}</div>
-                    </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <Badge variant={membershipTypeBadgeVariant(displayType)} className="px-1.5 py-0.5 text-[10px]">
-                      {displayType}
-                    </Badge>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {member.points} pts
-                    </span>
-                  </div>
-                </div>
-
-                {/* Bottom Info Row: Attendance Progress & Risk Indicator */}
-                <div className="flex items-center justify-between gap-4 bg-slate-50/50 border border-slate-100/50 rounded-xl px-3 py-2 text-xs">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">Attendance</span>
-                    <div className="flex items-center gap-2 flex-1">
-                      <ProgressBar
-                        progress={member.attendanceRate}
-                        color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'}
-                      />
-                      <span className="font-bold text-slate-700 shrink-0 text-[10px]">{member.attendanceRate}%</span>
-                    </div>
-                  </div>
-
-                  {member.churnRisk && member.churnRisk !== 'Low' && (
-                    <div className="shrink-0 flex items-center gap-1">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Risk</span>
-                      {member.churnRisk === 'High' && <Badge variant="error" className="px-1 py-0.5 text-[9px]">High</Badge>}
-                      {member.churnRisk === 'Medium' && <Badge variant="warning" className="px-1 py-0.5 text-[9px]">Medium</Badge>}
+                  {/* Avatar */}
+                  {member.avatar ? (
+                    <img src={member.avatar} alt={member.name}
+                      className="w-10 h-10 rounded-2xl object-cover bg-slate-200 shrink-0 border border-slate-100" />
+                  ) : (
+                    <div className={`w-10 h-10 rounded-2xl shrink-0 flex items-center justify-center text-white font-black text-sm ${tierColor}`}>
+                      {member.name.charAt(0)}
                     </div>
                   )}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-900 text-sm truncate">{member.name}</span>
+                      {isBoard && (
+                        <span className="bg-jci-blue/10 text-jci-blue text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0">BOD</span>
+                      )}
+                      {riskHigh && <span className="bg-red-100 text-red-600 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0">At Risk</span>}
+                      {riskMed && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0">Monitor</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-slate-400 truncate">{member.email}</span>
+                    </div>
+                    {/* Mini stats bar */}
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <span className={`text-[10px] font-black ${member.tier === 'Platinum' ? 'text-purple-500' : member.tier === 'Gold' ? 'text-amber-500' : 'text-slate-500'}`}>
+                        {member.tier}
+                      </span>
+                      <span className="text-[10px] text-slate-400">{member.points} pts</span>
+                      <div className="flex items-center gap-1 flex-1">
+                        <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden max-w-[48px]">
+                          <div className={`h-full rounded-full ${member.attendanceRate < 50 ? 'bg-red-400' : 'bg-green-400'}`}
+                            style={{ width: `${member.attendanceRate}%` }} />
+                        </div>
+                        <span className="text-[10px] text-slate-400">{member.attendanceRate}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right arrow */}
+                  <ChevronRight size={15} className="text-slate-300 shrink-0" />
                 </div>
               </div>
             );
