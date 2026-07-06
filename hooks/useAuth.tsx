@@ -77,8 +77,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } as User;
 
       setUser(mockUser);
-      // Use full MOCK_DEV_ADMIN when restoring admin@jcikl.com session
-      const member = storedState.user.email === 'admin@jcikl.com' ? MOCK_DEV_ADMIN : (storedState.member as Member);
+      const _devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
+      const member = (_devEmail && storedState.user.email === _devEmail) ? MOCK_DEV_ADMIN : (storedState.member as Member);
       setMember(member);
       setLoading(false);
       // Early return - don't set up Firebase listener
@@ -194,16 +194,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [isDevMode]);
 
   const signIn = async (email: string, password: string) => {
-    // Developer mock login
-    if (email === 'admin@jcikl.com' && password === 'admin123') {
+    // Developer mock login — credentials set via VITE_DEV_EMAIL / VITE_DEV_PASSWORD env vars
+    const devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
+    const devPassword = import.meta.env.VITE_DEV_PASSWORD as string | undefined;
+    if (devEmail && devPassword && email === devEmail && password === devPassword) {
       setIsDevMode(true);
       setDevMode(true);
 
       // Create mock user object
       const mockUser = {
         uid: 'dev-admin-001',
-        email: 'admin@jcikl.com',
-        displayName: 'Admin User',
+        email: devEmail,
+        displayName: 'Dev Admin',
         emailVerified: true,
         isAnonymous: false,
         metadata: {},
@@ -255,7 +257,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signUp = async (email: string, password: string, name: string, additionalData?: Record<string, any>) => {
     // Check if in developer mode
-    if (checkDevMode() || email === 'admin@jcikl.com') {
+    const _devEmailForSignUp = import.meta.env.VITE_DEV_EMAIL as string | undefined;
+    if (checkDevMode() || (_devEmailForSignUp && email === _devEmailForSignUp)) {
       // In developer mode, simulate sign up
       const mockUser = {
         uid: `mock-user-${Date.now()}`,

@@ -1,8 +1,13 @@
 [
   {
-    "origin": ["*"],
+    "origin": [
+      "https://jciklconnect.netlify.app",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:3002"
+    ],
     "method": ["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
-    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin", "x-goog-resumable", "Authorization"],
+    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin", "x-goog-resumable"],
     "maxAgeSeconds": 3600
   }
 ]
