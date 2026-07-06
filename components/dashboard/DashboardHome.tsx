@@ -509,7 +509,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {birthdayMembers.length > 0 && (
         <Card
           onClick={() => setShowBirthdayDrawer(true)}
-          className="relative overflow-hidden p-4 bg-gradient-to-r from-rose-50/60 via-fuchsia-50/40 to-indigo-50/20 dark:from-rose-950/10 dark:via-fuchsia-950/5 dark:to-transparent border border-rose-100/80 hover:border-rose-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group cursor-pointer"
+          className="relative overflow-hidden bg-gradient-to-r from-rose-50/60 via-fuchsia-50/40 to-indigo-50/20 dark:from-rose-950/10 dark:via-fuchsia-950/5 dark:to-transparent border border-rose-100/80 hover:border-rose-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group cursor-pointer"
         >
           {/* Decorative Background Glows */}
           <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-pink-400/10 rounded-full blur-2xl pointer-events-none" />
@@ -518,24 +518,20 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <div className="flex items-center justify-between gap-3 relative z-10">
             <div className="flex items-center gap-3 min-w-0">
               {/* Birthday Icon / Visual */}
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 flex items-center justify-center shadow-md shadow-pink-500/20 text-xl flex-shrink-0 transform group-hover:scale-105 transition-transform duration-300">
-                🎂
-              </div>
-
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-extrabold text-slate-800 text-sm tracking-tight truncate">
+                <div className="flex items-center gap-1.5 flex-nowrap">
+                  <h3 className="font-extrabold text-slate-800 text-sm tracking-tight flex-shrink-0">
                     Birthdays This Month
                   </h3>
                   <span className="text-[9px] font-extrabold uppercase tracking-wider text-pink-600 bg-pink-50 px-1.5 py-0.5 rounded-full border border-pink-100 flex-shrink-0">
                     {now.toLocaleString('default', { month: 'long' })}
                   </span>
                 </div>
-                
+
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
                   {birthdayMembers.length} members celebrate birthdays
                 </p>
-                
+
                 {todayBirthdays.length > 0 ? (
                   <div className="mt-1 flex items-center gap-1">
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
@@ -566,7 +562,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 {birthdayMembers.slice(0, 4).map((m, i) => {
                   const name = m.general?.name || m.name || '';
                   const avatarUrl = m.general?.avatarUrl || m.avatar;
-                  
+
                   if (avatarUrl) {
                     return (
                       <img
@@ -574,11 +570,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         src={avatarUrl}
                         alt={name}
                         className="rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5"
-                        style={{ 
+                        style={{
                           width: '34px',
                           height: '34px',
                           marginLeft: i > 0 ? '-10px' : '0px',
-                          zIndex: 10 - i 
+                          zIndex: 10 - i
                         }}
                       />
                     );
@@ -589,7 +585,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       .slice(0, 2)
                       .join('')
                       .toUpperCase();
-                    
+
                     let hash = 0;
                     for (let j = 0; j < name.length; j++) {
                       hash = name.charCodeAt(j) + ((hash << 5) - hash);
@@ -602,16 +598,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       'from-amber-500 to-orange-500',
                     ];
                     const gradient = gradients[Math.abs(hash) % gradients.length];
-                    
+
                     return (
                       <div
                         key={m.id}
                         className={`rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5`}
-                        style={{ 
+                        style={{
                           width: '34px',
                           height: '34px',
                           marginLeft: i > 0 ? '-10px' : '0px',
-                          zIndex: 10 - i 
+                          zIndex: 10 - i
                         }}
                       >
                         {initials}
@@ -619,15 +615,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     );
                   }
                 })}
-                
+
                 {birthdayMembers.length > 4 && (
-                  <div 
+                  <div
                     className="rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm ring-1 ring-pink-100/30 flex-shrink-0"
-                    style={{ 
+                    style={{
                       width: '34px',
                       height: '34px',
                       marginLeft: '-10px',
-                      zIndex: 5 
+                      zIndex: 5
                     }}
                   >
                     +{birthdayMembers.length - 4}
@@ -637,7 +633,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
               {/* Chevron */}
               <div className="text-slate-400 group-hover:text-pink-500 transition-colors pl-0.5 transform group-hover:translate-x-0.5 transition-transform duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
               </div>
             </div>
           </div>
@@ -964,15 +960,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             const dob = new Date(getDob(m)!);
             const day = dob.getDate();
             const isToday = day === currentDay;
-            
+
             return (
               <div
                 key={m.id}
-                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                  isToday
-                    ? 'bg-gradient-to-r from-orange-50 to-amber-50/50 border-orange-200 shadow-sm animate-pulse'
-                    : 'bg-white border-slate-100 hover:border-slate-200'
-                }`}
+                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${isToday
+                  ? 'bg-gradient-to-r from-orange-50 to-amber-50/50 border-orange-200 shadow-sm animate-pulse'
+                  : 'bg-white border-slate-100 hover:border-slate-200'
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -992,11 +987,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 </div>
 
                 <div className="text-right flex flex-col items-end gap-1">
-                  <span className={`text-xs font-bold px-2 py-1 rounded-xl border ${
-                    isToday
-                      ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                      : 'bg-slate-50 text-slate-600 border-slate-150'
-                  }`}>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-xl border ${isToday
+                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                    : 'bg-slate-50 text-slate-600 border-slate-150'
+                    }`}>
                     {isToday ? 'Today! 🎂' : `${dob.toLocaleString('default', { month: 'short' })} ${day}`}
                   </span>
                   {isToday && (
