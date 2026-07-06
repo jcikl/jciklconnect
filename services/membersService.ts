@@ -70,13 +70,7 @@ export class MembersService {
   /** Invalidate all members cache (call after any write to members collection). */
   static invalidateMembersCache(): void {
     apiCache.delete(CACHE_KEY_ALL_MEMBERS);
-    // Clear all loId-specific caches by clearing keys matching the prefix
-    const stats = apiCache.getStats();
-    if (stats.memorySize > 0) {
-      // Re-use the cache's internal cleanup by deleting known lo keys via a no-op get
-      // Simpler: clear the entire apiCache segment for members by key pattern
-      apiCache.delete(CACHE_KEY_ALL_MEMBERS);
-    }
+    apiCache.deleteByPrefix('members:lo:');
   }
 
   /** Get all members, optionally filtered by loId (for multi-LO). */

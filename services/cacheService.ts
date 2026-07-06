@@ -157,6 +157,17 @@ class CacheService {
   }
 
   /**
+   * Delete all entries whose key starts with the given prefix
+   */
+  deleteByPrefix(prefix: string): void {
+    for (const key of Array.from(this.memoryCache.keys())) {
+      if (key.startsWith(prefix)) {
+        this.delete(key);
+      }
+    }
+  }
+
+  /**
    * 清理过期的缓存项
    * Clean up expired cache items
    */
