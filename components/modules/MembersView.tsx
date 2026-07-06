@@ -1504,42 +1504,39 @@ const MemberStatisticsView: React.FC<{
 
         <Card title="Level of Management">
           {(() => {
-            const levels: Record<string, { color: string }> = {
-              'Top Management': { color: 'bg-jci-blue' },
-              'Senior Management': { color: 'bg-indigo-500' },
-              'Middle Management': { color: 'bg-violet-500' },
-              'Junior Management': { color: 'bg-cyan-500' },
-              'Non-Management': { color: 'bg-slate-400' },
-            };
             const activeMembers = members.filter(m => m.membershipType !== 'Guest');
             const counts: Record<string, number> = {};
             activeMembers.forEach(m => {
               const lvl = m.levelOfManagement?.trim() || 'Not Specified';
               counts[lvl] = (counts[lvl] || 0) + 1;
             });
-            const knownOrder = Object.keys(levels);
-            const entries = [
-              ...knownOrder.filter(k => counts[k]).map(k => ({ label: k, count: counts[k], color: levels[k].color })),
-              ...Object.keys(counts).filter(k => !levels[k] && k !== 'Not Specified').sort().map(k => ({ label: k, count: counts[k], color: 'bg-teal-500' })),
-              ...(counts['Not Specified'] ? [{ label: 'Not Specified', count: counts['Not Specified'], color: 'bg-slate-200' }] : []),
+            const knownOrder = ['Top Management', 'Senior Management', 'Middle Management', 'Junior Management', 'Non-Management'];
+            const data = [
+              ...knownOrder.filter(k => counts[k]).map(k => ({ name: k, value: counts[k] })),
+              ...Object.keys(counts).filter(k => !knownOrder.includes(k) && k !== 'Not Specified').sort().map(k => ({ name: k, value: counts[k] })),
+              ...(counts['Not Specified'] ? [{ name: 'Not Specified', value: counts['Not Specified'] }] : []),
             ];
-            const max = Math.max(...entries.map(e => e.count), 1);
             return (
-              <div className="space-y-2.5">
-                {entries.map(({ label, count, color }) => {
-                  const pct = Math.round((count / max) * 100);
-                  return (
-                    <div key={label} className="flex items-center gap-3">
-                      <span className="text-xs font-semibold text-slate-600 w-32 shrink-0 truncate">{label}</span>
-                      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-xs font-black text-slate-700 w-8 text-right">{count}</span>
-                    </div>
-                  );
-                })}
-                {entries.length === 0 && <p className="text-xs text-slate-400 text-center py-4">No data available</p>}
-              </div>
+              <ResponsiveContainer width="100%" height={isMobile ? 350 : 300}>
+                <PieChart>
+                  <Pie
+                    data={data}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={!isMobile}
+                    label={isMobile ? false : ({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={isMobile ? 70 : 80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {data.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  {isMobile && <Legend verticalAlign="bottom" height={36} />}
+                </PieChart>
+              </ResponsiveContainer>
             );
           })()}
         </Card>
