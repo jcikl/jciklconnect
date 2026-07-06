@@ -36,6 +36,13 @@ export const IntroducerManagement: React.FC<Props> = ({
   const [newGroupIntroducerVal, setNewGroupIntroducerVal] = useState('');
   const [isSavingGroup, setIsSavingGroup] = useState(false);
 
+  // Aggregation sort + batch selection
+  const [aggSort, setAggSort] = useState<'count' | 'name'>('count');
+  const [selectedGroupValues, setSelectedGroupValues] = useState<Set<string>>(new Set());
+  const [isBatchGroupEditing, setIsBatchGroupEditing] = useState(false);
+  const [batchGroupIntroducerVal, setBatchGroupIntroducerVal] = useState('');
+  const [isSavingBatchGroup, setIsSavingBatchGroup] = useState(false);
+
   // Batch selection states
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [isBatchEditing, setIsBatchEditing] = useState(false);
@@ -219,8 +226,11 @@ export const IntroducerManagement: React.FC<Props> = ({
         return item.name.toLowerCase().includes(introducerSearch.toLowerCase()) ||
                item.type.toLowerCase().includes(introducerSearch.toLowerCase());
       })
-      .sort((a, b) => b.invitees.length - a.invitees.length);
-  }, [members, introducerSearch]);
+      .sort((a, b) => aggSort === 'name'
+        ? a.name.localeCompare(b.name)
+        : b.invitees.length - a.invitees.length
+      );
+  }, [members, introducerSearch, aggSort]);
 
   // Filter members list for manual updates
   const filteredMembersForAssignment = useMemo(() => {
@@ -263,6 +273,28 @@ export const IntroducerManagement: React.FC<Props> = ({
       showToast(err instanceof Error ? err.message : 'Failed to update group introducer', 'error');
     } finally {
       setIsSavingGroup(false);
+    }
+  };
+
+  const handleSaveBatchGroup = async () => {
+    if (selectedGroupValues.size === 0) return;
+    setIsSavingBatchGroup(true);
+    try {
+      const allIds = introducersList
+        .filter(g => selectedGroupValues.has(g.value))
+        .flatMap(g => g.invitees.map(m => m.id));
+      if (onBatchUpdateMembers) {
+        await onBatchUpdateMembers(allIds, { introducer: batchGroupIntroducerVal });
+      } else {
+        await Promise.all(allIds.map(id => onUpdateMember(id, { introducer: batchGroupIntroducerVal })));
+      }
+      showToast(`Reassigned ${allIds.length} members across ${selectedGroupValues.size} groups`, 'success');
+      setSelectedGroupValues(new Set());
+      setIsBatchGroupEditing(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to batch reassign', 'error');
+    } finally {
+      setIsSavingBatchGroup(false);
     }
   };
 
@@ -364,20 +396,46 @@ export const IntroducerManagement: React.FC<Props> = ({
       {/* 3. Sub Tabs Content */}
       {activeSubTab === 'overview' && (
         <Card noPadding>
-          <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
-            <div>
-              <h3 className="font-bold text-slate-800">Introducer Aggregation</h3>
-              <p className="text-xs text-slate-500">List of all unique referral entities and the members they introduced.</p>
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h3 className="font-bold text-slate-800">Introducer Aggregation</h3>
+                <p className="text-xs text-slate-500">List of all unique referral entities and the members they introduced.</p>
+              </div>
+              <div className="relative w-full sm:w-64 shrink-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search introducer..."
+                  value={introducerSearch}
+                  onChange={e => { setIntroducerSearch(e.target.value); setSelectedGroupValues(new Set()); }}
+                  className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue"
+                />
+              </div>
             </div>
-            <div className="relative w-full sm:w-72 shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                placeholder="Search introducer..."
-                value={introducerSearch}
-                onChange={e => setIntroducerSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue"
-              />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Sort:</span>
+                {(['count', 'name'] as const).map(s => (
+                  <button key={s} onClick={() => setAggSort(s)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${aggSort === s ? 'bg-jci-blue text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-jci-blue/40'}`}>
+                    {s === 'count' ? 'By Count' : 'A → Z'}
+                  </button>
+                ))}
+              </div>
+              {selectedGroupValues.size > 0 && (
+                <div className="flex items-center gap-2 animate-in fade-in duration-150">
+                  <span className="text-xs font-bold text-jci-blue">{selectedGroupValues.size} selected</span>
+                  <button onClick={() => { setBatchGroupIntroducerVal(''); setIsBatchGroupEditing(true); }}
+                    className="px-3 py-1 rounded-full text-xs font-bold bg-jci-blue text-white hover:bg-jci-navy transition-colors">
+                    Batch Reassign
+                  </button>
+                  <button onClick={() => setSelectedGroupValues(new Set())}
+                    className="px-3 py-1 rounded-full text-xs font-bold border border-slate-200 text-slate-500 hover:border-slate-400 transition-colors">
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -385,27 +443,48 @@ export const IntroducerManagement: React.FC<Props> = ({
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100 text-slate-500 text-xs uppercase tracking-wider font-bold">
-                  <th className="px-6 py-3">Introducer / Channel</th>
-                  <th className="px-6 py-3">Type</th>
-                  <th className="px-6 py-3 text-center">Introduced Count</th>
-                  <th className="px-6 py-3 hidden md:table-cell">Introduced Members</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
+                  <th className="pl-4 pr-2 py-3 w-10">
+                    <input type="checkbox"
+                      className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue h-4 w-4 cursor-pointer"
+                      checked={introducersList.length > 0 && introducersList.every(g => selectedGroupValues.has(g.value))}
+                      onChange={() => {
+                        const allSelected = introducersList.every(g => selectedGroupValues.has(g.value));
+                        setSelectedGroupValues(allSelected ? new Set() : new Set(introducersList.map(g => g.value)));
+                      }}
+                    />
+                  </th>
+                  <th className="px-4 py-3">Introducer / Channel</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3 text-center">Count</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Introduced Members</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {introducersList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-slate-400">
+                    <td colSpan={6} className="text-center py-8 text-slate-400">
                       No introducers found matching query.
                     </td>
                   </tr>
                 ) : (
                   introducersList.map(intro => (
-                    <tr key={intro.value} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4">
+                    <tr key={intro.value} className={`hover:bg-slate-50/50 transition-colors ${selectedGroupValues.has(intro.value) ? 'bg-jci-blue/5' : ''}`}>
+                      <td className="pl-4 pr-2 py-4">
+                        <input type="checkbox"
+                          className="rounded border-slate-300 text-jci-blue focus:ring-jci-blue h-4 w-4 cursor-pointer"
+                          checked={selectedGroupValues.has(intro.value)}
+                          onChange={() => setSelectedGroupValues(prev => {
+                            const next = new Set(prev);
+                            next.has(intro.value) ? next.delete(intro.value) : next.add(intro.value);
+                            return next;
+                          })}
+                        />
+                      </td>
+                      <td className="px-4 py-4">
                         <span className="font-bold text-slate-800">{intro.name}</span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         <Badge
                           variant={
                             intro.type === 'JCI KL Member' ? 'success' :
@@ -417,12 +496,12 @@ export const IntroducerManagement: React.FC<Props> = ({
                           {intro.type}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-4 text-center">
                         <span className="font-bold px-2.5 py-1 bg-slate-100 rounded-full text-xs text-slate-700">
                           {intro.invitees.length}
                         </span>
                       </td>
-                      <td className="px-6 py-4 hidden md:table-cell">
+                      <td className="px-4 py-4 hidden md:table-cell">
                         <div className="flex flex-wrap gap-1.5 max-w-xl">
                           {intro.invitees.slice(0, 3).map(inv => {
                             const displayName = inv.fullName && inv.fullName !== inv.name
@@ -452,7 +531,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-4 text-right">
                         <Button
                           variant="outline"
                           size="sm"
@@ -665,6 +744,46 @@ export const IntroducerManagement: React.FC<Props> = ({
             </table>
           </div>
         </Card>
+      )}
+
+      {/* Batch group reassign modal */}
+      {isBatchGroupEditing && (
+        <Modal
+          isOpen={isBatchGroupEditing}
+          onClose={() => setIsBatchGroupEditing(false)}
+          title={`Batch Reassign — ${selectedGroupValues.size} Group${selectedGroupValues.size !== 1 ? 's' : ''}`}
+          size="md"
+          footer={
+            <div className="flex gap-3 w-full">
+              <Button variant="outline" className="flex-1" onClick={() => setIsBatchGroupEditing(false)} disabled={isSavingBatchGroup}>
+                Cancel
+              </Button>
+              <Button variant="primary" className="flex-1" onClick={handleSaveBatchGroup} isLoading={isSavingBatchGroup} disabled={isSavingBatchGroup}>
+                Reassign All ({introducersList.filter(g => selectedGroupValues.has(g.value)).reduce((s, g) => s + g.invitees.length, 0)} members)
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-slate-50 p-3 border border-slate-100 rounded-xl space-y-1.5">
+              {introducersList.filter(g => selectedGroupValues.has(g.value)).map(g => (
+                <div key={g.value} className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-800 truncate">{g.name}</span>
+                  <span className="text-xs font-bold text-slate-400 shrink-0 ml-2">{g.invitees.length} member{g.invitees.length !== 1 ? 's' : ''}</span>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-slate-700">Reassign all to</label>
+              <IntroducerSelector
+                value={batchGroupIntroducerVal}
+                onChange={setBatchGroupIntroducerVal}
+                members={members}
+                projects={allProjects}
+              />
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Aggregation group reassign modal */}
