@@ -6,7 +6,7 @@ import {
   CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift,
   Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, Save, RefreshCw
 } from 'lucide-react';
-import { Card, StatCard, StatCardsContainer, Badge, Button, useToast } from '../ui/Common';
+import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useEvents } from '../../hooks/useEvents';
@@ -165,6 +165,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [showPromoModal, setShowPromoModal] = useState(false);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
+  const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
 
   const PROMO_FIELD_MAP: Record<string, 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted'> = {
     'bod_meeting_attendance': 'bodMeetingAttended',
@@ -339,6 +340,37 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     ? Math.round(((leaderboard.length - userRank) / leaderboard.length) * 100)
     : 0;
 
+  // Birthday calculation
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentDay = now.getDate();
+  const getDob = (m: any): string | undefined =>
+    m.general?.dob || m.dob || m.dateOfBirth;
+
+  const birthdayMembers = React.useMemo(() => {
+    return members
+      .filter(m => {
+        const dob = getDob(m);
+        if (!dob) return false;
+        const d = new Date(dob);
+        return d.getMonth() === currentMonth;
+      })
+      .sort((a, b) => {
+        const da = new Date(getDob(a)!);
+        const db = new Date(getDob(b)!);
+        return da.getDate() - db.getDate();
+      });
+  }, [members, currentMonth]);
+
+  const todayBirthdays = React.useMemo(() => {
+    return birthdayMembers.filter(m => {
+      const dob = getDob(m);
+      if (!dob) return false;
+      const d = new Date(dob);
+      return d.getDate() === currentDay;
+    });
+  }, [birthdayMembers, currentDay]);
+
   if (!member) {
     return <div className="text-center py-10 text-slate-400">Loading member data...</div>;
   }
@@ -464,65 +496,55 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       )}
 
       {/* Birthday This Month */}
-      {(() => {
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentDay = now.getDate();
-        const getDob = (m: any): string | undefined =>
-          m.general?.dob || m.dob || m.dateOfBirth;
-        const birthdayMembers = members
-          .filter(m => {
-            const dob = getDob(m);
-            if (!dob) return false;
-            const d = new Date(dob);
-            return d.getMonth() === currentMonth;
-          })
-          .sort((a, b) => {
-            const da = new Date(getDob(a)!);
-            const db = new Date(getDob(b)!);
-            return da.getDate() - db.getDate();
-          });
-        if (birthdayMembers.length === 0) return null;
-        return (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">🎂</span>
-              <h3 className="font-bold text-slate-900">Birthdays This Month</h3>
-              <span className="text-xs text-slate-400 font-medium">{now.toLocaleString('default', { month: 'long' })}</span>
-            </div>
-            <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
-              {birthdayMembers.map(m => {
-                const dob = new Date(getDob(m)!);
-                const day = dob.getDate();
-                const isToday = day === currentDay;
-                return (
-                  <div
+      {birthdayMembers.length > 0 && (
+        <Card
+          onClick={() => setShowBirthdayDrawer(true)}
+          className="p-4 bg-gradient-to-r from-pink-50/40 via-purple-50/20 to-white border border-slate-100 hover:border-pink-200 transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* Overlapping Avatars */}
+              <div className="flex -space-x-3 overflow-hidden">
+                {birthdayMembers.slice(0, 5).map((m, i) => (
+                  <img
                     key={m.id}
-                    className={`flex-none snap-start flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all w-24 text-center ${isToday ? 'bg-gradient-to-b from-yellow-50 to-orange-50 border-orange-200 shadow-md' : 'bg-white border-slate-100 shadow-sm'}`}
-                  >
-                    <div className="relative">
-                      <img
-                        src={m.general?.avatarUrl || m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.general?.name || m.name || '')}&background=e0f2fe&color=0097D7`}
-                        alt={m.general?.name || m.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
-                      />
-                      {isToday && (
-                        <span className="absolute -top-1 -right-1 text-sm">🎉</span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 leading-tight line-clamp-1">{m.general?.name || m.name}</p>
-                      <p className={`text-[10px] font-bold mt-0.5 ${isToday ? 'text-orange-500' : 'text-slate-400'}`}>
-                        {isToday ? 'Today! 🎂' : `${dob.toLocaleString('default', { month: 'short' })} ${day}`}
-                      </p>
-                    </div>
+                    src={m.general?.avatarUrl || m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.general?.name || m.name || '')}&background=e0f2fe&color=0097D7`}
+                    alt={m.general?.name || m.name}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm ring-2 ring-pink-100/40"
+                    style={{ zIndex: 5 - i }}
+                  />
+                ))}
+                {birthdayMembers.length > 5 && (
+                  <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shadow-sm z-0 ring-2 ring-pink-100/40">
+                    +{birthdayMembers.length - 5}
                   </div>
-                );
-              })}
+                )}
+              </div>
+
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                  <span>🎂</span> Birthdays This Month
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  {birthdayMembers.length} members in {now.toLocaleString('default', { month: 'long' })}
+                </p>
+                {todayBirthdays.length > 0 && (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full animate-pulse">
+                      Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(' & ')} 🎈
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Arrow/Chevron to show clickability */}
+            <div className="text-slate-400 group-hover:text-jci-blue transition-colors pr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </div>
           </div>
-        );
-      })()}
+        </Card>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-4">
@@ -821,6 +843,83 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           onClose={() => setSelectedAdForDetail(null)}
         />
       )}
+
+      {/* Birthday Drawer */}
+      <Modal
+        isOpen={showBirthdayDrawer}
+        onClose={() => setShowBirthdayDrawer(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <span>🎂</span>
+            <span className="font-bold text-slate-900">Birthdays This Month</span>
+            <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+              {now.toLocaleString('default', { month: 'long' })}
+            </span>
+          </div>
+        }
+        size="md"
+        drawerOnMobile={true}
+        bottomSheet={true}
+      >
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          {birthdayMembers.map(m => {
+            const dob = new Date(getDob(m)!);
+            const day = dob.getDate();
+            const isToday = day === currentDay;
+            
+            return (
+              <div
+                key={m.id}
+                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                  isToday
+                    ? 'bg-gradient-to-r from-orange-50 to-amber-50/50 border-orange-200 shadow-sm animate-pulse'
+                    : 'bg-white border-slate-100 hover:border-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <img
+                      src={m.general?.avatarUrl || m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.general?.name || m.name || '')}&background=e0f2fe&color=0097D7`}
+                      alt={m.general?.name || m.name}
+                      className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm"
+                    />
+                    {isToday && (
+                      <span className="absolute -top-1.5 -right-1.5 text-base">🎉</span>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">{m.general?.name || m.name}</h4>
+                    <p className="text-[11px] text-slate-500 font-medium">{m.membershipType || 'Member'} • FY {m.duesYear || 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div className="text-right flex flex-col items-end gap-1">
+                  <span className={`text-xs font-bold px-2 py-1 rounded-xl border ${
+                    isToday
+                      ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                      : 'bg-slate-50 text-slate-600 border-slate-150'
+                  }`}>
+                    {isToday ? 'Today! 🎂' : `${dob.toLocaleString('default', { month: 'short' })} ${day}`}
+                  </span>
+                  {isToday && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="text-[10px] h-6 py-0 px-2.5 bg-orange-500 hover:bg-orange-650 text-white font-bold border-none"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`Happy Birthday ${m.general?.name || m.name}! 🎂 Wishing you a wonderful day!`);
+                        showToast(`Copied wishes to clipboard!`, 'success');
+                      }}
+                    >
+                      Copy Wishes
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
     </div>
   );
 };
