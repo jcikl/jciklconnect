@@ -224,7 +224,7 @@ export class PromotionService {
     details: any;
     evidence?: string[];
   } | null {
-    const progress = member.promotionProgress;
+    const progress = member.promotionProgress ?? member.jciCareer?.promotionProgress;
 
     switch (requirementType) {
       case 'bod_meeting_attendance': {
@@ -320,7 +320,9 @@ export class PromotionService {
 
     const requirements = this.ENGAGEMENT_REQUIREMENTS[year].map((definition) => {
       const progress = storedProgress[definition.key] || {};
-      const isCompleted = progress.completed === true || Boolean(progress.detail?.trim() && progress.date?.trim());
+      // Pending verification items are NOT yet completed — BOD must approve first
+      const isCompleted = !progress.pendingVerification &&
+        (progress.completed === true || Boolean(progress.detail?.trim() && progress.date?.trim()));
 
       return {
         ...definition,
@@ -356,11 +358,18 @@ export class PromotionService {
 
     const currentEngagement = member.engagementProgress || {};
     const yearProgress = currentEngagement[year] || {};
-    const cleanProgress = {
+    const cleanProgress: Record<string, any> = {
       detail: progress.detail || '',
       date: progress.date || '',
-      completed: progress.completed ?? Boolean(progress.detail?.trim() && progress.date?.trim())
+      completed: progress.completed ?? Boolean(progress.detail?.trim() && progress.date?.trim()),
     };
+    // Preserve optional verification fields
+    if (progress.pendingVerification !== undefined) cleanProgress.pendingVerification = progress.pendingVerification;
+    if (progress.autoSuggestedFrom !== undefined) cleanProgress.autoSuggestedFrom = progress.autoSuggestedFrom;
+    if (progress.verifiedBy !== undefined) cleanProgress.verifiedBy = progress.verifiedBy;
+    if (progress.verifiedAt !== undefined) cleanProgress.verifiedAt = progress.verifiedAt;
+    if (progress.rejectedBy !== undefined) cleanProgress.rejectedBy = progress.rejectedBy;
+    if (progress.rejectedAt !== undefined) cleanProgress.rejectedAt = progress.rejectedAt;
 
     await MembersService.updateMember(memberId, {
       engagementProgress: {
@@ -741,6 +750,7 @@ export class PromotionService {
       role?: string;
       membershipType?: string;
       computedMembershipType: string;
+      promotionProgress?: import('../types').MemberPromotionProgress;
     }[]
   > {
     const rules = await MembershipConfigService.getRules();
@@ -764,6 +774,7 @@ export class PromotionService {
     role?: string;
     membershipType?: string;
     computedMembershipType: string;
+    promotionProgress?: import('../types').MemberPromotionProgress;
   }[] {
     return probation.map((m) => ({
       id: m.id,
@@ -777,6 +788,7 @@ export class PromotionService {
       role: m.role,
       membershipType: m.membershipType,
       computedMembershipType: this.getComputedMembershipTypeWithRules(m, rules),
+      promotionProgress: m.promotionProgress ?? m.jciCareer?.promotionProgress,
     }));
   }
 

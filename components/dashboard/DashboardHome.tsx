@@ -176,6 +176,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   // Membership Journey modal state
   const [showJourneyModal, setShowJourneyModal] = useState(false);
   const [journeyActiveTab, setJourneyActiveTab] = useState<'probation' | 'firstYear' | 'secondYear'>('probation');
+  const [journeyGroupTab, setJourneyGroupTab] = useState<'Leadership Experience' | 'Skills Development' | 'JCI Experience'>('Leadership Experience');
   const [engagementFirst, setEngagementFirst] = useState<MemberEngagementProgressSummary | null>(null);
   const [engagementSecond, setEngagementSecond] = useState<MemberEngagementProgressSummary | null>(null);
   const [engagementLoading, setEngagementLoading] = useState(false);
@@ -236,9 +237,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     fetchContracts();
   }, [member]);
 
-  // Load Promotion Progress for Probation members
+  // Load Promotion Progress for Probation and Full members (Journey modal shows it for both)
   useEffect(() => {
-    if (!member || member.membershipType !== 'Probation') return;
+    if (!member || (member.membershipType !== 'Probation' && member.membershipType !== 'Full')) return;
     const loadPromotion = async () => {
       setPromoLoading(true);
       try {
@@ -912,51 +913,74 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             </div>
 
             {/* Tab Body — read-only */}
-            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+            <div className="p-4 overflow-y-auto flex-1 space-y-3">
 
               {/* ── Probation Tab ── */}
               {journeyActiveTab === 'probation' && (
                 <>
+                  {/* Segmented dots progress */}
                   {promotionProgress && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-700">
-                        {promotionProgress.requirements?.filter((r: any) => r.isCompleted).length || 0} of 4 completed
-                      </span>
-                      <span className="text-sm font-bold text-amber-600">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-500">
+                          {promotionProgress.requirements?.filter((r: any) => r.isCompleted).length || 0}/{promotionProgress.requirements?.length || 4} completed
+                        </span>
+                        <span className="text-xs font-bold text-slate-700">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {(promotionProgress.requirements || []).map((req: any, i: number) => (
+                          <div
+                            key={i}
+                            className={`flex-1 h-2 rounded-full transition-all duration-500 ${
+                              req.isCompleted ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-slate-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      {promotionProgress.isEligibleForPromotion && (
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-green-700">
+                          <CheckCircle size={12} /> All requirements met
+                        </div>
+                      )}
                     </div>
                   )}
-                  {promotionProgress && (
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${promotionProgress.isEligibleForPromotion ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`}
-                        style={{ width: `${promotionProgress.overallProgress || 0}%` }}
-                      />
-                    </div>
-                  )}
+
                   {promoLoading ? (
                     <div className="flex items-center justify-center py-10">
                       <RefreshCw className="animate-spin text-amber-500" size={24} />
                     </div>
                   ) : promotionProgress?.requirements ? (
-                    promotionProgress.requirements.map((req: any) => (
-                      <div key={req.id} className={`p-4 rounded-xl border-2 ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
-                              {req.isCompleted ? <CheckCircle size={18} /> : <Clock size={18} />}
+                    <div className="space-y-2">
+                      {promotionProgress.requirements.map((req: any) => (
+                        <div key={req.id} className={`p-3 rounded-xl border ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`flex-shrink-0 ${req.isCompleted ? 'text-green-500' : 'text-slate-300'}`}>
+                                {req.isCompleted ? <CheckCircle size={15} /> : <Clock size={15} />}
+                              </div>
+                              <span className="font-semibold text-xs text-slate-900 truncate">{req.name}</span>
                             </div>
-                            <span className="font-semibold text-sm text-slate-900">{req.name}</span>
+                            {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] flex-shrink-0">Done</Badge>}
                           </div>
-                          {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
+                          {req.isCompleted && req.completionDetails && (
+                            <p className="text-xs text-green-700 font-medium mt-1 pl-5 truncate">
+                              {Object.values(req.completionDetails)[0] as string}
+                            </p>
+                          )}
+                          {!req.isCompleted && (
+                            <p className="text-[11px] text-slate-400 mt-0.5 pl-5 line-clamp-1">{req.description}</p>
+                          )}
                         </div>
-                        <p className="text-xs text-slate-500 mt-1 pl-6">{req.description}</p>
-                        {req.isCompleted && req.completionDetails && (
-                          <p className="text-xs text-green-700 font-medium mt-1.5 pl-6">
-                            {Object.values(req.completionDetails)[0] as string}
-                          </p>
-                        )}
+                      ))}
+                    </div>
+                  ) : isFullMember ? (
+                    <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                        <CheckCircle size={22} />
                       </div>
-                    ))
+                      <p className="text-sm font-semibold text-green-700">Probation completed</p>
+                      <p className="text-xs text-slate-400">You have been promoted to Full Member.</p>
+                    </div>
                   ) : (
                     <div className="text-center py-8 text-slate-400 text-sm">
                       <AlertTriangle size={24} className="mx-auto mb-2" />
@@ -969,7 +993,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               {/* ── 1st / 2nd Year Engagement Tab (shared renderer, read-only) ── */}
               {(journeyActiveTab === 'firstYear' || journeyActiveTab === 'secondYear') && (() => {
                 const summary = journeyActiveTab === 'firstYear' ? engagementFirst : engagementSecond;
-                const accentBar = journeyActiveTab === 'firstYear' ? 'from-blue-400 to-blue-600' : 'from-indigo-400 to-indigo-600';
+                const accentDot = journeyActiveTab === 'firstYear' ? 'from-blue-400 to-blue-600' : 'from-indigo-400 to-indigo-600';
                 const accentPct = journeyActiveTab === 'firstYear' ? 'text-blue-600' : 'text-indigo-600';
 
                 if (engagementLoading) return (
@@ -984,50 +1008,98 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   </div>
                 );
 
+                const groupReqs = summary.requirements.filter(r => r.group === journeyGroupTab);
+
                 return (
                   <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-700">{summary.completedCount} of {summary.totalCount} completed</span>
-                      <span className={`text-sm font-bold ${accentPct}`}>{summary.overallProgress.toFixed(0)}%</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${summary.isCompleted ? 'bg-gradient-to-r from-green-500 to-emerald-400' : `bg-gradient-to-r ${accentBar}`}`}
-                        style={{ width: `${summary.overallProgress}%` }}
-                      />
+                    {/* Segmented dots */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-500">{summary.completedCount}/{summary.totalCount} completed</span>
+                        <span className={`text-xs font-bold ${accentPct}`}>{summary.overallProgress.toFixed(0)}%</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {summary.requirements.map((req, i) => {
+                          const isPending = !!req.progress.pendingVerification;
+                          return (
+                            <div
+                              key={i}
+                              className={`flex-1 h-2 rounded-full transition-all duration-500 ${
+                                req.isCompleted
+                                  ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                                  : isPending
+                                    ? 'bg-amber-300'
+                                    : summary.isCompleted
+                                      ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                                      : `bg-gradient-to-r ${accentDot} opacity-20`
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
 
-                    {(['Leadership Experience', 'Skills Development', 'JCI Experience'] as const).map(group => {
-                      const groupReqs = summary.requirements.filter(r => r.group === group);
-                      if (groupReqs.length === 0) return null;
-                      return (
-                        <div key={group}>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 mt-2">{group}</p>
-                          <div className="space-y-3">
-                            {groupReqs.map(req => (
-                              <div key={req.key} className={`p-4 rounded-xl border-2 ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
-                                      {req.isCompleted ? <CheckCircle size={16} /> : <Clock size={16} />}
-                                    </div>
-                                    <span className="font-semibold text-sm text-slate-900">{req.title}</span>
-                                  </div>
-                                  {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
+                    {/* Group tabs */}
+                    <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                      {(['Leadership Experience', 'Skills Development', 'JCI Experience'] as const).map(g => {
+                        const gReqs = summary.requirements.filter(r => r.group === g);
+                        if (gReqs.length === 0) return null;
+                        const doneCount = gReqs.filter(r => r.isCompleted).length;
+                        const isActive = journeyGroupTab === g;
+                        const label = g === 'Leadership Experience' ? 'Lead' : g === 'Skills Development' ? 'Skills' : 'JCI';
+                        return (
+                          <button
+                            key={g}
+                            onClick={() => setJourneyGroupTab(g)}
+                            className={`flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold transition-all flex flex-col items-center gap-0.5 ${
+                              isActive ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            <span>{label}</span>
+                            <span className={`text-[9px] font-black ${doneCount === gReqs.length ? 'text-green-600' : isActive ? accentPct : 'text-slate-400'}`}>
+                              {doneCount}/{gReqs.length}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Requirements for active group */}
+                    <div className="space-y-2">
+                      {groupReqs.map(req => {
+                        const isPending = !!req.progress.pendingVerification;
+                        const cardClass = req.isCompleted
+                          ? 'border-green-200 bg-green-50/60'
+                          : isPending
+                            ? 'border-amber-200 bg-amber-50/60'
+                            : 'border-slate-200 bg-white';
+                        const iconClass = req.isCompleted ? 'text-green-500' : isPending ? 'text-amber-400' : 'text-slate-300';
+                        return (
+                          <div key={req.key} className={`p-3 rounded-xl border ${cardClass}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`flex-shrink-0 ${iconClass}`}>
+                                  {req.isCompleted ? <CheckCircle size={15} /> : <Clock size={15} />}
                                 </div>
-                                <p className="text-xs text-slate-500 mt-1 pl-6">{req.description}</p>
-                                {req.isCompleted && (req.progress.detail || req.progress.date) && (
-                                  <div className="mt-1.5 pl-6 flex items-center gap-2 text-xs">
-                                    {req.progress.detail && <span className="text-green-700 font-medium">{req.progress.detail}</span>}
-                                    {req.progress.date && <span className="text-slate-400">{req.progress.date}</span>}
-                                  </div>
-                                )}
+                                <span className="font-semibold text-xs text-slate-900 truncate">{req.title}</span>
                               </div>
-                            ))}
+                              <div className="flex-shrink-0">
+                                {req.isCompleted && !isPending && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
+                                {isPending && <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px]">Pending BOD</Badge>}
+                              </div>
+                            </div>
+                            {(isPending || req.isCompleted) && (req.progress.detail || req.progress.date) ? (
+                              <div className="mt-1 pl-5 flex items-center gap-2 text-[11px]">
+                                {req.progress.detail && <span className={isPending ? 'text-amber-700 font-medium' : 'text-green-700 font-medium'}>{req.progress.detail}</span>}
+                                {req.progress.date && <span className="text-slate-400">{req.progress.date}</span>}
+                              </div>
+                            ) : !req.isCompleted ? (
+                              <p className="text-[11px] text-slate-400 mt-0.5 pl-5 line-clamp-1">{req.description}</p>
+                            ) : null}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </>
                 );
               })()}

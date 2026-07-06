@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, CheckCircle, Clock, Award, AlertCircle,
-  Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown
+  Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown, ChevronUp, Sparkles, Filter
 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, Modal, useToast } from '../../ui/Common';
 import {
@@ -11,6 +11,7 @@ import {
   PromotionService
 } from '../../../services/promotionService';
 import { MembersService } from '../../../services/membersService';
+import { EngagementAutoSuggestService } from '../../../services/engagementAutoSuggestService';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
 import {
   PromotionProgress,
@@ -112,42 +113,29 @@ const getEngagementYearFromJoinDate = (
 
 const MemberSummaryPanel: React.FC<{ member: Member | null }> = ({ member }) => {
   if (!member) return null;
-
-  const displayName = member.fullName || member.name;
-
+  const displayName = member.fullName || member.name || '?';
+  const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
   return (
-    <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
-      <div className="flex items-center gap-2 mb-3">
-        <User size={16} className="text-slate-500" />
-        <p className="text-sm font-semibold text-slate-900">{displayValue(displayName)}</p>
+    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+      <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-bold text-sm shrink-0">
+        {initials}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-        <div>
-          <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Birthday</div>
-          <div className="text-slate-900">{displayValue(member.dateOfBirth)}</div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-slate-500 uppercase mb-1">ID Number</div>
-          <div className="text-slate-900">{displayValue(member.idNumber)}</div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Contact</div>
-          <div className="text-slate-900">{displayValue(member.phone)}</div>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Membership Type</div>
-          <MembershipTypeDisplay
-            member={{
-              nationality: member.nationality,
-              dateOfBirth: member.dateOfBirth,
-              senatorCertified: member.senatorCertified,
-              senatorshipId: member.senatorshipId,
-              role: member.role,
-              membershipType: member.membershipType as any,
-            }}
-            showDetails={false}
-          />
-        </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-slate-900 truncate">{displayName}</div>
+        <div className="text-xs text-slate-500 truncate">{member.phone || member.idNumber || ''}</div>
+      </div>
+      <div className="shrink-0">
+        <MembershipTypeDisplay
+          member={{
+            nationality: member.nationality,
+            dateOfBirth: member.dateOfBirth,
+            senatorCertified: member.senatorCertified,
+            senatorshipId: member.senatorshipId,
+            role: member.role,
+            membershipType: member.membershipType as any,
+          }}
+          showDetails={false}
+        />
       </div>
     </div>
   );
@@ -177,6 +165,19 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [savingField, setSavingField] = useState<string | null>(null);
   const [savingEngagementKey, setSavingEngagementKey] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [promoAutoSuggesting, setPromoAutoSuggesting] = useState(false);
+  const [autoSuggesting, setAutoSuggesting] = useState(false);
+  const [approvingKey, setApprovingKey] = useState<string | null>(null);
+  const [rejectingKey, setRejectingKey] = useState<string | null>(null);
+  const [engagementGroupTab, setEngagementGroupTab] = useState<'Leadership Experience' | 'Skills Development' | 'JCI Experience'>('Leadership Experience');
+  const [bulkAutoSuggesting, setBulkAutoSuggesting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [inlineApprovingKey, setInlineApprovingKey] = useState<string | null>(null);
+  const [inlineRejectingKey, setInlineRejectingKey] = useState<string | null>(null);
+  const [statsExpanded, setStatsExpanded] = useState(false);
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const [promotingConfirmId, setPromotingConfirmId] = useState<string | null>(null);
+  const [quickPromotingId, setQuickPromotingId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -283,6 +284,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     setSelectedEngagementYear(year);
     setSelectedMemberId(member.id);
     setSelectedMemberRecord(member);
+    setEngagementGroupTab('Leadership Experience');
 
     const progress = PromotionService.buildEngagementProgress(member, year);
     setEngagementProgress(progress);
@@ -339,6 +341,234 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     }
   };
 
+  const handlePromoAutoSuggest = async () => {
+    if (!selectedMemberId) return;
+    setPromoAutoSuggesting(true);
+    try {
+      const suggested = await EngagementAutoSuggestService.runProbationAutoSuggest(selectedMemberId);
+      let filled = 0;
+      setEditValues(prev => {
+        const next = { ...prev };
+        if (suggested.event_organizing_committee) {
+          next.event_organizing_committee_detail = suggested.event_organizing_committee.detail;
+          next.event_organizing_committee_date = suggested.event_organizing_committee.date;
+          filled++;
+        }
+        if (suggested.jci_inspire_completion) {
+          next.jci_inspire_completion_course = suggested.jci_inspire_completion.course;
+          next.jci_inspire_completion_date = suggested.jci_inspire_completion.date;
+          filled++;
+        }
+        if (suggested.event_participation_1) {
+          next.event_participation_1 = suggested.event_participation_1.detail;
+          next.event_participation_1_date = suggested.event_participation_1.date;
+          filled++;
+        }
+        if (suggested.event_participation_2) {
+          next.event_participation_2 = suggested.event_participation_2.detail;
+          next.event_participation_2_date = suggested.event_participation_2.date;
+          filled++;
+        }
+        return next;
+      });
+      showToast(`Auto-suggest: ${filled} field${filled !== 1 ? 's' : ''} pre-filled — review and save`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Auto-suggest failed', 'error');
+    } finally {
+      setPromoAutoSuggesting(false);
+    }
+  };
+
+  const handleAutoSuggest = async () => {
+    if (!selectedMemberId || !selectedMemberRecord) return;
+    setAutoSuggesting(true);
+    try {
+      const results = await EngagementAutoSuggestService.runAutoSuggest(
+        selectedMemberId,
+        selectedEngagementYear,
+        'bod' // placeholder — replace with actual user ID from auth context
+      );
+      const suggested = results.filter(r => !r.skipped).length;
+      const skipped = results.filter(r => r.skipped).length;
+      showToast(`Auto-suggest complete: ${suggested} pending, ${skipped} skipped`, 'success');
+      // Refresh engagement progress
+      const refreshed = await MembersService.getMemberById(selectedMemberId);
+      if (refreshed) {
+        setSelectedMemberRecord(refreshed);
+        setEngagementMembers(prev => prev.map(m => m.id === refreshed.id ? refreshed : m));
+        const progress = PromotionService.buildEngagementProgress(refreshed, selectedEngagementYear);
+        setEngagementProgress(progress);
+        setEngagementEditValues(
+          progress.requirements.reduce((acc, req) => {
+            acc[req.key] = { detail: req.progress.detail || '', date: req.progress.date || '' };
+            return acc;
+          }, {} as Record<string, { detail: string; date: string }>)
+        );
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Auto-suggest failed', 'error');
+    } finally {
+      setAutoSuggesting(false);
+    }
+  };
+
+  const handleApprove = async (requirementKey: string) => {
+    if (!selectedMemberId) return;
+    setApprovingKey(requirementKey);
+    try {
+      await EngagementAutoSuggestService.approveSuggestion(
+        selectedMemberId,
+        selectedEngagementYear,
+        requirementKey,
+        'bod'
+      );
+      showToast('Suggestion approved', 'success');
+      const refreshed = await MembersService.getMemberById(selectedMemberId);
+      if (refreshed) {
+        setSelectedMemberRecord(refreshed);
+        setEngagementMembers(prev => prev.map(m => m.id === refreshed.id ? refreshed : m));
+        const progress = PromotionService.buildEngagementProgress(refreshed, selectedEngagementYear);
+        setEngagementProgress(progress);
+        setEngagementEditValues(
+          progress.requirements.reduce((acc, req) => {
+            acc[req.key] = { detail: req.progress.detail || '', date: req.progress.date || '' };
+            return acc;
+          }, {} as Record<string, { detail: string; date: string }>)
+        );
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Approve failed', 'error');
+    } finally {
+      setApprovingKey(null);
+    }
+  };
+
+  const handleReject = async (requirementKey: string) => {
+    if (!selectedMemberId) return;
+    setRejectingKey(requirementKey);
+    try {
+      await EngagementAutoSuggestService.rejectSuggestion(
+        selectedMemberId,
+        selectedEngagementYear,
+        requirementKey,
+        'bod'
+      );
+      showToast('Suggestion rejected', 'success');
+      const refreshed = await MembersService.getMemberById(selectedMemberId);
+      if (refreshed) {
+        setSelectedMemberRecord(refreshed);
+        setEngagementMembers(prev => prev.map(m => m.id === refreshed.id ? refreshed : m));
+        const progress = PromotionService.buildEngagementProgress(refreshed, selectedEngagementYear);
+        setEngagementProgress(progress);
+        setEngagementEditValues(
+          progress.requirements.reduce((acc, req) => {
+            acc[req.key] = { detail: req.progress.detail || '', date: req.progress.date || '' };
+            return acc;
+          }, {} as Record<string, { detail: string; date: string }>)
+        );
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Reject failed', 'error');
+    } finally {
+      setRejectingKey(null);
+    }
+  };
+
+  const handleInlineApprove = async (memberId: string, year: EngagementYear, requirementKey: string) => {
+    const k = `${memberId}_${requirementKey}`;
+    setInlineApprovingKey(k);
+    try {
+      await EngagementAutoSuggestService.approveSuggestion(memberId, year, requirementKey, 'bod');
+      showToast('Suggestion approved', 'success');
+      const refreshed = await MembersService.getMemberById(memberId);
+      if (refreshed) {
+        setEngagementMembers(prev => prev.map(m => m.id === refreshed.id ? refreshed : m));
+        if (selectedMemberId === memberId) {
+          setSelectedMemberRecord(refreshed);
+          const progress = PromotionService.buildEngagementProgress(refreshed, year);
+          setEngagementProgress(progress);
+        }
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Approve failed', 'error');
+    } finally {
+      setInlineApprovingKey(null);
+    }
+  };
+
+  const handleInlineReject = async (memberId: string, year: EngagementYear, requirementKey: string) => {
+    const k = `${memberId}_${requirementKey}`;
+    setInlineRejectingKey(k);
+    try {
+      await EngagementAutoSuggestService.rejectSuggestion(memberId, year, requirementKey, 'bod');
+      showToast('Suggestion rejected', 'success');
+      const refreshed = await MembersService.getMemberById(memberId);
+      if (refreshed) {
+        setEngagementMembers(prev => prev.map(m => m.id === refreshed.id ? refreshed : m));
+        if (selectedMemberId === memberId) {
+          setSelectedMemberRecord(refreshed);
+          const progress = PromotionService.buildEngagementProgress(refreshed, year);
+          setEngagementProgress(progress);
+        }
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Reject failed', 'error');
+    } finally {
+      setInlineRejectingKey(null);
+    }
+  };
+
+  const handleBulkPromoAutoSuggest = async () => {
+    const members = filteredProbationMembers;
+    if (!members.length) return;
+    setBulkAutoSuggesting(true);
+    setBulkProgress({ current: 0, total: members.length });
+    let filled = 0;
+    for (let i = 0; i < members.length; i++) {
+      setBulkProgress({ current: i + 1, total: members.length });
+      try {
+        const suggested = await EngagementAutoSuggestService.runProbationAutoSuggest(members[i].id);
+        if (suggested.event_organizing_committee) {
+          const v = formatDatedDetail(suggested.event_organizing_committee.date, suggested.event_organizing_committee.detail);
+          if (v) { await PromotionService.savePromotionProgressField(members[i].id, 'eventOrganizerParticipation', v); filled++; }
+        }
+        if (suggested.jci_inspire_completion) {
+          const v = formatDatedDetail(suggested.jci_inspire_completion.date, suggested.jci_inspire_completion.course);
+          if (v) { await PromotionService.savePromotionProgressField(members[i].id, 'jciInspireCompleted', v); filled++; }
+        }
+        if (suggested.event_participation_1 || suggested.event_participation_2) {
+          const p1 = suggested.event_participation_1 ? formatDatedDetail(suggested.event_participation_1.date, suggested.event_participation_1.detail) : '';
+          const p2 = suggested.event_participation_2 ? formatDatedDetail(suggested.event_participation_2.date, suggested.event_participation_2.detail) : '';
+          const v = [p1, p2].filter(Boolean).join(', ');
+          if (v) { await PromotionService.savePromotionProgressField(members[i].id, 'eventParticipation', v); filled++; }
+        }
+      } catch { /* skip member on error */ }
+    }
+    showToast(`Bulk auto-suggest: ${filled} field(s) filled across ${members.length} members`, 'success');
+    setBulkAutoSuggesting(false);
+    setBulkProgress(null);
+    await loadData();
+  };
+
+  const handleBulkEngagementAutoSuggest = async (year: EngagementYear) => {
+    const members = filteredEngagementMembers;
+    if (!members.length) return;
+    setBulkAutoSuggesting(true);
+    setBulkProgress({ current: 0, total: members.length });
+    let suggested = 0;
+    for (let i = 0; i < members.length; i++) {
+      setBulkProgress({ current: i + 1, total: members.length });
+      try {
+        const results = await EngagementAutoSuggestService.runAutoSuggest(members[i].id, year, 'bod');
+        suggested += results.filter(r => !r.skipped).length;
+      } catch { /* skip member on error */ }
+    }
+    showToast(`Bulk auto-suggest: ${suggested} pending item(s) created across ${members.length} members`, 'success');
+    setBulkAutoSuggesting(false);
+    setBulkProgress(null);
+    await loadData();
+  };
+
   const handlePromoteMember = async (memberId: string, method: 'automatic' | 'manual' = 'automatic') => {
     try {
       const promotion = await PromotionService.promoteToFullMember(
@@ -390,13 +620,25 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
 
   const filteredProbationMembers = React.useMemo(() => {
     const term = (searchQuery || '').toLowerCase();
-    if (!term) return probationMembers;
-    return probationMembers.filter((m: any) =>
-      (m.name ?? '').toLowerCase().includes(term) ||
-      (m.email ?? '').toLowerCase().includes(term) ||
-      (m.phone ?? '').toLowerCase().includes(term) ||
-      (m.fullName ?? '').toLowerCase().includes(term)
-    );
+    const filtered = term
+      ? probationMembers.filter((m: any) =>
+          (m.name ?? '').toLowerCase().includes(term) ||
+          (m.email ?? '').toLowerCase().includes(term) ||
+          (m.phone ?? '').toLowerCase().includes(term) ||
+          (m.fullName ?? '').toLowerCase().includes(term)
+        )
+      : [...probationMembers];
+    const getName = (m: any) => ((m.fullName || m.name) ?? '').toLowerCase();
+    const isEligible = (m: any) => {
+      const pp = m.promotionProgress ?? m.jciCareer?.promotionProgress;
+      return !!(pp?.bodMeetingAttended && pp?.eventOrganizerParticipation && pp?.eventParticipation && pp?.jciInspireCompleted);
+    };
+    return filtered.sort((a, b) => {
+      const aE = isEligible(a) ? 0 : 1;
+      const bE = isEligible(b) ? 0 : 1;
+      if (aE !== bE) return aE - bE;
+      return getName(a).localeCompare(getName(b));
+    });
   }, [probationMembers, searchQuery]);
 
   const filteredEngagementMembers = React.useMemo(() => {
@@ -405,16 +647,53 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       if (activeView === 'promotion') return false;
       return getEngagementYearFromJoinDate(member.joinDate) === activeView;
     });
-
-    if (!term) return yearScopedMembers;
-    return yearScopedMembers.filter((member) =>
-      (member.name ?? '').toLowerCase().includes(term) ||
-      (member.email ?? '').toLowerCase().includes(term) ||
-      (member.phone ?? '').toLowerCase().includes(term) ||
-      (member.fullName ?? '').toLowerCase().includes(term) ||
-      (member.idNumber ?? '').toLowerCase().includes(term)
-    );
+    const filtered = term
+      ? yearScopedMembers.filter((member) =>
+          (member.name ?? '').toLowerCase().includes(term) ||
+          (member.email ?? '').toLowerCase().includes(term) ||
+          (member.phone ?? '').toLowerCase().includes(term) ||
+          (member.fullName ?? '').toLowerCase().includes(term) ||
+          (member.idNumber ?? '').toLowerCase().includes(term)
+        )
+      : [...yearScopedMembers];
+    const getName = (m: Member) => ((m.fullName || m.name) ?? '').toLowerCase();
+    const hasPending = (m: Member) =>
+      PromotionService.buildEngagementProgress(m, activeView as EngagementYear)
+        .requirements.some(r => r.progress.pendingVerification);
+    return filtered.sort((a, b) => {
+      const aP = hasPending(a) ? 0 : 1;
+      const bP = hasPending(b) ? 0 : 1;
+      if (aP !== bP) return aP - bP;
+      return getName(a).localeCompare(getName(b));
+    });
   }, [engagementMembers, searchQuery, activeView]);
+
+  const pendingCounts = React.useMemo(() => {
+    const count = (year: EngagementYear) =>
+      engagementMembers
+        .filter(m => getEngagementYearFromJoinDate(m.joinDate) === year)
+        .filter(m => PromotionService.buildEngagementProgress(m, year).requirements.some(r => r.progress.pendingVerification))
+        .length;
+    return { firstYear: count('firstYear'), secondYear: count('secondYear') };
+  }, [engagementMembers]);
+
+  const displayedEngagementMembers = React.useMemo(() => {
+    if (!pendingOnly) return filteredEngagementMembers;
+    return filteredEngagementMembers.filter(m => {
+      const p = PromotionService.buildEngagementProgress(m, activeView as EngagementYear);
+      return p.requirements.some(r => r.progress.pendingVerification);
+    });
+  }, [filteredEngagementMembers, pendingOnly, activeView]);
+
+  const handleQuickPromote = async (memberId: string) => {
+    setPromotingConfirmId(null);
+    setQuickPromotingId(memberId);
+    try {
+      await handlePromoteMember(memberId, 'automatic');
+    } finally {
+      setQuickPromotingId(null);
+    }
+  };
 
   if (loading && !statistics) {
     return (
@@ -425,229 +704,363 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
-        {[
-          { key: 'promotion' as TrackingView, label: 'Probation Promotion' },
-          { key: 'firstYear' as TrackingView, label: '1st Year Engagement' },
-          { key: 'secondYear' as TrackingView, label: '2nd Year Engagement' }
-        ].map(view => (
-          <Button
+    <div className="space-y-4">
+      {/* Pill tab switcher */}
+      <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+        {([
+          { key: 'promotion' as TrackingView, label: 'Probation', short: 'Probation', badge: 0 },
+          { key: 'firstYear' as TrackingView, label: '1st Year', short: '1st Yr', badge: pendingCounts.firstYear },
+          { key: 'secondYear' as TrackingView, label: '2nd Year', short: '2nd Yr', badge: pendingCounts.secondYear },
+        ] as const).map(view => (
+          <button
             key={view.key}
-            size="sm"
-            variant={activeView === view.key ? 'primary' : 'outline'}
-            onClick={() => setActiveView(view.key)}
+            onClick={() => { setActiveView(view.key); setPendingOnly(false); }}
+            className={`flex-1 relative py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+              activeView === view.key
+                ? 'bg-white shadow-sm text-slate-900'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            {view.label}
-          </Button>
+            <span className="hidden sm:inline">{view.label}</span>
+            <span className="sm:hidden">{view.short}</span>
+            {view.badge > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-400 text-white text-[9px] font-black flex items-center justify-center leading-none">
+                {view.badge}
+              </span>
+            )}
+          </button>
         ))}
       </div>
 
       {activeView === 'promotion' && (
         <>
-          {/* Statistics Overview */}
+          {/* Stats + completion rates — collapsible */}
           {statistics && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Mobile: Combined Card (Single Row) */}
-              <Card className="md:hidden">
-                <div className="grid grid-cols-4 divide-x divide-slate-100 -m-4">
-                  <div className="p-1 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Probation</div>
-                    <div className="text-sm font-bold text-slate-900">{statistics.totalProbationMembers}</div>
-                  </div>
-                  <div className="p-1 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Eligible</div>
-                    <div className="text-sm font-bold text-green-600">{statistics.eligibleForPromotion}</div>
-                  </div>
-                  <div className="p-1 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Promoted</div>
-                    <div className="text-sm font-bold text-purple-600">{statistics.promotedThisYear}</div>
-                  </div>
-                  <div className="p-1 text-center">
-                    <div className="text-[9px] text-slate-500 uppercase tracking-tighter mb-1 whitespace-nowrap">Avg Time</div>
-                    <div className="text-sm font-bold text-amber-600">{statistics.averageTimeToPromotion}d</div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Desktop: Separate Cards */}
-              <Card className="hidden md:block">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-slate-500 mb-1">Probation Members</div>
-                    <div className="text-2xl font-bold text-slate-900">{statistics.totalProbationMembers}</div>
-                  </div>
-                  <Users className="text-blue-600" size={32} />
-                </div>
-              </Card>
-
-              <Card className="hidden md:block">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-slate-500 mb-1">Eligible for Promotion</div>
-                    <div className="text-2xl font-bold text-green-600">{statistics.eligibleForPromotion}</div>
-                  </div>
-                  <CheckCircle className="text-green-600" size={32} />
-                </div>
-              </Card>
-
-              <Card className="hidden md:block">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-slate-500 mb-1">Promoted This Year</div>
-                    <div className="text-2xl font-bold text-purple-600">{statistics.promotedThisYear}</div>
-                  </div>
-                  <TrendingUp className="text-purple-600" size={32} />
-                </div>
-              </Card>
-
-              <Card className="hidden md:block">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-slate-500 mb-1">Avg. Time to Promotion</div>
-                    <div className="text-2xl font-bold text-amber-600">{statistics.averageTimeToPromotion} days</div>
-                  </div>
-                  <Clock className="text-amber-600" size={32} />
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Requirement Completion Rates */}
-          {statistics && (
-            <Card title="Requirement Completion Rates">
-              <div className="space-y-4">
-                {Object.entries(statistics.requirementCompletionRates).map(([type, rate]: [string, any]) => (
-                  <div key={type}>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-slate-700">
-                        {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </span>
-                      <span className="text-sm font-semibold text-slate-900">{rate.toFixed(1)}%</span>
-                    </div>
-                    <ProgressBar progress={rate} color="bg-blue-600" />
+            <Card>
+              {/* Always-visible: 4 stat chips + expand toggle */}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: 'Probation', value: statistics.totalProbationMembers, color: 'text-slate-900' },
+                  { label: 'Eligible', value: statistics.eligibleForPromotion, color: 'text-green-600' },
+                  { label: 'Promoted', value: statistics.promotedThisYear, color: 'text-purple-600' },
+                  { label: 'Avg Days', value: statistics.averageTimeToPromotion, color: 'text-amber-600' },
+                ].map(s => (
+                  <div key={s.label} className="text-center p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
+                    <div className="text-[10px] text-slate-500 font-medium mt-0.5">{s.label}</div>
                   </div>
                 ))}
               </div>
+              <button
+                onClick={() => setStatsExpanded(v => !v)}
+                className="mt-3 w-full flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {statsExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {statsExpanded ? 'Hide completion rates' : 'Show completion rates'}
+              </button>
+              {/* Collapsible completion rates */}
+              {statsExpanded && (
+                <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Completion Rates</p>
+                  {Object.entries(statistics.requirementCompletionRates).map(([type, rate]: [string, any]) => (
+                    <div key={type} className="flex items-center gap-3">
+                      <span className="text-[11px] text-slate-600 w-36 shrink-0 truncate">
+                        {type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      </span>
+                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-jci-blue transition-all duration-500"
+                          style={{ width: `${rate}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-700 w-9 text-right shrink-0">{rate.toFixed(0)}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           )}
 
           {/* Probation Members List */}
-          <Card title="Probation Members">
-            <div className="space-y-3">
-              {filteredProbationMembers.map(member => (
-                <div key={member.id} className="border border-slate-100 rounded-xl overflow-hidden hover:border-jci-blue/20 transition-all">
-                  <div className="flex items-center justify-between p-3 bg-white">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                        {member.name.split(' ').map((n: string) => n[0]).join('')}
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-bold text-slate-900">Probation Members{filteredProbationMembers.length ? ` · ${filteredProbationMembers.length}` : ''}</span>
+              <button
+                onClick={handleBulkPromoAutoSuggest}
+                disabled={bulkAutoSuggesting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {bulkAutoSuggesting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-500" />}
+                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}…` : 'Auto-Suggest All'}
+              </button>
+            </div>
+            <div className="space-y-2">
+              {filteredProbationMembers.map(member => {
+                const reqs = [
+                  { label: 'BOD', done: !!member.promotionProgress?.bodMeetingAttended },
+                  { label: 'Organizer', done: !!member.promotionProgress?.eventOrganizerParticipation },
+                  { label: 'Participation', done: !!member.promotionProgress?.eventParticipation },
+                  { label: 'Inspire', done: !!member.promotionProgress?.jciInspireCompleted },
+                ];
+                const doneCount = reqs.filter(r => r.done).length;
+                const isEligible = doneCount === 4;
+                return (
+                  <div
+                    key={member.id}
+                    className={`rounded-xl border overflow-hidden transition-all ${
+                      isEligible ? 'border-green-200 bg-green-50/40' : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 p-3">
+                      {/* Avatar */}
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${isEligible ? 'bg-green-500' : 'bg-jci-blue'}`}>
+                        {(member.fullName || member.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        {member.fullName && (
-                          <div className="font-medium text-slate-900">{member.fullName}</div>
-                        )}
-                        <div className={member.fullName ? "text-sm text-slate-600" : "font-medium text-slate-900"}>{member.name}</div>
-                        <div className="text-xs text-slate-500">Joined: {member.joinDate}</div>
+                      {/* Name + join date */}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-slate-900 truncate">{member.fullName || member.name}</div>
+                        <div className="text-[11px] text-slate-400">Joined {member.joinDate}</div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleViewProgress(member.id, member)}>
-                        Full View
-                      </Button>
-                      <button
-                        onClick={() => setExpandedId(expandedId === member.id ? null : member.id)}
-                        className="p-2 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-jci-blue transition-colors"
-                      >
-                        <ChevronDown size={16} className={expandedId === member.id ? 'rotate-180 transition-transform' : 'transition-transform'} />
-                      </button>
-                    </div>
-                  </div>
-                  {expandedId === member.id && (
-                    <div className="px-4 pb-4 pt-2 bg-slate-50/50 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                      {[
-                        { label: 'BOD Meeting', done: !!member.promotionProgress?.bodMeetingAttended },
-                        { label: 'Event Organizer', done: !!member.promotionProgress?.eventOrganizerParticipation },
-                        { label: 'Event Participation', done: !!member.promotionProgress?.eventParticipation },
-                        { label: 'JCI Inspire', done: !!member.promotionProgress?.jciInspireCompleted },
-                      ].map(req => (
-                        <div key={req.label} className={`flex items-center gap-2 p-2 rounded-lg ${req.done ? 'bg-green-50 border border-green-100' : 'bg-white border border-slate-100'}`}>
-                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${req.done ? 'bg-green-500' : 'bg-slate-200'}`}>
-                            {req.done && <Check size={10} className="text-white" />}
+                      {/* Eligible badge/promote or req dots */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isEligible ? (
+                          promotingConfirmId === member.id ? (
+                            <>
+                              <span className="text-[10px] font-semibold text-slate-600">Promote?</span>
+                              <button
+                                onClick={() => handleQuickPromote(member.id)}
+                                disabled={quickPromotingId === member.id}
+                                className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-bold rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                              >
+                                {quickPromotingId === member.id ? <RefreshCw size={9} className="animate-spin" /> : <Check size={9} />}
+                                Yes
+                              </button>
+                              <button
+                                onClick={() => setPromotingConfirmId(null)}
+                                className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-bold rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                              >
+                                <X size={9} /> No
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setPromotingConfirmId(member.id)}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 border border-green-200 hover:bg-green-200 px-2 py-0.5 rounded-full transition-colors"
+                            >
+                              <CheckCircle size={10} /> Eligible · Promote →
+                            </button>
+                          )
+                        ) : (
+                          <div className="flex gap-1">
+                            {reqs.map(req => (
+                              <div
+                                key={req.label}
+                                title={req.label}
+                                className={`w-2 h-2 rounded-full ${req.done ? 'bg-green-500' : 'bg-slate-200'}`}
+                              />
+                            ))}
                           </div>
-                          <span className={`font-semibold ${req.done ? 'text-green-700' : 'text-slate-500'}`}>{req.label}</span>
+                        )}
+                        <button
+                          onClick={() => handleViewProgress(member.id, member)}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-jci-blue transition-colors"
+                          title="Open full view"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {/* Inline req pills */}
+                    <div className="flex gap-1.5 px-3 pb-3">
+                      {reqs.map(req => (
+                        <div
+                          key={req.label}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            req.done
+                              ? 'bg-green-50 border-green-200 text-green-700'
+                              : 'bg-slate-50 border-slate-200 text-slate-400'
+                          }`}
+                        >
+                          {req.done ? <Check size={9} /> : <Clock size={9} />}
+                          {req.label}
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
+              {filteredProbationMembers.length === 0 && (
+                <div className="py-8 text-center text-sm text-slate-400">No probation members found.</div>
+              )}
             </div>
           </Card>
         </>
       )}
 
       {activeView !== 'promotion' && (
-        <Card title={ENGAGEMENT_VIEW_LABELS[activeView]}>
-          <div className="space-y-3">
-            {filteredEngagementMembers.map(member => {
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-bold text-slate-900">
+              {ENGAGEMENT_VIEW_LABELS[activeView]}
+              {displayedEngagementMembers.length ? ` · ${displayedEngagementMembers.length}` : ''}
+            </span>
+            <div className="flex items-center gap-1.5">
+              {/* Pending Only toggle */}
+              {(pendingCounts[activeView as EngagementYear] ?? 0) > 0 && (
+                <button
+                  onClick={() => setPendingOnly(v => !v)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-xl border transition-colors shadow-sm ${
+                    pendingOnly
+                      ? 'bg-amber-50 border-amber-300 text-amber-700'
+                      : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  <Filter size={11} />
+                  <span className="hidden sm:inline">Pending only</span>
+                  <span className="sm:hidden">{pendingCounts[activeView as EngagementYear]}</span>
+                </button>
+              )}
+              <button
+                onClick={() => handleBulkEngagementAutoSuggest(activeView as EngagementYear)}
+                disabled={bulkAutoSuggesting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {bulkAutoSuggesting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-500" />}
+                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}…` : 'Auto-Suggest All'}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {displayedEngagementMembers.map(member => {
               const progress = PromotionService.buildEngagementProgress(member, activeView);
+              const groups: Array<{ label: string; key: 'Leadership Experience' | 'Skills Development' | 'JCI Experience'; color: string }> = [
+                { label: 'Lead', key: 'Leadership Experience', color: 'text-purple-600' },
+                { label: 'Skills', key: 'Skills Development', color: 'text-blue-600' },
+                { label: 'JCI', key: 'JCI Experience', color: 'text-indigo-600' },
+              ];
+              const accentDot = activeView === 'firstYear' ? 'bg-blue-500' : 'bg-indigo-500';
+              const pendingReqs = progress.requirements.filter(r => r.progress.pendingVerification);
               return (
                 <div
                   key={member.id}
-                  className="p-3 bg-white rounded-xl border border-slate-100 hover:border-jci-blue/20 hover:shadow-sm transition-all"
+                  className={`rounded-xl border overflow-hidden transition-all ${
+                    progress.isCompleted ? 'border-green-200 bg-green-50/40'
+                    : pendingReqs.length > 0 ? 'border-amber-200 bg-white'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
                 >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                        {(member.fullName || member.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
-                      </div>
-                      <div>
-                        {member.fullName && (
-                          <div className="font-medium text-slate-900">{member.fullName}</div>
-                        )}
-                        <div className={member.fullName ? "text-sm text-slate-600" : "font-medium text-slate-900"}>{member.name}</div>
-                        <div className="text-xs text-slate-500">Joined: {member.joinDate || '-'}</div>
-                        <div className="mt-1">
-                          {progress.isCompleted ? (
-                            <Badge variant="success">Completed</Badge>
-                          ) : (
-                            <Badge variant="neutral">In Progress</Badge>
-                          )}
-                        </div>
+                  <div className="flex items-center gap-3 p-3">
+                    {/* Avatar */}
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${progress.isCompleted ? 'bg-green-500' : 'bg-jci-blue'}`}>
+                      {(member.fullName || member.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    {/* Name + join date + dots */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-slate-900 truncate">{member.fullName || member.name}</div>
+                      <div className="text-[11px] text-slate-400">Joined {member.joinDate}</div>
+                      <div className="flex gap-1 mt-1">
+                        {progress.requirements.map((req, i) => (
+                          <div
+                            key={i}
+                            title={req.title}
+                            className={`w-2 h-2 rounded-full ${
+                              req.isCompleted ? 'bg-green-500' : req.progress.pendingVerification ? 'bg-amber-400' : `${accentDot} opacity-20`
+                            }`}
+                          />
+                        ))}
                       </div>
                     </div>
-
-                    <div className="flex flex-col gap-3 md:w-72">
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-medium text-slate-600">
-                            {progress.completedCount}/{progress.totalCount} completed
+                    {/* Group breakdown + edit button */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {progress.isCompleted ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded-full">
+                          <CheckCircle size={10} /> Done
+                        </span>
+                      ) : (
+                        <>
+                          {/* Mobile: compact done/total */}
+                          <span className="sm:hidden text-[11px] font-bold text-slate-500">
+                            <span className={progress.completedCount > 0 ? 'text-green-600' : 'text-slate-400'}>{progress.completedCount}</span>
+                            <span className="text-slate-300">/{progress.totalCount}</span>
                           </span>
-                          <span className="text-xs font-semibold text-slate-900">
-                            {progress.overallProgress.toFixed(0)}%
-                          </span>
-                        </div>
-                        <ProgressBar
-                          progress={progress.overallProgress}
-                          color={progress.isCompleted ? 'bg-green-600' : 'bg-blue-600'}
-                        />
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
+                          {/* Desktop: 3-group breakdown */}
+                          <div className="hidden sm:flex gap-2">
+                            {groups.map(g => {
+                              const gReqs = progress.requirements.filter(r => r.group === g.key);
+                              if (!gReqs.length) return null;
+                              const done = gReqs.filter(r => r.isCompleted).length;
+                              const allDone = done === gReqs.length;
+                              return (
+                                <div key={g.label} className="flex flex-col items-center">
+                                  <span className={`text-[9px] font-black ${allDone ? 'text-green-600' : 'text-slate-400'}`}>{g.label}</span>
+                                  <span className={`text-[10px] font-bold ${allDone ? 'text-green-700' : g.color}`}>{done}/{gReqs.length}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                      <button
                         onClick={() => handleViewEngagement(member, activeView)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-jci-blue transition-colors"
+                        title="Open engagement view"
                       >
-                        View Engagement
-                      </Button>
+                        <Edit3 size={14} />
+                      </button>
                     </div>
                   </div>
+
+                  {/* Inline pending approval panel */}
+                  {pendingReqs.length > 0 && (
+                    <div className="border-t border-amber-100 bg-amber-50/50 px-3 py-2 space-y-1.5">
+                      {pendingReqs.map(req => {
+                        const k = `${member.id}_${req.key}`;
+                        const approving = inlineApprovingKey === k;
+                        const rejecting = inlineRejectingKey === k;
+                        const busy = approving || rejecting;
+                        return (
+                          <div key={req.key} className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] font-semibold text-amber-800">{req.title}</span>
+                              {req.progress.detail && (
+                                <span className="ml-1.5 text-[10px] text-amber-700 truncate max-w-[120px] inline-block align-bottom">{req.progress.detail}</span>
+                              )}
+                              {req.progress.date && (
+                                <span className="ml-1 text-[10px] text-amber-500">{req.progress.date}</span>
+                              )}
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <button
+                                onClick={() => handleInlineApprove(member.id, activeView, req.key)}
+                                disabled={busy}
+                                className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                              >
+                                {approving ? <RefreshCw size={9} className="animate-spin" /> : <Check size={9} />}
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleInlineReject(member.id, activeView, req.key)}
+                                disabled={busy}
+                                className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                              >
+                                {rejecting ? <RefreshCw size={9} className="animate-spin" /> : <X size={9} />}
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
 
-            {filteredEngagementMembers.length === 0 && (
-              <div className="py-8 text-center text-sm text-slate-500">
-                No {activeView === 'firstYear' ? '1st year' : '2nd year'} members found for engagement tracking.
+            {displayedEngagementMembers.length === 0 && (
+              <div className="py-8 text-center text-sm text-slate-400">
+                {pendingOnly
+                  ? 'No pending items to review.'
+                  : `No ${activeView === 'firstYear' ? '1st year' : '2nd year'} members found.`}
               </div>
             )}
           </div>
@@ -667,214 +1080,154 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         title="Promotion Progress"
       >
         {promotionProgress && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <MemberSummaryPanel member={selectedMemberRecord} />
-            {/* Overall Progress */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-slate-700">Overall Progress</span>
-                <span className="text-sm font-semibold text-slate-900">
-                  {promotionProgress.overallProgress.toFixed(0)}%
+
+            {/* Segmented progress */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-medium text-slate-500">
+                  {promotionProgress.requirements.filter(r => r.isCompleted).length}/{promotionProgress.requirements.length} completed
                 </span>
+                <span className="text-xs font-bold text-slate-700">{promotionProgress.overallProgress.toFixed(0)}%</span>
               </div>
-              <ProgressBar
-                progress={promotionProgress.overallProgress}
-                color={promotionProgress.isEligibleForPromotion ? 'bg-green-600' : 'bg-blue-600'}
-              />
+              <div className="flex gap-1">
+                {promotionProgress.requirements.map(req => (
+                  <div
+                    key={req.id}
+                    className={`h-2 flex-1 rounded-full transition-colors ${req.isCompleted ? 'bg-green-500' : 'bg-slate-200'}`}
+                    title={req.name}
+                  />
+                ))}
+              </div>
+              {promotionProgress.isEligibleForPromotion && (
+                <div className="flex items-center gap-1.5 text-xs font-medium text-green-700">
+                  <CheckCircle size={12} /> All requirements met — eligible for promotion
+                </div>
+              )}
             </div>
 
-            {/* Requirements with editable text inputs */}
+            {/* Auto-Suggest row */}
+            <div className="flex justify-end">
+              <button
+                onClick={handlePromoAutoSuggest}
+                disabled={promoAutoSuggesting}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {promoAutoSuggesting ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} className="text-amber-500" />}
+                <span>{promoAutoSuggesting ? 'Scanning…' : 'Auto-Suggest from Activity'}</span>
+              </button>
+            </div>
+
+            {/* Requirements */}
             <div className="space-y-3">
-              <h4 className="font-semibold text-slate-900">Requirements</h4>
               {promotionProgress.requirements.map(req => (
                 <div
                   key={req.id}
-                  className={`p-4 rounded-lg border-2 ${req.isCompleted
-                    ? 'border-green-200 bg-green-50'
-                    : 'border-slate-200 bg-white'
-                    }`}
+                  className={`rounded-xl border overflow-hidden ${req.isCompleted ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-white'}`}
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-start space-x-3">
-                      <div className={`mt-0.5 ${req.isCompleted ? 'text-green-600' : 'text-slate-400'}`}>
-                        {req.isCompleted ? <CheckCircle size={20} /> : <Clock size={20} />}
+                  <div className={`h-1 w-full ${req.isCompleted ? 'bg-green-500' : 'bg-slate-200'}`} />
+                  <div className="p-3.5">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className={req.isCompleted ? 'text-green-500' : 'text-slate-300'}>
+                          {req.isCompleted ? <CheckCircle size={15} /> : <Clock size={15} />}
+                        </div>
+                        <span className="font-semibold text-sm text-slate-900">{req.name}</span>
                       </div>
-                      <div>
-                        <div className="font-medium text-slate-900">{req.name}</div>
-                        <div className="text-sm text-slate-600 mt-1">{req.description}</div>
-                      </div>
+                      {req.isCompleted && <Badge variant="success">Done</Badge>}
                     </div>
-                    {req.isCompleted && (
-                      <Badge variant="success">Complete</Badge>
-                    )}
-                  </div>
-                  {/* Editable text input */}
+                    <p className="text-xs text-slate-500 mb-3 pl-5">{req.description}</p>
+                  {/* Inputs — stacked mobile, side-by-side sm+ */}
                   {req.type === 'event_participation' ? (
-                    <div className="mt-3 flex items-start gap-2">
-                      <div className="space-y-2 flex-1">
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
-                          <input
-                            type="text"
-                            className={inputClassName}
-                            placeholder="Event 1"
-                            value={editValues.event_participation_1 || ''}
-                            onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1: e.target.value }))}
-                          />
-                          <input
-                            type="date"
-                            className={inputClassName}
-                            value={editValues.event_participation_1_date || ''}
-                            onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1_date: e.target.value }))}
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2">
-                          <input
-                            type="text"
-                            className={inputClassName}
-                            placeholder="Event 2"
-                            value={editValues.event_participation_2 || ''}
-                            onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2: e.target.value }))}
-                          />
-                          <input
-                            type="date"
-                            className={inputClassName}
-                            value={editValues.event_participation_2_date || ''}
-                            onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2_date: e.target.value }))}
-                          />
-                        </div>
+                    <div className="space-y-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input type="text" className={`${inputClassName} flex-1`} placeholder="Event 1"
+                          value={editValues.event_participation_1 || ''}
+                          onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1: e.target.value }))} />
+                        <input type="date" className={`${inputClassName} sm:w-36`}
+                          value={editValues.event_participation_1_date || ''}
+                          onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1_date: e.target.value }))} />
                       </div>
-                      <Button
-                        size="sm"
-                        variant={
-                          editValues.event_participation_1?.trim() &&
-                            editValues.event_participation_1_date?.trim() &&
-                            editValues.event_participation_2?.trim() &&
-                            editValues.event_participation_2_date?.trim()
-                            ? 'primary'
-                            : 'outline'
-                        }
-                        onClick={() => handleSaveField(req.type)}
-                        disabled={savingField === req.type}
-                      >
-                        {savingField === req.type ? (
-                          <RefreshCw size={14} className="animate-spin" />
-                        ) : (
-                          <Save size={14} />
-                        )}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input type="text" className={`${inputClassName} flex-1`} placeholder="Event 2"
+                          value={editValues.event_participation_2 || ''}
+                          onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2: e.target.value }))} />
+                        <input type="date" className={`${inputClassName} sm:w-36`}
+                          value={editValues.event_participation_2_date || ''}
+                          onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2_date: e.target.value }))} />
+                      </div>
+                      <Button size="sm" variant={
+                        editValues.event_participation_1?.trim() && editValues.event_participation_1_date?.trim() &&
+                        editValues.event_participation_2?.trim() && editValues.event_participation_2_date?.trim()
+                          ? 'primary' : 'outline'}
+                        onClick={() => handleSaveField(req.type)} disabled={savingField === req.type}>
+                        {savingField === req.type ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                       </Button>
                     </div>
                   ) : req.type === 'jci_inspire_completion' ? (
-                    <div className="mt-3 flex items-start gap-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2 flex-1">
-                        <select
-                          className={inputClassName}
-                          value={editValues.jci_inspire_completion_course || ''}
-                          onChange={(e) => setEditValues(prev => ({ ...prev, jci_inspire_completion_course: e.target.value }))}
-                        >
-                          <option value="">Select course</option>
-                          {COURSE_OPTIONS.map(option => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="date"
-                          className={inputClassName}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select className={`${inputClassName} flex-1`}
+                        value={editValues.jci_inspire_completion_course || ''}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, jci_inspire_completion_course: e.target.value }))}>
+                        <option value="">Select course</option>
+                        {COURSE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                      <div className="flex gap-2">
+                        <input type="date" className={`${inputClassName} flex-1 sm:w-36 sm:flex-none`}
                           value={editValues.jci_inspire_completion_date || ''}
-                          onChange={(e) => setEditValues(prev => ({ ...prev, jci_inspire_completion_date: e.target.value }))}
-                        />
+                          onChange={(e) => setEditValues(prev => ({ ...prev, jci_inspire_completion_date: e.target.value }))} />
+                        <Button size="sm" variant={
+                          editValues.jci_inspire_completion_course?.trim() && editValues.jci_inspire_completion_date?.trim()
+                            ? 'primary' : 'outline'}
+                          onClick={() => handleSaveField(req.type)} disabled={savingField === req.type} className="shrink-0">
+                          {savingField === req.type ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant={
-                          editValues.jci_inspire_completion_course?.trim() &&
-                            editValues.jci_inspire_completion_date?.trim()
-                            ? 'primary'
-                            : 'outline'
-                        }
-                        onClick={() => handleSaveField(req.type)}
-                        disabled={savingField === req.type}
-                      >
-                        {savingField === req.type ? (
-                          <RefreshCw size={14} className="animate-spin" />
-                        ) : (
-                          <Save size={14} />
-                        )}
-                      </Button>
                     </div>
                   ) : (
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2 flex-1">
-                        <input
-                          type="text"
-                          className={inputClassName}
-                          placeholder={REQUIREMENT_PLACEHOLDER[req.type] || 'Enter details...'}
-                          value={editValues[`${req.type}_detail`] || ''}
-                          onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_detail`]: e.target.value }))}
-                        />
-                        <input
-                          type="date"
-                          className={inputClassName}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input type="text" className={`${inputClassName} flex-1`}
+                        placeholder={REQUIREMENT_PLACEHOLDER[req.type] || 'Enter details…'}
+                        value={editValues[`${req.type}_detail`] || ''}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_detail`]: e.target.value }))} />
+                      <div className="flex gap-2">
+                        <input type="date" className={`${inputClassName} flex-1 sm:w-36 sm:flex-none`}
                           value={editValues[`${req.type}_date`] || ''}
-                          onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_date`]: e.target.value }))}
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={
+                          onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_date`]: e.target.value }))} />
+                        <Button size="sm" variant={
                           editValues[`${req.type}_detail`]?.trim() && editValues[`${req.type}_date`]?.trim()
-                            ? 'primary'
-                            : 'outline'
-                        }
-                        onClick={() => handleSaveField(req.type)}
-                        disabled={savingField === req.type}
-                      >
-                        {savingField === req.type ? (
-                          <RefreshCw size={14} className="animate-spin" />
-                        ) : (
-                          <Save size={14} />
-                        )}
-                      </Button>
+                            ? 'primary' : 'outline'}
+                          onClick={() => handleSaveField(req.type)} disabled={savingField === req.type} className="shrink-0">
+                          {savingField === req.type ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                        </Button>
+                      </div>
                     </div>
                   )}
+                  </div>
                 </div>
               ))}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex space-x-3">
+            <div className="flex gap-3">
               {promotionProgress.isEligibleForPromotion ? (
-                <Button
-                  className="flex-1"
-                  onClick={() => handlePromoteMember(promotionProgress.memberId, 'automatic')}
-                >
+                <Button className="flex-1" onClick={() => handlePromoteMember(promotionProgress.memberId, 'automatic')}>
                   <Award size={16} className="mr-2" />
                   Promote to Full Member
                 </Button>
               ) : (
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowManualPromotionModal(true)}
-                >
+                <Button variant="outline" className="flex-1" onClick={() => setShowManualPromotionModal(true)}>
                   <FileText size={16} className="mr-2" />
                   Request Manual Promotion
                 </Button>
               )}
             </div>
 
-            {/* Promotion Info */}
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <AlertCircle className="text-blue-600 mt-0.5" size={16} />
-                <div className="text-sm text-blue-900">
-                  <p className="font-medium mb-1">Promotion Details</p>
-                  <p>Current Dues: RM350 (Probation)</p>
-                  <p>New Dues: RM300 (Full Member)</p>
-                  <p className="mt-2 text-xs text-blue-700">
-                    Upon promotion, the member's dues will be automatically adjusted.
-                  </p>
-                </div>
-              </div>
+            {/* Dues info */}
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-800">
+              <AlertCircle size={14} className="text-blue-500 mt-0.5 shrink-0" />
+              <span>Upon promotion: dues change from <strong>RM350</strong> (Probation) → <strong>RM300</strong> (Full Member).</span>
             </div>
           </div>
         )}
@@ -891,114 +1244,181 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         }}
         title={ENGAGEMENT_VIEW_LABELS[selectedEngagementYear]}
       >
-        {engagementProgress && (
-          <div className="space-y-6">
-            <MemberSummaryPanel member={selectedMemberRecord} />
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-slate-700">Overall Progress</span>
-                <span className="text-sm font-semibold text-slate-900">
-                  {engagementProgress.completedCount}/{engagementProgress.totalCount} ({engagementProgress.overallProgress.toFixed(0)}%)
-                </span>
+        {engagementProgress && (() => {
+          const GROUPS = ['Leadership Experience', 'Skills Development', 'JCI Experience'] as const;
+          const pendingTotal = engagementProgress.requirements.filter(r => r.progress.pendingVerification).length;
+          return (
+            <div className="space-y-4">
+              {/* Compact member header + Auto-Suggest */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <MemberSummaryPanel member={selectedMemberRecord} />
+                </div>
               </div>
-              <ProgressBar
-                progress={engagementProgress.overallProgress}
-                color={engagementProgress.isCompleted ? 'bg-green-600' : 'bg-blue-600'}
-              />
-            </div>
 
-            {(['Leadership Experience', 'Skills Development', 'JCI Experience'] as const).map(group => {
-              const groupRequirements = engagementProgress.requirements.filter(req => req.group === group);
-              if (groupRequirements.length === 0) return null;
+              {/* Segmented progress + Auto-Suggest in same row */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-slate-500">
+                      {engagementProgress.completedCount}/{engagementProgress.totalCount} completed
+                      {pendingTotal > 0 && <span className="ml-2 text-amber-500">· {pendingTotal} pending</span>}
+                    </span>
+                    <span className="text-xs font-bold text-slate-700">{engagementProgress.overallProgress.toFixed(0)}%</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {engagementProgress.requirements.map(req => {
+                      const isPend = !!req.progress.pendingVerification;
+                      const seg = req.isCompleted ? 'bg-green-500' : isPend ? 'bg-amber-400' : 'bg-slate-200';
+                      return <div key={req.key} className={`h-2 flex-1 rounded-full transition-colors ${seg}`} title={req.title} />;
+                    })}
+                  </div>
+                </div>
+                <button
+                  onClick={handleAutoSuggest}
+                  disabled={autoSuggesting}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {autoSuggesting ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} className="text-amber-500" />}
+                  <span className="hidden sm:inline">{autoSuggesting ? 'Scanning…' : 'Auto-Suggest'}</span>
+                </button>
+              </div>
 
-              return (
-                <div key={group} className="space-y-3">
-                  <h4 className="font-semibold text-slate-900">{group}</h4>
-                  {groupRequirements.map(requirement => {
-                    const values = engagementEditValues[requirement.key] || { detail: '', date: '' };
-                    const complete = Boolean(values.detail.trim() && values.date.trim());
+              {/* Group tabs */}
+              <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+                {GROUPS.map(g => {
+                  const reqs = engagementProgress.requirements.filter(r => r.group === g);
+                  const done = reqs.filter(r => r.isCompleted).length;
+                  const pend = reqs.filter(r => r.progress.pendingVerification).length;
+                  const isActive = engagementGroupTab === g;
+                  return (
+                    <button
+                      key={g}
+                      onClick={() => setEngagementGroupTab(g)}
+                      className={`flex-1 py-1.5 px-1 rounded-lg text-xs font-medium transition-all ${
+                        isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      <span className="hidden sm:inline">{g.split(' ')[0]}</span>
+                      <span className="sm:hidden">{g === 'Leadership Experience' ? 'Lead' : g === 'Skills Development' ? 'Skills' : 'JCI'}</span>
+                      <span className={`ml-1 text-[10px] ${done === reqs.length ? 'text-green-500' : pend > 0 ? 'text-amber-500' : 'text-slate-400'}`}>
+                        {done}/{reqs.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-                    return (
-                      <div
-                        key={requirement.key}
-                        className={`p-4 rounded-lg border-2 ${requirement.isCompleted
-                          ? 'border-green-200 bg-green-50'
-                          : 'border-slate-200 bg-white'
-                          }`}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-start space-x-3">
-                            <div className={`mt-0.5 ${requirement.isCompleted ? 'text-green-600' : 'text-slate-400'}`}>
-                              {requirement.isCompleted ? <CheckCircle size={20} /> : <Clock size={20} />}
+              {/* Requirement cards for active group */}
+              <div className="space-y-3">
+                {engagementProgress.requirements.filter(r => r.group === engagementGroupTab).map(requirement => {
+                  const values = engagementEditValues[requirement.key] || { detail: '', date: '' };
+                  const complete = Boolean(values.detail.trim() && values.date.trim());
+                  const isPending = !!requirement.progress.pendingVerification;
+
+                  const cardBorder = requirement.isCompleted
+                    ? 'border-green-200 bg-green-50'
+                    : isPending
+                      ? 'border-amber-200 bg-amber-50/60'
+                      : 'border-slate-200 bg-white';
+                  const accentBar = requirement.isCompleted
+                    ? 'bg-green-500'
+                    : isPending ? 'bg-amber-400' : 'bg-slate-200';
+
+                  return (
+                    <div key={requirement.key} className={`rounded-xl border overflow-hidden ${cardBorder}`}>
+                      {/* Thin accent bar at top */}
+                      <div className={`h-1 w-full ${accentBar}`} />
+
+                      <div className="p-3.5">
+                        {/* Title row */}
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2">
+                            <div className={requirement.isCompleted ? 'text-green-500' : isPending ? 'text-amber-400' : 'text-slate-300'}>
+                              {requirement.isCompleted ? <CheckCircle size={15} /> : <Clock size={15} />}
                             </div>
-                            <div>
-                              <div className="font-medium text-slate-900">{requirement.title}</div>
-                              <div className="text-sm text-slate-600 mt-1">{requirement.description}</div>
-                            </div>
+                            <span className="font-semibold text-sm text-slate-900">{requirement.title}</span>
                           </div>
-                          {requirement.isCompleted && <Badge variant="success">Complete</Badge>}
+                          {requirement.isCompleted && <Badge variant="success">Done</Badge>}
+                          {isPending && <Badge variant="warning">Pending BOD</Badge>}
                         </div>
 
-                        <div className="flex items-start gap-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-2 flex-1">
-                            {requirement.inputType === 'select' ? (
-                              <select
-                                className={inputClassName}
-                                value={values.detail}
-                                onChange={(e) => setEngagementEditValues(prev => ({
-                                  ...prev,
-                                  [requirement.key]: { ...(prev[requirement.key] || { detail: '', date: '' }), detail: e.target.value }
-                                }))}
+                        <p className="text-xs text-slate-500 mb-3 pl-5">{requirement.description}</p>
+
+                        {/* Pending suggestion preview */}
+                        {isPending && requirement.progress.detail && (
+                          <div className="mb-3 ml-5 flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-100 border border-amber-200">
+                            <div className="text-xs text-amber-800 min-w-0">
+                              <span className="font-medium">{requirement.progress.detail}</span>
+                              {requirement.progress.date && <span className="ml-1.5 text-amber-600">{requirement.progress.date}</span>}
+                              <span className="ml-1.5 text-amber-500 text-[10px]">
+                                via {requirement.progress.autoSuggestedFrom === 'committee' ? 'Committee' : 'Activity Log'}
+                              </span>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              <button
+                                onClick={() => handleApprove(requirement.key)}
+                                disabled={approvingKey === requirement.key || rejectingKey === requirement.key}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
                               >
-                                <option value="">Select option</option>
-                                {(requirement.options || []).map(option => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                className={inputClassName}
-                                placeholder="Enter details"
-                                value={values.detail}
-                                onChange={(e) => setEngagementEditValues(prev => ({
-                                  ...prev,
-                                  [requirement.key]: { ...(prev[requirement.key] || { detail: '', date: '' }), detail: e.target.value }
-                                }))}
-                              />
-                            )}
+                                {approvingKey === requirement.key ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleReject(requirement.key)}
+                                disabled={approvingKey === requirement.key || rejectingKey === requirement.key}
+                                className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                              >
+                                {rejectingKey === requirement.key ? <RefreshCw size={11} className="animate-spin" /> : <X size={11} />}
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Input row — stacked on mobile, side-by-side on sm+ */}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            className={`${inputClassName} flex-1`}
+                            placeholder="Event / activity name"
+                            value={values.detail}
+                            onChange={(e) => setEngagementEditValues(prev => ({
+                              ...prev,
+                              [requirement.key]: { ...(prev[requirement.key] || { detail: '', date: '' }), detail: e.target.value }
+                            }))}
+                          />
+                          <div className="flex gap-2">
                             <input
                               type="date"
-                              className={inputClassName}
+                              className={`${inputClassName} flex-1 sm:w-36 sm:flex-none`}
                               value={values.date}
                               onChange={(e) => setEngagementEditValues(prev => ({
                                 ...prev,
                                 [requirement.key]: { ...(prev[requirement.key] || { detail: '', date: '' }), date: e.target.value }
                               }))}
                             />
+                            <Button
+                              size="sm"
+                              variant={complete ? 'primary' : 'outline'}
+                              onClick={() => handleSaveEngagementRequirement(requirement)}
+                              disabled={savingEngagementKey === requirement.key}
+                              className="shrink-0"
+                            >
+                              {savingEngagementKey === requirement.key
+                                ? <RefreshCw size={14} className="animate-spin" />
+                                : <Save size={14} />}
+                            </Button>
                           </div>
-                          <Button
-                            size="sm"
-                            variant={complete ? 'primary' : 'outline'}
-                            onClick={() => handleSaveEngagementRequirement(requirement)}
-                            disabled={savingEngagementKey === requirement.key}
-                          >
-                            {savingEngagementKey === requirement.key ? (
-                              <RefreshCw size={14} className="animate-spin" />
-                            ) : (
-                              <Save size={14} />
-                            )}
-                          </Button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Manual Promotion Request Modal */}
