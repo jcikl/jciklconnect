@@ -31,6 +31,8 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
 
   const memberContainerRef = useRef<HTMLDivElement>(null);
   const eventContainerRef = useRef<HTMLDivElement>(null);
+  const memberListRef = useRef<HTMLUListElement>(null);
+  const eventListRef = useRef<HTMLUListElement>(null);
 
   const openMemberDropdown = () => {
     if (memberContainerRef.current) {
@@ -51,10 +53,17 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
   // Click outside to close
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (memberContainerRef.current && !memberContainerRef.current.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (
+        memberContainerRef.current && !memberContainerRef.current.contains(t) &&
+        memberListRef.current && !memberListRef.current.contains(t)
+      ) {
         setMemberOpen(false);
       }
-      if (eventContainerRef.current && !eventContainerRef.current.contains(e.target as Node)) {
+      if (
+        eventContainerRef.current && !eventContainerRef.current.contains(t) &&
+        eventListRef.current && !eventListRef.current.contains(t)
+      ) {
         setEventOpen(false);
       }
     };
@@ -223,6 +232,7 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
           </div>
           {memberOpen && memberDropdownRect && createPortal(
             <ul
+              ref={memberListRef}
               style={{ position: 'fixed', top: memberDropdownRect.bottom + 4, left: memberDropdownRect.left, width: memberDropdownRect.width, zIndex: 9999 }}
               className="max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1"
             >
@@ -275,6 +285,7 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
           </div>
           {eventOpen && eventDropdownRect && createPortal(
             <ul
+              ref={eventListRef}
               style={{ position: 'fixed', top: eventDropdownRect.bottom + 4, left: eventDropdownRect.left, width: eventDropdownRect.width, zIndex: 9999 }}
               className="max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1"
             >
