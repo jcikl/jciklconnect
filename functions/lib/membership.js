@@ -1,8 +1,41 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.membershipFunctions = exports.generateDuesRenewal = exports.checkMemberPromotion = void 0;
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+const functions = __importStar(require("firebase-functions"));
+const admin = __importStar(require("firebase-admin"));
 const db = admin.firestore();
 // Function to handle member promotion from Probation to Full
 exports.checkMemberPromotion = functions.firestore
@@ -12,7 +45,7 @@ exports.checkMemberPromotion = functions.firestore
     const after = change.after.data();
     const memberId = context.params.memberId;
     // Only check Probation members
-    if (after.membershipType !== 'probation') {
+    if (after.membershipType !== 'probation' && after.membershipType !== 'Probation') {
         return null;
     }
     // Check if promotion progress was updated
@@ -49,7 +82,7 @@ exports.checkMemberPromotion = functions.firestore
 });
 // Function to handle annual dues renewal
 exports.generateDuesRenewal = functions.https.onCall(async (data, context) => {
-    var _a;
+    var _a, _b, _c;
     // Verify admin permissions
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
@@ -86,7 +119,7 @@ exports.generateDuesRenewal = functions.https.onCall(async (data, context) => {
         }
         // Determine dues amount based on membership type
         let amount = 0;
-        switch (member.membershipType) {
+        switch (((_c = (_b = member.membershipType) === null || _b === void 0 ? void 0 : _b.toLowerCase) === null || _c === void 0 ? void 0 : _c.call(_b)) || member.membershipType) {
             case 'probation':
                 amount = 350;
                 break;

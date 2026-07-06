@@ -37,3 +37,6 @@ yarn-error.log*
 .cursor/
 tsc_errors_latest.txt
 tsc_errors_new.txt
+
+# Local Netlify folder
+.netlify

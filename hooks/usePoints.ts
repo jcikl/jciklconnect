@@ -31,11 +31,11 @@ export const usePoints = () => {
     }
   };
 
-  const loadLeaderboard = async (limit: number = 10) => {
+  const loadLeaderboard = async (limit: number = 10, year?: number) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await PointsService.getLeaderboard(limit);
+      const data = await PointsService.getLeaderboard(limit, 'public', undefined, year);
       setLeaderboard(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load leaderboard';

@@ -39,12 +39,24 @@ import 'swiper/css/pagination';
  * Competitive UI Helper Component: Elite Leaderboard
  * Purpose: Peer pressure, Public Comparison (Jealousy/Vanity)
  */
-const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ members, currentUser }) => {
+interface EliteLeaderboardProps {
+  members: any[];
+  currentUser: any;
+  year: number;
+  onYearChange: (year: number) => void;
+}
+
+const EliteLeaderboard: React.FC<EliteLeaderboardProps> = ({ members, currentUser, year, onYearChange }) => {
   const top3 = members.slice(0, 3);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(top3[0]?.id || null);
   const currentYear = new Date().getFullYear();
-  const [radarYear, setRadarYear] = useState(currentYear);
   const availableYears = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
+  useEffect(() => {
+    if (top3[0]?.id) {
+      setSelectedMemberId(top3[0].id);
+    }
+  }, [members]);
 
   return (
     <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-jci-navy border-none shadow-[0_20px_50px_rgba(8,112,184,0.7)] text-white">
@@ -98,8 +110,8 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
             {/* Year Selector */}
             <div className="absolute top-3 right-4">
               <select
-                value={radarYear}
-                onChange={(e) => setRadarYear(Number(e.target.value))}
+                value={year}
+                onChange={(e) => onYearChange(Number(e.target.value))}
                 className="appearance-none bg-white/10 text-amber-400 text-[10px] font-black uppercase tracking-wider rounded-full pl-2.5 pr-6 py-1 border border-white/15 cursor-pointer hover:bg-white/15 transition-all focus:outline-none focus:ring-1 focus:ring-amber-400/50"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
               >
@@ -109,7 +121,7 @@ const EliteLeaderboard: React.FC<{ members: any[], currentUser: any }> = ({ memb
               </select>
             </div>
 
-            <PointsSourceRadarChart memberId={selectedMemberId || undefined} year={radarYear} className="mt-4" />
+            <PointsSourceRadarChart memberId={selectedMemberId || undefined} year={year} className="mt-4" />
 
             <div className="absolute bottom-4 right-6 text-right">
               <p className="text-[10px] font-black text-amber-400 italic uppercase">Competitive Mode</p>
@@ -145,7 +157,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const { projects, loading: projectsLoading } = useProjects();
   const { members, loading: membersLoading } = useMembers();
   const { nudges, dismissNudge } = useBehavioralNudging();
-  const { leaderboard, pointHistory } = usePoints();
+  const { leaderboard, pointHistory, loadLeaderboard } = usePoints();
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);
@@ -166,6 +178,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
   const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
+  const currentYear = new Date().getFullYear();
+  const [radarYear, setRadarYear] = useState(currentYear);
+
+  // Load leaderboard when selected year changes
+  useEffect(() => {
+    const isEligibleMember = member && member.role !== 'GUEST' && member.role !== 'INACTIVE';
+    if (isEligibleMember) {
+      loadLeaderboard(10, radarYear);
+    }
+  }, [radarYear, member]);
 
   const PROMO_FIELD_MAP: Record<string, 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted'> = {
     'bod_meeting_attendance': 'bodMeetingAttended',
@@ -702,7 +724,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <>
             {/* LEADERBOARD (Wolf Heart) - Spanning 2 or 3 columns depending on active commitments */}
             <div className={contracts.filter(c => c.status === 'Active').length > 0 ? "lg:col-span-2" : "lg:col-span-3"}>
-              <EliteLeaderboard members={leaderboard} currentUser={member} />
+              <EliteLeaderboard members={leaderboard} currentUser={member} year={radarYear} onYearChange={setRadarYear} />
             </div>
 
             {/* ACTIVE COMMITMENTS / BETS */}

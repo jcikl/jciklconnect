@@ -318,13 +318,65 @@ export class PointsService {
     return this.getMemberPointHistory(memberId);
   }
 
-  // Get leaderboard with visibility filtering
+  // Get leaderboard with visibility filtering and year filtering
   static async getLeaderboard(
     limitCount: number = 10,
     visibility: 'public' | 'members_only' | 'private' = 'public',
-    requestingMemberId?: string
+    requestingMemberId?: string,
+    year?: number
   ): Promise<Member[]> {
+    if (isDevMode() && year) {
+      try {
+        const members = await MembersService.getAllMembers();
+        return members
+          .filter(m => {
+            if (visibility === 'private') {
+              return requestingMemberId ? m.id === requestingMemberId : false;
+            }
+            if (visibility === 'members_only') {
+              return m.leaderboardVisibility === 'members_only' || m.leaderboardVisibility === 'public';
+            }
+            return m.leaderboardVisibility !== 'private';
+          })
+          .map(m => {
+            let hash = 0;
+            for (let i = 0; i < m.id.length; i++) {
+              hash = m.id.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const seed = Math.abs(hash + year) % 100;
+            const mockPoints = seed * 15 + 50;
+            return {
+              ...m,
+              points: mockPoints
+            };
+          })
+          .sort((a, b) => (b.points || 0) - (a.points || 0))
+          .slice(0, limitCount);
+      } catch (error) {
+        console.error('Error fetching mock leaderboard:', error);
+        throw error;
+      }
+    }
+
     try {
+      const memberPointsMap: Record<string, number> = {};
+      if (year) {
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31, 23, 59, 59);
+        const q = query(
+          collection(db, COLLECTIONS.POINTS),
+          where('createdAt', '>=', Timestamp.fromDate(startDate)),
+          where('createdAt', '<=', Timestamp.fromDate(endDate))
+        );
+        const snapshot = await getDocs(q);
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const memberId = data.memberId;
+          const pts = data.points || data.amount || 0;
+          memberPointsMap[memberId] = (memberPointsMap[memberId] || 0) + pts;
+        });
+      }
+
       const members = await MembersService.getAllMembers();
       return members
         .filter(m => {
@@ -336,6 +388,15 @@ export class PointsService {
           }
           // For public view, display anyone unless they explicitly opted out to 'private'
           return m.leaderboardVisibility !== 'private';
+        })
+        .map(m => {
+          if (year) {
+            return {
+              ...m,
+              points: memberPointsMap[m.id] || 0
+            };
+          }
+          return m;
         })
         .sort((a, b) => (b.points || 0) - (a.points || 0))
         .slice(0, limitCount);

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -7,7 +7,7 @@ import {
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
   ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw,
-  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap
+  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -3913,93 +3913,259 @@ export const JCIKLApp: React.FC = () => {
                   <div className={`w-10 h-1 rounded-full mx-auto mb-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
                   <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
                   <div className="grid grid-cols-4 gap-y-4 gap-x-1 my-2">
-                    {/* My Projects */}
-                    <div
-                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                      onClick={() => {
-                        setShowMobileMenu(false);
-                        if (member?.role === UserRole.GUEST) {
-                          setUpgradeModalOpen(true);
-                        } else {
-                          handleViewChange('PROJECTS');
-                        }
-                      }}
-                    >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : (isBoard || isAdmin || isDeveloper ? 'bg-green-950/30 text-green-400 border-green-900/50' : 'bg-green-50 text-green-600 border-green-100')}`}>
-                        <Briefcase size={22} />
-                      </div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : (isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600')}`}>
-                        My Projects
-                      </span>
-                    </div>
+                    {(isBoard || isAdmin || isDeveloper) ? (
+                      <>
+                        {/* 1. Projects */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('PROJECTS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-blue-950/30 text-blue-400 border-blue-900/50">
+                            <Briefcase size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Projects
+                          </span>
+                        </div>
 
-                    {/* Survey */}
-                    <div
-                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                      onClick={() => {
-                        handleViewChange('SURVEYS');
-                        setShowMobileMenu(false);
-                      }}
-                    >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-rose-950/30 text-rose-400 border-rose-900/50' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                        <CheckSquare size={22} />
-                      </div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
-                        Survey
-                      </span>
-                    </div>
+                        {/* 2. Survey */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('SURVEYS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-rose-950/30 text-rose-400 border-rose-900/50">
+                            <CheckSquare size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Surveys
+                          </span>
+                        </div>
 
-                    {/* Hobby Clubs */}
-                    <div
-                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                      onClick={() => {
-                        handleViewChange('CLUBS');
-                        setShowMobileMenu(false);
-                      }}
-                    >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-pink-950/30 text-pink-400 border-pink-900/50' : 'bg-pink-50 text-pink-600 border-pink-100'}`}>
-                        <Heart size={22} />
-                      </div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
-                        Hobby Clubs
-                      </span>
-                    </div>
+                        {/* 3. Members */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('MEMBERS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-purple-950/30 text-purple-400 border-purple-900/50">
+                            <Users size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Members
+                          </span>
+                        </div>
 
-                    {/* Knowledge */}
-                    <div
-                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                      onClick={() => {
-                        handleViewChange('KNOWLEDGE');
-                        setShowMobileMenu(false);
-                      }}
-                    >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-indigo-950/30 text-indigo-400 border-indigo-900/50' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
-                        <BookOpen size={22} />
-                      </div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>
-                        Knowledge
-                      </span>
-                    </div>
+                        {/* 4. Inventories */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('INVENTORY');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-amber-950/30 text-amber-400 border-amber-900/50">
+                            <Package size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Inventories
+                          </span>
+                        </div>
 
-                    {/* Claim */}
-                    <div
-                      className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
-                      onClick={() => {
-                        setShowMobileMenu(false);
-                        if (member?.role === UserRole.GUEST) {
-                          setUpgradeModalOpen(true);
-                        } else {
-                          handleViewChange('PAYMENT_REQUESTS');
-                        }
-                      }}
-                    >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : (isBoard || isAdmin || isDeveloper ? 'bg-amber-950/30 text-amber-400 border-amber-900/50' : 'bg-amber-50 text-amber-600 border-amber-100')}`}>
-                        <CreditCard size={22} />
-                      </div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : (isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600')}`}>
-                        Claim
-                      </span>
-                    </div>
+                        {/* 5. Calendar */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('EVENTS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-green-950/30 text-green-400 border-green-900/50">
+                            <Zap size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Calendar
+                          </span>
+                        </div>
+
+                        {/* 6. Communication */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('COMMUNICATION');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50">
+                            <Activity size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Comm
+                          </span>
+                        </div>
+
+                        {/* 7. Knowledge */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('KNOWLEDGE');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-indigo-950/30 text-indigo-400 border-indigo-900/50">
+                            <BookOpen size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Knowledge
+                          </span>
+                        </div>
+
+                        {/* 8. Hobby Clubs */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('CLUBS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-pink-950/30 text-pink-400 border-pink-900/50">
+                            <Heart size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Hobbies
+                          </span>
+                        </div>
+
+                        {/* 9. Finance */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('FINANCE');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-emerald-950/30 text-emerald-400 border-emerald-900/50">
+                            <DollarSign size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Finance
+                          </span>
+                        </div>
+
+                        {/* 10. Claim */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('PAYMENT_REQUESTS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-amber-950/30 text-amber-400 border-amber-900/50">
+                            <CreditCard size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">
+                            Claim
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* My Projects */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            setShowMobileMenu(false);
+                            if (member?.role === UserRole.GUEST) {
+                              setUpgradeModalOpen(true);
+                            } else {
+                              handleViewChange('PROJECTS');
+                            }
+                          }}
+                        >
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                            <Briefcase size={22} />
+                          </div>
+                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>
+                            My Projects
+                          </span>
+                        </div>
+
+                        {/* Survey */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('SURVEYS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-rose-50 text-rose-600 border-rose-100">
+                            <CheckSquare size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-600">
+                            Survey
+                          </span>
+                        </div>
+
+                        {/* Hobby Clubs */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('CLUBS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-pink-50 text-pink-600 border-pink-100">
+                            <Heart size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-600">
+                            Hobby Clubs
+                          </span>
+                        </div>
+
+                        {/* Knowledge */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            handleViewChange('KNOWLEDGE');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm bg-indigo-50 text-indigo-600 border-indigo-100">
+                            <BookOpen size={22} />
+                          </div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-600">
+                            Knowledge
+                          </span>
+                        </div>
+
+                        {/* Claim */}
+                        <div
+                          className="flex flex-col items-center gap-1 group cursor-pointer active:scale-95 transform transition-transform"
+                          onClick={() => {
+                            setShowMobileMenu(false);
+                            if (member?.role === UserRole.GUEST) {
+                              setUpgradeModalOpen(true);
+                            } else {
+                              handleViewChange('PAYMENT_REQUESTS');
+                            }
+                          }}
+                        >
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-300 shadow-sm ${member?.role === UserRole.GUEST ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                            <CreditCard size={22} />
+                          </div>
+                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${member?.role === UserRole.GUEST ? 'text-slate-400' : 'text-slate-600'}`}>
+                            Claim
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

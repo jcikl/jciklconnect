@@ -240,10 +240,131 @@ export const sendEventReminders = functions.pubsub
     return null;
   });
 
+// ─── Helper: send FCM push + create Firestore notification doc ───────────────
+
+async function sendFcmPush(
+  memberId: string,
+  title: string,
+  body: string,
+  type: string,
+  data: Record<string, string> = {}
+): Promise<void> {
+  // Write in-app notification
+  await db.collection('notifications').add({
+    memberId,
+    type,
+    title,
+    message: body,
+    data,
+    read: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // Look up FCM token from users collection
+  const userDoc = await db.collection('users').doc(memberId).get();
+  const fcmToken: string | undefined = userDoc.data()?.fcmToken;
+  if (!fcmToken) return;
+
+  await admin.messaging().send({
+    token: fcmToken,
+    notification: { title, body },
+    webpush: {
+      notification: {
+        icon: '/favicon-128x128.png',
+        badge: '/favicon-64x64.png',
+      },
+    },
+    data,
+  });
+}
+
+// ─── Birthday notifications (runs daily 8 AM Malaysia time = 0:00 UTC) ────────
+
+export const sendBirthdayNotifications = functions.pubsub
+  .schedule('0 0 * * *')
+  .timeZone('Asia/Kuala_Lumpur')
+  .onRun(async (_context) => {
+    const now = new Date();
+    const todayMonth = now.getMonth() + 1; // 1-12
+    const todayDay = now.getDate();
+
+    // Fetch all active members
+    const membersSnap = await db.collection('members')
+      .where('status', '==', 'active')
+      .get();
+
+    if (membersSnap.empty) return null;
+
+    const birthdayMembers: { id: string; name: string }[] = [];
+
+    for (const doc of membersSnap.docs) {
+      const m = doc.data();
+      if (!m.dateOfBirth) continue;
+
+      // dateOfBirth stored as "YYYY-MM-DD"
+      const parts = (m.dateOfBirth as string).split('-');
+      if (parts.length < 3) continue;
+      const bMonth = parseInt(parts[1], 10);
+      const bDay = parseInt(parts[2], 10);
+
+      if (bMonth === todayMonth && bDay === todayDay) {
+        const firstName = (m.name as string || '').split(' ')[0] || m.name;
+        birthdayMembers.push({ id: doc.id, name: firstName });
+      }
+    }
+
+    if (birthdayMembers.length === 0) {
+      console.log('No birthdays today.');
+      return null;
+    }
+
+    console.log(`Birthdays today: ${birthdayMembers.map(m => m.name).join(', ')}`);
+
+    // 1. Send personal birthday wish to each birthday member
+    const personalWishes = birthdayMembers.map(({ id, name }) =>
+      sendFcmPush(
+        id,
+        `Happy Birthday, ${name}! 🎂`,
+        'Wishing you a wonderful day filled with joy! From everyone at JCI KL.',
+        'birthday_self',
+        { type: 'birthday_self' }
+      ).catch(err => console.error(`Failed birthday push for ${id}:`, err))
+    );
+
+    // 2. Announce to all other members
+    const allMemberIds = membersSnap.docs.map(d => d.id);
+    const birthdayIds = new Set(birthdayMembers.map(m => m.id));
+    const otherMemberIds = allMemberIds.filter(id => !birthdayIds.has(id));
+
+    const birthdayNames = birthdayMembers.map(m => m.name).join(' & ');
+    const announcementBody =
+      birthdayMembers.length === 1
+        ? `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`
+        : `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`;
+
+    const announcements = otherMemberIds.map(id =>
+      sendFcmPush(
+        id,
+        'Birthday Today! 🎂',
+        announcementBody,
+        'birthday_announcement',
+        { type: 'birthday_announcement', names: birthdayNames }
+      ).catch(err => console.error(`Failed announcement push for ${id}:`, err))
+    );
+
+    await Promise.all([...personalWishes, ...announcements]);
+
+    console.log(
+      `Birthday notifications sent: ${birthdayMembers.length} personal, ${otherMemberIds.length} announcements.`
+    );
+    return null;
+  });
+
 export const notificationFunctions = {
   sendNotification,
   sendBulkNotifications,
   markNotificationRead,
   sendDuesRenewalReminders,
-  sendEventReminders
+  sendEventReminders,
+  sendBirthdayNotifications,
 };
