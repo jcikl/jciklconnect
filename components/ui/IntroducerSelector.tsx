@@ -33,6 +33,13 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
   const eventContainerRef = useRef<HTMLDivElement>(null);
   const memberListRef = useRef<HTMLUListElement>(null);
   const eventListRef = useRef<HTMLUListElement>(null);
+  // Track the last value we emitted so the parse useEffect doesn't re-parse our own emissions
+  const lastEmittedRef = useRef<string | null>(null);
+
+  const emit = (val: string) => {
+    lastEmittedRef.current = val;
+    onChange(val);
+  };
 
   const openMemberDropdown = () => {
     if (memberContainerRef.current) {
@@ -71,8 +78,12 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Parse the initial value when it changes externally
+  // Parse the initial value when it changes externally (skip if we emitted it ourselves)
   useEffect(() => {
+    if (lastEmittedRef.current === value) {
+      lastEmittedRef.current = null;
+      return;
+    }
     const cleanVal = (value || '').trim();
     if (!cleanVal) {
       setType('direct');
@@ -133,17 +144,17 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
     setEventOpen(false);
 
     if (newType === 'friend') {
-      onChange('Friend');
+      emit('Friend');
     } else if (newType === 'direct') {
-      onChange(detail || 'Direct Join');
+      emit(detail || 'Direct Join');
     } else if (newType === 'social_media') {
-      onChange(`Social Media (Facebook)`); // default detail
+      emit(`Social Media (Facebook)`); // default detail
       setDetail('Facebook');
     } else if (newType === 'member') {
-      onChange(''); // wait for selection
+      emit(''); // wait for selection
       setDetail('');
     } else if (newType === 'event') {
-      onChange(''); // wait for selection
+      emit(''); // wait for selection
       setDetail('');
     }
   };
@@ -151,13 +162,13 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
   const handleDetailChange = (newDetail: string) => {
     setDetail(newDetail);
     if (type === 'social_media') {
-      onChange(`Social Media (${newDetail})`);
+      emit(`Social Media (${newDetail})`);
     } else if (type === 'member') {
-      onChange(newDetail); // Stores member ID
+      emit(newDetail); // Stores member ID
     } else if (type === 'event') {
-      onChange(`Event: ${newDetail}`); // Stores Event Name
+      emit(`Event: ${newDetail}`); // Stores Event Name
     } else if (type === 'direct') {
-      onChange(newDetail || 'Direct Join');
+      emit(newDetail || 'Direct Join');
     }
   };
 
