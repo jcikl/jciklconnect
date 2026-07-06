@@ -1719,6 +1719,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
 
   const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'career' | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [inlineValues, setInlineValues] = useState<any>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'professional' | 'career' | 'activities'>('basic');
   const [activitiesLoading, setActivitiesLoading] = useState(false);
@@ -1836,6 +1837,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       senatorshipValidatedAt: member.senatorshipValidatedAt || '',
     });
     setActiveInlineEditCard(card);
+    setIsEditMode(true);
   };
 
   const handleInlineAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1870,6 +1872,47 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     } catch (err) {
       showToast('Failed to update profile', 'error');
       return false;
+    }
+  };
+
+  const handleGlobalSave = async () => {
+    if (!inlineValues) return;
+    const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+    try {
+      await updateMember(member.id, {
+        avatar: inlineValues.avatar || '', avatarUrl: inlineValues.avatar || '',
+        name: inlineValues.name, fullName: inlineValues.fullName, idNumber: inlineValues.idNumber,
+        dateOfBirth: inlineValues.dateOfBirth, gender: inlineValues.gender, ethnicity: inlineValues.ethnicity,
+        nationality: inlineValues.nationality, introducer: inlineValues.introducer, bio: inlineValues.bio,
+        hobbies: inlineValues.hobbies, skills: skillsArr,
+        companyName: inlineValues.companyName, companyWebsite: inlineValues.companyWebsite,
+        companyDescription: inlineValues.companyDescription, departmentAndPosition: inlineValues.departmentAndPosition,
+        acceptInternationalBusiness: inlineValues.acceptInternationalBusiness, businessCategory: inlineValues.businessCategory,
+        industry: inlineValues.industry, interestedIndustries: inlineValues.interestedIndustries,
+        levelOfManagement: inlineValues.levelOfManagement, idealReferralIndustry: inlineValues.idealReferralIndustry,
+        idealReferral: inlineValues.idealReferral, specialOffer: inlineValues.specialOffer,
+        phone: inlineValues.phone, alternatePhone: inlineValues.alternatePhone, email: inlineValues.email,
+        whatsappGroup: inlineValues.whatsappGroup, address: inlineValues.address,
+        emergencyContactName: inlineValues.emergencyContactName, emergencyContactRelationship: inlineValues.emergencyContactRelationship,
+        emergencyContactPhone: inlineValues.emergencyContactPhone, linkedin: inlineValues.linkedin,
+        facebook: inlineValues.facebook, instagram: inlineValues.instagram, wechat: inlineValues.wechat,
+        cutStyle: inlineValues.cutStyle, tshirtSize: inlineValues.tshirtSize, jacketSize: inlineValues.jacketSize,
+        tshirtStatus: inlineValues.tshirtStatus, embroideredName: inlineValues.embroideredName,
+        senatorshipId: inlineValues.senatorshipId?.trim(), senatorCertified: inlineValues.senatorCertified,
+        senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
+        senatorshipValidatedBy: inlineValues.senatorshipValidatedBy?.trim(),
+        senatorshipValidatedAt: inlineValues.senatorshipValidatedAt?.trim(),
+      });
+      const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+      if (originalAvatar && originalAvatar !== inlineValues.avatar) {
+        deleteFromCloudinary(originalAvatar).catch(console.error);
+      }
+      setIsEditMode(false);
+      setActiveInlineEditCard(null);
+      setInlineValues(null);
+      showToast('Profile updated successfully', 'success');
+    } catch (err) {
+      showToast('Failed to update profile', 'error');
     }
   };
 
@@ -2332,30 +2375,39 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               </div>
             </div>
 
-            <div className="flex gap-2 w-full md:w-auto">
-              {(canEditMembers || isSelfView) && (
-                <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-1 md:flex-none h-10 px-6 font-bold">Edit Profile</Button>
-              )}
-              {(isAdmin || isDeveloper) && !isSelfView && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`flex-1 md:flex-none h-10 px-6 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
-                  onClick={async () => {
-                    const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
-                    try {
-                      await updateMember(member.id, { role: newRole });
-                      showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
-                    } catch (err) {
-                      showToast('Failed to update member status', 'error');
-                    }
-                  }}
-                >
-                  {member.role === UserRole.INACTIVE ? 'Activate Member' : 'Set Inactive'}
-                </Button>
-              )}
-              {isDeveloper && !isSelfView && (
-                <Button variant="outline" size="sm" className="flex-1 md:flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
+            <div className="flex gap-2 w-full md:w-auto flex-wrap">
+              {isEditMode ? (
+                <>
+                  <Button variant="primary" size="sm" onClick={handleGlobalSave} className="flex-1 md:flex-none h-10 px-6 font-bold">Save Changes</Button>
+                  <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-1 md:flex-none h-10 px-6 font-bold">Cancel</Button>
+                </>
+              ) : (
+                <>
+                  {(canEditMembers || isSelfView) && (
+                    <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-1 md:flex-none h-10 px-6 font-bold">Edit Profile</Button>
+                  )}
+                  {(isAdmin || isDeveloper) && !isSelfView && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`flex-1 md:flex-none h-10 px-6 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
+                      onClick={async () => {
+                        const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
+                        try {
+                          await updateMember(member.id, { role: newRole });
+                          showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
+                        } catch (err) {
+                          showToast('Failed to update member status', 'error');
+                        }
+                      }}
+                    >
+                      {member.role === UserRole.INACTIVE ? 'Activate Member' : 'Set Inactive'}
+                    </Button>
+                  )}
+                  {isDeveloper && !isSelfView && (
+                    <Button variant="outline" size="sm" className="flex-1 md:flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -2506,21 +2558,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 <>
                   <Card
                     title="Basic Information"
-                    action={
-                      (canEditMembers || isSelfView) && activeInlineEditCard !== 'basic' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                          onClick={() => startInlineEdit('basic')}
-                          title="Edit Basic Info"
-                        >
-                          <Edit size={14} />
-                        </Button>
-                      )
-                    }
                   >
-                    {activeInlineEditCard === 'basic' && inlineValues ? (
+                    {isEditMode && inlineValues ? (
                       <div className="space-y-4 text-sm">
                         <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-blue-50 shadow-sm shrink-0">
@@ -2697,33 +2736,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                           />
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-3 border-t">
-                          <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                          <Button variant="primary" size="sm" onClick={async () => {
-                            const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-                            const saved = await handleInlineSave('basic', {
-                              avatar: inlineValues.avatar || '',
-                              avatarUrl: inlineValues.avatar || '',
-                              name: inlineValues.name,
-                              fullName: inlineValues.fullName,
-                              idNumber: inlineValues.idNumber,
-                              dateOfBirth: inlineValues.dateOfBirth,
-                              gender: inlineValues.gender,
-                              ethnicity: inlineValues.ethnicity,
-                              nationality: inlineValues.nationality,
-                              introducer: inlineValues.introducer,
-                              bio: inlineValues.bio,
-                              hobbies: inlineValues.hobbies,
-                              skills: skillsArr,
-                            });
-                            const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
-                            if (saved && originalAvatar && originalAvatar !== inlineValues.avatar) {
-                              deleteFromCloudinary(originalAvatar).catch((err) => {
-                                console.error('Failed to delete previous member avatar from Cloudinary:', err);
-                              });
-                            }
-                          }}>Save</Button>
-                        </div>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -2865,22 +2877,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               )}
 
               {activeDetailTab === 'career' && (
-                <Card title="Membership & Dues"
-                  action={
-                    (canEditMembers) && activeInlineEditCard !== 'career' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                        onClick={() => startInlineEdit('career')}
-                        title="Edit Membership & Senatorship"
-                      >
-                        <Edit size={14} />
-                      </Button>
-                    )
-                  }
-                >
-                  {activeInlineEditCard === 'career' && inlineValues ? (
+                <Card title="Membership & Dues">
+                  {isEditMode && inlineValues ? (
                     <div className="space-y-4 text-sm">
                       <div className="grid grid-cols-1 gap-4">
                         <div>
@@ -2937,18 +2935,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             </div>
                           </div>
                         )}
-                      </div>
-                      <div className="flex justify-end gap-2 pt-3 border-t">
-                        <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                        <Button variant="primary" size="sm" onClick={() => {
-                          handleInlineSave('career', {
-                            senatorshipId: inlineValues.senatorshipId !== undefined ? inlineValues.senatorshipId.trim() : undefined,
-                            senatorCertified: inlineValues.senatorCertified,
-                            senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
-                            senatorshipValidatedBy: inlineValues.senatorshipValidatedBy !== undefined ? inlineValues.senatorshipValidatedBy.trim() : undefined,
-                            senatorshipValidatedAt: inlineValues.senatorshipValidatedAt !== undefined ? inlineValues.senatorshipValidatedAt.trim() : undefined,
-                          });
-                        }}>Save</Button>
                       </div>
                     </div>
                   ) : (
@@ -3070,21 +3056,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             {activeDetailTab === 'professional' && (
               <Card
                 title="Professional & Business"
-                action={
-                  (canEditMembers || isSelfView) && activeInlineEditCard !== 'professional' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                      onClick={() => startInlineEdit('professional')}
-                      title="Edit Professional Info"
-                    >
-                      <Edit size={14} />
-                    </Button>
-                  )
-                }
               >
-                {activeInlineEditCard === 'professional' && inlineValues ? (
+                {isEditMode && inlineValues ? (
                   <div className="space-y-4 text-sm">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -3203,22 +3176,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       />
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-3 border-t">
-                      <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                      <Button variant="primary" size="sm" onClick={() => handleInlineSave('professional', {
-                        companyName: inlineValues.companyName,
-                        companyWebsite: inlineValues.companyWebsite,
-                        departmentAndPosition: inlineValues.departmentAndPosition,
-                        industry: inlineValues.industry,
-                        acceptInternationalBusiness: inlineValues.acceptInternationalBusiness,
-                        businessCategory: inlineValues.businessCategory,
-                        levelOfManagement: inlineValues.levelOfManagement,
-                        idealReferralIndustry: inlineValues.idealReferralIndustry,
-                        idealReferral: inlineValues.idealReferral,
-                        companyDescription: inlineValues.companyDescription,
-                        specialOffer: inlineValues.specialOffer,
-                      })}>Save</Button>
-                    </div>
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -3317,21 +3274,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <>
                 <Card
                   title="Contact Information"
-                  action={
-                    (canEditMembers || isSelfView) && activeInlineEditCard !== 'contact' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                        onClick={() => startInlineEdit('contact')}
-                        title="Edit Contact Info"
-                      >
-                        <Edit size={14} />
-                      </Button>
-                    )
-                  }
                 >
-                  {activeInlineEditCard === 'contact' && inlineValues ? (
+                  {isEditMode && inlineValues ? (
                     <div className="space-y-4 text-sm">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -3458,23 +3402,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-3 border-t">
-                        <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                        <Button variant="primary" size="sm" onClick={() => handleInlineSave('contact', {
-                          phone: inlineValues.phone,
-                          alternatePhone: inlineValues.alternatePhone,
-                          email: inlineValues.email,
-                          whatsappGroup: inlineValues.whatsappGroup,
-                          address: inlineValues.address,
-                          emergencyContactName: inlineValues.emergencyContactName,
-                          emergencyContactRelationship: inlineValues.emergencyContactRelationship,
-                          emergencyContactPhone: inlineValues.emergencyContactPhone,
-                          linkedin: inlineValues.linkedin,
-                          facebook: inlineValues.facebook,
-                          instagram: inlineValues.instagram,
-                          wechat: inlineValues.wechat,
-                        })}>Save</Button>
-                      </div>
                     </div>
                   ) : (
                     <div className="grid md:grid-cols-2 gap-6">
@@ -3538,21 +3465,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
                 <Card
                   title="Apparel & Items"
-                  action={
-                    (canEditMembers || isSelfView) && activeInlineEditCard !== 'apparel' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-full transition-colors"
-                        onClick={() => startInlineEdit('apparel')}
-                        title="Edit Apparel Size"
-                      >
-                        <Edit size={14} />
-                      </Button>
-                    )
-                  }
                 >
-                  {activeInlineEditCard === 'apparel' && inlineValues ? (
+                  {isEditMode && inlineValues ? (
                     <div className="space-y-4 text-sm">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -3615,16 +3529,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         />
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-3 border-t">
-                        <Button variant="outline" size="sm" onClick={() => setActiveInlineEditCard(null)}>Cancel</Button>
-                        <Button variant="primary" size="sm" onClick={() => handleInlineSave('apparel', {
-                          cutStyle: inlineValues.cutStyle,
-                          tshirtSize: inlineValues.tshirtSize,
-                          jacketSize: inlineValues.jacketSize,
-                          tshirtStatus: inlineValues.tshirtStatus,
-                          embroideredName: inlineValues.embroideredName,
-                        })}>Save</Button>
-                      </div>
                     </div>
                   ) : (
                     <>

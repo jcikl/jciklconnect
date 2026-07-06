@@ -2862,6 +2862,35 @@ export const JCIKLApp: React.FC = () => {
   // It handles the case when member is null internally
   const { notifications, markNotificationAsRead } = useCommunication();
   const { members } = useMembers();
+  const { events } = useEvents();
+
+  const metrics = React.useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const totalMembers = members.length;
+    const activeMembers = members.filter(m => {
+      const record = (m.membership as any)?.[currentYear];
+      const isPaid = record?.status === 'paid' || record?.status === 'over paid';
+      return m.role !== UserRole.GUEST && isPaid;
+    }).length;
+    
+    const newMembersThisMonth = members.filter(m => {
+      if (!m.joinDate) return false;
+      const joinDate = new Date(m.joinDate);
+      const now = new Date();
+      return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
+    }).length;
+
+    const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status === 'Upcoming').length;
+    const activeProjects = projects.filter(p => p.status === 'Active').length;
+
+    return {
+      totalMembers,
+      activeMembers,
+      newMembersThisMonth,
+      upcomingEvents,
+      activeProjects,
+    };
+  }, [members, events, projects]);
 
   // FCM push notification registration
   React.useEffect(() => {
@@ -3920,6 +3949,67 @@ export const JCIKLApp: React.FC = () => {
                   onClick={e => e.stopPropagation()}
                 >
                   <div className={`w-10 h-1 rounded-full mx-auto mb-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
+
+                  {/* Board Metrics Grid */}
+                  {(isBoard || isAdmin || isDeveloper) && (
+                    <div className="mb-6">
+                      <p className="text-xs font-bold uppercase tracking-widest mb-3 text-slate-400">Board Overview</p>
+                      <div className="grid grid-cols-4 gap-2 bg-slate-800/40 p-2 rounded-xl border border-slate-800/60">
+                        {/* Total Members */}
+                        <div
+                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
+                          onClick={() => {
+                            handleViewChange('MEMBERS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <Users size={16} className="text-blue-400 mb-1" />
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Members</span>
+                          <span className="text-sm font-black text-white mt-0.5">{metrics.totalMembers}</span>
+                        </div>
+
+                        {/* Active Members */}
+                        <div
+                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
+                          onClick={() => {
+                            handleViewChange('MEMBERS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <CheckCircle size={16} className="text-green-400 mb-1" />
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Active</span>
+                          <span className="text-sm font-black text-white mt-0.5">{metrics.activeMembers}</span>
+                        </div>
+
+                        {/* Upcoming Events */}
+                        <div
+                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
+                          onClick={() => {
+                            handleViewChange('EVENTS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <Calendar size={16} className="text-purple-400 mb-1" />
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Events</span>
+                          <span className="text-sm font-black text-white mt-0.5">{metrics.upcomingEvents}</span>
+                        </div>
+
+                        {/* Active Projects */}
+                        <div
+                          className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900/40 border border-slate-800/40 cursor-pointer active:scale-95 transition-all text-center"
+                          onClick={() => {
+                            handleViewChange('PROJECTS');
+                            setShowMobileMenu(false);
+                          }}
+                        >
+                          <Briefcase size={16} className="text-amber-400 mb-1" />
+                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider scale-90">Projects</span>
+                          <span className="text-sm font-black text-white mt-0.5">{metrics.activeProjects}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <p className={`text-xs font-bold uppercase tracking-widest mb-4 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400'}`}>More</p>
                   <div className="grid grid-cols-4 gap-y-4 gap-x-1 my-2">
                     {(isBoard || isAdmin || isDeveloper) ? (

@@ -156,7 +156,7 @@ describe('Points Rule Properties', () => {
               id: fc.string({ minLength: 1, maxLength: 50 }),
               memberId: fc.string({ minLength: 1, maxLength: 50 }),
               pointsAwarded: fc.integer({ min: 1, max: 500 }),
-              executedAt: fc.date({ min: new Date('2020-01-01'), max: new Date('2023-12-31') }).map(d => d.toISOString()),
+              executedAt: fc.integer({ min: new Date(2020, 0, 1).getTime(), max: new Date(2023, 11, 31).getTime() }).map(t => new Date(t).toISOString()),
             }),
             { minLength: 1, maxLength: 10 }
           ),
