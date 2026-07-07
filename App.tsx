@@ -428,7 +428,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/75">Presidential Theme {currentYear}</p>
 
                   {/* Headline + logo side by side */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-stretch gap-4">
                     <div className="flex-1">
                       {(() => {
                         const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
@@ -448,7 +448,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="relative shrink-0 flex items-center">
                         <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/20 blur-xl animate-pulse" />
                         <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
-                          className="relative z-10 h-20 w-auto object-contain drop-shadow-2xl"
+                          className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
                           onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
                       </div>
                     )}
@@ -509,7 +509,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   </div>
 
                   {/* Headline + logo side by side */}
-                  <div className="flex items-center gap-6 mb-4">
+                  <div className="flex items-stretch gap-6 mb-4">
                     {/* Theme headline — gradient amber on highlight word */}
                     <div className="flex-1">
                       {(() => {
@@ -532,7 +532,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="relative shrink-0 flex items-center">
                         <div className="absolute inset-0 scale-[2.5] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
                         <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
-                          className="relative z-10 h-36 xl:h-40 w-auto object-contain drop-shadow-2xl"
+                          className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
                           onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
                       </div>
                     )}
