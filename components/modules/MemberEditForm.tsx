@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button, Tabs } from '../ui/Common';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { Member, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
@@ -104,6 +104,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const sessionUploads = useRef<string[]>([]);
 
   useEffect(() => {
     if (initialTab) {
@@ -165,11 +166,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     setAvatarUploading(true);
     setAvatarUploadProgress(0);
     try {
-      // If a new avatar was uploaded this session (different from the saved one), clean it up first
-      if (currentAvatar && currentAvatar !== originalAvatar) {
-        deleteFromCloudinary(currentAvatar).catch(() => {});
-      }
       const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
+      sessionUploads.current.push(uploadedUrl);
       handleChange('avatar', uploadedUrl);
     } catch (err) {
       console.error('Failed to upload member avatar:', err);
@@ -298,12 +296,17 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
 
     await onSubmit(filteredUpdates);
 
+    const finalAvatar = formValues.avatar;
     const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
-    if (originalAvatar && originalAvatar !== formValues.avatar) {
-      deleteFromCloudinary(originalAvatar).catch((err) => {
-        console.error('Failed to delete previous member avatar from Cloudinary:', err);
-      });
+    // Delete original saved avatar if replaced
+    if (originalAvatar && originalAvatar !== finalAvatar) {
+      deleteFromCloudinary(originalAvatar).catch(console.error);
     }
+    // Delete any intermediate session uploads that were replaced
+    sessionUploads.current.forEach(url => {
+      if (url !== finalAvatar) deleteFromCloudinary(url).catch(console.error);
+    });
+    sessionUploads.current = [];
   };
 
   return (

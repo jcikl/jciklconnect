@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Trash2, Settings, X, ChevronDown, Sparkles, ArrowLeft, Phone, Mail,
   Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users,
@@ -1840,6 +1840,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
   const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const sessionUploads = useRef<string[]>([]);
 
   const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'career' | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -1976,11 +1977,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     setAvatarUploading(true);
     setAvatarUploadProgress(0);
     try {
-      const originalMemberAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
-      if (inlineValues.avatar && inlineValues.avatar !== originalMemberAvatar) {
-        deleteFromCloudinary(inlineValues.avatar).catch(() => {});
-      }
       const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
+      sessionUploads.current.push(uploadedUrl);
       setInlineValues({ ...inlineValues, avatar: uploadedUrl });
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to upload avatar', 'error');
@@ -2030,10 +2028,17 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         senatorshipValidatedBy: inlineValues.senatorshipValidatedBy?.trim(),
         senatorshipValidatedAt: inlineValues.senatorshipValidatedAt?.trim(),
       });
+      const finalAvatar = inlineValues.avatar;
       const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
-      if (originalAvatar && originalAvatar !== inlineValues.avatar) {
+      // Delete original saved avatar if replaced
+      if (originalAvatar && originalAvatar !== finalAvatar) {
         deleteFromCloudinary(originalAvatar).catch(console.error);
       }
+      // Delete any intermediate session uploads that were replaced
+      sessionUploads.current.forEach(url => {
+        if (url !== finalAvatar) deleteFromCloudinary(url).catch(console.error);
+      });
+      sessionUploads.current = [];
       setIsEditMode(false);
       setActiveInlineEditCard(null);
       setInlineValues(null);
