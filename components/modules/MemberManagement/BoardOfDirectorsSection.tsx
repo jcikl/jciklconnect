@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Save, Calendar, Users, UserPlus, Plus, Trash2, ChevronRight, Award, Shield, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Save, Calendar, Users, UserPlus, Plus, Trash2, ChevronRight, Award, Shield, RefreshCw, Camera } from 'lucide-react';
 import { Card, Button, useToast, Badge, Modal } from '../../ui/Common';
 import { Select, Input } from '../../ui/Form';
 import { MemberSelector } from '../../ui/MemberSelector';
 import { BoardManagementService } from '../../../services/boardManagementService';
+import { uploadBoardAvatarToCloudinary, deleteFromCloudinary } from '../../../services/cloudinaryService';
 import { BoardMember, Member } from '../../../types';
 
 const POSITION_ORDER: Record<string, number> = {
@@ -39,11 +40,65 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const [isEditing, setIsEditing] = useState(false);
 
   // States for the management modal
-  const [assignments, setAssignments] = useState<Record<string, { memberId: string; commissionDirectorIds: string[] }>>({});
+  const [assignments, setAssignments] = useState<Record<string, {
+    memberId: string;
+    commissionDirectorIds: string[];
+    boardAvatarUrl?: string;
+    commissionDirectorAvatars?: Record<string, string>;
+  }>>({});
   const [saving, setSaving] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { showToast } = useToast();
 
   const positions = BoardManagementService.getDefaultBoardPositions();
+
+  const handleBodAvatarUpload = async (
+    member: Member,
+    file: File,
+    position: string,
+    type: 'board' | 'commission'
+  ) => {
+    if (!selectedTerm) return;
+    const key = type === 'board' ? `${position}:board` : `${position}:commission:${member.id}`;
+    setUploadingKey(key);
+    setUploadProgress(0);
+    try {
+      const oldUrl = type === 'board'
+        ? assignments[position]?.boardAvatarUrl || ''
+        : assignments[position]?.commissionDirectorAvatars?.[member.id] || '';
+
+      const url = await uploadBoardAvatarToCloudinary(file, member, selectedTerm, (p) => setUploadProgress(p));
+
+      if (oldUrl && oldUrl !== url) {
+        deleteFromCloudinary(oldUrl).catch(console.error);
+      }
+
+      if (type === 'board') {
+        setAssignments(prev => ({
+          ...prev,
+          [position]: { ...prev[position], boardAvatarUrl: url }
+        }));
+      } else {
+        setAssignments(prev => ({
+          ...prev,
+          [position]: {
+            ...prev[position],
+            commissionDirectorAvatars: {
+              ...(prev[position].commissionDirectorAvatars || {}),
+              [member.id]: url
+            }
+          }
+        }));
+      }
+      showToast(`Photo updated for ${member.name}`, 'success');
+    } catch (err) {
+      showToast('Failed to upload photo', 'error');
+    } finally {
+      setUploadingKey(null);
+      setUploadProgress(0);
+    }
+  };
 
   const loadTerms = async () => {
     setLoading(true);
@@ -86,13 +141,20 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
     setLoading(true);
     try {
       const boardMembers = await BoardManagementService.getBoardMembersByYear(year);
-      const map: Record<string, { memberId: string; commissionDirectorIds: string[] }> = {};
+      const map: Record<string, {
+        memberId: string;
+        commissionDirectorIds: string[];
+        boardAvatarUrl?: string;
+        commissionDirectorAvatars?: Record<string, string>;
+      }> = {};
 
       positions.forEach(pos => {
         const found = boardMembers.find(bm => bm.position === pos && bm.isActive);
         map[pos] = {
           memberId: found?.memberId || '',
-          commissionDirectorIds: found?.commissionDirectorIds || []
+          commissionDirectorIds: found?.commissionDirectorIds || [],
+          boardAvatarUrl: found?.boardAvatarUrl || '',
+          commissionDirectorAvatars: found?.commissionDirectorAvatars || {},
         };
       });
 
@@ -146,7 +208,9 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
         .map(([position, data]) => ({
           position,
           memberId: data.memberId,
-          commissionDirectorIds: data.commissionDirectorIds
+          commissionDirectorIds: data.commissionDirectorIds,
+          boardAvatarUrl: data.boardAvatarUrl || undefined,
+          commissionDirectorAvatars: data.commissionDirectorAvatars,
         }));
 
       await BoardManagementService.setBoardForTerm(selectedTerm, list);
@@ -334,6 +398,33 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                     </div>
                   </div>
 
+                  {assignments[position]?.memberId && (() => {
+                    const sel = members.find(m => m.id === assignments[position].memberId);
+                    if (!sel) return null;
+                    const boardAvatar = assignments[position]?.boardAvatarUrl || '';
+                    const avatarSrc = boardAvatar || sel.avatar || sel.avatarUrl || '';
+                    const isUp = uploadingKey === `${position}:board`;
+                    return (
+                      <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                          {avatarSrc
+                            ? <img src={avatarSrc} alt={sel.name} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.name.charAt(0)}</div>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{sel.name}</p>
+                          {boardAvatar && <p className="text-[10px] text-jci-blue font-medium">Board photo set</p>}
+                          {isUp && <div className="mt-1 h-1 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-jci-blue transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
+                        </div>
+                        <label className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${isUp ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-blue-50 hover:text-jci-blue text-slate-600 cursor-pointer'}`}>
+                          <Camera size={12} />
+                          {isUp ? 'Uploading...' : 'Photo'}
+                          <input type="file" accept="image/*" className="hidden" disabled={isUp} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleBodAvatarUpload(sel, f, position, 'board'); }} />
+                        </label>
+                      </div>
+                    );
+                  })()}
+
                   {assignments[position]?.memberId && (
                     <div className="pt-4 border-t border-slate-50 space-y-3">
                       <div className="flex items-center justify-between">
@@ -360,16 +451,27 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                         ) : (
                           assignments[position].commissionDirectorIds.map(id => {
                             const m = members.find(mem => mem.id === id);
+                            const dirBoardAvatar = assignments[position]?.commissionDirectorAvatars?.[id] || '';
+                            const dirAvatar = dirBoardAvatar || m?.avatar || m?.avatarUrl || '';
+                            const isDirUp = uploadingKey === `${position}:commission:${id}`;
                             return (
-                              <div key={id} className="flex items-center gap-2 bg-slate-50 pl-4 pr-1 py-1 rounded-full border border-slate-200">
+                              <div key={id} className="flex items-center gap-1.5 bg-slate-50 pl-1.5 pr-1 py-1 rounded-full border border-slate-200">
+                                <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 shrink-0">
+                                  {dirAvatar
+                                    ? <img src={dirAvatar} alt={m?.name} className="w-full h-full object-cover" />
+                                    : <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-slate-500">{m?.name?.charAt(0)}</div>}
+                                </div>
                                 <span className="text-xs font-medium text-slate-700">{m?.name || 'Unknown'}</span>
                                 {canManage && (
-                                  <button
-                                    onClick={() => handleRemoveCommissionDirector(position, id)}
-                                    className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
+                                  <>
+                                    <label className={`transition-colors rounded-full p-0.5 ${isDirUp ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-jci-blue cursor-pointer'}`} title="Upload photo">
+                                      <Camera size={11} />
+                                      <input type="file" accept="image/*" className="hidden" disabled={isDirUp || !m} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f && m) handleBodAvatarUpload(m, f, position, 'commission'); }} />
+                                    </label>
+                                    <button onClick={() => handleRemoveCommissionDirector(position, id)} className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors p-0.5">
+                                      <Trash2 size={11} />
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             );
@@ -418,9 +520,9 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                           </div>
                         )}
                         <div className="flex items-center gap-4">
-                          <img 
-                            src={bm.avatar || undefined} 
-                            alt={bm.name} 
+                          <img
+                            src={data.boardAvatarUrl || bm.avatar || bm.avatarUrl || undefined}
+                            alt={bm.name}
                             className={`rounded-xl object-cover bg-slate-100 border shrink-0 ${
                               isPresident ? 'w-16 h-16 border-blue-300' : 'w-12 h-12 border-slate-200'
                             }`} 
@@ -440,7 +542,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                             <div className="flex flex-wrap gap-2">
                               {directors.map(dir => (
                                 <div key={dir.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/60 rounded-full pl-1.5 pr-3 py-0.5 max-w-[200px] truncate">
-                                  <img src={dir.avatar || undefined} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
+                                  <img src={data.commissionDirectorAvatars?.[dir.id] || dir.avatar || dir.avatarUrl || undefined} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
                                   <span className="text-[10px] font-semibold text-slate-600 truncate">{dir.name}</span>
                                 </div>
                               ))}

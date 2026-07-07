@@ -66,6 +66,25 @@ export const uploadMemberAvatarToCloudinary = async (
   });
 };
 
+export const uploadBoardAvatarToCloudinary = async (
+  file: File,
+  member: MemberAvatarFolderSource,
+  term: string,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 0.2,
+    maxWidthOrHeight: 1024,
+    useWebWorker: false,
+  });
+
+  const memberKey = getMemberAvatarKey(member);
+  const folder = `${sanitizeFolderPath(MEMBER_AVATAR_ASSET_ROOT)}/board-directors/${sanitizePathSegment(term)}`;
+  const publicId = `${memberKey}-${Math.floor(Date.now() / 1000)}`;
+
+  return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
+};
+
 /**
  * Uploads a file directly to Cloudinary using unsigned upload with progress tracking.
  * @param file - The file to upload (e.g. image)

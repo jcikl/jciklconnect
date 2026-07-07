@@ -370,7 +370,13 @@ export class BoardManagementService {
    */
   static async setBoardForTerm(
     year: string,
-    assignments: Array<{ memberId: string; position: string; commissionDirectorIds?: string[] }>,
+    assignments: Array<{
+      memberId: string;
+      position: string;
+      commissionDirectorIds?: string[];
+      boardAvatarUrl?: string;
+      commissionDirectorAvatars?: Record<string, string>;
+    }>,
     updatedBy?: string
   ): Promise<void> {
     if (isDevMode()) {
@@ -393,7 +399,7 @@ export class BoardManagementService {
       const startDate = `${year}-01-01`;
       const endDate = `${year}-12-31`;
 
-      for (const { memberId, position, commissionDirectorIds } of assignments) {
+      for (const { memberId, position, commissionDirectorIds, boardAvatarUrl, commissionDirectorAvatars } of assignments) {
         if (!memberId || !position) continue;
 
         const permissions = this.getRolePermissions(position);
@@ -407,7 +413,9 @@ export class BoardManagementService {
           isActive: true,
           permissions,
           commissionDirectorIds: commissionDirectorIds || [],
+          commissionDirectorAvatars: commissionDirectorAvatars || {},
           ...display,
+          ...(boardAvatarUrl ? { boardAvatarUrl } : {}),
           createdAt: now,
           updatedAt: now,
         };
