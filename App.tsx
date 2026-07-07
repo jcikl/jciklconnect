@@ -2860,6 +2860,7 @@ export const JCIKLApp: React.FC = () => {
   const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isSimulateDropdownOpen, setIsSimulateDropdownOpen] = useState(false);
+  const [showBoardDashboard, setShowBoardDashboard] = useState(false);
 
   const { user, member, loading: authLoading, signOut, simulatedRole, simulateRole, isDevMode } = useAuth();
   const { showToast } = useToast();
@@ -3273,16 +3274,12 @@ export const JCIKLApp: React.FC = () => {
       case 'ACCESS_CONFIG': return <AccessConfigView />;
       case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
       default:
-        // Show dashboard home for all users
-        // Use isBoard and isAdmin from component scope (already fetched at top level)
-        if (isBoard || isAdmin) {
+        if ((isBoard || isAdmin) && showBoardDashboard) {
           return <BoardDashboard
             onNavigate={handleViewChange}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             scrollRef={scrollRef}
-
-
           />;
         }
         return <DashboardHome
@@ -3674,6 +3671,21 @@ export const JCIKLApp: React.FC = () => {
                           </>
                         )}
                       </div>
+                    )}
+
+                    {(isBoard || isAdmin) && (
+                      <button
+                        onClick={() => setShowBoardDashboard(v => !v)}
+                        className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 mr-1 transition-all text-[11px] font-bold border ${
+                          showBoardDashboard
+                            ? 'bg-white text-jci-navy border-white/30 shadow-sm'
+                            : 'bg-white/10 hover:bg-white/20 border-white/10 hover:border-white/20 text-white'
+                        }`}
+                        title="Toggle Board Dashboard"
+                      >
+                        <LayoutDashboard size={12} className="shrink-0" />
+                        <span>{showBoardDashboard ? 'Board' : 'Board'}</span>
+                      </button>
                     )}
 
                     <button
