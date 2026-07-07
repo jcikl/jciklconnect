@@ -305,7 +305,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
       const pres = members.find(m => m.position === 'President' && m.isActive);
       if (pres) setPresident({ name: pres.memberName || 'JCI Member', avatar: pres.boardAvatarUrl || pres.avatarUrl || '', company: pres.companyName || 'JCI Kuala Lumpur' });
       if (ts) setTermSettings(ts);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [currentYear]);
 
   const pillars = [
@@ -329,7 +329,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 
       <main id="main-content">
         {/* Hero */}
-        <section className="relative bg-jci-navy py-24 md:py-32 overflow-hidden" aria-label="Hero">
+        <section className="relative bg-jci-navy py-20 overflow-hidden" aria-label="Hero">
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-20" />
           <div className="absolute inset-0 bg-gradient-to-r from-jci-navy via-jci-navy/90 to-jci-navy/50 pointer-events-none" />
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-jci-blue/10 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
@@ -400,7 +400,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                 <div className="absolute inset-0 bg-white/5" />
               )}
               {/* Gradient anchored to bottom — stops 100px above president name */}
-              <div className="absolute bottom-0 inset-x-0 h-[50%] bg-gradient-to-t from-jci-navy via-jci-navy/80 to-transparent" />
+              <div className="absolute bottom-0 inset-x-0 h-[50%] bg-gradient-to-t from-jci-navy via-jci-navy/100 to-transparent" />
 
               {/* Content overlay */}
               <div className="absolute inset-0 z-10 flex flex-col justify-end">
@@ -437,11 +437,10 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="flex items-center gap-4" style={{ height: containerH }}>
                         <div className="flex-1 flex flex-col justify-center h-full">
                           {parts.map((part: string, i: number) => (
-                            <h2 key={i} className={`text-[2rem] font-black leading-[0.9] tracking-tight whitespace-nowrap ${
-                              i === Math.floor(parts.length / 2)
-                                ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
-                                : 'text-white'
-                            }`}>
+                            <h2 key={i} className={`text-[2rem] font-black leading-[0.9] tracking-tight whitespace-nowrap ${i === Math.floor(parts.length / 2)
+                              ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
+                              : 'text-white'
+                              }`}>
                               {part}.
                             </h2>
                           ))}
@@ -473,20 +472,20 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
             </div>
 
             {/* ── DESKTOP: two-panel grid ── */}
-            <div className="hidden lg:grid lg:grid-cols-[5fr_7fr] lg:min-h-[560px] relative">
+            <div className="hidden lg:grid lg:grid-cols-[5fr_8fr] lg:min-h-[560px] relative">
 
               {/* Left: photo panel */}
               <div className="relative overflow-hidden">
                 {president.avatar ? (
                   <img src={president.avatar} alt={president.name}
-                    className="absolute inset-0 w-full h-full object-cover object-top scale-105" />
+                    className="absolute inset-0 w-full h-full object-cover object-top scale-100" />
                 ) : (
                   <div className="absolute inset-0 bg-white/5 flex items-center justify-center">
                     <span className="text-8xl font-black text-white/20">{president.name.charAt(0)}</span>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-jci-navy/20 to-jci-navy" />
-                <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-jci-navy/70 to-transparent" />
+                <div className="absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-jci-navy/100 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-jci-navy/100 to-transparent" />
                 <div className="absolute bottom-8 inset-x-0 flex flex-col items-center gap-1 z-10">
                   <p className="text-white font-black text-xl drop-shadow-lg leading-snug">{president.name}</p>
                   <p className="text-white/55 text-sm drop-shadow">{president.company}</p>
@@ -522,11 +521,10 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="flex items-center gap-6 mb-4 xl:hidden" style={{ height: containerH }}>
                         <div className="flex-1 flex flex-col justify-center h-full">
                           {parts.map((part: string, i: number) => (
-                            <h2 key={i} className={`text-5xl font-black leading-[0.92] tracking-tight whitespace-nowrap ${
-                              i === Math.floor(parts.length / 2)
-                                ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
-                                : 'text-white'
-                            }`}>
+                            <h2 key={i} className={`text-5xl font-black leading-[0.92] tracking-tight whitespace-nowrap ${i === Math.floor(parts.length / 2)
+                              ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
+                              : 'text-white'
+                              }`}>
                               {part}.
                             </h2>
                           ))}
@@ -550,11 +548,10 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="hidden xl:flex items-center gap-6 mb-4" style={{ height: containerH }}>
                         <div className="flex-1 flex flex-col justify-center h-full">
                           {parts.map((part: string, i: number) => (
-                            <h2 key={i} className={`text-[3.5rem] font-black leading-[0.92] tracking-tight whitespace-nowrap ${
-                              i === Math.floor(parts.length / 2)
-                                ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
-                                : 'text-white'
-                            }`}>
+                            <h2 key={i} className={`text-[3.5rem] font-black leading-[0.92] tracking-tight whitespace-nowrap ${i === Math.floor(parts.length / 2)
+                              ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
+                              : 'text-white'
+                              }`}>
                               {part}.
                             </h2>
                           ))}
@@ -690,7 +687,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
               <div className="hidden md:flex flex-col gap-3">
                 {[
                   { icon: <FolderKanban size={18} className="text-white" />, title: 'Explore Flagship Projects', sub: 'See the initiatives making a difference', page: 'projects' as const },
-                  { icon: <Users size={18} className="text-white" />, title: 'Meet the Board of Directors', sub: 'Leadership driving JCI KL forward', page: 'about' as const },
+                  { icon: <Users size={18} className="text-white" />, title: 'Meet the Board of Directors', sub: 'Leadership driving JCI Kuala Lumpur forward', page: 'about' as const },
                 ].map(item => (
                   <button key={item.page} onClick={() => onPageChange(item.page)}
                     className="flex items-center gap-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl p-4 transition-all group text-left">
@@ -747,10 +744,13 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="events" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Upcoming Events</h1>
-            <p className="text-base text-blue-100 max-w-2xl mx-auto">
+        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden" aria-label="Page header">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">JCI Kuala Lumpur Events</p>
+            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">Upcoming Events</h1>
+            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
               Join us for exciting events, trainings, and networking opportunities.
             </p>
           </div>
@@ -1070,28 +1070,15 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="projects" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="relative py-16 md:py-20 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white" aria-label="Page header">
-          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/3 pointer-events-none" />
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
-              <div className="shrink-0 w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg shadow-black/20">
-                <FolderKanban size={40} className="text-white/80" />
-              </div>
-              <div>
-                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider mb-4">
-                  <span>JCI KL</span>
-                  <span className="w-1 h-1 rounded-full bg-white/50" />
-                  <span>Active Projects</span>
-                </div>
-                <h1 className="text-4xl md:text-5xl font-black mb-3 leading-tight tracking-tight">
-                  Flagship <span className="text-sky-200">Projects</span>
-                </h1>
-                <p className="text-lg text-blue-100 max-w-xl leading-relaxed">
-                  Discover the impactful initiatives driving positive change in our community and beyond.
-                </p>
-              </div>
-            </div>
+        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden" aria-label="Page header">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Impact & Community</p>
+            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">Flagship Projects</h1>
+            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+              Discover the impactful initiatives driving positive change in our community and beyond.
+            </p>
           </div>
         </section>
 
@@ -1447,11 +1434,11 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
 }) => {
   const timelineEvents = [
-    { year: '1953', title: 'JCI KL was Initiated', description: 'Initiated by JC Frank Wakerman in 1953 followed up by President JC Wong Peng Tuck.' },
-    { year: '1954', title: 'JCI KL was Formed', description: 'JCI Kuala Lumpur ("JCI KL") is the first Malaysia Junior Chamber Chapter that was formed in 1954.' },
-    { year: '1980s', title: 'JCI Asia Pacific Conference', description: 'JCI KL hosted JCI Asia Pacific Conference under our Past President, JCI Sen. Loh Yit Lock as Conference Director.' },
+    { year: '1953', title: 'JCI Kuala Lumpur was Initiated', description: 'Initiated by JC Frank Wakerman in 1953 followed up by President JC Wong Peng Tuck.' },
+    { year: '1954', title: 'JCI Kuala Lumpur was Formed', description: 'JCI Kuala Lumpur ("JCI KL") is the first Malaysia Junior Chamber Chapter that was formed in 1954.' },
+    { year: '1980s', title: 'JCI Asia Pacific Conference', description: 'JCI Kuala Lumpur hosted JCI Asia Pacific Conference under our Past President, JCI Sen. Loh Yit Lock as Conference Director.' },
     { year: '1980s', title: '1st JCI MALAYSIA National Convention', description: 'Past President, Robert Ng as Conference Director.' },
-    { year: '1984', title: '2nd JCI Asia Pacific Conference', description: 'During our 30th Anniversary, JCI KL was the Hosting Chapter for JCI Asia Pacific Conference held in Genting Highlands Resort under our Past President JCI Sen. Larry Koh as Conference Director.' },
+    { year: '1984', title: '2nd JCI Asia Pacific Conference', description: 'During our 30th Anniversary, JCI Kuala Lumpur was the Hosting Chapter for JCI Asia Pacific Conference held in Genting Highlands Resort under our Past President JCI Sen. Larry Koh as Conference Director.' },
     { year: '1990s', title: 'JCI National Convention', description: 'We hosted the National Convention.' },
     { year: '2000s', title: 'Area Peninsular Malaysia Convention', description: 'We hosted the Area Peninsular Malaysia Convention.' },
     { year: '2010s', title: 'JCI National Convention', description: 'We hosted the National Convention.' },
@@ -1493,7 +1480,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
       '2025': [
         { position: 'President', name: 'Chris Teng', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', company: 'Teng Holdings' },
         { position: 'Immediate Past President', name: 'Thomas Chin', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Chin & Associates' },
-        { position: 'Secretary', name: 'Jane Doe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'JCI KL' },
+        { position: 'Secretary', name: 'Jane Doe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'JCI Kuala Lumpur' },
         { position: 'Honorary Treasurer', name: 'John Smith', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80', company: 'Capital Partners' },
         { position: 'General Legal Counsel', name: 'Alice Johnson', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', company: 'Apex Legal' },
         { position: 'Executive Vice President', name: 'Bob Brown', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', company: 'Brown Enterprises' },
@@ -1519,7 +1506,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
       '2023': [
         { position: 'President', name: 'Chris Teng', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', company: 'Teng Holdings' },
         { position: 'Immediate Past President', name: 'Thomas Chin', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', company: 'Chin & Associates' },
-        { position: 'Secretary', name: 'Jane Doe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'JCI KL' },
+        { position: 'Secretary', name: 'Jane Doe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', company: 'JCI Kuala Lumpur' },
         { position: 'Honorary Treasurer', name: 'John Smith', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80', company: 'Capital Partners' },
         { position: 'General Legal Counsel', name: 'Alice Johnson', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', company: 'Apex Legal' },
         { position: 'Executive Vice President', name: 'Bob Brown', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', company: 'Brown Enterprises' },
@@ -1672,7 +1659,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
 
     if (variant === 'ipp') {
       return (
-        <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-4 flex items-center gap-4 w-full max-w-[240px] mx-auto hover:border-slate-300 hover:shadow-md transition-all group">
+        <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-4 flex items-center gap-4 w-full max-w-xl mx-auto hover:border-slate-300 hover:shadow-md transition-all group">
           <div className="shrink-0">
             {avatar ? (
               <img src={avatar} alt={name} className="w-14 h-14 rounded-xl object-cover border border-slate-200 group-hover:border-jci-blue/30 transition-colors" />
@@ -1683,7 +1670,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <span className="inline-block text-[8px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full mb-1">Past President</span>
+            <span className="inline-block text-[8px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full mb-1">Immediate Past President</span>
             <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{name}</h4>
             <p className="text-[11px] text-slate-400 truncate">{company}</p>
           </div>
@@ -1771,29 +1758,15 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="about" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white" aria-label="Page header">
-          <div className="absolute top-0 right-0 w-[480px] h-[480px] bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/3 pointer-events-none" />
-          <div className="absolute top-1/2 left-1/4 w-40 h-40 bg-white/[0.04] rounded-full -translate-y-1/2 pointer-events-none" />
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
-              <div className="shrink-0 w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/10 border border-white/20 p-4 flex items-center justify-center shadow-lg shadow-black/20">
-                <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" className="w-full h-full object-contain drop-shadow" />
-              </div>
-              <div>
-                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider mb-4">
-                  <span>Est. 1954</span>
-                  <span className="w-1 h-1 rounded-full bg-white/50" />
-                  <span>JCI Kuala Lumpur</span>
-                </div>
-                <h1 className="text-4xl md:text-5xl font-black mb-3 leading-tight tracking-tight">
-                  About <span className="text-sky-200">JCI KL</span>
-                </h1>
-                <p className="text-lg text-blue-100 max-w-xl leading-relaxed">
-                  The first Malaysia Junior Chamber Chapter, empowering young active citizens to create positive change since 1954.
-                </p>
-              </div>
-            </div>
+        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden" aria-label="Page header">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Est. 1954 · Kuala Lumpur</p>
+            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">About JCI Kuala Lumpur</h1>
+            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+              The first Malaysia Junior Chamber Chapter, empowering young active citizens to create positive change since 1954.
+            </p>
           </div>
         </section>
 
@@ -1926,7 +1899,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
               <div className="space-y-10">
                 {/* Level 1: President + IPP */}
                 <div className="flex flex-col sm:flex-row justify-center items-center gap-6 sm:gap-10">
-                  <div className="w-full sm:flex-1 max-w-2xl">
+                  <div className="w-full sm:flex-1 max-w-md">
                     <BoardNode member={president} defaultRole="President" variant="president" />
                   </div>
                   <div className="hidden sm:flex flex-col items-center gap-1 shrink-0">
@@ -1958,13 +1931,13 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 <div className="hidden lg:block w-px h-8 bg-gradient-to-b from-transparent via-slate-300/60 to-transparent mx-auto" />
 
                 {/* Level 3: VPs */}
-                <div className="rounded-3xl bg-slate-50/60 border border-slate-200/60 p-6 sm:p-8 max-w-5xl mx-auto">
+                <div className="rounded-3xl bg-slate-50/60 border border-slate-200/60 p-6 sm:p-8 mx-auto">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="flex-1 h-px bg-slate-200/80" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-jci-blue px-3 py-1 bg-sky-50 border border-sky-100/80 rounded-full shrink-0">Vice Presidents</span>
                     <div className="flex-1 h-px bg-slate-200/80" />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
                     <BoardNode member={vpIndividual} defaultRole="Vice President (Individual)" variant="vp" />
                     <BoardNode member={vpCommunity} defaultRole="Vice President (Community)" variant="vp" />
                     <BoardNode member={vpBusiness} defaultRole="Vice President (Business)" variant="vp" />
@@ -2017,7 +1990,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-slate-900 mb-12 text-center">What We Do</h2>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-4 gap-6">
               <Card>
                 <div className="p-4">
                   <div className="w-12 h-12 bg-jci-blue/10 text-jci-blue rounded-lg flex items-center justify-center mb-4">
@@ -2252,41 +2225,28 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
 
       <main id="main-content">
         {/* Hero */}
-        <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white">
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/5 rounded-full" />
-            <div className="absolute -bottom-16 -left-16 w-72 h-72 bg-white/5 rounded-full" />
-          </div>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
-              <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg">
-                <BookOpen size={36} className="text-white/80" />
-              </div>
-              <div className="text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider text-white/80 mb-3">
-                  JCI KL Publications Archive
+        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Publications</p>
+            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">E-Newsletters</h1>
+            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+              Stories, projects, achievements and impact from JCI Kuala Lumpur — curated every term.
+            </p>
+            {!loadingPubs && totalIssues > 0 && (
+              <div className="flex items-center justify-center gap-6 md:gap-10 mt-8">
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-black text-white">{totalIssues}</p>
+                  <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wider mt-0.5">Issue{totalIssues !== 1 ? 's' : ''}</p>
                 </div>
-                <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-2">
-                  E-<span className="text-sky-200">Newsletters</span>
-                </h1>
-                <p className="text-base text-blue-100 max-w-xl leading-relaxed">
-                  Stories, projects, achievements and impact from JCI Kuala Lumpur &#8212; curated every term.
-                </p>
-                {!loadingPubs && totalIssues > 0 && (
-                  <div className="flex items-center gap-6 mt-4 justify-center sm:justify-start">
-                    <div>
-                      <span className="text-2xl font-black text-white">{totalIssues}</span>
-                      <span className="text-sky-200/80 text-sm font-semibold ml-1.5">Issue{totalIssues !== 1 ? 's' : ''}</span>
-                    </div>
-                    <div className="w-px h-6 bg-white/20" />
-                    <div>
-                      <span className="text-2xl font-black text-white">{newsletters.length}</span>
-                      <span className="text-sky-200/80 text-sm font-semibold ml-1.5">Year{newsletters.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-                )}
+                <div className="w-px h-8 bg-white/15" />
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-black text-white">{newsletters.length}</p>
+                  <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wider mt-0.5">Year{newsletters.length !== 1 ? 's' : ''}</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
 
@@ -2388,12 +2348,12 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
             <div className="flex-1 text-center md:text-left">
               <h2 className="text-2xl font-black text-white mb-2">Want to stay updated?</h2>
               <p className="text-blue-200 text-sm leading-relaxed max-w-lg">
-                Become a JCI KL member to receive our newsletters directly and be part of the stories we tell every term.
+                Become a JCI Kuala Lumpur member to receive our newsletters directly and be part of the stories we tell every term.
               </p>
             </div>
             <Button size="lg" variant="outline" onClick={onRegister}
               className="shrink-0 bg-white !text-jci-navy border-white hover:bg-sky-50 hover:!text-jci-navy font-black shadow-lg">
-              Join JCI KL
+              Join JCI Kuala Lumpur
             </Button>
           </div>
         </section>
@@ -2570,30 +2530,64 @@ const GuestDirectoryPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="directory" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Business Directory</h1>
-            <p className="text-base text-blue-100 max-w-2xl mx-auto">
-              Explore the businesses of our members and connect with the global JCI network.
+        {/* ── Hero ── */}
+        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden" aria-label="Page header">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
+          <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Member Business Directory</p>
+            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">
+              Connect with<br className="hidden md:block" /> JCI Member Businesses
+            </h1>
+            <p className="text-blue-200 text-sm md:text-base mb-6 max-w-xl mx-auto leading-relaxed">
+              Discover member businesses, explore partnership opportunities, and unlock exclusive member-only deals.
             </p>
+
+            {/* Stats row */}
+            <div className="flex items-center justify-center gap-6 md:gap-10 mt-6">
+              {[
+                { value: '200+', label: 'Active Members' },
+                { value: '80+', label: 'Businesses Listed' },
+                { value: '10+', label: 'Industries' },
+              ].map((stat, i, arr) => (
+                <React.Fragment key={stat.label}>
+                  <div className="text-center">
+                    <p className="text-2xl md:text-3xl font-black text-white">{stat.value}</p>
+                    <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wider mt-0.5">{stat.label}</p>
+                  </div>
+                  {i < arr.length - 1 && <div className="w-px h-8 bg-white/15" />}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="py-16">
+        <section className="py-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <BusinessDirectoryView />
+            <BusinessDirectoryView isGuest onGuestCta={onRegister} />
           </div>
         </section>
 
         {/* CTA Section */}
-        <section className="py-16 bg-slate-100">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">Want to List Your Business?</h2>
-            <p className="text-slate-600 mb-8">
-              Join JCI Kuala Lumpur and showcase your business to our local and global network.
+        <section className="relative py-20 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-400/10 via-transparent to-transparent pointer-events-none" />
+          <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            {/* Avatar stack */}
+            <div className="flex justify-center -space-x-2.5 mb-6">
+              {['E4A&background=0097D7', 'NW&background=1a3d7c', 'LK&background=FFC300&color=1a3d7c', 'RB&background=0a5fba'].map((q, i) => (
+                <img key={i} src={`https://ui-avatars.com/api/?name=${q}&color=fff&size=48&bold=true`}
+                  className="w-11 h-11 rounded-full border-2 border-jci-navy shadow-md" alt="member" />
+              ))}
+              <div className="w-11 h-11 rounded-full border-2 border-jci-navy bg-white/10 backdrop-blur flex items-center justify-center text-white text-[10px] font-black">+196</div>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-3">Want to List Your Business?</h2>
+            <p className="text-blue-200 mb-8 max-w-lg mx-auto leading-relaxed">
+              Join 200+ JCI Kuala Lumpur members. Get your business listed, unlock member-only deals, and connect with a global network of entrepreneurs.
             </p>
-            <Button size="lg" onClick={onRegister}>
-              Join JCI KL Today
+            <Button size="lg" onClick={onRegister}
+              className="bg-amber-400 hover:bg-amber-300 text-jci-navy font-black border-0 shadow-xl shadow-amber-400/25 px-10">
+              Join JCI Kuala Lumpur Today →
             </Button>
           </div>
         </section>
@@ -2644,6 +2638,9 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
   const handleCardClick = (partner: Partnership) => {
     setSelectedPartner(partner);
     setIsDetailModalOpen(true);
+    if (partner.id && !partner.id.startsWith('mock')) {
+      AdvertisementService.recordClick(partner.id).catch(console.error);
+    }
   };
 
   // Benefit Shielding Logic
@@ -2668,49 +2665,29 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
 
   const redeemStatus = selectedPartner ? checkRedeemPermission(selectedPartner) : { allowed: false, reason: 'login' };
 
-  const getValidityChip = (endDate: string) => {
-    const end = new Date(endDate);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const daysLeft = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysLeft < 0) return { label: 'Expired', className: 'bg-red-50 text-red-500 border-red-100' };
-    if (daysLeft <= 30) return { label: `${daysLeft}d left`, className: 'bg-amber-50 text-amber-600 border-amber-100' };
-    return { label: `Until ${new Date(endDate).toLocaleDateString('en-MY', { month: 'short', year: 'numeric' })}`, className: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
-  };
-
   return (
     <div className="min-h-screen bg-slate-50">
       <GuestHeader currentPage="partnerships" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
         {/* Hero */}
-        <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white">
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/5 rounded-full" />
-            <div className="absolute -bottom-16 -left-16 w-72 h-72 bg-white/5 rounded-full" />
-          </div>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
-              <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg">
-                <Gift size={36} className="text-white/80" />
-              </div>
-              <div className="text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider text-white/80 mb-3">
-                  Exclusive to JCI KL Members
+        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Member Benefits</p>
+            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">Member Perks</h1>
+            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+              Exclusive discounts and rewards from our merchant partners — curated for JCI Kuala Lumpur members.
+            </p>
+            {!loading && partnerships.length > 0 && (
+              <div className="flex items-center justify-center gap-6 md:gap-10 mt-8">
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-black text-white">{partnerships.length}</p>
+                  <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wider mt-0.5">Active Partner{partnerships.length !== 1 ? 's' : ''}</p>
                 </div>
-                <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-2">
-                  Member <span className="text-sky-200">Perks</span>
-                </h1>
-                <p className="text-base text-blue-100 max-w-xl leading-relaxed">
-                  Exclusive discounts and rewards from our merchant partners &#8212; curated for JCI Kuala Lumpur members.
-                </p>
-                {!loading && partnerships.length > 0 && (
-                  <div className="flex items-center gap-2 mt-4 justify-center sm:justify-start">
-                    <span className="text-2xl font-black text-white">{partnerships.length}</span>
-                    <span className="text-sky-200/80 text-sm font-semibold">Active Partner{partnerships.length !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
               </div>
-            </div>
+            )}
           </div>
         </section>
 
@@ -2731,9 +2708,8 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
                 {partnerships.map(partner => {
-                  const validity = getValidityChip(partner.period.endDate);
                   return (
                     <div
                       key={partner.id}
@@ -2742,9 +2718,9 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                     >
                       {/* Logo area */}
                       <div className="relative w-full h-36 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
-                        {partner.banner ? (
+                        {partner.logo ? (
                           <img
-                            src={partner.banner}
+                            src={partner.logo}
                             alt={partner.name}
                             className="max-w-full max-h-full object-contain drop-shadow-sm"
                             onError={(e) => {
@@ -2757,9 +2733,6 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                             <Gift size={36} />
                           </div>
                         )}
-                        <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full border ${validity.className}`}>
-                          {validity.label}
-                        </span>
                       </div>
 
                       {/* Body */}
@@ -2817,15 +2790,25 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
           drawerOnMobile
         >
           <div className="space-y-5">
-            {/* Banner */}
-            <div className="w-full h-44 overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
+            {/* Banner + Logo */}
+            <div className="relative w-full h-44 overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100">
               {selectedPartner.banner ? (
                 <img src={selectedPartner.banner} alt={selectedPartner.name}
-                  className="max-w-full max-h-full object-contain drop-shadow-sm"
+                  className="w-full h-full object-cover"
                   onError={(e) => { const img = e.target as HTMLImageElement; img.onerror = null; img.style.display = 'none'; }}
                 />
               ) : (
-                <Gift size={48} className="text-slate-300" />
+                <div className="w-full h-full flex items-center justify-center">
+                  <Gift size={48} className="text-slate-300" />
+                </div>
+              )}
+              {selectedPartner.logo && (
+                <div className="absolute bottom-3 left-3 w-12 h-12 rounded-xl bg-white shadow-md border border-slate-100 overflow-hidden flex items-center justify-center p-1.5">
+                  <img src={selectedPartner.logo} alt="logo"
+                    className="w-full h-full object-contain"
+                    onError={(e) => { const img = e.target as HTMLImageElement; img.onerror = null; img.parentElement!.style.display = 'none'; }}
+                  />
+                </div>
               )}
             </div>
 
@@ -2833,16 +2816,6 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
             <div className="bg-jci-blue/5 border border-jci-blue/10 rounded-xl p-4">
               <p className="text-[10px] font-black uppercase tracking-widest text-jci-blue mb-1">Member Benefit</p>
               <p className="text-base font-black text-slate-900 leading-snug">{selectedPartner.memberBenefits}</p>
-            </div>
-
-            {/* Validity */}
-            <div className="flex gap-3">
-              {[{ label: 'Valid From', value: selectedPartner.period.startDate }, { label: 'Valid Until', value: selectedPartner.period.endDate }].map(d => (
-                <div key={d.label} className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{d.label}</p>
-                  <p className="text-sm font-bold text-slate-800">{d.value}</p>
-                </div>
-              ))}
             </div>
 
             {/* Redeem */}
@@ -2868,7 +2841,7 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                       {redeemStatus.reason === 'dues' && 'Settle annual dues to unlock'}
                     </p>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Benefit details are protected under JCI KL Member Benefit Shielding.
+                      Benefit details are protected under JCI Kuala Lumpur Member Benefit Shielding.
                     </p>
                   </div>
                   {redeemStatus.reason === 'login' && (
@@ -3992,11 +3965,10 @@ export const JCIKLApp: React.FC = () => {
                     {(isBoard || isAdmin) && (
                       <button
                         onClick={() => setShowBoardDashboard(v => !v)}
-                        className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 mr-1 transition-all text-[11px] font-bold border ${
-                          showBoardDashboard
-                            ? 'bg-white text-jci-navy border-white/30 shadow-sm'
-                            : 'bg-white/10 hover:bg-white/20 border-white/10 hover:border-white/20 text-white'
-                        }`}
+                        className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 mr-1 transition-all text-[11px] font-bold border ${showBoardDashboard
+                          ? 'bg-white text-jci-navy border-white/30 shadow-sm'
+                          : 'bg-white/10 hover:bg-white/20 border-white/10 hover:border-white/20 text-white'
+                          }`}
                         title="Toggle Board Dashboard"
                       >
                         <LayoutDashboard size={12} className="shrink-0" />
@@ -4022,6 +3994,14 @@ export const JCIKLApp: React.FC = () => {
                           {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
                         </span>
                       )}
+                    </button>
+
+                    <button
+                      onClick={handleLogout}
+                      className="hidden md:flex items-center gap-1.5 p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
+                      title="Sign Out"
+                    >
+                      <LogOut size={20} />
                     </button>
 
                   </div>
