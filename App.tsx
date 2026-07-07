@@ -402,20 +402,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
               <div className="absolute inset-0 bg-gradient-to-t from-jci-navy via-jci-navy/80 to-jci-navy/10" />
 
               {/* Content overlay */}
-              <div className="absolute inset-0 z-10 flex flex-col">
-
-                {/* Upper zone: logo centred as identity anchor */}
-                <div className="flex-1 flex items-center justify-center">
-                  {termSettings?.logoUrl && (
-                    <div className="relative flex items-center justify-center">
-                      <div className="absolute w-52 h-52 rounded-full bg-amber-400/20 blur-2xl animate-pulse" />
-                      <img src={termSettings.logoUrl} alt="Presidential theme logo"
-                        className="relative z-10 h-28 w-auto object-contain drop-shadow-2xl" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Lower zone: president identity → theme content → CTA */}
+              <div className="absolute inset-0 z-10 flex flex-col justify-end">
                 <div className="px-5 pb-7 space-y-3">
 
                   {/* President identity row */}
@@ -439,13 +426,13 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   {/* Eyebrow */}
                   <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/75">Presidential Theme {currentYear}</p>
 
-                  {/* Headline */}
-                  {(() => {
-                    const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
-                    const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
-                    return (
-                      <div>
-                        {parts.map((part: string, i: number) => (
+                  {/* Headline + logo side by side */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      {(() => {
+                        const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
+                        const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
+                        return parts.map((part: string, i: number) => (
                           <h2 key={i} className={`text-[2rem] font-black leading-[0.9] tracking-tight whitespace-nowrap ${
                             i === Math.floor(parts.length / 2)
                               ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
@@ -453,10 +440,17 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                           }`}>
                             {part}.
                           </h2>
-                        ))}
+                        ));
+                      })()}
+                    </div>
+                    {termSettings?.logoUrl && (
+                      <div className="relative shrink-0 flex items-center">
+                        <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/20 blur-xl animate-pulse" />
+                        <img src={termSettings.logoUrl} alt="Presidential theme logo"
+                          className="relative z-10 h-20 w-auto object-contain drop-shadow-2xl" />
                       </div>
-                    );
-                  })()}
+                    )}
+                  </div>
 
                   {/* Description — capped at 2 lines */}
                   <p className="text-white/50 text-[11px] leading-relaxed line-clamp-2">
