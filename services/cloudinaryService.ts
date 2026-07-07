@@ -3,6 +3,12 @@
  */
 import imageCompression from 'browser-image-compression';
 
+/** Injects c_trim into a Cloudinary URL to auto-crop transparent padding. */
+export const trimCloudinaryImage = (url: string): string => {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  return url.replace('/image/upload/', '/image/upload/c_trim/');
+};
+
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'drpa1zcmp';
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'jciklconnect';
 const MEMBER_AVATAR_ASSET_ROOT = import.meta.env.VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT || 'jciklconnect';
