@@ -285,6 +285,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 }) => {
   const currentYear = String(new Date().getFullYear());
   const [president, setPresident] = useState<{ name: string; avatar: string; company: string } | null>(null);
+  const [termSettings, setTermSettings] = useState<{ presidentTheme?: string; tagline?: string; shortDescription?: string; logoUrl?: string } | null>(null);
   const { events } = useEvents({ publicMode: true });
 
   const upcomingEvents = useMemo(() => {
@@ -296,9 +297,13 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   }, [events]);
 
   useEffect(() => {
-    BoardManagementService.getBoardMembersByYear(currentYear).then(members => {
+    Promise.all([
+      BoardManagementService.getBoardMembersByYear(currentYear),
+      BoardManagementService.getBoardTermSettings(currentYear),
+    ]).then(([members, ts]) => {
       const pres = members.find(m => m.position === 'President' && m.isActive);
       if (pres) setPresident({ name: pres.memberName || 'JCI Member', avatar: pres.boardAvatarUrl || pres.avatarUrl || '', company: pres.companyName || 'JCI Kuala Lumpur' });
+      if (ts) setTermSettings(ts);
     }).catch(() => {});
   }, [currentYear]);
 
@@ -419,12 +424,25 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                     <div className="w-5 h-px bg-amber-400/50" />
                   </div>
 
-                  {/* Theme stacked headline */}
-                  <div className="mb-5">
-                    <h2 className="text-4xl lg:text-6xl font-black text-white leading-[0.95] tracking-tight">Ignite.</h2>
-                    <h2 className="text-4xl lg:text-6xl font-black text-amber-400 leading-[0.95] tracking-tight">Lead.</h2>
-                    <h2 className="text-4xl lg:text-6xl font-black text-white leading-[0.95] tracking-tight">Transform.</h2>
-                  </div>
+                  {/* Theme stacked headline — split by "." for multi-line display */}
+                  {(() => {
+                    const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
+                    const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
+                    return (
+                      <div className="mb-5">
+                        {parts.map((part: string, i: number) => (
+                          <h2 key={i} className={`text-4xl lg:text-6xl font-black leading-[0.95] tracking-tight ${i === Math.floor(parts.length / 2) ? 'text-amber-400' : 'text-white'}`}>
+                            {part}.
+                          </h2>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Tagline */}
+                  {termSettings?.tagline && (
+                    <p className="text-amber-300/80 text-xs font-bold uppercase tracking-widest mb-4 -mt-2">{termSettings.tagline}</p>
+                  )}
 
                   {/* Divider */}
                   <div className="w-10 h-0.5 bg-amber-400/40 mx-auto lg:mx-0 mb-5" />
@@ -437,7 +455,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 
                   {/* Presidential message */}
                   <p className="text-white/55 text-sm leading-relaxed max-w-md mx-auto lg:mx-0 mb-7">
-                    This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose and transforms Kuala Lumpur for generations to come.
+                    {termSettings?.shortDescription || 'This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose and transforms Kuala Lumpur for generations to come.'}
                   </p>
 
                   {/* CTA */}

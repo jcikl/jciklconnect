@@ -577,6 +577,11 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if isBoard();
     }
+    // Presidential term settings (theme, tagline, description, logo) — public read for guest home page
+    match /boardTermSettings/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isBoard();
+    }
     
     // Mentorship: mentorMatches, mentorshipFeedback (Mentor Matching / stats)
     match /mentorMatches/{docId} {

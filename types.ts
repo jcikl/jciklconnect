@@ -262,6 +262,15 @@ export interface BoardPosition {
   endDate: string;
 }
 
+export interface BoardTermSettings {
+  year: string;
+  presidentTheme?: string;
+  tagline?: string;
+  shortDescription?: string;
+  logoUrl?: string;
+  updatedAt: string;
+}
+
 export interface BoardMember {
   id: string;
   memberId: string;

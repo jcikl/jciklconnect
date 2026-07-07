@@ -20,7 +20,7 @@ import {
 } from '../utils/boardMembership';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { Member, UserRole, BoardPosition, BoardMember, BoardTransition } from '../types';
+import { Member, UserRole, BoardPosition, BoardMember, BoardTransition, BoardTermSettings } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 import { CommunicationService } from './communicationService';
@@ -550,6 +550,34 @@ export class BoardManagementService {
     }
 
     return null;
+  }
+
+  // ─── Presidential Term Settings ──────────────────────────────────────────
+
+  static async getBoardTermSettings(year: string): Promise<BoardTermSettings | null> {
+    try {
+      const ref = doc(db, COLLECTIONS.BOARD_TERM_SETTINGS, year);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      return { year, ...snap.data() } as BoardTermSettings;
+    } catch (error) {
+      console.error('Error getting board term settings:', error);
+      return null;
+    }
+  }
+
+  static async setBoardTermSettings(year: string, settings: Partial<Omit<BoardTermSettings, 'year' | 'updatedAt'>>): Promise<void> {
+    try {
+      const ref = doc(db, COLLECTIONS.BOARD_TERM_SETTINGS, year);
+      await updateDoc(ref, { ...settings, updatedAt: new Date().toISOString() }).catch(async () => {
+        // doc doesn't exist yet — create it
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(ref, { year, ...settings, updatedAt: new Date().toISOString() });
+      });
+    } catch (error) {
+      console.error('Error setting board term settings:', error);
+      throw error;
+    }
   }
 
   // Legacy methods for backward compatibility

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Save, Calendar, Users, UserPlus, Plus, Trash2, ChevronRight, Award, Shield, RefreshCw, Camera } from 'lucide-react';
+import { Save, Users, Plus, Trash2, ChevronRight, Award, Shield, RefreshCw, Camera, Quote, Tag, AlignLeft, ImageIcon } from 'lucide-react';
 import { Card, Button, useToast, Badge, Modal } from '../../ui/Common';
 import { Select, Input } from '../../ui/Form';
 import { MemberSelector } from '../../ui/MemberSelector';
 import { BoardManagementService } from '../../../services/boardManagementService';
 import { uploadBoardAvatarToCloudinary, deleteFromCloudinary } from '../../../services/cloudinaryService';
-import { BoardMember, Member } from '../../../types';
+import { BoardMember, BoardTermSettings, Member } from '../../../types';
 
 const POSITION_ORDER: Record<string, number> = {
   'President': 1,
@@ -49,6 +49,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [termSettings, setTermSettings] = useState<Partial<BoardTermSettings>>({});
   const { showToast } = useToast();
 
   const positions = BoardManagementService.getDefaultBoardPositions();
@@ -140,7 +141,11 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
     setIsEditing(forceEdit);
     setLoading(true);
     try {
-      const boardMembers = await BoardManagementService.getBoardMembersByYear(year);
+      const [boardMembers, ts] = await Promise.all([
+        BoardManagementService.getBoardMembersByYear(year),
+        BoardManagementService.getBoardTermSettings(year),
+      ]);
+      setTermSettings(ts || {});
       const map: Record<string, {
         memberId: string;
         commissionDirectorIds: string[];
@@ -213,7 +218,15 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           commissionDirectorAvatars: data.commissionDirectorAvatars,
         }));
 
-      await BoardManagementService.setBoardForTerm(selectedTerm, list);
+      await Promise.all([
+        BoardManagementService.setBoardForTerm(selectedTerm, list),
+        BoardManagementService.setBoardTermSettings(selectedTerm, {
+          presidentTheme: termSettings.presidentTheme,
+          tagline: termSettings.tagline,
+          shortDescription: termSettings.shortDescription,
+          logoUrl: termSettings.logoUrl,
+        }),
+      ]);
       showToast(`Board for ${selectedTerm} updated successfully`, 'success');
       setShowManageModal(false);
       loadTerms();
@@ -363,6 +376,69 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
         <div className="space-y-4">
           {isEditing ? (
             <div className="space-y-3">
+              {/* Presidential Identity */}
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center">
+                    <Award size={15} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-800">Presidential Identity</h4>
+                    <p className="text-[10px] text-slate-500">Displayed on the guest home page President Spotlight</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                      <Quote size={11} /> Presidential Theme
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
+                      placeholder="e.g. Ignite. Lead. Transform."
+                      value={termSettings.presidentTheme || ''}
+                      onChange={e => setTermSettings(prev => ({ ...prev, presidentTheme: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                      <Tag size={11} /> Tagline
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
+                      placeholder="e.g. Empowering Young Leaders"
+                      value={termSettings.tagline || ''}
+                      onChange={e => setTermSettings(prev => ({ ...prev, tagline: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                      <ImageIcon size={11} /> Theme Logo URL
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
+                      placeholder="https://... (optional)"
+                      value={termSettings.logoUrl || ''}
+                      onChange={e => setTermSettings(prev => ({ ...prev, logoUrl: e.target.value }))}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                      <AlignLeft size={11} /> Short Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 resize-none"
+                      placeholder="A brief message from the president about this year's direction..."
+                      value={termSettings.shortDescription || ''}
+                      onChange={e => setTermSettings(prev => ({ ...prev, shortDescription: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
                 <Shield className="text-blue-500 shrink-0 mt-1" size={20} />
                 <p className="text-sm text-blue-700 font-medium">
@@ -485,6 +561,23 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
             </div>
           ) : (
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Presidential Identity summary */}
+              {(termSettings.presidentTheme || termSettings.tagline || termSettings.shortDescription) && (
+                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 flex gap-3">
+                  <Award size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    {termSettings.presidentTheme && (
+                      <p className="text-sm font-black text-slate-800 leading-snug">{termSettings.presidentTheme}</p>
+                    )}
+                    {termSettings.tagline && (
+                      <p className="text-xs font-semibold text-amber-600 mt-0.5">{termSettings.tagline}</p>
+                    )}
+                    {termSettings.shortDescription && (
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{termSettings.shortDescription}</p>
+                    )}
+                  </div>
+                </div>
+              )}
               {assignedPositions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Users className="w-12 h-12 text-slate-300 mb-2" />
