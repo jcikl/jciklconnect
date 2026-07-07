@@ -130,7 +130,6 @@ export const uploadToCloudinary = (
     formData.append('upload_preset', UPLOAD_PRESET);
     if (folder) {
       formData.append('folder', folder);
-      formData.append('asset_folder', folder);
     }
     if (options?.publicId) {
       formData.append('public_id', sanitizePathSegment(options.publicId));
