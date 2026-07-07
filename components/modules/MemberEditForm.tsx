@@ -104,6 +104,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const [avatarTs, setAvatarTs] = useState(0);
   const sessionUploads = useRef<string[]>([]);
 
   useEffect(() => {
@@ -169,6 +170,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
       sessionUploads.current.push(uploadedUrl);
       handleChange('avatar', uploadedUrl);
+      setAvatarTs(Date.now());
     } catch (err) {
       console.error('Failed to upload member avatar:', err);
       window.alert(err instanceof Error ? err.message : 'Failed to upload avatar.');
@@ -331,7 +333,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
             <div className="flex flex-col md:flex-row md:items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-slate-200 shadow-sm shrink-0">
                 {currentAvatar ? (
-                  <img src={currentAvatar} alt={formValues.name || member.name || 'Member avatar'} className="w-full h-full object-cover" />
+                  <img src={avatarTs ? `${currentAvatar}?v=${avatarTs}` : currentAvatar} alt={formValues.name || member.name || 'Member avatar'} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-xl font-black text-jci-blue bg-blue-50">
                     {(formValues.name || member.name || 'M').charAt(0)}
