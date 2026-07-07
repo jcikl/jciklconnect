@@ -462,7 +462,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="hidden lg:flex shrink-0 items-center relative">
                         <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/10 blur-xl" />
                         <img src={termSettings.logoUrl} alt="Presidential theme logo"
-                          className="relative z-10 h-16 xl:h-20 w-auto object-contain drop-shadow-xl" />
+                          className="relative z-10 h-24 xl:h-28 w-auto object-contain drop-shadow-xl" />
                       </div>
                     )}
                   </div>
@@ -471,7 +471,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   {termSettings?.logoUrl && (
                     <div className="flex justify-center lg:hidden mb-5">
                       <img src={termSettings.logoUrl} alt="Presidential theme logo"
-                        className="h-14 w-auto object-contain opacity-90 drop-shadow-lg" />
+                        className="h-20 w-auto object-contain opacity-90 drop-shadow-lg" />
                     </div>
                   )}
 
