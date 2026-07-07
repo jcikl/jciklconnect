@@ -391,7 +391,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
             </div>
 
             {/* ── MOBILE: full-bleed cinematic overlay ── */}
-            <div className="lg:hidden relative h-[520px] overflow-hidden">
+            <div className="lg:hidden relative h-[620px] overflow-hidden">
               {president.avatar ? (
                 <img src={president.avatar} alt={president.name}
                   className="absolute inset-0 w-full h-full object-cover object-top" />
@@ -443,6 +443,11 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   {termSettings?.tagline && (
                     <p className="text-amber-300/75 text-[10px] font-black uppercase tracking-widest mb-3">{termSettings.tagline}</p>
                   )}
+
+                  {/* Description */}
+                  <p className="text-white/55 text-xs leading-relaxed max-w-xs mb-4">
+                    {termSettings?.shortDescription || 'This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose and transforms Kuala Lumpur for generations to come.'}
+                  </p>
 
                   <div className="flex flex-col items-center gap-0.5 mb-5">
                     <p className="text-white font-black text-base drop-shadow">{president.name}</p>
