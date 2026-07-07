@@ -29,6 +29,8 @@ yarn-error.log*
 # IDEs and editors
 .idea/
 .vscode/
+.claude/*
+!.claude/launch.json
 *.suo
 *.ntvs*
 *.njsproj
