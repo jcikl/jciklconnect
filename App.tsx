@@ -7,7 +7,7 @@ import {
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
   ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw,
-  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign
+  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -2500,82 +2500,137 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
 
   const redeemStatus = selectedPartner ? checkRedeemPermission(selectedPartner) : { allowed: false, reason: 'login' };
 
+  const getValidityChip = (endDate: string) => {
+    const end = new Date(endDate);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const daysLeft = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft < 0) return { label: 'Expired', className: 'bg-red-50 text-red-500 border-red-100' };
+    if (daysLeft <= 30) return { label: `${daysLeft}d left`, className: 'bg-amber-50 text-amber-600 border-amber-100' };
+    return { label: `Until ${new Date(endDate).toLocaleDateString('en-MY', { month: 'short', year: 'numeric' })}`, className: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <GuestHeader currentPage="partnerships" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Merchant Partnerships</h1>
-            <p className="text-base text-blue-100 max-w-2xl mx-auto">
-              Exclusive discounts and rewards curated for JCI Kuala Lumpur members.
-            </p>
+        {/* Hero */}
+        <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/5 rounded-full" />
+            <div className="absolute -bottom-16 -left-16 w-72 h-72 bg-white/5 rounded-full" />
+          </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
+              <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg">
+                <Gift size={36} className="text-white/80" />
+              </div>
+              <div className="text-center sm:text-left">
+                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider text-white/80 mb-3">
+                  Exclusive to JCI KL Members
+                </div>
+                <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-2">
+                  Member <span className="text-sky-200">Perks</span>
+                </h1>
+                <p className="text-base text-blue-100 max-w-xl leading-relaxed">
+                  Exclusive discounts and rewards from our merchant partners — curated for JCI Kuala Lumpur members.
+                </p>
+                {!loading && partnerships.length > 0 && (
+                  <div className="flex items-center gap-2 mt-4 justify-center sm:justify-start">
+                    <span className="text-2xl font-black text-white">{partnerships.length}</span>
+                    <span className="text-sky-200/80 text-sm font-semibold">Active Partner{partnerships.length !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="py-16">
+        {/* Partners Grid */}
+        <section className="py-14">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {loading ? (
               <div className="text-center py-20">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue mx-auto mb-4" />
-                <p className="text-slate-600">Loading partnerships...</p>
+                <p className="text-slate-500 text-sm">Loading partnerships...</p>
               </div>
             ) : partnerships.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto p-8">
-                <Gift size={48} className="text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-slate-800">No Active Partnerships</h3>
-                <p className="text-sm text-slate-500 mt-2 leading-relaxed max-w-sm mx-auto">
-                  There are currently no active merchant partnerships. Please check back later!
+              <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto p-10">
+                <Gift size={44} className="text-slate-200 mx-auto mb-4" />
+                <h3 className="text-lg font-black text-slate-800 mb-2">No Active Partnerships</h3>
+                <p className="text-sm text-slate-400 leading-relaxed max-w-sm mx-auto">
+                  There are currently no active merchant partnerships. Check back soon!
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
-                {partnerships.map(partner => (
-                  <div
-                    key={partner.id}
-                    className="flex flex-col h-full items-center bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleCardClick(partner)}
-                  >
-                    <div className="w-full h-28 relative flex items-center justify-center p-4">
-                      {partner.banner ? (
-                        <img
-                          src={partner.banner}
-                          alt={partner.name}
-                          className="max-w-full max-h-full object-contain"
-                          onError={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            img.onerror = null;
-                            img.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-slate-300">
-                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {partnerships.map(partner => {
+                  const validity = getValidityChip(partner.period.endDate);
+                  return (
+                    <div
+                      key={partner.id}
+                      className="group flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
+                      onClick={() => handleCardClick(partner)}
+                    >
+                      {/* Logo area */}
+                      <div className="relative w-full h-36 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
+                        {partner.banner ? (
+                          <img
+                            src={partner.banner}
+                            alt={partner.name}
+                            className="max-w-full max-h-full object-contain drop-shadow-sm"
+                            onError={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              img.onerror = null; img.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-300">
+                            <Gift size={36} />
+                          </div>
+                        )}
+                        <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full border ${validity.className}`}>
+                          {validity.label}
+                        </span>
+                      </div>
+
+                      {/* Body */}
+                      <div className="flex flex-col flex-1 p-4 gap-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-black text-slate-900 text-sm leading-tight">{partner.name}</h3>
+                          <Lock size={13} className="shrink-0 text-slate-300 mt-0.5 group-hover:text-jci-blue transition-colors" />
                         </div>
-                      )}
+                        {partner.memberBenefits && (
+                          <p className="text-sm text-jci-blue font-semibold line-clamp-2 leading-snug">{partner.memberBenefits}</p>
+                        )}
+                        <div className="mt-auto pt-3 border-t border-slate-50 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Tap to unlock details</span>
+                          <ChevronRight size={13} className="text-slate-300 group-hover:text-jci-blue transition-colors" />
+                        </div>
+                      </div>
                     </div>
-                    <div className="w-full px-3 pb-3 border-t border-slate-50 pt-2">
-                      <p className="text-xs font-semibold text-slate-700 text-center truncate">{partner.name}</p>
-                      {partner.memberBenefits && (
-                        <p className="text-[11px] text-jci-blue text-center truncate mt-0.5">{partner.memberBenefits}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="py-16 bg-slate-100">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-2xl font-bold text-slate-900 mb-4">Are you a merchant?</h2>
-            <p className="text-slate-600 mb-8">
-              Partner with JCI Kuala Lumpur to offer exclusive discounts to our vast professional network of members.
-            </p>
-            <Button size="lg" onClick={onRegister}>
+        {/* Merchant CTA */}
+        <section className="py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+            <div className="shrink-0 w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
+              <Briefcase size={28} className="text-white/80" />
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-2xl font-black text-white mb-2">Are you a merchant?</h2>
+              <p className="text-blue-200 text-sm leading-relaxed max-w-lg">
+                Partner with JCI Kuala Lumpur to offer exclusive discounts to our professional network of 200+ members across Kuala Lumpur.
+              </p>
+            </div>
+            <Button size="lg" variant="outline" onClick={onRegister}
+              className="shrink-0 bg-white !text-jci-navy border-white hover:bg-sky-50 hover:!text-jci-navy font-black shadow-lg">
               Partner With Us
             </Button>
           </div>
@@ -2588,84 +2643,76 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
       {selectedPartner && (
         <Modal
           isOpen={isDetailModalOpen}
-          onClose={() => {
-            setIsDetailModalOpen(false);
-            setSelectedPartner(null);
-          }}
+          onClose={() => { setIsDetailModalOpen(false); setSelectedPartner(null); }}
           title={selectedPartner.name}
           size="md"
           drawerOnMobile
         >
-          <div className="space-y-6">
-            <div className="w-full h-48 overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
+          <div className="space-y-5">
+            {/* Banner */}
+            <div className="w-full h-44 overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
               {selectedPartner.banner ? (
-                <img
-                  src={selectedPartner.banner}
-                  alt={selectedPartner.name}
+                <img src={selectedPartner.banner} alt={selectedPartner.name}
                   className="max-w-full max-h-full object-contain drop-shadow-sm"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    img.onerror = null;
-                    img.style.display = 'none';
-                  }}
+                  onError={(e) => { const img = e.target as HTMLImageElement; img.onerror = null; img.style.display = 'none'; }}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center text-slate-300">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
-                  <span className="text-xs mt-2 font-medium">No Logo</span>
-                </div>
+                <Gift size={48} className="text-slate-300" />
               )}
             </div>
 
-            <div>
-              <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Member Benefit</h4>
-              <p className="text-lg font-bold text-slate-800">{selectedPartner.memberBenefits}</p>
+            {/* Benefit headline */}
+            <div className="bg-jci-blue/5 border border-jci-blue/10 rounded-xl p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-jci-blue mb-1">Member Benefit</p>
+              <p className="text-base font-black text-slate-900 leading-snug">{selectedPartner.memberBenefits}</p>
             </div>
 
-            <div className="border-t border-b border-slate-100 py-4 flex justify-between text-sm text-slate-600">
-              <div>
-                <span className="font-semibold block">Valid From</span>
-                <span>{selectedPartner.period.startDate}</span>
-              </div>
-              <div className="text-right">
-                <span className="font-semibold block">Valid Until</span>
-                <span>{selectedPartner.period.endDate}</span>
-              </div>
+            {/* Validity */}
+            <div className="flex gap-3">
+              {[{ label: 'Valid From', value: selectedPartner.period.startDate }, { label: 'Valid Until', value: selectedPartner.period.endDate }].map(d => (
+                <div key={d.label} className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{d.label}</p>
+                  <p className="text-sm font-bold text-slate-800">{d.value}</p>
+                </div>
+              ))}
             </div>
 
+            {/* Redeem */}
             <div>
-              <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">How to Redeem</h4>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">How to Redeem</p>
               {redeemStatus.allowed ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-sm font-medium">
-                  <p className="mb-2">ðŸ”“ Eligibility Verified successfully.</p>
-                  <p className="text-base font-bold bg-white px-3 py-2 rounded-lg border border-emerald-100 shadow-sm mt-2">{selectedPartner.redeemMethod}</p>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-700 text-sm font-bold">
+                    <Unlock size={15} className="shrink-0" />
+                    Eligibility verified — benefit unlocked
+                  </div>
+                  <p className="text-sm font-black text-slate-900 bg-white px-4 py-3 rounded-lg border border-emerald-100 shadow-sm">{selectedPartner.redeemMethod}</p>
                 </div>
               ) : (
-                <div className="bg-slate-100 border border-slate-200 rounded-xl p-6 text-slate-700 text-center space-y-4">
-                  <p className="font-semibold text-slate-800">
-                    {redeemStatus.reason === 'login' && 'ðŸ”’ Please login to view how to redeem.'}
-                    {redeemStatus.reason === 'role' && 'ðŸ”’ This benefit is not available for your member tier.'}
-                    {redeemStatus.reason === 'dues' && 'ðŸ”’ Please settle annual dues to unlock benefit details.'}
-                  </p>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Merchant discount codes and instruction details are protected by JCI Kuala Lumpur Member Benefit Shielding policies.
-                  </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center mx-auto">
+                    <Lock size={18} className="text-slate-500" />
+                  </div>
+                  <div>
+                    <p className="font-black text-slate-800 text-sm">
+                      {redeemStatus.reason === 'login' && 'Login to view how to redeem'}
+                      {redeemStatus.reason === 'role' && 'Not available for your member tier'}
+                      {redeemStatus.reason === 'dues' && 'Settle annual dues to unlock'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Benefit details are protected under JCI KL Member Benefit Shielding.
+                    </p>
+                  </div>
                   {redeemStatus.reason === 'login' && (
-                    <div className="flex gap-3 justify-center pt-2">
-                      <Button size="sm" onClick={() => { setIsDetailModalOpen(false); onLogin(); }}>
-                        Login
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setIsDetailModalOpen(false); onRegister(); }}>
-                        Register
-                      </Button>
+                    <div className="flex gap-3 justify-center pt-1">
+                      <Button size="sm" onClick={() => { setIsDetailModalOpen(false); onLogin(); }}>Login</Button>
+                      <Button size="sm" variant="outline" onClick={() => { setIsDetailModalOpen(false); onRegister(); }}>Register</Button>
                     </div>
                   )}
                   {redeemStatus.reason === 'dues' && (
-                    <div className="pt-2">
-                      <Button size="sm" onClick={() => { setIsDetailModalOpen(false); navigate('/roadmap'); }}>
-                        Go to Dues Billing
-                      </Button>
-                    </div>
+                    <Button size="sm" onClick={() => { setIsDetailModalOpen(false); navigate('/roadmap'); }}>
+                      Go to Dues Billing
+                    </Button>
                   )}
                 </div>
               )}
