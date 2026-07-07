@@ -1979,7 +1979,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     try {
       const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
       sessionUploads.current.push(uploadedUrl);
-      setInlineValues({ ...inlineValues, avatar: uploadedUrl });
+      setInlineValues((prev: any) => ({ ...prev, avatar: uploadedUrl }));
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to upload avatar', 'error');
     } finally {
@@ -2800,18 +2800,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                                 {avatarUploading ? 'Uploading...' : 'Upload'}
                                 <input type="file" accept="image/*" className="hidden" disabled={avatarUploading} onChange={handleInlineAvatarUpload} />
                               </label>
-                              {inlineValues.avatar && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={avatarUploading}
-                                  className="text-red-600 border-red-200 hover:bg-red-50"
-                                  onClick={() => setInlineValues({ ...inlineValues, avatar: '' })}
-                                >
-                                  Remove
-                                </Button>
-                              )}
                             </div>
                           </div>
                         </div>

@@ -178,11 +178,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     }
   };
 
-  const handleAvatarDelete = () => {
-    if (!currentAvatar) return;
-    handleChange('avatar', '');
-  };
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -357,11 +352,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   {avatarUploading ? 'Uploading...' : 'Upload Photo'}
                   <input type="file" accept="image/*" className="hidden" disabled={avatarUploading} onChange={handleAvatarUpload} />
                 </label>
-                {currentAvatar && (
-                  <Button type="button" variant="outline" onClick={handleAvatarDelete} disabled={avatarUploading} className="text-red-600 border-red-200 hover:bg-red-50">
-                    Remove
-                  </Button>
-                )}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
