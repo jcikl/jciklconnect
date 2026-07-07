@@ -6,6 +6,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  setDoc,
   deleteDoc,
   query,
   where,
@@ -569,11 +570,12 @@ export class BoardManagementService {
   static async setBoardTermSettings(year: string, settings: Partial<Omit<BoardTermSettings, 'year' | 'updatedAt'>>): Promise<void> {
     try {
       const ref = doc(db, COLLECTIONS.BOARD_TERM_SETTINGS, year);
-      await updateDoc(ref, { ...settings, updatedAt: new Date().toISOString() }).catch(async () => {
-        // doc doesn't exist yet — create it
-        const { setDoc } = await import('firebase/firestore');
-        await setDoc(ref, { year, ...settings, updatedAt: new Date().toISOString() });
-      });
+      // Strip undefined values — Firestore rejects them
+      const clean: Record<string, unknown> = { year, updatedAt: new Date().toISOString() };
+      for (const [k, v] of Object.entries(settings)) {
+        if (v !== undefined) clean[k] = v;
+      }
+      await setDoc(ref, clean, { merge: true });
     } catch (error) {
       console.error('Error setting board term settings:', error);
       throw error;
