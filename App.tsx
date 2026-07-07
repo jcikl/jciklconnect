@@ -494,28 +494,20 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
               <div className="flex items-center px-12 xl:px-16 py-16">
                 <div className="w-full max-w-lg">
 
-                  {/* Eyebrow row + logo on the right */}
-                  <div className="flex items-center justify-between gap-4 mb-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-px bg-amber-400/50 shrink-0" />
-                      <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/80">Presidential Theme {currentYear}</span>
-                    </div>
-                    {termSettings?.logoUrl && (
-                      <div className="relative shrink-0 flex items-center">
-                        <div className="absolute inset-0 scale-[3] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
-                        <img src={termSettings.logoUrl} alt="Presidential theme logo"
-                          className="relative z-10 h-36 xl:h-40 w-auto object-contain drop-shadow-2xl" />
-                      </div>
-                    )}
+                  {/* Eyebrow */}
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-5 h-px bg-amber-400/50 shrink-0" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/80">Presidential Theme {currentYear}</span>
                   </div>
 
-                  {/* Theme headline — gradient amber on highlight word */}
-                  {(() => {
-                    const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
-                    const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
-                    return (
-                      <div className="mb-4">
-                        {parts.map((part: string, i: number) => (
+                  {/* Headline + logo side by side */}
+                  <div className="flex items-center gap-6 mb-4">
+                    {/* Theme headline — gradient amber on highlight word */}
+                    <div className="flex-1">
+                      {(() => {
+                        const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
+                        const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
+                        return parts.map((part: string, i: number) => (
                           <h2 key={i} className={`text-5xl xl:text-[3.5rem] font-black leading-[0.92] tracking-tight ${
                             i === Math.floor(parts.length / 2)
                               ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
@@ -523,10 +515,19 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                           }`}>
                             {part}.
                           </h2>
-                        ))}
+                        ));
+                      })()}
+                    </div>
+
+                    {/* Logo to the right of headline */}
+                    {termSettings?.logoUrl && (
+                      <div className="relative shrink-0 flex items-center">
+                        <div className="absolute inset-0 scale-[2.5] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
+                        <img src={termSettings.logoUrl} alt="Presidential theme logo"
+                          className="relative z-10 h-36 xl:h-40 w-auto object-contain drop-shadow-2xl" />
                       </div>
-                    );
-                  })()}
+                    )}
+                  </div>
 
                   {termSettings?.tagline && (
                     <p className="text-amber-300/75 text-[10px] font-black uppercase tracking-widest mb-5">{termSettings.tagline}</p>
