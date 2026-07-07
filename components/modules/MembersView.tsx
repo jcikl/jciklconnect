@@ -2766,7 +2766,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   >
                     {isEditMode && inlineValues ? (
                       <div className="space-y-4 text-sm">
-                        <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex flex-row items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-blue-50 shadow-sm shrink-0">
                             {inlineValues.avatar ? (
                               <img src={inlineValues.avatar} alt={inlineValues.name || member.name} className="w-full h-full object-cover" />
