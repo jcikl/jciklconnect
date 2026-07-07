@@ -303,10 +303,10 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   }, [currentYear]);
 
   const pillars = [
-    { icon: <Briefcase size={26} />, title: 'Business', description: 'Connect with entrepreneurs, grow your network, and sharpen your professional edge.', accent: 'text-jci-blue bg-blue-50 border-blue-100' },
-    { icon: <Heart size={26} />, title: 'Community', description: 'Lead meaningful service projects that create lasting impact in Kuala Lumpur.', accent: 'text-rose-500 bg-rose-50 border-rose-100' },
-    { icon: <Award size={26} />, title: 'International', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.', accent: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-    { icon: <Sparkles size={26} />, title: 'Individual', description: 'Unlock your leadership potential through training, mentorship, and real experiences.', accent: 'text-amber-500 bg-amber-50 border-amber-100' },
+    { image: '/pillars/business-portrait.jpg', title: 'Business', description: 'Connect with entrepreneurs, grow your network, and sharpen your professional edge.', accent: 'from-jci-navy/80 to-jci-blue/60' },
+    { image: '/pillars/community-portrait.jpg', title: 'Community', description: 'Lead meaningful service projects that create lasting impact in Kuala Lumpur.', accent: 'from-rose-900/70 to-rose-600/50' },
+    { image: '/pillars/international-portrait.jpg', title: 'International', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.', accent: 'from-emerald-900/70 to-emerald-600/50' },
+    { image: '/pillars/individual-portrait.jpg', title: 'Individual', description: 'Unlock your leadership potential through training, mentorship, and real experiences.', accent: 'from-amber-900/70 to-amber-600/50' },
   ];
 
   const eventTypeColor: Record<string, string> = {
@@ -407,10 +407,18 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {pillars.map(p => (
-                <div key={p.title} className="rounded-2xl border border-slate-100 bg-white p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
-                  <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-5 ${p.accent}`}>{p.icon}</div>
-                  <h3 className="text-lg font-black text-slate-900 mb-2">{p.title}</h3>
-                  <p className="text-slate-500 text-sm leading-relaxed">{p.description}</p>
+                <div key={p.title} className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default" style={{ aspectRatio: '3/4' }}>
+                  <img
+                    src={p.image}
+                    alt={p.title}
+                    className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className={`absolute inset-0 bg-gradient-to-t ${p.accent} via-transparent`} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <h3 className="text-lg font-black text-white mb-1 tracking-wide">{p.title}</h3>
+                    <p className="text-white/80 text-xs leading-relaxed">{p.description}</p>
+                  </div>
                 </div>
               ))}
             </div>
