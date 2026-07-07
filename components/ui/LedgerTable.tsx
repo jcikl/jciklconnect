@@ -10,6 +10,8 @@ export interface LedgerRecord {
   points: number;
   year?: string | number;
   eventDate?: string;
+  hostingLO?: string;
+  chapterLO?: string;
   createdAt: string;
 }
 
@@ -74,6 +76,8 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
               )}
               <th className="py-2 px-3 font-bold text-slate-600 border-b">Member Name</th>
               <th className="py-2 px-3 font-bold text-slate-600 border-b">Event Title</th>
+              <th className="py-2 px-3 font-bold text-slate-600 border-b">Hosting LO</th>
+              <th className="py-2 px-3 font-bold text-slate-600 border-b">Chapter / LO</th>
               <th className="py-2 px-3 font-bold text-slate-600 border-b">Radar Key</th>
               <th className="py-2 px-3 font-bold text-slate-600 border-b">Points</th>
               <th className="py-2 px-3 font-bold text-slate-600 border-b">Year</th>
@@ -88,7 +92,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
             {logs.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showSelection ? 9 : 8}
+                  colSpan={showSelection ? 11 : 10}
                   className="py-8 text-center text-slate-500"
                 >
                   No contribution records found.
@@ -122,6 +126,12 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                     title={log.eventTitle}
                   >
                     {log.eventTitle}
+                  </td>
+                  <td className="py-1.5 px-3 text-slate-500 text-[10px]">
+                    {log.hostingLO || '-'}
+                  </td>
+                  <td className="py-1.5 px-3 text-slate-500 text-[10px]">
+                    {log.chapterLO || '-'}
                   </td>
                   <td className="py-1.5 px-3">
                     <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold">

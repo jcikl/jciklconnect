@@ -574,6 +574,16 @@ export interface MemberEngagementRequirementProgress {
   detail?: string;
   date?: string;
   completed?: boolean;
+  /** Set to true when auto-suggested by the system, awaiting BOD verification */
+  pendingVerification?: boolean;
+  /** Source of the auto-suggestion */
+  autoSuggestedFrom?: 'radar' | 'committee';
+  /** UID of the BOD member who approved this entry */
+  verifiedBy?: string;
+  verifiedAt?: string;
+  /** UID of the BOD member who rejected this entry */
+  rejectedBy?: string;
+  rejectedAt?: string;
 }
 
 /** Create payload; membershipType is computed on save if omitted */

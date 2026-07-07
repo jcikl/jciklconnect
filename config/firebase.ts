@@ -3,6 +3,7 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
 import { isDevMode } from '../utils/devMode';
 
 const firebaseConfig = {
@@ -42,23 +43,19 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
+let appCheck: AppCheck | undefined;
 
 if (typeof window !== 'undefined') {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
-  
+
   // Only set persistence if not in dev mode (to avoid Firebase API calls)
   if (!isDevMode()) {
-    // Set persistence to LOCAL (default, but explicit for clarity)
-    // This ensures user stays logged in across browser sessions
     setPersistence(auth, browserLocalPersistence).catch((error) => {
-      // Only log error if not in dev mode
-      if (!isDevMode()) {
-        console.error('Error setting auth persistence:', error);
-      }
+      console.error('Error setting auth persistence:', error);
     });
   }
-  
+
   // persistentLocalCache only in production — HMR in dev causes re-init errors
   if (import.meta.env.PROD) {
     try {
@@ -70,8 +67,22 @@ if (typeof window !== 'undefined') {
     db = getFirestore(app);
   }
   storage = getStorage(app);
+
+  // Firebase App Check — blocks requests from non-app clients
+  // In dev: set window.FIREBASE_APPCHECK_DEBUG_TOKEN = true in browser console to get a debug token
+  // In production: uses reCAPTCHA v3 (requires VITE_RECAPTCHA_SITE_KEY env var)
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+  if (import.meta.env.PROD && recaptchaSiteKey) {
+    appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } else if (import.meta.env.DEV) {
+    // Expose debug token flag so devs can copy the token from the console and register it in Firebase Console
+    (self as unknown as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
 }
 
-export { app, auth, db, storage };
+export { app, auth, db, storage, appCheck };
 export default app;
 

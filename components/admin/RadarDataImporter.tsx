@@ -238,12 +238,16 @@ export const RadarDataImporter: React.FC = () => {
       let eventTitle = '';
 
       // 9-column input: URL | Event Title | Hosting LO | Registrant Name | Mobile / Phone | Chapter / LO | Event Date | Type | Cat
+      let hostingLO = '';
+      let chapterLO = '';
       if (cols.length >= 9) {
         const chapter = cols[5];
         if (chapter && !chapter.toLowerCase().includes('kuala lumpur')) {
           return { id: index, isIgnored: true };
         }
 
+        hostingLO = cols[2]?.trim() || '';
+        chapterLO = cols[5]?.trim() || '';
         eventTitle = cols[1]?.trim() || '';
         rawName = cols[3];
         const rawDate = cols[6]?.trim() || '';
@@ -320,6 +324,8 @@ export const RadarDataImporter: React.FC = () => {
         eventYear,
         eventDate,
         eventTitle,
+        hostingLO,
+        chapterLO,
         matchedMemberId: matchedMember ? matchedMember.id : '',
         matchedMemberName: matchedMember ? (matchedMember.general?.name || matchedMember.name) : 'Unmatched',
       };
@@ -443,6 +449,8 @@ export const RadarDataImporter: React.FC = () => {
           points,
           year,
           eventDate: row.eventDate || '',
+          hostingLO: row.hostingLO || '',
+          chapterLO: row.chapterLO || '',
           createdAt: new Date().toISOString(),
           source: 'Bulk Import'
         });
