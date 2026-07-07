@@ -1396,7 +1396,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   const BoardNode = ({ member, defaultRole, variant = 'default' }: {
     member?: any;
     defaultRole: string;
-    variant?: 'default' | 'president' | 'ipp';
+    variant?: 'default' | 'president' | 'ipp' | 'vp';
   }) => {
     const name = member?.name || 'Vacant';
     const role = member?.position || defaultRole;
@@ -1404,59 +1404,135 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
     const company = member?.company || 'JCI Kuala Lumpur';
     const commissionDirectors: Array<{ id: string; name: string; avatar: string }> = member?.commissionDirectors || [];
 
-    let cardClasses = "bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:shadow-md hover:border-jci-blue transition-all flex flex-col items-center text-center w-full max-w-[210px] mx-auto shrink-0 relative group";
-    let roleClasses = "text-[10px] font-extrabold uppercase tracking-wider text-jci-blue mb-0.5 max-w-full truncate";
-    let nameClasses = "font-bold text-slate-800 text-sm mb-0.5 line-clamp-1";
-    let avatarSize = "w-16 h-16";
+    const AvatarCircle = ({ src, label, size }: { src?: string; label: string; size: string }) =>
+      src ? (
+        <img src={src} alt={label} className={`${size} rounded-full object-cover border border-white/40 shadow-sm`} />
+      ) : (
+        <div className={`${size} rounded-full bg-white/20 flex items-center justify-center`}>
+          <span className="font-bold text-white/60 text-xs">{label.charAt(0)}</span>
+        </div>
+      );
 
     if (variant === 'president') {
-      cardClasses = "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200/80 rounded-2xl p-5 shadow-md hover:shadow-lg hover:border-jci-blue transition-all flex flex-col items-center text-center w-full max-w-[230px] mx-auto shrink-0 relative group ring-2 ring-jci-blue/10";
-      roleClasses = "text-[11px] font-black uppercase tracking-widest text-jci-blue mb-1 max-w-full truncate";
-      nameClasses = "font-black text-slate-900 text-base mb-0.5 line-clamp-1";
-      avatarSize = "w-20 h-20 border-2 border-jci-blue/20";
-    } else if (variant === 'ipp') {
-      cardClasses = "bg-white border-2 border-dashed border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-jci-blue transition-all flex flex-col items-center text-center w-full max-w-[210px] mx-auto shrink-0 relative group";
-      roleClasses = "text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-0.5 max-w-full truncate";
+      return (
+        <div className="relative bg-gradient-to-br from-jci-navy to-jci-blue text-white rounded-3xl p-6 md:p-8 flex items-center gap-5 md:gap-7 shadow-xl shadow-jci-blue/25 overflow-hidden w-full max-w-2xl mx-auto group hover:shadow-2xl hover:shadow-jci-blue/30 transition-all">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-white/[0.04] rounded-full -translate-y-1/3 translate-x-1/3 pointer-events-none" />
+          <div className="absolute bottom-0 left-1/4 w-40 h-40 bg-white/[0.04] rounded-full translate-y-1/2 pointer-events-none" />
+          <div className="shrink-0 relative z-10">
+            {avatar ? (
+              <img src={avatar} alt={name} className="w-20 h-20 md:w-28 md:h-28 rounded-2xl object-cover border-2 border-white/25 shadow-xl" />
+            ) : (
+              <div className="w-20 h-20 md:w-28 md:h-28 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center">
+                <span className="text-4xl font-black text-white/40">{name.charAt(0)}</span>
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 relative z-10">
+            <span className="inline-block text-[9px] font-black uppercase tracking-widest bg-white/15 border border-white/20 px-3 py-1 rounded-full mb-2.5">President {selectedYear}</span>
+            <h3 className="text-xl md:text-2xl font-black leading-tight mb-1">{name}</h3>
+            <p className="text-sky-200/80 text-sm truncate">{company}</p>
+            {commissionDirectors.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {commissionDirectors.map(dir => (
+                  <div key={dir.id} className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-full pl-0.5 pr-2.5 py-0.5">
+                    <AvatarCircle src={dir.avatar} label={dir.name} size="w-5 h-5" />
+                    <span className="text-[10px] text-white/75 font-medium max-w-[80px] truncate">{dir.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
     }
 
+    if (variant === 'ipp') {
+      return (
+        <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-4 flex items-center gap-4 w-full max-w-[240px] mx-auto hover:border-slate-300 hover:shadow-md transition-all group">
+          <div className="shrink-0">
+            {avatar ? (
+              <img src={avatar} alt={name} className="w-14 h-14 rounded-xl object-cover border border-slate-200 group-hover:border-jci-blue/30 transition-colors" />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <span className="text-lg font-bold text-slate-300">{name.charAt(0)}</span>
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="inline-block text-[8px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full mb-1">Past President</span>
+            <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{name}</h4>
+            <p className="text-[11px] text-slate-400 truncate">{company}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (variant === 'vp') {
+      const shortRole = role.replace('Vice President', 'VP');
+      return (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-jci-blue/25 transition-all p-4 flex items-start gap-3.5 h-full group">
+          <div className="shrink-0 mt-0.5">
+            {avatar ? (
+              <img src={avatar} alt={name} className="w-12 h-12 rounded-xl object-cover border border-slate-100 group-hover:border-jci-blue/30 transition-colors" />
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-100 flex items-center justify-center">
+                <span className="text-base font-bold text-slate-300">{name.charAt(0)}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] font-extrabold uppercase tracking-wider text-jci-blue mb-0.5 truncate">{shortRole}</p>
+            <h4 className="font-bold text-slate-900 text-sm truncate">{name}</h4>
+            <p className="text-[11px] text-slate-400 truncate mb-0">{company}</p>
+            {commissionDirectors.length > 0 && (
+              <div className="mt-2.5 pt-2.5 border-t border-slate-100">
+                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Commission Directors</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {commissionDirectors.map(dir => (
+                    <div key={dir.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-full pl-0.5 pr-2 py-0.5">
+                      {dir.avatar ? (
+                        <img src={dir.avatar} alt={dir.name} className="w-5 h-5 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-500">{dir.name.charAt(0)}</div>
+                      )}
+                      <span className="text-[10px] font-medium text-slate-600 max-w-[90px] truncate">{dir.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // default — Secretary, Treasurer, GLC, EVP
     return (
-      <div className={cardClasses}>
-        {variant === 'president' && (
-          <div className="absolute top-0 right-0 bg-jci-blue text-white text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-bl-lg">
-            Leader
-          </div>
-        )}
-        {variant === 'ipp' && (
-          <div className="absolute top-0 right-0 bg-slate-100 text-slate-500 text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-bl-lg">
-            Support
-          </div>
-        )}
-        <div className="relative mb-3">
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md hover:border-jci-blue/25 transition-all flex flex-col items-center text-center w-full h-full group">
+        <div className="mb-3">
           {avatar ? (
-            <img src={avatar} alt={name} className={`${avatarSize} rounded-full object-cover border-2 border-slate-100 shadow-sm group-hover:border-jci-blue transition-colors`} />
+            <img src={avatar} alt={name} className="w-14 h-14 rounded-xl object-cover border-2 border-slate-100 shadow-sm group-hover:border-jci-blue/20 transition-colors" />
           ) : (
-            <div className={`${avatarSize} rounded-full bg-slate-100 flex items-center justify-center border-2 border-slate-100 text-slate-400`}>
+            <div className="w-14 h-14 rounded-xl bg-slate-100 border-2 border-slate-100 flex items-center justify-center">
               <span className="text-xl font-bold text-slate-300">{name.charAt(0)}</span>
             </div>
           )}
         </div>
-        <p className={roleClasses}>{role}</p>
-        <h4 className={nameClasses}>{name}</h4>
+        <p className="text-[9px] font-extrabold uppercase tracking-wider text-jci-blue mb-0.5 w-full truncate px-1">{role}</p>
+        <h4 className="font-bold text-slate-900 text-sm mb-0.5 line-clamp-1">{name}</h4>
         <p className="text-[11px] text-slate-400 line-clamp-1">{company}</p>
         {commissionDirectors.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-slate-100 w-full">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2">Commission Directors</p>
-            <div className="flex flex-wrap justify-center gap-2">
+          <div className="mt-2.5 pt-2.5 border-t border-slate-100 w-full">
+            <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Commission Directors</p>
+            <div className="flex flex-wrap justify-center gap-1.5">
               {commissionDirectors.map(dir => (
-                <div key={dir.id} className="flex flex-col items-center gap-1" title={dir.name}>
+                <div key={dir.id} className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-full pl-0.5 pr-1.5 py-0.5">
                   {dir.avatar ? (
-                    <img src={dir.avatar} alt={dir.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm" />
+                    <img src={dir.avatar} alt={dir.name} className="w-4 h-4 rounded-full object-cover" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400">
-                      {dir.name.charAt(0)}
-                    </div>
+                    <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">{dir.name.charAt(0)}</div>
                   )}
-                  <span className="text-[9px] text-slate-500 font-medium max-w-[60px] truncate text-center">{dir.name}</span>
+                  <span className="text-[9px] font-medium text-slate-600 max-w-[60px] truncate">{dir.name}</span>
                 </div>
               ))}
             </div>
@@ -1471,12 +1547,29 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="about" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">About JCI Kuala Lumpur</h1>
-            <p className="text-base text-blue-100 max-w-2xl mx-auto">
-              Empowering young active citizens to create positive change.
-            </p>
+        <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white" aria-label="Page header">
+          <div className="absolute top-0 right-0 w-[480px] h-[480px] bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+          <div className="absolute top-1/2 left-1/4 w-40 h-40 bg-white/[0.04] rounded-full -translate-y-1/2 pointer-events-none" />
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
+              <div className="shrink-0 w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/10 border border-white/20 p-4 flex items-center justify-center shadow-lg shadow-black/20">
+                <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" className="w-full h-full object-contain drop-shadow" />
+              </div>
+              <div>
+                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider mb-4">
+                  <span>Est. 1954</span>
+                  <span className="w-1 h-1 rounded-full bg-white/50" />
+                  <span>JCI Kuala Lumpur</span>
+                </div>
+                <h1 className="text-4xl md:text-5xl font-black mb-3 leading-tight tracking-tight">
+                  About <span className="text-sky-200">JCI KL</span>
+                </h1>
+                <p className="text-lg text-blue-100 max-w-xl leading-relaxed">
+                  The first Malaysia Junior Chamber Chapter, empowering young active citizens to create positive change since 1954.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1606,83 +1699,57 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                 <p className="text-slate-500 text-sm font-semibold">Loading Board Directory...</p>
               </div>
             ) : (
-              <div className="space-y-12">
-                {/* Level 1: President & IPP */}
-                <div className="relative flex flex-col md:flex-row justify-center items-center gap-8 md:gap-16">
-                  {/* President */}
-                  <div className="w-full max-w-[240px]">
+              <div className="space-y-10">
+                {/* Level 1: President + IPP */}
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-6 sm:gap-10">
+                  <div className="w-full sm:flex-1 max-w-2xl">
                     <BoardNode member={president} defaultRole="President" variant="president" />
                   </div>
-
-                  {/* Connecting Line for Support */}
-                  <div className="hidden md:flex flex-col items-center justify-center shrink-0">
-                    <div className="w-16 h-0.5 border-t-2 border-dashed border-slate-300"></div>
-                    <span className="mt-1 px-2.5 py-0.5 bg-sky-50 text-jci-blue font-extrabold uppercase tracking-widest text-[8px] rounded-full border border-sky-100">
-                      Support
-                    </span>
+                  <div className="hidden sm:flex flex-col items-center gap-1 shrink-0">
+                    <div className="w-12 h-px border-t-2 border-dashed border-slate-300" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-full">Support</span>
                   </div>
-
-                  {/* Immediate Past President */}
-                  <div className="w-full max-w-[220px]">
+                  <div className="w-full sm:w-auto">
                     <BoardNode member={ipp} defaultRole="Immediate Past President" variant="ipp" />
                   </div>
                 </div>
 
-                {/* Line downwards from President to Level 2 */}
-                <div className="hidden lg:block w-0.5 h-10 bg-gradient-to-b from-slate-300 to-slate-200 mx-auto -mt-6"></div>
+                {/* Connector */}
+                <div className="hidden lg:block w-px h-8 bg-gradient-to-b from-jci-blue/30 to-transparent mx-auto" />
 
                 {/* Level 2: Secretary, Treasurer, GLC, EVP */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-                  <div className="w-full">
-                    <BoardNode member={secretary} defaultRole="Secretary" />
-                  </div>
-                  <div className="w-full">
-                    <BoardNode member={treasurer} defaultRole="Honorary Treasurer" />
-                  </div>
-                  <div className="w-full">
-                    <BoardNode member={glc} defaultRole="General Legal Counsel" />
-                  </div>
-                  <div className="w-full relative group">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-jci-blue to-jci-lightblue rounded-2xl blur opacity-15 group-hover:opacity-30 transition duration-300"></div>
-                    <div className="relative">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                  <BoardNode member={secretary} defaultRole="Secretary" />
+                  <BoardNode member={treasurer} defaultRole="Honorary Treasurer" />
+                  <BoardNode member={glc} defaultRole="General Legal Counsel" />
+                  <div className="relative">
+                    <div className="absolute -inset-px bg-gradient-to-br from-jci-blue/20 to-sky-400/20 rounded-2xl blur-sm" />
+                    <div className="relative h-full">
                       <BoardNode member={evp} defaultRole="Executive Vice President" />
                     </div>
                   </div>
                 </div>
 
-                {/* Line downwards from EVP to Level 3 VPs */}
-                <div className="hidden lg:block w-0.5 h-10 bg-gradient-to-b from-slate-200 to-slate-100 mx-auto"></div>
+                {/* Connector */}
+                <div className="hidden lg:block w-px h-8 bg-gradient-to-b from-transparent via-slate-300/60 to-transparent mx-auto" />
 
-                {/* Level 3: VPs under Executive Vice President */}
-                <div className="bg-slate-50/50 rounded-3xl p-6 sm:p-8 border border-slate-200/50 max-w-6xl mx-auto">
-                  <div className="text-center mb-8">
-                    <span className="px-4 py-1 bg-sky-50 border border-sky-100 text-jci-blue font-extrabold text-[10px] uppercase tracking-wider rounded-full">
-                      Vice Presidents
-                    </span>
+                {/* Level 3: VPs */}
+                <div className="rounded-3xl bg-slate-50/60 border border-slate-200/60 p-6 sm:p-8 max-w-5xl mx-auto">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex-1 h-px bg-slate-200/80" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-jci-blue px-3 py-1 bg-sky-50 border border-sky-100/80 rounded-full shrink-0">Vice Presidents</span>
+                    <div className="flex-1 h-px bg-slate-200/80" />
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 justify-center">
-                    <div className="w-full"><BoardNode member={vpIndividual} defaultRole="Vice President (Individual)" /></div>
-                    <div className="w-full"><BoardNode member={vpCommunity} defaultRole="Vice President (Community)" /></div>
-                    <div className="w-full"><BoardNode member={vpBusiness} defaultRole="Vice President (Business)" /></div>
-                    <div className="w-full"><BoardNode member={vpInternational} defaultRole="Vice President (International Affairs)" /></div>
-                    <div className="w-full"><BoardNode member={vpLom} defaultRole="Vice President (LOM)" /></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <BoardNode member={vpIndividual} defaultRole="Vice President (Individual)" variant="vp" />
+                    <BoardNode member={vpCommunity} defaultRole="Vice President (Community)" variant="vp" />
+                    <BoardNode member={vpBusiness} defaultRole="Vice President (Business)" variant="vp" />
+                    <BoardNode member={vpInternational} defaultRole="Vice President (International Affairs)" variant="vp" />
+                    <BoardNode member={vpLom} defaultRole="Vice President (LOM)" variant="vp" />
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Optional Group Photo Section */}
-            <div className="max-w-4xl mx-auto mt-16 pt-12 border-t border-slate-100">
-              <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-200/60 shadow-sm">
-                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 relative">
-                  <div className="text-center p-8">
-                    <Users size={48} className="mx-auto mb-3 text-slate-400/80" />
-                    <p className="text-slate-600 font-bold text-base">{selectedYear} Board of Directors Group Photo</p>
-                    <p className="text-slate-400 text-xs mt-1">Photo will be updated shortly</p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
