@@ -46,16 +46,25 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const { showToast } = useToast();
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>([]);
   const [formImage, setFormImage] = useState<File | null>(null);
+  const [formLogo, setFormLogo] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [statusActive, setStatusActive] = useState(true);
 
   React.useEffect(() => {
     if (selectedAd) {
       setSelectedPlacements(Array.isArray(selectedAd.placement) ? selectedAd.placement : [selectedAd.placement]);
       setFormImage(null);
+      setFormLogo(null);
+      setShowAdvanced(false);
+      setStatusActive(selectedAd.status === 'Active');
     } else {
       setSelectedPlacements(['Homepage']);
       setFormImage(null);
+      setFormLogo(null);
+      setShowAdvanced(false);
+      setStatusActive(true);
     }
   }, [selectedAd, isModalOpen]);
 
@@ -79,33 +88,28 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
     setIsUploading(true);
     try {
       let imageUrl = selectedAd?.imageUrl || '';
+      let logoUrl = selectedAd?.logoUrl || '';
+
+      const compressAndUpload = async (file: File, folder: string) => {
+        let fileToUpload = file;
+        try {
+          const compressedFile = await imageCompression(file, { maxSizeMB: 0.2, maxWidthOrHeight: 1920, useWebWorker: true });
+          fileToUpload = new File([compressedFile], file.name, { type: compressedFile.type, lastModified: Date.now() });
+        } catch {
+          // use original
+        }
+        return uploadToCloudinary(fileToUpload, folder, (p) => setUploadProgress(p));
+      };
 
       if (formImage) {
-        let fileToUpload = formImage;
-        try {
-          const options = {
-            maxSizeMB: 0.2,
-            maxWidthOrHeight: 1920,
-            useWebWorker: true,
-          };
-          const compressedFile = await imageCompression(formImage, options);
-          fileToUpload = new File([compressedFile], formImage.name, {
-            type: compressedFile.type,
-            lastModified: Date.now(),
-          });
-        } catch (error) {
-          console.error('Image compression failed, using original file:', error);
-        }
-
-        imageUrl = await uploadToCloudinary(fileToUpload, 'advertisements', (progress) => {
-          setUploadProgress(progress);
-        });
-      } else if (!imageUrl && formData.get('imageUrl')) {
-        imageUrl = formData.get('imageUrl') as string;
+        imageUrl = await compressAndUpload(formImage, 'advertisements');
+      }
+      if (formLogo) {
+        logoUrl = await compressAndUpload(formLogo, 'advertisements/logos');
       }
 
       if (!imageUrl) {
-        showToast('Please provide an image.', 'error');
+        showToast('Please upload an Ad Image.', 'error');
         setIsUploading(false);
         return;
       }
@@ -117,9 +121,10 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         placement: ['Homepage'],
         targetAudience: formData.get('targetAudience') as any || 'All Members',
         imageUrl: imageUrl,
+        logoUrl: logoUrl || undefined,
         linkUrl: formData.get('linkUrl') as string || undefined,
-        startDate: formData.get('startDate') as string,
-        endDate: formData.get('endDate') as string || undefined,
+        startDate: selectedAd?.startDate || new Date().toISOString().split('T')[0],
+        endDate: selectedAd?.endDate,
         status: (formData.get('status') as any) || 'Active',
         priority: parseInt(formData.get('priority') as string) || 0,
         budget: formData.get('budget') ? parseFloat(formData.get('budget') as string) : undefined,
@@ -134,6 +139,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       setIsModalOpen(false);
       setSelectedAd(null);
       setFormImage(null);
+      setFormLogo(null);
       e.currentTarget.reset();
     } catch (err) {
       // Error handled by hook
@@ -228,105 +234,129 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         </div>
         <div className="p-4">
           {activeTab === 'ads' ? (
-            <LoadingState loading={loading} error={error} empty={filteredAds.length === 0} emptyMessage="No advertisements found">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAds.map(ad => (
-                  <Card key={ad.id} className="hover:shadow-md transition-shadow">
-                    <div className="aspect-video bg-slate-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden relative">
-                      <AdImage imageUrl={ad.imageUrl} title={ad.title} />
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-bold text-slate-900 mb-1">{ad.title}</h3>
-                          <p className="text-sm text-slate-600 line-clamp-2">{ad.description}</p>
-                        </div>
-                        <Badge variant={ad.status === 'Active' ? 'success' : ad.status === 'Scheduled' ? 'info' : 'neutral'}>
-                          {ad.status}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2 text-xs text-slate-500">
-                        {ad.termsAndConditions ? (
-                          <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-                            <span className="text-slate-700">T&C:</span>
-                            <span className="line-clamp-1 italic">{ad.termsAndConditions}</span>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 italic">No terms and conditions set</span>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Calendar size={12} />
-                          <span>{formatDate(toDate(ad.startDate).toISOString())}</span>
-                          {ad.endDate && (
-                            <>
-                              <span>-</span>
-                              <span>{formatDate(toDate(ad.endDate).toISOString())}</span>
-                            </>
+            <LoadingState loading={loading} error={error} empty={filteredAds.length === 0} emptyMessage="No partnerships found">
+              <>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="py-3 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Partner</th>
+                        <th className="py-3 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Benefit</th>
+                        <th className="py-3 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Impressions</th>
+                        <th className="py-3 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Clicks</th>
+                        <th className="py-3 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">CTR</th>
+                        <th className="py-3 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                        {(isBoard || isAdmin) && <th className="py-3 px-3" />}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredAds.map(ad => (
+                        <tr key={ad.id} className="hover:bg-slate-50/60 transition-colors">
+                          {/* Partner identity */}
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                                {ad.logoUrl
+                                  ? <img src={ad.logoUrl} alt="" className="w-full h-full object-contain p-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                  : ad.imageUrl
+                                    ? <img src={ad.imageUrl} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                    : <ImageIcon size={16} className="text-slate-300" />
+                                }
+                              </div>
+                              <span className="font-semibold text-slate-900 whitespace-nowrap">{ad.title}</span>
+                            </div>
+                          </td>
+                          {/* Benefit */}
+                          <td className="py-3 px-3 max-w-xs">
+                            <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed">{ad.description}</p>
+                          </td>
+                          {/* Stats */}
+                          <td className="py-3 px-3 text-right font-semibold text-slate-700 tabular-nums">{formatNumber(ad.impressions)}</td>
+                          <td className="py-3 px-3 text-right font-semibold text-slate-700 tabular-nums">{formatNumber(ad.clicks)}</td>
+                          <td className="py-3 px-3 text-right">
+                            <span className="text-xs font-semibold text-slate-700 tabular-nums">{calculateCTR(ad).toFixed(1)}%</span>
+                            <div className="w-16 bg-slate-100 rounded-full h-1 mt-1 ml-auto">
+                              <div className="bg-jci-blue h-1 rounded-full" style={{ width: `${Math.min(calculateCTR(ad) * 10, 100)}%` }} />
+                            </div>
+                          </td>
+                          {/* Status */}
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full ${ad.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${ad.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                              {ad.status}
+                            </span>
+                          </td>
+                          {/* Actions */}
+                          {(isBoard || isAdmin) && (
+                            <td className="py-3 px-3">
+                              <div className="flex items-center gap-1 justify-end">
+                                <button
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-blue-50 transition-colors"
+                                  onClick={() => { setSelectedAd(ad); setIsModalOpen(true); }}
+                                >
+                                  <Edit size={14} />
+                                </button>
+                                <button
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                  onClick={async () => { if (window.confirm('Delete this partnership?')) await deleteAdvertisement(ad.id!); }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
                           )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile list */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {filteredAds.map(ad => (
+                    <div key={ad.id} className="flex items-center gap-3 py-3 px-1">
+                      {/* Thumbnail */}
+                      <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                        {ad.logoUrl
+                          ? <img src={ad.logoUrl} alt="" className="w-full h-full object-contain p-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          : ad.imageUrl
+                            ? <img src={ad.imageUrl} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            : <ImageIcon size={16} className="text-slate-300" />
+                        }
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-slate-900 text-sm truncate">{ad.title}</p>
+                          <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${ad.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                            <span className={`w-1 h-1 rounded-full ${ad.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            {ad.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-slate-400">
+                          <span className="flex items-center gap-1"><Eye size={10} />{formatNumber(ad.impressions)}</span>
+                          <span className="flex items-center gap-1"><MousePointerClick size={10} />{formatNumber(ad.clicks)}</span>
+                          <span>{calculateCTR(ad).toFixed(1)}% CTR</span>
                         </div>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-3 border-t">
-                        <div>
-                          <div className="flex items-center gap-1 text-xs text-slate-500">
-                            <Eye size={12} />
-                            <span>Impressions</span>
-                          </div>
-                          <p className="font-semibold text-slate-900">{formatNumber(ad.impressions)}</p>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1 text-xs text-slate-500">
-                            <MousePointerClick size={12} />
-                            <span>Clicks</span>
-                          </div>
-                          <p className="font-semibold text-slate-900">{formatNumber(ad.clicks)}</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-slate-500">CTR</span>
-                          <span className="font-semibold text-slate-900">{calculateCTR(ad).toFixed(2)}%</span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-1.5">
-                          <div
-                            className="bg-jci-blue h-1.5 rounded-full"
-                            style={{ width: `${Math.min(calculateCTR(ad) * 10, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-
+                      {/* Actions */}
                       {(isBoard || isAdmin) && (
-                        <div className="flex gap-2 pt-3 border-t">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedAd(ad);
-                              setIsModalOpen(true);
-                            }}
-                          >
-                            <Edit size={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              if (window.confirm('Are you sure you want to delete this advertisement?')) {
-                                await deleteAdvertisement(ad.id!);
-                              }
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button className="p-2 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-blue-50 transition-colors"
+                            onClick={() => { setSelectedAd(ad); setIsModalOpen(true); }}>
+                            <Edit size={15} />
+                          </button>
+                          <button className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            onClick={async () => { if (window.confirm('Delete this partnership?')) await deleteAdvertisement(ad.id!); }}>
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       )}
                     </div>
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             </LoadingState>
           ) : activeTab === 'packages' ? (
             <LoadingState loading={loading} error={error} empty={packages.length === 0} emptyMessage="No promotion packages available">
@@ -384,158 +414,163 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         size="lg"
         drawerOnMobile
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            name="title"
-            label="Title"
-            placeholder="e.g. Tech Solutions Inc."
-            defaultValue={selectedAd?.title}
-            required
-          />
+        <form onSubmit={handleSubmit} className="space-y-6">
 
-          <Textarea
-            name="description"
-            label="Description"
-            placeholder="Partnership description..."
-            defaultValue={selectedAd?.description}
-            rows={3}
-            required
-          />
+          {/* Section: Basic Info */}
+          <div className="space-y-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Basic Info</p>
+            <Input
+              name="title"
+              label="Partner Name"
+              placeholder="e.g. Tech Solutions Inc."
+              defaultValue={selectedAd?.title}
+              required
+            />
+            <Textarea
+              name="description"
+              label="Member Benefit"
+              placeholder="What's the exclusive offer for JCI members?"
+              defaultValue={selectedAd?.description}
+              rows={2}
+              required
+            />
+            <Textarea
+              name="termsAndConditions"
+              label="Terms & Conditions"
+              placeholder="Optional — how to redeem, expiry, restrictions..."
+              defaultValue={selectedAd?.termsAndConditions}
+              rows={2}
+            />
+          </div>
 
-          <Textarea
-            name="termsAndConditions"
-            label="Terms & Conditions (Optional)"
-            placeholder="Partnership terms and conditions..."
-            defaultValue={selectedAd?.termsAndConditions}
-            rows={3}
-          />
-
-          <Select
-            name="targetAudience"
-            label="Target Audience"
-            defaultValue={selectedAd?.targetAudience || 'All Members'}
-            options={[
-              { label: 'All Members', value: 'All Members' },
-              { label: 'Specific Tier', value: 'Specific Tier' },
-              { label: 'Specific Role', value: 'Specific Role' },
-              { label: 'Custom', value: 'Custom' },
-            ]}
-          />
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">Ad Image <span className="text-red-500">*</span></label>
-            <div className="flex items-center gap-4">
-              <div className="w-32 h-20 bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative">
-                {(formImage || selectedAd?.imageUrl) ? (
-                  <img
-                    src={formImage ? URL.createObjectURL(formImage) : selectedAd?.imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                    <ImageIcon size={24} />
-                    <span className="text-[10px] mt-1">Image</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setFormImage(file);
-                  }}
-                  className="hidden"
-                  id="ad-image-upload"
-                />
-                <label
-                  htmlFor="ad-image-upload"
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-jci-blue bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+          {/* Section: Images */}
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Images</p>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Logo */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-600">Logo <span className="text-slate-400 font-normal">(square)</span></label>
+                <div
+                  className="relative w-full aspect-square bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center cursor-pointer hover:border-jci-blue hover:bg-blue-50/40 transition-colors group"
+                  onClick={() => document.getElementById('ad-logo-upload')?.click()}
                 >
-                  <Upload size={16} />
-                  {formImage ? 'Change Image' : selectedAd?.imageUrl ? 'Change Image' : 'Upload Image'}
-                </label>
-                {isUploading && (
-                  <div className="mt-2 w-full max-w-xs">
-                    <ProgressBar progress={uploadProgress} label={`Uploading... ${uploadProgress}%`} />
-                  </div>
-                )}
-                <p className="text-xs text-slate-500 mt-2">Max 1MB.</p>
+                  {(formLogo || selectedAd?.logoUrl) ? (
+                    <>
+                      <img
+                        src={formLogo ? URL.createObjectURL(formLogo) : selectedAd?.logoUrl}
+                        alt="Logo"
+                        className="w-full h-full object-contain p-3"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Upload size={18} className="text-white" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-slate-400 group-hover:text-jci-blue transition-colors">
+                      <Upload size={20} />
+                      <span className="text-[10px] font-semibold">Upload Logo</span>
+                    </div>
+                  )}
+                </div>
+                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFormLogo(f); }} className="hidden" id="ad-logo-upload" />
+              </div>
+
+              {/* Banner */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-600">Ad Banner <span className="text-red-400">*</span> <span className="text-slate-400 font-normal">(landscape)</span></label>
+                <div
+                  className="relative w-full aspect-square bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center cursor-pointer hover:border-jci-blue hover:bg-blue-50/40 transition-colors group"
+                  onClick={() => document.getElementById('ad-image-upload')?.click()}
+                >
+                  {(formImage || selectedAd?.imageUrl) ? (
+                    <>
+                      <img
+                        src={formImage ? URL.createObjectURL(formImage) : selectedAd?.imageUrl}
+                        alt="Banner"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Upload size={18} className="text-white" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-slate-400 group-hover:text-jci-blue transition-colors">
+                      <Upload size={20} />
+                      <span className="text-[10px] font-semibold">Upload Banner</span>
+                    </div>
+                  )}
+                </div>
+                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFormImage(f); }} className="hidden" id="ad-image-upload" />
               </div>
             </div>
-            {/* Hidden input for fallback/editing logic if needed */}
-            <input type="hidden" name="imageUrl" value={selectedAd?.imageUrl || ''} />
+            {isUploading && (
+              <ProgressBar progress={uploadProgress} label={`Uploading... ${uploadProgress}%`} />
+            )}
           </div>
 
-          <Input
-            name="linkUrl"
-            label="Link URL (Optional)"
-            placeholder="https://example.com"
-            defaultValue={selectedAd?.linkUrl}
-          />
-
-          <div className="grid grid-cols-2 gap-4">
+          {/* Section: Settings */}
+          <div className="space-y-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Settings</p>
+            <div className="flex items-center justify-between py-2">
+              <label className="text-sm font-medium text-slate-700">Status</label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={statusActive}
+                onClick={() => setStatusActive(v => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${statusActive ? 'bg-emerald-500' : 'bg-slate-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${statusActive ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+              <span className={`text-xs font-semibold ${statusActive ? 'text-emerald-600' : 'text-slate-400'}`}>{statusActive ? 'Active' : 'Inactive'}</span>
+              <input type="hidden" name="status" value={statusActive ? 'Active' : 'Inactive'} />
+            </div>
             <Input
-              name="startDate"
-              label="Start Date"
-              type="date"
-              defaultValue={selectedAd?.startDate ? toDate(selectedAd.startDate).toISOString().split('T')[0] : undefined}
-              required
-            />
-            <Input
-              name="endDate"
-              label="End Date (Optional)"
-              type="date"
-              defaultValue={selectedAd?.endDate ? toDate(selectedAd.endDate).toISOString().split('T')[0] : undefined}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              name="priority"
-              label="Priority (0-10)"
-              type="number"
-              min="0"
-              max="10"
-              defaultValue={selectedAd?.priority?.toString() || '5'}
-              required
-            />
-            <Input
-              name="budget"
-              label="Budget (RM, Optional)"
-              type="number"
-              min="0"
-              step="0.01"
-              defaultValue={selectedAd?.budget?.toString()}
+              name="linkUrl"
+              label="Partner Website (Optional)"
+              placeholder="https://example.com"
+              defaultValue={selectedAd?.linkUrl}
             />
           </div>
 
-          <Select
-            name="status"
-            label="Status"
-            defaultValue={selectedAd?.status || 'Active'}
-            options={[
-              { label: 'Active', value: 'Active' },
-              { label: 'Scheduled', value: 'Scheduled' },
-              { label: 'Paused', value: 'Paused' },
-              { label: 'Expired', value: 'Expired' },
-            ]}
-          />
-
-          <div className="flex gap-3 pt-4">
-            <Button className="flex-1" type="submit" disabled={isUploading}>
-              {isUploading ? 'Uploading...' : (selectedAd ? 'Update Partnership' : 'Create Partnership')}
-            </Button>
-            <Button
-              variant="ghost"
+          {/* Advanced (collapsed) */}
+          <div>
+            <button
               type="button"
-              onClick={() => {
-                setIsModalOpen(false);
-                setSelectedAd(null);
-              }}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              onClick={() => setShowAdvanced(v => !v)}
             >
+              <svg className={`w-3 h-3 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+              Advanced
+            </button>
+            {showAdvanced && (
+              <div className="mt-3 grid grid-cols-2 gap-4">
+                <Input
+                  name="priority"
+                  label="Priority (0–10)"
+                  type="number"
+                  min="0"
+                  max="10"
+                  defaultValue={selectedAd?.priority?.toString() || '5'}
+                />
+                <Input
+                  name="budget"
+                  label="Budget (RM)"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue={selectedAd?.budget?.toString()}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-2 border-t border-slate-100">
+            <Button className="flex-1" type="submit" disabled={isUploading}>
+              {isUploading ? 'Uploading...' : (selectedAd ? 'Save Changes' : 'Create Partnership')}
+            </Button>
+            <Button variant="ghost" type="button" onClick={() => { setIsModalOpen(false); setSelectedAd(null); }}>
               Cancel
             </Button>
           </div>
@@ -584,130 +619,198 @@ const AdvertisementAnalyticsTab: React.FC<AdvertisementAnalyticsTabProps> = ({
   summary,
   filter,
   onFilterChange,
-  onSelectAd,
   calculateCTR,
   calculateROI,
 }) => {
-  return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <StatCardsContainer>
-        <Card className="bg-blue-50 border-blue-100">
-          <div className="flex items-center gap-3">
-            <Eye className="text-blue-600" size={24} />
-            <div>
-              <p className="text-sm text-blue-600 font-medium">Total Impressions</p>
-              <h3 className="text-2xl font-bold text-slate-900">{formatNumber(summary.totalImpressions)}</h3>
-            </div>
-          </div>
-        </Card>
-        <Card className="bg-green-50 border-green-100">
-          <div className="flex items-center gap-3">
-            <MousePointerClick className="text-green-600" size={24} />
-            <div>
-              <p className="text-sm text-green-600 font-medium">Total Clicks</p>
-              <h3 className="text-2xl font-bold text-slate-900">{formatNumber(summary.totalClicks)}</h3>
-            </div>
-          </div>
-        </Card>
-        <Card className="bg-purple-50 border-purple-100">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="text-purple-600" size={24} />
-            <div>
-              <p className="text-sm text-purple-600 font-medium">Avg CTR</p>
-              <h3 className="text-2xl font-bold text-slate-900">{summary.avgCTR.toFixed(2)}%</h3>
-            </div>
-          </div>
-        </Card>
-        <Card className="bg-amber-50 border-amber-100">
-          <div className="flex items-center gap-3">
-            <BarChart3 className="text-amber-600" size={24} />
-            <div>
-              <p className="text-sm text-amber-600 font-medium">Active Ads</p>
-              <h3 className="text-2xl font-bold text-slate-900">{summary.activeAds}</h3>
-            </div>
-          </div>
-        </Card>
-      </StatCardsContainer>
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const maxImpressions = Math.max(...advertisements.map(a => a.impressions), 1);
+  const maxCTR = Math.max(...advertisements.map(a => calculateCTR(a)), 1);
 
-      {/* Filter */}
-      <div className="flex items-center gap-2">
-        <Filter size={16} className="text-slate-500" />
-        <span className="text-sm text-slate-600">Filter:</span>
-        <select
-          value={filter}
-          onChange={(e) => onFilterChange(e.target.value as any)}
-          className="px-3 py-1 border rounded-md text-sm"
-        >
-          <option value="all">All</option>
-          <option value="active">Active</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="completed">Completed</option>
-        </select>
+  const FILTER_PILLS: { label: string; value: typeof filter }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Active', value: 'active' },
+    { label: 'Completed', value: 'completed' },
+  ];
+
+  return (
+    <div className="space-y-5">
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Impressions */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Impressions</p>
+          <p className="text-2xl font-black text-slate-900 tabular-nums">{formatNumber(summary.totalImpressions)}</p>
+          <div className="w-full bg-slate-100 rounded-full h-1 mt-2">
+            <div className="bg-jci-blue h-1 rounded-full" style={{ width: `${Math.min(summary.totalImpressions / 1000 * 100, 100)}%` }} />
+          </div>
+          <p className="text-[10px] text-slate-400">across {advertisements.length} partner{advertisements.length !== 1 ? 's' : ''}</p>
+        </div>
+
+        {/* Clicks */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Clicks</p>
+          <p className="text-2xl font-black text-slate-900 tabular-nums">{formatNumber(summary.totalClicks)}</p>
+          <div className="w-full bg-slate-100 rounded-full h-1 mt-2">
+            <div className="bg-emerald-500 h-1 rounded-full" style={{ width: `${summary.totalImpressions > 0 ? Math.min((summary.totalClicks / summary.totalImpressions) * 100 * 20, 100) : 0}%` }} />
+          </div>
+          <p className="text-[10px] text-slate-400">{summary.totalImpressions > 0 ? ((summary.totalClicks / summary.totalImpressions) * 100).toFixed(1) : '0.0'}% of impressions</p>
+        </div>
+
+        {/* Avg CTR */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg CTR</p>
+          <p className={`text-2xl font-black tabular-nums ${summary.avgCTR >= 2 ? 'text-emerald-600' : summary.avgCTR >= 1 ? 'text-amber-500' : 'text-slate-900'}`}>
+            {summary.avgCTR.toFixed(2)}%
+          </p>
+          <div className="w-full bg-slate-100 rounded-full h-1 mt-2">
+            <div className={`h-1 rounded-full ${summary.avgCTR >= 2 ? 'bg-emerald-500' : summary.avgCTR >= 1 ? 'bg-amber-400' : 'bg-slate-400'}`}
+              style={{ width: `${Math.min(summary.avgCTR / 5 * 100, 100)}%` }} />
+          </div>
+          <p className="text-[10px] text-slate-400">benchmark ~2%</p>
+        </div>
+
+        {/* Active */}
+        <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Active</p>
+          <p className="text-2xl font-black text-slate-900 tabular-nums">{summary.activeAds}</p>
+          <div className="flex gap-0.5 mt-2">
+            {advertisements.map(a => (
+              <div key={a.id} className={`h-1 flex-1 rounded-full ${a.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400">of {advertisements.length} total</p>
+        </div>
       </div>
 
-      {/* Ad Performance Table */}
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="py-3 px-4">Advertisement</th>
-                <th className="py-3 px-4">Impressions</th>
-                <th className="py-3 px-4">Clicks</th>
-                <th className="py-3 px-4">CTR</th>
-                <th className="py-3 px-4">Budget</th>
-                <th className="py-3 px-4">CPC</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+      {/* Filter pills */}
+      <div className="flex items-center gap-2">
+        {FILTER_PILLS.map(p => (
+          <button
+            key={p.value}
+            onClick={() => onFilterChange(p.value)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${filter === p.value ? 'bg-jci-blue text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Performance table */}
+      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+        {advertisements.length === 0 ? (
+          <p className="text-center text-slate-400 text-sm py-10">No data</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Partner</th>
+                <th className="py-3 px-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Impressions</th>
+                <th className="py-3 px-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400 hidden sm:table-cell">Clicks</th>
+                <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">CTR</th>
+                <th className="py-3 px-2 w-8" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-50">
               {advertisements.map(ad => {
+                const ctr = calculateCTR(ad);
                 const roi = calculateROI(ad);
+                const isExpanded = expandedId === ad.id;
                 return (
-                  <tr key={ad.id} className="hover:bg-slate-50">
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-slate-900">{ad.title}</p>
-                        <p className="text-xs text-slate-500">{ad.termsAndConditions ? 'T&C Configured' : 'No T&C'}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">{formatNumber(ad.impressions)}</td>
-                    <td className="py-3 px-4 text-slate-600">{formatNumber(ad.clicks)}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{calculateCTR(ad).toFixed(2)}%</span>
-                        <div className="w-16 bg-slate-200 rounded-full h-1.5">
-                          <div
-                            className="bg-jci-blue h-1.5 rounded-full"
-                            style={{ width: `${Math.min(calculateCTR(ad) * 10, 100)}%` }}
-                          />
+                  <React.Fragment key={ad.id}>
+                    <tr
+                      className="hover:bg-slate-50/60 cursor-pointer transition-colors"
+                      onClick={() => setExpandedId(isExpanded ? null : (ad.id ?? null))}
+                    >
+                      {/* Partner */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            {ad.logoUrl
+                              ? <img src={ad.logoUrl} alt="" className="w-full h-full object-contain p-0.5" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              : <ImageIcon size={13} className="text-slate-300" />
+                            }
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900 leading-tight">{ad.title}</p>
+                            <span className={`text-[10px] font-bold ${ad.status === 'Active' ? 'text-emerald-600' : 'text-slate-400'}`}>{ad.status}</span>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {ad.budget ? `RM ${formatNumber(ad.budget)}` : '-'}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {roi.costPerClick ? `RM ${roi.costPerClick.toFixed(2)}` : '-'}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onSelectAd(ad)}
-                      >
-                        <BarChart3 size={14} className="mr-1" />
-                        View Details
-                      </Button>
-                    </td>
-                  </tr>
+                      </td>
+                      {/* Impressions bar */}
+                      <td className="py-3 px-4 text-right hidden sm:table-cell">
+                        <p className="font-semibold text-slate-700 tabular-nums text-xs">{formatNumber(ad.impressions)}</p>
+                        <div className="w-20 bg-slate-100 rounded-full h-1 mt-1 ml-auto">
+                          <div className="bg-jci-blue/40 h-1 rounded-full" style={{ width: `${(ad.impressions / maxImpressions) * 100}%` }} />
+                        </div>
+                      </td>
+                      {/* Clicks */}
+                      <td className="py-3 px-4 text-right hidden sm:table-cell">
+                        <p className="font-semibold text-slate-700 tabular-nums text-xs">{formatNumber(ad.clicks)}</p>
+                      </td>
+                      {/* CTR bar */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold tabular-nums ${ctr >= 2 ? 'text-emerald-600' : ctr >= 1 ? 'text-amber-500' : 'text-slate-500'}`}>
+                            {ctr.toFixed(1)}%
+                          </span>
+                          <div className="flex-1 max-w-[80px] bg-slate-100 rounded-full h-1.5">
+                            <div
+                              className={`h-1.5 rounded-full ${ctr >= 2 ? 'bg-emerald-500' : ctr >= 1 ? 'bg-amber-400' : 'bg-slate-400'}`}
+                              style={{ width: `${maxCTR > 0 ? (ctr / maxCTR) * 100 : 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      {/* Expand chevron */}
+                      <td className="py-3 px-2">
+                        <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </td>
+                    </tr>
+
+                    {/* Expanded row */}
+                    {isExpanded && (
+                      <tr className="bg-slate-50/70">
+                        <td colSpan={5} className="px-4 py-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="bg-white rounded-lg border border-slate-100 p-3">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Impressions</p>
+                              <p className="text-lg font-black text-slate-900 tabular-nums">{formatNumber(ad.impressions)}</p>
+                            </div>
+                            <div className="bg-white rounded-lg border border-slate-100 p-3">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Clicks</p>
+                              <p className="text-lg font-black text-slate-900 tabular-nums">{formatNumber(ad.clicks)}</p>
+                            </div>
+                            {ad.budget ? (
+                              <>
+                                <div className="bg-white rounded-lg border border-slate-100 p-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Budget</p>
+                                  <p className="text-lg font-black text-slate-900 tabular-nums">RM {formatNumber(ad.budget)}</p>
+                                </div>
+                                <div className="bg-white rounded-lg border border-slate-100 p-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Cost/Click</p>
+                                  <p className="text-lg font-black text-slate-900 tabular-nums">RM {roi.costPerClick.toFixed(2)}</p>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="bg-white rounded-lg border border-slate-100 p-3 col-span-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">T&C</p>
+                                <p className="text-xs text-slate-600 leading-relaxed">{ad.termsAndConditions || '—'}</p>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
           </table>
-        </div>
-      </Card>
+        )}
+      </div>
     </div>
   );
 };
