@@ -273,6 +273,7 @@ export interface BoardMember {
   permissions: string[];
   commissionDirectorIds?: string[]; // IDs of members serving as Commission Directors under this position
   commissionDirectorAvatars?: Record<string, string>; // Board-specific avatars for commission directors, keyed by member ID
+  commissionDirectorNames?: Record<string, string>; // Denormalized names for commission directors, keyed by member ID
   /** Denormalized for public About page (guests cannot read members collection) */
   memberName?: string;
   avatarUrl?: string; // Copied from member profile at save time

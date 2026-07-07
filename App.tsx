@@ -1323,8 +1323,13 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
           const mapped = activeBoard.map((bm) => ({
             position: bm.position,
             name: bm.memberName || 'JCI Member',
-            avatar: bm.avatarUrl,
+            avatar: bm.boardAvatarUrl || bm.avatarUrl,
             company: bm.companyName || 'JCI Kuala Lumpur',
+            commissionDirectors: (bm.commissionDirectorIds || []).map(id => ({
+              id,
+              name: bm.commissionDirectorNames?.[id] || 'JCI Member',
+              avatar: bm.commissionDirectorAvatars?.[id] || '',
+            })),
           }));
           setBoardMembers(mapped);
         } else {
@@ -1397,6 +1402,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
     const role = member?.position || defaultRole;
     const avatar = member?.avatar;
     const company = member?.company || 'JCI Kuala Lumpur';
+    const commissionDirectors: Array<{ id: string; name: string; avatar: string }> = member?.commissionDirectors || [];
 
     let cardClasses = "bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:shadow-md hover:border-jci-blue transition-all flex flex-col items-center text-center w-full max-w-[210px] mx-auto shrink-0 relative group";
     let roleClasses = "text-[10px] font-extrabold uppercase tracking-wider text-jci-blue mb-0.5 max-w-full truncate";
@@ -1437,6 +1443,25 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
         <p className={roleClasses}>{role}</p>
         <h4 className={nameClasses}>{name}</h4>
         <p className="text-[11px] text-slate-400 line-clamp-1">{company}</p>
+        {commissionDirectors.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-100 w-full">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2">Commission Directors</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {commissionDirectors.map(dir => (
+                <div key={dir.id} className="flex flex-col items-center gap-1" title={dir.name}>
+                  {dir.avatar ? (
+                    <img src={dir.avatar} alt={dir.name} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400">
+                      {dir.name.charAt(0)}
+                    </div>
+                  )}
+                  <span className="text-[9px] text-slate-500 font-medium max-w-[60px] truncate text-center">{dir.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };

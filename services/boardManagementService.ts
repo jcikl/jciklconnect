@@ -404,6 +404,14 @@ export class BoardManagementService {
 
         const permissions = this.getRolePermissions(position);
         const display = await this.getMemberDisplayFields(memberId);
+
+        // Denormalize commission director names for guest page display
+        const commissionDirectorNames: Record<string, string> = {};
+        for (const dirId of (commissionDirectorIds || [])) {
+          const dirDisplay = await this.getMemberDisplayFields(dirId);
+          if (dirDisplay.memberName) commissionDirectorNames[dirId] = dirDisplay.memberName;
+        }
+
         const newMember: Omit<BoardMember, 'id'> = {
           memberId,
           position,
@@ -414,6 +422,7 @@ export class BoardManagementService {
           permissions,
           commissionDirectorIds: commissionDirectorIds || [],
           commissionDirectorAvatars: commissionDirectorAvatars || {},
+          commissionDirectorNames,
           ...display,
           ...(boardAvatarUrl ? { boardAvatarUrl } : {}),
           createdAt: now,
