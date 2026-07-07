@@ -399,8 +399,8 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
               ) : (
                 <div className="absolute inset-0 bg-white/5" />
               )}
-              {/* Strong gradient: transparent top → solid navy bottom */}
-              <div className="absolute inset-0 bg-gradient-to-t from-jci-navy via-jci-navy/80 to-jci-navy/10" />
+              {/* Gradient anchored to bottom — stops 100px above president name */}
+              <div className="absolute bottom-0 inset-x-0 h-[72%] bg-gradient-to-t from-jci-navy via-jci-navy/80 to-transparent" />
 
               {/* Content overlay */}
               <div className="absolute inset-0 z-10 flex flex-col justify-end">
