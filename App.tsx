@@ -716,18 +716,6 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<FlagshipProject | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
-
-  const toggleFlip = (id: string, e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('a')) {
-      return;
-    }
-    setFlippedCards(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -761,259 +749,174 @@ const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="projects" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Flagship Projects</h1>
-            <p className="text-base text-blue-100 max-w-2xl mx-auto">
-              Discover the impactful projects we're working on to create positive change in our community.
-            </p>
+        <section className="relative py-16 md:py-20 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white" aria-label="Page header">
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
+              <div className="shrink-0 w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg shadow-black/20">
+                <FolderKanban size={40} className="text-white/80" />
+              </div>
+              <div>
+                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider mb-4">
+                  <span>JCI KL</span>
+                  <span className="w-1 h-1 rounded-full bg-white/50" />
+                  <span>Active Projects</span>
+                </div>
+                <h1 className="text-4xl md:text-5xl font-black mb-3 leading-tight tracking-tight">
+                  Flagship <span className="text-sky-200">Projects</span>
+                </h1>
+                <p className="text-lg text-blue-100 max-w-xl leading-relaxed">
+                  Discover the impactful initiatives driving positive change in our community and beyond.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="py-16">
+        <section className="py-14">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <style>{`
+              .scrollbar-none::-webkit-scrollbar { display: none; }
+              .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue mx-auto mb-4"></div>
-                <p className="text-slate-600">Loading projects...</p>
+              <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-100">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-jci-blue mb-4"></div>
+                <p className="text-slate-500 text-sm font-semibold">Loading projects...</p>
               </div>
             ) : activeProjects.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-20">
                 <Briefcase size={48} className="mx-auto mb-4 text-slate-300" />
                 <h3 className="text-xl font-bold text-slate-900 mb-2">No active projects</h3>
-                <p className="text-slate-600">Check back soon for new projects!</p>
+                <p className="text-slate-500">Check back soon for new projects!</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-8 mx-auto">
-                {/* 3D Flip Card Styles */}
-                <style>{`
-                  .flip-card {
-                    perspective: 1000px;
-                    height: 380px;
-                    width: 100%;
-                  }
-                  @media (min-width: 768px) {
-                    .flip-card {
-                      height: 300px;
-                    }
-                  }
-                  .flip-card-inner {
-                    position: relative;
-                    width: 100%;
-                    height: 100%;
-                    transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-                    transform-style: preserve-3d;
-                  }
-                  .flip-card.flipped .flip-card-inner {
-                    transform: rotateY(180deg);
-                  }
-                  .flip-card-front, .flip-card-back {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    backface-visibility: hidden;
-                    -webkit-backface-visibility: hidden;
-                    border-radius: 1rem;
-                    overflow: hidden;
-                  }
-                  .flip-card-front {
-                    transform: rotateY(0deg);
-                  }
-                  .flip-card-back {
-                    transform: rotateY(180deg);
-                  }
-                  .truncate-2-lines {
-                    display: -webkit-box;
-                    -webkit-line-clamp: 2;
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
-                  }
-                  .scrollbar-none::-webkit-scrollbar {
-                    display: none;
-                  }
-                  .scrollbar-none {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                  }
-                `}</style>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {activeProjects.map(project => {
-                  const hasPhotos = project.galleryUrls && project.galleryUrls.length > 0;
-                  const isFlipped = !!flippedCards[project.id];
+                  const allPhotos = project.galleryUrls?.length
+                    ? project.galleryUrls
+                    : Object.values(project.galleryByYear || {}).flat();
+                  const coverPhoto = allPhotos[0] || null;
+                  const hasPhotos = allPhotos.length > 0;
+                  const previewPhotos = allPhotos.slice(0, 5);
+                  const extraCount = allPhotos.length - 5;
+
                   return (
-                    <div
-                      key={project.id}
-                      className={`flip-card ${isFlipped ? 'flipped' : ''}`}
-                      onClick={(e) => toggleFlip(project.id, e)}
-                    >
-                      <div className="flip-card-inner">
-                        {/* FRONT FACE (2-Column Layout) */}
-                        <div className="flip-card-front bg-white border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row overflow-hidden cursor-pointer h-full">
-                          {/* Left Column: Project Logo */}
-                          <div className="w-full md:w-1/3 bg-slate-50 flex items-center justify-center relative p-6 border-b md:border-b-0 md:border-r border-slate-100 flex-shrink-0 h-44 md:h-full">
-                            {project.logoUrl ? (
-                              <img
-                                src={project.logoUrl}
-                                alt={`${project.title} Logo`}
-                                className="max-w-full max-h-full object-contain rounded-lg"
-                              />
-                            ) : (
-                              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
-                                <Briefcase size={32} />
+                    <div key={project.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300 overflow-hidden flex flex-col group">
+                      {/* Cover */}
+                      <div className="relative h-48 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden shrink-0">
+                        {coverPhoto ? (
+                          <img src={coverPhoto} alt={project.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        ) : (
+                          project.logoUrl && <img src={project.logoUrl} alt={project.title} className="w-full h-full object-contain p-12 opacity-20" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+
+                        {/* Pillar chip */}
+                        {project.pillar && (
+                          <div className="absolute top-3 left-3">
+                            <span className="text-[9px] font-black uppercase tracking-widest bg-black/30 border border-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
+                              {project.pillar}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* UNSDG icons */}
+                        {project.unsdg && project.unsdg.length > 0 && (
+                          <div className="absolute top-3 right-3 flex gap-1">
+                            {project.unsdg.slice(0, 4).map(goalId => (
+                              <img key={goalId} src={`/UNSDG/${goalId}.png`} alt={goalId} title={goalId}
+                                className="w-8 h-8 rounded-lg object-cover shadow-md border-2 border-white/60 hover:scale-110 transition-transform" />
+                            ))}
+                            {project.unsdg.length > 4 && (
+                              <div className="w-8 h-8 rounded-lg bg-black/30 border-2 border-white/40 flex items-center justify-center backdrop-blur-sm">
+                                <span className="text-[9px] font-black text-white">+{project.unsdg.length - 4}</span>
                               </div>
                             )}
                           </div>
+                        )}
 
-                          {/* Right Column: Banner, Title, Description, Progress & Buttons */}
-                          <div className="w-full md:w-2/3 p-6 flex flex-col justify-between h-full min-w-0">
-                            <div>
-                              {/* Banner Wrapper */}
-                              <div className="relative mb-3">
-                                {/* Banner */}
-                                <div className="h-10 w-full rounded bg-gradient-to-r from-jci-blue/10 to-indigo-500/10 flex items-center px-2 border-l-2 border-jci-blue">
-                                  <span className="text-[24px] font-bold text-jci-blue uppercase tracking-wider">{project.title}</span>
-                                </div>
+                        {/* Logo badge */}
+                        {project.logoUrl && coverPhoto && (
+                          <div className="absolute bottom-3 left-4 w-11 h-11 rounded-xl bg-white shadow-lg border-2 border-white overflow-hidden">
+                            <img src={project.logoUrl} alt="" className="w-full h-full object-contain p-1" />
+                          </div>
+                        )}
+                      </div>
 
-                                {/* Selected UNSDG goals row */}
-                                {project.unsdg && project.unsdg.length > 0 && (
-                                  <div className="absolute right-0 -bottom-3 flex gap-1 z-10">
-                                    {project.unsdg.map(goalId => (
-                                      <img
-                                        key={goalId}
-                                        src={`/UNSDG/${goalId}.png`}
-                                        alt={goalId}
-                                        className="w-12 h-12 rounded object-cover shadow-sm border border-white hover:scale-110 transition-transform duration-200"
-                                        title={goalId}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
+                      {/* Body */}
+                      <div className="p-5 flex flex-col flex-1">
+                        <h3 className="font-black text-slate-900 text-lg leading-tight mb-2">{project.title}</h3>
 
-                              {project.description ? (
-                                <p className="text-slate-600 text-xs line-clamp-6 leading-relaxed whitespace-pre-wrap mb-3">{project.description}</p>
-                              ) : (
-                                <div className="text-slate-400 text-xs italic mb-3">No description available.</div>
+                        {/* Meta chips */}
+                        {!!(project.level || project.startDate || project.teamSize) && (
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {project.level && (
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-jci-blue bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                                {project.level}
+                              </span>
+                            )}
+                            {project.startDate && (
+                              <span className="text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">
+                                {project.startDate.slice(0, 4)}
+                              </span>
+                            )}
+                            {!!project.teamSize && (
+                              <span className="text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">
+                                {project.teamSize} members
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="text-sm text-slate-600 leading-relaxed line-clamp-3 flex-1 mb-4">
+                          {project.description || 'No description available.'}
+                        </p>
+
+                        {/* Photo strip */}
+                        {hasPhotos && (
+                          <div className="mb-4">
+                            <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+                              {previewPhotos.map((url, i) => (
+                                <button
+                                  key={i}
+                                  className="w-16 h-12 rounded-lg overflow-hidden shrink-0 border border-slate-100 hover:border-jci-blue/40 transition-colors"
+                                  onClick={() => { setSelectedProject(project); setLightboxIndex(i); }}
+                                >
+                                  <img src={url} alt="" className="w-full h-full object-cover hover:scale-110 transition-transform duration-200" />
+                                </button>
+                              ))}
+                              {extraCount > 0 && (
+                                <button
+                                  className="w-16 h-12 rounded-lg bg-slate-100 shrink-0 flex items-center justify-center border border-slate-200 hover:bg-slate-200 transition-colors"
+                                  onClick={() => { setSelectedProject(project); setLightboxIndex(5); }}
+                                >
+                                  <span className="text-xs font-bold text-slate-500">+{extraCount}</span>
+                                </button>
                               )}
                             </div>
-
-                            <div className="flex justify-between items-center gap-2 mt-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleFlip(project.id, e);
-                                }}
-                                className="inline-flex items-center text-xs font-semibold text-jci-blue hover:text-sky-600 transition-colors"
-                              >
-                                <ImageIcon size={14} className="mr-1" /> View Gallery
-                              </button>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRegister();
-                                }}
-                                className="text-xs font-semibold px-3 py-1.5 bg-jci-blue hover:bg-jci-blue/90 text-white border-0 h-8"
-                              >
-                                Get Involved
-                              </Button>
-                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {/* BACK FACE: Photo Gallery */}
-                        <div className="flip-card-back bg-white border border-slate-100 shadow-sm p-6 flex flex-col justify-between h-full overflow-hidden cursor-pointer">
-                          <div className="flex justify-between items-center pb-3 border-b border-slate-100 flex-shrink-0">
-                            <div className="flex items-center gap-2">
-                              <ImageIcon size={16} className="text-jci-blue" />
-                              <h4 className="font-bold text-slate-800 text-sm">Photo Gallery</h4>
-                            </div>
+                        {/* Footer */}
+                        <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                          {hasPhotos ? (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFlip(project.id, e);
-                              }}
-                              className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all"
-                              title="Back to details"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-jci-blue hover:text-sky-600 transition-colors"
+                              onClick={() => { setSelectedProject(project); setLightboxIndex(0); }}
                             >
-                              <RotateCcw size={16} />
+                              <ImageIcon size={13} /> {allPhotos.length} {allPhotos.length === 1 ? 'Photo' : 'Photos'}
                             </button>
-                          </div>
-
-                          <div className="flex-1 py-4 overflow-y-auto min-h-0">
-                            {hasPhotos ? (() => {
-                              const foldersData: Record<string, string[]> = project.galleryByYear || {
-                                'General': project.galleryUrls || []
-                              };
-                              const sortedFolders = Object.keys(foldersData).sort((a, b) => a.localeCompare(b));
-                              return (
-                                <div className="relative pl-4 border-l-2 border-slate-100 space-y-6 ml-2 my-2">
-                                  {sortedFolders.map((folder) => {
-                                    const urls = foldersData[folder] || [];
-                                    if (urls.length === 0) return null;
-                                    return (
-                                      <div key={folder} className="relative flex flex-col sm:flex-row gap-4 items-start border-b border-slate-50 pb-4 last:border-b-0 last:pb-0">
-                                        {/* Timeline Dot */}
-                                        <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-jci-blue border-2 border-white ring-4 ring-blue-50 shadow-sm" />
-
-                                        {/* Folder Label Column */}
-                                        <div className="flex sm:flex-col items-start gap-1 w-full sm:w-28 flex-shrink-0">
-                                          <span className="text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded select-none flex items-center gap-1">
-                                            {folder}
-                                          </span>
-                                          <span className="text-[10px] text-slate-400 font-medium pl-1 sm:pl-0">{urls.length} photo(s)</span>
-                                        </div>
-
-                                        {/* 6x2 Grid Column */}
-                                        <div className="grid grid-cols-6 gap-1.5 flex-1 w-full">
-                                          {urls.slice(0, 12).map((url, imgIndex) => {
-                                            const globalIndex = project.galleryUrls?.indexOf(url) ?? imgIndex;
-                                            return (
-                                              <div
-                                                key={imgIndex}
-                                                className="aspect-video rounded-lg overflow-hidden border border-slate-100 cursor-pointer relative group shadow-sm hover:shadow transition-shadow"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setSelectedProject(project);
-                                                  setLightboxIndex(globalIndex);
-                                                }}
-                                              >
-                                                <img src={url} alt={`Gallery ${folder}-${imgIndex}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
-                                                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                  <span className="text-[8px] text-white bg-black/50 px-1 py-0.5 rounded scale-75 sm:scale-100">Enlarge</span>
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })() : (
-                              <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                                <ImageIcon size={32} className="mb-2 opacity-50" />
-                                <p className="text-xs">No photos in gallery yet.</p>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="pt-3 border-t border-slate-100 flex justify-between items-center flex-shrink-0">
-                            <span className="text-xs text-slate-500 font-medium">
-                              {project.galleryUrls?.length || 0} photos available
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFlip(project.id, e);
-                              }}
-                              className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1"
-                            >
-                              <RotateCcw size={12} /> Flip to details
-                            </button>
-                          </div>
+                          ) : (
+                            <span className="text-xs text-slate-400 flex items-center gap-1"><ImageIcon size={12} /> No photos yet</span>
+                          )}
+                          <Button
+                            onClick={onRegister}
+                            className="text-xs font-bold px-4 py-1.5 bg-jci-blue hover:bg-jci-blue/90 text-white border-0 h-8 rounded-xl"
+                          >
+                            Get Involved
+                          </Button>
                         </div>
                       </div>
                     </div>
