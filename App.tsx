@@ -508,7 +508,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                         const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
                         const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
                         return parts.map((part: string, i: number) => (
-                          <h2 key={i} className={`text-5xl xl:text-[3.5rem] font-black leading-[0.92] tracking-tight ${
+                          <h2 key={i} className={`text-5xl xl:text-[3.5rem] font-black leading-[0.92] tracking-tight whitespace-nowrap ${
                             i === Math.floor(parts.length / 2)
                               ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
                               : 'text-white'
