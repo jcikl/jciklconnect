@@ -85,6 +85,23 @@ export const uploadBoardAvatarToCloudinary = async (
   return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
 };
 
+export const uploadPresidentialLogoToCloudinary = async (
+  file: File,
+  term: string,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 0.3,
+    maxWidthOrHeight: 800,
+    useWebWorker: false,
+  });
+
+  const folder = `${sanitizeFolderPath(MEMBER_AVATAR_ASSET_ROOT)}/presidential-logos`;
+  const publicId = `${sanitizePathSegment(term)}-logo`;
+
+  return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
+};
+
 /**
  * Uploads a file directly to Cloudinary using unsigned upload with progress tracking.
  * @param file - The file to upload (e.g. image)

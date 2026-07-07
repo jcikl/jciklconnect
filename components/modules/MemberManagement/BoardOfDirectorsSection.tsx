@@ -4,7 +4,7 @@ import { Card, Button, useToast, Badge, Modal } from '../../ui/Common';
 import { Select, Input } from '../../ui/Form';
 import { MemberSelector } from '../../ui/MemberSelector';
 import { BoardManagementService } from '../../../services/boardManagementService';
-import { uploadBoardAvatarToCloudinary, deleteFromCloudinary } from '../../../services/cloudinaryService';
+import { uploadBoardAvatarToCloudinary, uploadPresidentialLogoToCloudinary, deleteFromCloudinary } from '../../../services/cloudinaryService';
 import { BoardMember, BoardTermSettings, Member } from '../../../types';
 
 const POSITION_ORDER: Record<string, number> = {
@@ -49,6 +49,8 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUploadProgress, setLogoUploadProgress] = useState(0);
   const [termSettings, setTermSettings] = useState<Partial<BoardTermSettings>>({});
   const { showToast } = useToast();
 
@@ -414,15 +416,53 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                   </div>
                   <div>
                     <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                      <ImageIcon size={11} /> Theme Logo URL
+                      <ImageIcon size={11} /> Theme Logo
                     </label>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
-                      placeholder="https://... (optional)"
-                      value={termSettings.logoUrl || ''}
-                      onChange={e => setTermSettings(prev => ({ ...prev, logoUrl: e.target.value }))}
-                    />
+                    <div className="flex items-center gap-3">
+                      {/* Preview */}
+                      <div className="w-12 h-12 rounded-xl border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                        {termSettings.logoUrl
+                          ? <img src={termSettings.logoUrl} alt="logo" className="w-full h-full object-contain p-1" />
+                          : <ImageIcon size={18} className="text-slate-300" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {logoUploading ? (
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-slate-500 font-medium">Uploading...</p>
+                            <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                              <div className="h-full bg-amber-400 transition-all" style={{ width: `${logoUploadProgress}%` }} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <label className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 cursor-pointer transition-colors">
+                              <Camera size={11} /> {termSettings.logoUrl ? 'Replace' : 'Upload'}
+                              <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                const f = e.target.files?.[0]; e.target.value = '';
+                                if (!f || !selectedTerm) return;
+                                setLogoUploading(true); setLogoUploadProgress(0);
+                                try {
+                                  const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
+                                  if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
+                                  setTermSettings(prev => ({ ...prev, logoUrl: url }));
+                                  showToast('Logo uploaded', 'success');
+                                } catch { showToast('Upload failed', 'error'); }
+                                finally { setLogoUploading(false); setLogoUploadProgress(0); }
+                              }} />
+                            </label>
+                            {termSettings.logoUrl && (
+                              <button onClick={() => setTermSettings(prev => ({ ...prev, logoUrl: '' }))}
+                                className="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50">
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {termSettings.logoUrl && !logoUploading && (
+                          <p className="text-[10px] text-amber-600 font-medium mt-0.5 truncate">Logo set</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div className="sm:col-span-2">
                     <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
