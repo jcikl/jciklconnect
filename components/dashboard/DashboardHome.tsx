@@ -4,7 +4,7 @@ import {
   Calendar, Briefcase, Award, Sparkles, AlertTriangle, CheckCircle,
   TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
   CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift,
-  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, RefreshCw
+  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, RefreshCw, ChevronRight
 } from 'lucide-react';
 import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
@@ -426,6 +426,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     ? promotionProgress?.isEligibleForPromotion
     : activeEngSummary?.isCompleted;
 
+  const nextStepHint = isProbationMember
+    ? (promotionProgress?.requirements?.find((r: any) => !r.isCompleted)?.name ?? null)
+    : (activeEngSummary?.requirements?.find(r => !r.isCompleted && !r.progress?.pendingVerification)?.title ?? null);
+
   return (
     <div className="space-y-4">
 
@@ -484,38 +488,42 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {/* Membership Journey Card — Probation & Full Members */}
       {showJourneyCard && (
         <div
-          className="flex items-center gap-4 p-4 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-white cursor-pointer hover:shadow-md transition-all group"
+          className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all"
           onClick={openJourneyModal}
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md flex-shrink-0">
-            <TrendingUp size={20} />
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <TrendingUp size={20} className="text-amber-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1.5">
-              <h3 className="font-bold text-sm text-slate-900">Membership Journey</h3>
-              <span className="text-xs font-bold text-amber-700">
-                {(isProbationMember ? promoLoading : engagementLoading) ? '...' : journeyLabel}
+            <div className="flex items-center gap-2 mb-1.5">
+              <h3 className="font-semibold text-sm text-slate-900">Membership journey</h3>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                journeyIsComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+              }`}>
+                {isProbationMember ? 'Probation' : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
+              </span>
+              <ChevronRight size={14} className="text-slate-400 ml-auto flex-shrink-0" />
+            </div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${journeyProgress}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className={`h-full rounded-full ${journeyIsComplete ? 'bg-green-500' : 'bg-amber-500'}`}
+                />
+              </div>
+              <span className="text-[11px] text-slate-500 flex-shrink-0">
+                {(isProbationMember ? promoLoading : engagementLoading) ? '...' : journeyLabel.split(' · ')[0]}
               </span>
             </div>
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${journeyProgress}%` }}
-                transition={{ duration: 1, ease: 'easeOut' }}
-                className={`h-full rounded-full ${journeyIsComplete
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-400'
-                  : 'bg-gradient-to-r from-amber-400 to-orange-500'
-                  }`}
-              />
-            </div>
+            {nextStepHint && !journeyIsComplete && (
+              <p className="text-[11px] text-slate-400 truncate">
+                <ArrowUpRight size={10} className="inline -mt-0.5 mr-0.5" />
+                Next: {nextStepHint}
+              </p>
+            )}
           </div>
-          <Button
-            size="sm"
-            className="flex-shrink-0 text-xs h-8 px-4 bg-amber-500 hover:bg-amber-600 border-none text-white font-bold"
-            onClick={(e) => { e.stopPropagation(); openJourneyModal(); }}
-          >
-            View
-          </Button>
         </div>
       )}
 
@@ -838,78 +846,91 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </button>
             </div>
 
-            {/* Stage Tabs */}
-            <div className="flex border-b border-slate-100 flex-shrink-0">
-              {/* Probation tab */}
-              <button
-                className={`flex-1 py-2.5 px-1 text-[11px] font-bold flex flex-col items-center gap-1 border-b-2 transition-all ${
-                  journeyActiveTab === 'probation'
-                    ? 'text-amber-700 border-amber-500 bg-amber-50/40'
-                    : isFullMember
-                      ? 'text-emerald-700 border-transparent hover:bg-slate-50'
-                      : 'text-slate-500 border-transparent'
-                }`}
-                onClick={() => setJourneyActiveTab('probation')}
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black leading-none ${
-                  journeyActiveTab === 'probation' ? 'bg-amber-500 text-white'
-                  : isFullMember ? 'bg-emerald-500 text-white'
-                  : 'bg-slate-200 text-slate-500'
-                }`}>
-                  {isFullMember ? '✓' : 'P'}
-                </div>
-                Probation
-              </button>
+            {/* Journey Stepper */}
+            <div className="px-5 py-4 border-b border-slate-100 flex-shrink-0">
+              <div className="flex items-start">
 
-              {/* 1st Year tab */}
-              <button
-                className={`flex-1 py-2.5 px-1 text-[11px] font-bold flex flex-col items-center gap-1 border-b-2 transition-all ${
-                  journeyActiveTab === 'firstYear'
-                    ? 'text-blue-700 border-blue-500 bg-blue-50/40'
-                    : isProbationMember
-                      ? 'text-slate-300 border-transparent cursor-not-allowed'
-                      : engagementFirst?.isCompleted
-                        ? 'text-emerald-700 border-transparent hover:bg-slate-50'
-                        : 'text-slate-500 border-transparent hover:bg-slate-50'
-                }`}
-                onClick={() => !isProbationMember && setJourneyActiveTab('firstYear')}
-                disabled={isProbationMember}
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black leading-none ${
-                  journeyActiveTab === 'firstYear' ? 'bg-blue-500 text-white'
-                  : isProbationMember ? 'bg-slate-200 text-slate-400'
-                  : engagementFirst?.isCompleted ? 'bg-emerald-500 text-white'
-                  : 'bg-slate-200 text-slate-500'
-                }`}>
-                  {isProbationMember ? '—' : engagementFirst?.isCompleted ? '✓' : '1'}
-                </div>
-                1st Year
-              </button>
+                {/* Probation step */}
+                <button
+                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                  onClick={() => setJourneyActiveTab('probation')}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    isFullMember ? 'bg-green-500 text-white'
+                    : journeyActiveTab === 'probation' ? 'bg-amber-500 text-white'
+                    : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {isFullMember ? <CheckCircle size={14} /> : 'P'}
+                  </div>
+                  <span className={`text-[10px] font-semibold ${
+                    journeyActiveTab === 'probation' ? 'text-amber-700'
+                    : isFullMember ? 'text-green-700'
+                    : 'text-slate-400'
+                  }`}>Probation</span>
+                  <span className={`text-[10px] ${isFullMember ? 'text-green-600' : 'text-amber-600'}`}>
+                    {isProbationMember
+                      ? `${promotionProgress?.overallProgress?.toFixed(0) ?? 0}%`
+                      : '100%'}
+                  </span>
+                </button>
 
-              {/* 2nd Year tab */}
-              <button
-                className={`flex-1 py-2.5 px-1 text-[11px] font-bold flex flex-col items-center gap-1 border-b-2 transition-all ${
-                  journeyActiveTab === 'secondYear'
-                    ? 'text-indigo-700 border-indigo-500 bg-indigo-50/40'
-                    : isProbationMember
-                      ? 'text-slate-300 border-transparent cursor-not-allowed'
-                      : engagementSecond?.isCompleted
-                        ? 'text-emerald-700 border-transparent hover:bg-slate-50'
-                        : 'text-slate-500 border-transparent hover:bg-slate-50'
-                }`}
-                onClick={() => !isProbationMember && setJourneyActiveTab('secondYear')}
-                disabled={isProbationMember}
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black leading-none ${
-                  journeyActiveTab === 'secondYear' ? 'bg-indigo-500 text-white'
-                  : isProbationMember ? 'bg-slate-200 text-slate-400'
-                  : engagementSecond?.isCompleted ? 'bg-emerald-500 text-white'
-                  : 'bg-slate-200 text-slate-500'
-                }`}>
-                  {isProbationMember ? '—' : engagementSecond?.isCompleted ? '✓' : '2'}
-                </div>
-                2nd Year
-              </button>
+                {/* Connector */}
+                <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-green-300' : 'bg-slate-200'}`} />
+
+                {/* 1st Year step */}
+                <button
+                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  onClick={() => !isProbationMember && setJourneyActiveTab('firstYear')}
+                  disabled={isProbationMember}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    engagementFirst?.isCompleted ? 'bg-green-500 text-white'
+                    : journeyActiveTab === 'firstYear' ? 'bg-blue-500 text-white'
+                    : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {engagementFirst?.isCompleted ? <CheckCircle size={14} /> : '1'}
+                  </div>
+                  <span className={`text-[10px] font-semibold ${
+                    journeyActiveTab === 'firstYear' ? 'text-blue-700'
+                    : engagementFirst?.isCompleted ? 'text-green-700'
+                    : 'text-slate-400'
+                  }`}>1st Year</span>
+                  {!isProbationMember && engagementFirst && (
+                    <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-green-600' : 'text-blue-600'}`}>
+                      {engagementFirst.overallProgress.toFixed(0)}%
+                    </span>
+                  )}
+                </button>
+
+                {/* Connector */}
+                <div className={`flex-1 h-0.5 mt-4 transition-colors ${engagementFirst?.isCompleted ? 'bg-green-300' : 'bg-slate-200'}`} />
+
+                {/* 2nd Year step */}
+                <button
+                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  onClick={() => !isProbationMember && setJourneyActiveTab('secondYear')}
+                  disabled={isProbationMember}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    engagementSecond?.isCompleted ? 'bg-green-500 text-white'
+                    : journeyActiveTab === 'secondYear' ? 'bg-indigo-500 text-white'
+                    : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {engagementSecond?.isCompleted ? <CheckCircle size={14} /> : '2'}
+                  </div>
+                  <span className={`text-[10px] font-semibold ${
+                    journeyActiveTab === 'secondYear' ? 'text-indigo-700'
+                    : engagementSecond?.isCompleted ? 'text-green-700'
+                    : 'text-slate-400'
+                  }`}>2nd Year</span>
+                  {!isProbationMember && engagementSecond && (
+                    <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-green-600' : 'text-indigo-600'}`}>
+                      {engagementSecond.overallProgress.toFixed(0)}%
+                    </span>
+                  )}
+                </button>
+
+              </div>
             </div>
 
             {/* Tab Body — read-only */}
@@ -955,20 +976,22 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         <div key={req.id} className={`p-3 rounded-xl border ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <div className={`flex-shrink-0 ${req.isCompleted ? 'text-green-500' : 'text-slate-300'}`}>
-                                {req.isCompleted ? <CheckCircle size={15} /> : <Clock size={15} />}
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-green-500' : 'bg-slate-200'}`}>
+                                {req.isCompleted
+                                  ? <CheckCircle size={11} className="text-white" />
+                                  : <Clock size={11} className="text-slate-400" />}
                               </div>
                               <span className="font-semibold text-xs text-slate-900 truncate">{req.name}</span>
                             </div>
                             {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] flex-shrink-0">Done</Badge>}
                           </div>
                           {req.isCompleted && req.completionDetails && (
-                            <p className="text-xs text-green-700 font-medium mt-1 pl-5 truncate">
+                            <p className="text-xs text-green-700 font-medium mt-1 pl-7 truncate">
                               {Object.values(req.completionDetails)[0] as string}
                             </p>
                           )}
                           {!req.isCompleted && (
-                            <p className="text-[11px] text-slate-400 mt-0.5 pl-5 line-clamp-1">{req.description}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5 pl-7 line-clamp-1">{req.description}</p>
                           )}
                         </div>
                       ))}
@@ -1078,8 +1101,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <div key={req.key} className={`p-3 rounded-xl border ${cardClass}`}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className={`flex-shrink-0 ${iconClass}`}>
-                                  {req.isCompleted ? <CheckCircle size={15} /> : <Clock size={15} />}
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  req.isCompleted ? 'bg-green-500' : isPending ? 'bg-amber-400' : 'bg-slate-200'
+                                }`}>
+                                  {req.isCompleted
+                                    ? <CheckCircle size={11} className="text-white" />
+                                    : <Clock size={11} className={isPending ? 'text-white' : 'text-slate-400'} />}
                                 </div>
                                 <span className="font-semibold text-xs text-slate-900 truncate">{req.title}</span>
                               </div>
@@ -1089,12 +1116,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                               </div>
                             </div>
                             {(isPending || req.isCompleted) && (req.progress.detail || req.progress.date) ? (
-                              <div className="mt-1 pl-5 flex items-center gap-2 text-[11px]">
+                              <div className="mt-1 pl-7 flex items-center gap-2 text-[11px]">
                                 {req.progress.detail && <span className={isPending ? 'text-amber-700 font-medium' : 'text-green-700 font-medium'}>{req.progress.detail}</span>}
                                 {req.progress.date && <span className="text-slate-400">{req.progress.date}</span>}
                               </div>
                             ) : !req.isCompleted ? (
-                              <p className="text-[11px] text-slate-400 mt-0.5 pl-5 line-clamp-1">{req.description}</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5 pl-7 line-clamp-1">{req.description}</p>
                             ) : null}
                           </div>
                         );
