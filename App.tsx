@@ -494,20 +494,20 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
               <div className="flex items-center px-12 xl:px-16 py-16">
                 <div className="w-full max-w-lg">
 
-                  {/* Eyebrow */}
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-5 h-px bg-amber-400/50 shrink-0" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/80">Presidential Theme {currentYear}</span>
-                  </div>
-
-                  {/* Logo: above headline, left-aligned, large glow halo */}
-                  {termSettings?.logoUrl && (
-                    <div className="relative inline-flex mb-6">
-                      <div className="absolute inset-0 scale-[3] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
-                      <img src={termSettings.logoUrl} alt="Presidential theme logo"
-                        className="relative z-10 h-36 xl:h-40 w-auto object-contain drop-shadow-2xl" />
+                  {/* Eyebrow row + logo on the right */}
+                  <div className="flex items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-px bg-amber-400/50 shrink-0" />
+                      <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/80">Presidential Theme {currentYear}</span>
                     </div>
-                  )}
+                    {termSettings?.logoUrl && (
+                      <div className="relative shrink-0 flex items-center">
+                        <div className="absolute inset-0 scale-[3] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
+                        <img src={termSettings.logoUrl} alt="Presidential theme logo"
+                          className="relative z-10 h-36 xl:h-40 w-auto object-contain drop-shadow-2xl" />
+                      </div>
+                    )}
+                  </div>
 
                   {/* Theme headline — gradient amber on highlight word */}
                   {(() => {
