@@ -3,10 +3,10 @@
  */
 import imageCompression from 'browser-image-compression';
 
-/** Injects c_trim into a Cloudinary URL to auto-crop transparent padding. */
+/** Injects e_trim into a Cloudinary URL to auto-remove transparent/uniform-color borders. */
 export const trimCloudinaryImage = (url: string): string => {
   if (!url || !url.includes('cloudinary.com')) return url;
-  return url.replace('/image/upload/', '/image/upload/c_trim/');
+  return url.replace('/image/upload/', '/image/upload/e_trim/');
 };
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'drpa1zcmp';
