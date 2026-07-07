@@ -59,9 +59,10 @@ export const uploadMemberAvatarToCloudinary = async (
 
   const folder = getMemberAvatarFolder(member);
   const avatarKey = getMemberAvatarKey(member);
+  const uniqueId = `${avatarKey}-${Math.floor(Date.now() / 1000)}`;
 
   return uploadToCloudinary(compressedFile, folder, onProgress, {
-    publicId: avatarKey,
+    publicId: uniqueId,
   });
 };
 
