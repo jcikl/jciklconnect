@@ -428,31 +428,35 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/75">Presidential Theme {currentYear}</p>
 
                   {/* Headline + logo side by side */}
-                  <div className="flex items-stretch gap-4">
-                    <div className="flex-1">
-                      {(() => {
-                        const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
-                        const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
-                        return parts.map((part: string, i: number) => (
-                          <h2 key={i} className={`text-[2rem] font-black leading-[0.9] tracking-tight whitespace-nowrap ${
-                            i === Math.floor(parts.length / 2)
-                              ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
-                              : 'text-white'
-                          }`}>
-                            {part}.
-                          </h2>
-                        ));
-                      })()}
-                    </div>
-                    {termSettings?.logoUrl && (
-                      <div className="relative shrink-0 self-stretch">
-                        <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/20 blur-xl animate-pulse" />
-                        <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
-                          className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
-                          onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
+                  {(() => {
+                    const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
+                    const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
+                    const lineH = 1.8; // rem: text-[2rem] × leading-[0.9]
+                    const containerH = `${(parts.length * lineH).toFixed(2)}rem`;
+                    return (
+                      <div className="flex items-center gap-4" style={{ height: containerH }}>
+                        <div className="flex-1 flex flex-col justify-center h-full">
+                          {parts.map((part: string, i: number) => (
+                            <h2 key={i} className={`text-[2rem] font-black leading-[0.9] tracking-tight whitespace-nowrap ${
+                              i === Math.floor(parts.length / 2)
+                                ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
+                                : 'text-white'
+                            }`}>
+                              {part}.
+                            </h2>
+                          ))}
+                        </div>
+                        {termSettings?.logoUrl && (
+                          <div className="relative shrink-0 h-full">
+                            <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/20 blur-xl animate-pulse" />
+                            <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
+                              className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
+                              onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Description — capped at 2 lines */}
                   <p className="text-white/50 text-[11px] leading-relaxed line-clamp-2">
@@ -509,34 +513,63 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   </div>
 
                   {/* Headline + logo side by side */}
-                  <div className="flex items-stretch gap-6 mb-4">
-                    {/* Theme headline — gradient amber on highlight word */}
-                    <div className="flex-1">
-                      {(() => {
-                        const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
-                        const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
-                        return parts.map((part: string, i: number) => (
-                          <h2 key={i} className={`text-5xl xl:text-[3.5rem] font-black leading-[0.92] tracking-tight whitespace-nowrap ${
-                            i === Math.floor(parts.length / 2)
-                              ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
-                              : 'text-white'
-                          }`}>
-                            {part}.
-                          </h2>
-                        ));
-                      })()}
-                    </div>
-
-                    {/* Logo to the right of headline */}
-                    {termSettings?.logoUrl && (
-                      <div className="relative shrink-0 self-stretch">
-                        <div className="absolute inset-0 scale-[2.5] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
-                        <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
-                          className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
-                          onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
+                  {(() => {
+                    const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
+                    const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
+                    // text-5xl leading-[0.92] = 3rem × 0.92; xl:text-[3.5rem] leading-[0.92] = 3.5rem × 0.92
+                    const containerH = `${(parts.length * 2.76).toFixed(2)}rem`;
+                    return (
+                      <div className="flex items-center gap-6 mb-4 xl:hidden" style={{ height: containerH }}>
+                        <div className="flex-1 flex flex-col justify-center h-full">
+                          {parts.map((part: string, i: number) => (
+                            <h2 key={i} className={`text-5xl font-black leading-[0.92] tracking-tight whitespace-nowrap ${
+                              i === Math.floor(parts.length / 2)
+                                ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
+                                : 'text-white'
+                            }`}>
+                              {part}.
+                            </h2>
+                          ))}
+                        </div>
+                        {termSettings?.logoUrl && (
+                          <div className="relative shrink-0 h-full">
+                            <div className="absolute inset-0 scale-[2.5] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
+                            <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
+                              className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
+                              onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
+                  {(() => {
+                    const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
+                    const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
+                    const containerH = `${(parts.length * 3.22).toFixed(2)}rem`;
+                    return (
+                      <div className="hidden xl:flex items-center gap-6 mb-4" style={{ height: containerH }}>
+                        <div className="flex-1 flex flex-col justify-center h-full">
+                          {parts.map((part: string, i: number) => (
+                            <h2 key={i} className={`text-[3.5rem] font-black leading-[0.92] tracking-tight whitespace-nowrap ${
+                              i === Math.floor(parts.length / 2)
+                                ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
+                                : 'text-white'
+                            }`}>
+                              {part}.
+                            </h2>
+                          ))}
+                        </div>
+                        {termSettings?.logoUrl && (
+                          <div className="relative shrink-0 h-full">
+                            <div className="absolute inset-0 scale-[2.5] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
+                            <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
+                              className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
+                              onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {termSettings?.tagline && (
                     <p className="text-amber-300/75 text-[10px] font-black uppercase tracking-widest mb-5">{termSettings.tagline}</p>
