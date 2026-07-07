@@ -11,11 +11,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useEvents } from '../../hooks/useEvents';
 import { useProjects } from '../../hooks/useProjects';
-import { usePoints } from '../../hooks/usePoints';
 import { useMembers } from '../../hooks/useMembers';
 import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
 import { NudgeBanner } from '../ui/NudgeBanner';
-import { MemberGrowthChart, PointsDistributionChart, PointsSourceRadarChart } from './Analytics';
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
 import { ActivityRecommendationService } from '../../services/activityRecommendationService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
@@ -35,104 +33,6 @@ import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
 
-/**
- * Competitive UI Helper Component: Elite Leaderboard
- * Purpose: Peer pressure, Public Comparison (Jealousy/Vanity)
- */
-interface EliteLeaderboardProps {
-  members: any[];
-  currentUser: any;
-  year: number;
-  onYearChange: (year: number) => void;
-}
-
-const EliteLeaderboard: React.FC<EliteLeaderboardProps> = ({ members, currentUser, year, onYearChange }) => {
-  const top3 = members.slice(0, 3);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(top3[0]?.id || null);
-  const currentYear = new Date().getFullYear();
-  const availableYears = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
-  useEffect(() => {
-    if (top3[0]?.id) {
-      setSelectedMemberId(top3[0].id);
-    }
-  }, [members]);
-
-  return (
-    <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-jci-navy border-none shadow-[0_20px_50px_rgba(8,112,184,0.7)] text-white">
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-xl font-black uppercase tracking-tighter italic leading-none mb-1">Elite Leaderboard</h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Global Ranking • Top 3 Members</p>
-          </div>
-          <Badge className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-white border-none animate-pulse shadow-[0_0_20px_rgba(245,158,11,0.5)] font-black italic tracking-tighter">
-            Top League
-          </Badge>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
-          {/* Left Side: Member List */}
-          <div className="grid grid-cols-3 md:grid-cols-1 gap-3 md:gap-4 ">
-            {top3.map((m, idx) => (
-              <div
-                key={m.id}
-                className={`flex flex-col md:flex-row items-center md:justify-between p-3 md:p-4 rounded-2xl border transition-all group cursor-pointer ${m.id === selectedMemberId ? 'bg-white/20 border-white/40 shadow-lg scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-                onClick={() => setSelectedMemberId(m.id)}
-              >
-                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3 text-center md:text-left">
-                  <div className="relative mb-2 md:mb-0">
-                    <span className={`absolute -top-1 -left-1 md:-top-2 md:-left-2 w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-[9px] md:text-[10px] font-black shadow-lg ${idx === 0 ? 'bg-amber-400 text-amber-900' : idx === 1 ? 'bg-slate-300 text-slate-800' : 'bg-orange-400 text-orange-900'}`}>
-                      {idx + 1}
-                    </span>
-                    <img src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}`} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`font-black tracking-tight text-xs md:text-base truncate max-w-[60px] md:max-w-none ${m.id === currentUser?.id ? 'text-amber-400' : 'text-white'}`}>{m.name}</p>
-                    <p className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest hidden md:block">{m.tier || 'MEMBER'}</p>
-                  </div>
-                </div>
-                <div className="text-center md:text-right mt-1 md:mt-0">
-                  <p className="text-sm md:text-lg font-black tracking-tighter leading-none">{(m.points || 0).toLocaleString()}</p>
-                  <p className="text-[8px] md:text-[9px] text-slate-400 font-bold uppercase tracking-widest">Points</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Right Side: Radar Chart */}
-          <div className="relative bg-white/5 rounded-[32px] p-4 border border-white/10 h-full flex flex-col items-center justify-center min-h-[280px]">
-            <div className="absolute top-4 left-6">
-              <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 italic">Points Source</h4>
-              <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Skill Analysis</p>
-            </div>
-
-            {/* Year Selector */}
-            <div className="absolute top-3 right-4">
-              <select
-                value={year}
-                onChange={(e) => onYearChange(Number(e.target.value))}
-                className="appearance-none bg-white/10 text-amber-400 text-[10px] font-black uppercase tracking-wider rounded-full pl-2.5 pr-6 py-1 border border-white/15 cursor-pointer hover:bg-white/15 transition-all focus:outline-none focus:ring-1 focus:ring-amber-400/50"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-              >
-                {availableYears.map(y => (
-                  <option key={y} value={y} className="bg-slate-900 text-white">{y}</option>
-                ))}
-              </select>
-            </div>
-
-            <PointsSourceRadarChart memberId={selectedMemberId || undefined} year={year} className="mt-4" />
-
-            <div className="absolute bottom-4 right-6 text-right">
-              <p className="text-[10px] font-black text-amber-400 italic uppercase">Competitive Mode</p>
-              <p className="text-[8px] text-slate-500 uppercase font-bold">Data Realtime</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-};
 
 interface DashboardHomeProps {
   userRole: import('../../types').UserRole;
@@ -157,7 +57,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const { projects, loading: projectsLoading } = useProjects();
   const { members, loading: membersLoading } = useMembers();
   const { nudges, dismissNudge } = useBehavioralNudging();
-  const { leaderboard, pointHistory, loadLeaderboard } = usePoints();
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);
@@ -183,16 +82,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
   const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
-  const currentYear = new Date().getFullYear();
-  const [radarYear, setRadarYear] = useState(currentYear);
-
-  // Load leaderboard when selected year changes
-  useEffect(() => {
-    const isEligibleMember = member && member.role !== 'GUEST' && member.role !== 'INACTIVE';
-    if (isEligibleMember) {
-      loadLeaderboard(10, radarYear);
-    }
-  }, [radarYear, member]);
 
 
   const handleRestrictedAction = (viewType: string) => {
@@ -355,12 +244,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     .filter((e) => new Date(e.date) >= new Date())
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Calculate rank
-  const userRankIndex = member ? leaderboard.findIndex(m => m.id === member.id) : -1;
-  const userRank = userRankIndex >= 0 ? userRankIndex + 1 : 0;
-  const rankPercentile = (userRank > 0 && leaderboard.length > 0)
-    ? Math.round(((leaderboard.length - userRank) / leaderboard.length) * 100)
-    : 0;
 
   // Birthday calculation
   const now = new Date();
@@ -749,11 +632,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
         {member.role !== UserRole.GUEST && (
           <>
-            {/* LEADERBOARD (Wolf Heart) - Spanning 2 or 3 columns depending on active commitments */}
-            <div className={contracts.filter(c => c.status === 'Active').length > 0 ? "lg:col-span-2" : "lg:col-span-3"}>
-              <EliteLeaderboard members={leaderboard} currentUser={member} year={radarYear} onYearChange={setRadarYear} />
-            </div>
-
             {/* ACTIVE COMMITMENTS / BETS */}
             {contracts.filter(c => c.status === 'Active').length > 0 && (
               <Card className="bg-slate-50 border-2 border-slate-200 hover:bg-white transition-all group overflow-hidden">
