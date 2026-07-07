@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
             short_name: 'JCI KL',
             description: 'JCI Kuala Lumpur Member Portal',
             theme_color: '#1e3a5f',
-            background_color: '#ffffff',
+            background_color: '#1e3a5f',
             display: 'standalone',
             orientation: 'portrait',
             scope: '/',
