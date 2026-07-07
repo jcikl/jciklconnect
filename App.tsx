@@ -398,26 +398,38 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
         )}
 
         {/* JCI 4 Pillars */}
-        <section className="py-20 bg-white">
+        <section className="py-16 md:py-20 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
+            <div className="text-center mb-8 md:mb-12">
               <span className="text-[10px] font-black uppercase tracking-widest text-jci-blue">What We Stand For</span>
-              <h2 className="text-3xl font-black text-slate-900 mt-2 mb-3">The Four Pillars of JCI</h2>
-              <p className="text-slate-500 max-w-xl mx-auto">Everything we do is guided by four areas that empower young active citizens.</p>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 mt-2 mb-2">The Four Pillars of JCI</h2>
+              <p className="text-slate-500 text-sm max-w-xl mx-auto">Everything we do is guided by four areas that empower young active citizens.</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {pillars.map(p => (
-                <div key={p.title} className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default" style={{ aspectRatio: '3/4' }}>
+            {/* Mobile: 2-col short landscape | Desktop: 4-col taller portrait */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
+              {pillars.map((p, i) => (
+                <div
+                  key={p.title}
+                  className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-default
+                    aspect-[3/2] sm:aspect-[4/3] lg:aspect-[3/4]"
+                >
                   <img
                     src={p.image}
                     alt={p.title}
                     className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${p.accent} via-transparent`} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-5">
-                    <h3 className="text-lg font-black text-white mb-1 tracking-wide">{p.title}</h3>
-                    <p className="text-white/80 text-xs leading-relaxed">{p.description}</p>
+                  {/* Colour tint overlay */}
+                  <div className={`absolute inset-0 bg-gradient-to-t ${p.accent} via-transparent opacity-60`} />
+                  {/* Dark legibility gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/10" />
+                  {/* Number badge */}
+                  <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/20 border border-white/30 backdrop-blur-sm flex items-center justify-center">
+                    <span className="text-[10px] font-black text-white leading-none">0{i + 1}</span>
+                  </div>
+                  {/* Text */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3 md:p-5">
+                    <h3 className="text-sm md:text-lg font-black text-white mb-0.5 md:mb-1 leading-tight">{p.title}</h3>
+                    <p className="text-white/75 text-[10px] md:text-xs leading-relaxed hidden sm:block">{p.description}</p>
                   </div>
                 </div>
               ))}
