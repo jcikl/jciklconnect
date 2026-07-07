@@ -445,7 +445,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       })()}
                     </div>
                     {termSettings?.logoUrl && (
-                      <div className="relative shrink-0 flex items-center">
+                      <div className="relative shrink-0 self-stretch flex items-center">
                         <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/20 blur-xl animate-pulse" />
                         <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
                           className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
@@ -529,7 +529,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 
                     {/* Logo to the right of headline */}
                     {termSettings?.logoUrl && (
-                      <div className="relative shrink-0 flex items-center">
+                      <div className="relative shrink-0 self-stretch flex items-center">
                         <div className="absolute inset-0 scale-[2.5] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
                         <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
                           className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
