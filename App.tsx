@@ -282,114 +282,220 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
-}) => (
-  <div className="min-h-screen bg-slate-50">
-    <GuestHeader currentPage="home" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
+}) => {
+  const currentYear = String(new Date().getFullYear());
+  const [president, setPresident] = useState<{ name: string; avatar: string; company: string } | null>(null);
+  const { events } = useEvents({ publicMode: true });
 
-    <main id="main-content">
-      {/* Hero */}
-      <section className="relative bg-jci-navy py-32 overflow-hidden" aria-label="Hero">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-            Be Better. <span className="text-jci-lightblue">Do Better.</span>
-          </h1>
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-10">
-            Join a global network of young active citizens creating positive change.
-            Manage your growth, connect with mentors, and lead impactful projects.
-          </p>
-          <div className="flex justify-center gap-4 flex-wrap">
-            <Button size="lg" onClick={onRegister}>
-              Become a Member
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-2 border-white text-white bg-transparent hover:border-jci-blue hover:text-jci-blue focus:ring-jci-blue text-lg hover:bg-white hover:text-jci-navy"
-              onClick={() => onPageChange('events')}
-            >
-              View Activity Calendar
-            </Button>
-          </div>
-          <div className="flex justify-center items-center gap-8 mt-10 pt-8 border-t border-white/10">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">1954</p>
-              <p className="text-[11px] text-blue-200 uppercase tracking-widest mt-0.5">Founded</p>
-            </div>
-            <div className="w-px h-8 bg-white/20"></div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">200+</p>
-              <p className="text-[11px] text-blue-200 uppercase tracking-widest mt-0.5">Members</p>
-            </div>
-            <div className="w-px h-8 bg-white/20"></div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">50+</p>
-              <p className="text-[11px] text-blue-200 uppercase tracking-widest mt-0.5">Events / Year</p>
-            </div>
-          </div>
-        </div>
-      </section>
+  const upcomingEvents = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return events
+      .filter(e => e.date && new Date(e.date) >= today)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 3);
+  }, [events]);
 
-      {/* Features */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
-            <div className="text-center p-6 rounded-2xl bg-slate-50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="w-16 h-16 bg-jci-blue/10 text-jci-blue rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-                <Sparkles size={32} />
+  useEffect(() => {
+    BoardManagementService.getBoardMembersByYear(currentYear).then(members => {
+      const pres = members.find(m => m.position === 'President' && m.isActive);
+      if (pres) setPresident({ name: pres.memberName || 'JCI Member', avatar: pres.boardAvatarUrl || pres.avatarUrl || '', company: pres.companyName || 'JCI Kuala Lumpur' });
+    }).catch(() => {});
+  }, [currentYear]);
+
+  const pillars = [
+    { icon: <Briefcase size={26} />, title: 'Business', description: 'Connect with entrepreneurs, grow your network, and sharpen your professional edge.', accent: 'text-jci-blue bg-blue-50 border-blue-100' },
+    { icon: <Heart size={26} />, title: 'Community', description: 'Lead meaningful service projects that create lasting impact in Kuala Lumpur.', accent: 'text-rose-500 bg-rose-50 border-rose-100' },
+    { icon: <Award size={26} />, title: 'International', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.', accent: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+    { icon: <Sparkles size={26} />, title: 'Individual', description: 'Unlock your leadership potential through training, mentorship, and real experiences.', accent: 'text-amber-500 bg-amber-50 border-amber-100' },
+  ];
+
+  const eventTypeColor: Record<string, string> = {
+    Meeting: 'from-blue-500 to-blue-600',
+    Training: 'from-violet-500 to-purple-600',
+    Social: 'from-emerald-500 to-teal-600',
+    Project: 'from-orange-500 to-amber-600',
+    International: 'from-jci-blue to-sky-500',
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <GuestHeader currentPage="home" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
+
+      <main id="main-content">
+        {/* Hero */}
+        <section className="relative bg-jci-navy py-24 md:py-32 overflow-hidden" aria-label="Hero">
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-jci-navy via-jci-navy/90 to-jci-navy/50 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-jci-blue/10 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="flex flex-col md:flex-row items-center gap-12 md:gap-16">
+              <div className="flex-1 text-center md:text-left">
+                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider text-white/80 mb-6">
+                  <span>JCI Kuala Lumpur</span>
+                  <span className="w-1 h-1 rounded-full bg-white/50" />
+                  <span>Est. 1954</span>
+                </div>
+                <h1 className="text-5xl md:text-6xl font-black text-white mb-5 leading-tight tracking-tight">
+                  Be Better.<br /><span className="text-sky-300">Do Better.</span>
+                </h1>
+                <p className="text-lg text-slate-300 max-w-xl mb-8 leading-relaxed">
+                  The first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954.
+                </p>
+                <div className="flex gap-4 flex-wrap justify-center md:justify-start">
+                  <Button size="lg" onClick={onRegister} className="shadow-lg shadow-jci-blue/30 font-bold">
+                    Become a Member
+                  </Button>
+                  <Button size="lg" variant="outline"
+                    className="border-2 border-white/60 text-white bg-transparent hover:bg-white hover:text-jci-navy font-bold"
+                    onClick={() => onPageChange('events')}>
+                    View Activity Calendar
+                  </Button>
+                </div>
+                <div className="flex items-center gap-8 mt-10 pt-8 border-t border-white/10 justify-center md:justify-start flex-wrap">
+                  {[{ v: '1954', l: 'Founded' }, { v: '200+', l: 'Members' }, { v: '50+', l: 'Events / Year' }, { v: '70+', l: 'Years Active' }].map((s, i) => (
+                    <div key={i} className="text-center md:text-left">
+                      <p className="text-2xl font-black text-white leading-none">{s.v}</p>
+                      <p className="text-[10px] text-sky-300/80 uppercase tracking-widest mt-0.5 font-bold">{s.l}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-slate-900">Personalized Growth</h3>
-              <p className="text-slate-600 leading-relaxed">
-                AI-driven recommendations for trainings and roles that match your career goals.
-              </p>
-            </div>
-
-            <div className="text-center p-6 rounded-2xl bg-slate-50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="w-16 h-16 bg-jci-blue/10 text-jci-blue rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-                <Briefcase size={32} />
+              <div className="shrink-0 hidden md:flex">
+                <div className="w-52 h-52 rounded-3xl bg-white/5 border border-white/10 p-8 flex items-center justify-center shadow-2xl shadow-black/30 backdrop-blur-sm">
+                  <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" className="w-full h-full object-contain drop-shadow-lg" />
+                </div>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-slate-900">Project Leadership</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Lead real-world projects with automated financial tracking and team management tools.
-              </p>
-            </div>
-
-            <div className="text-center p-6 rounded-2xl bg-slate-50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="w-16 h-16 bg-jci-blue/10 text-jci-blue rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-                <Users size={32} />
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-slate-900">Global Networking</h3>
-              <p className="text-slate-600 leading-relaxed">
-                Connect with members locally and internationally. Expand your business reach.
-              </p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Additional CTA Section */}
-      <section className="py-16 bg-gradient-to-r from-jci-blue to-jci-lightblue">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to Make an Impact?
-          </h2>
-          <p className="text-xl text-blue-100 mb-8">
-            Join thousands of young leaders creating positive change in their communities.
-          </p>
-          <Button
-            size="lg"
-            onClick={onRegister}
-            className="bg-transparent text-white border-2 border-white hover:bg-white hover:text-jci-blue focus:ring-jci-blue shadow-lg hover:shadow-xl transition-all"
-          >
-            Get Started Today
-          </Button>
-        </div>
-      </section>
+        {/* President Spotlight */}
+        {president && (
+          <section className="py-10 bg-white border-b border-slate-100">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col sm:flex-row items-center gap-5 bg-gradient-to-r from-slate-50 to-blue-50/40 rounded-2xl border border-slate-100 p-5 md:p-6 max-w-2xl mx-auto">
+                <div className="shrink-0">
+                  {president.avatar ? (
+                    <img src={president.avatar} alt={president.name} className="w-16 h-16 rounded-xl object-cover border-2 border-white shadow-md" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-jci-blue/10 border-2 border-jci-blue/20 flex items-center justify-center">
+                      <span className="text-2xl font-black text-jci-blue/40">{president.name.charAt(0)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="text-center sm:text-left min-w-0 flex-1">
+                  <span className="inline-block text-[9px] font-black uppercase tracking-widest text-jci-blue bg-blue-50 border border-blue-100 px-3 py-0.5 rounded-full mb-1.5">President {currentYear}</span>
+                  <h3 className="text-lg font-black text-slate-900 leading-tight">{president.name}</h3>
+                  <p className="text-sm text-slate-500 truncate">{president.company}</p>
+                </div>
+                <button onClick={() => onPageChange('about')} className="shrink-0 hidden sm:flex items-center gap-2 text-xs font-bold text-jci-blue border border-jci-blue/20 bg-blue-50 hover:bg-jci-blue hover:text-white px-4 py-2 rounded-xl transition-colors">
+                  <Users size={13} /> Meet the Board
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
 
-    </main>
-    <GuestFooter />
-  </div>
-);
+        {/* JCI 4 Pillars */}
+        <section className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <span className="text-[10px] font-black uppercase tracking-widest text-jci-blue">What We Stand For</span>
+              <h2 className="text-3xl font-black text-slate-900 mt-2 mb-3">The Four Pillars of JCI</h2>
+              <p className="text-slate-500 max-w-xl mx-auto">Everything we do is guided by four areas that empower young active citizens.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {pillars.map(p => (
+                <div key={p.title} className="rounded-2xl border border-slate-100 bg-white p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+                  <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-5 ${p.accent}`}>{p.icon}</div>
+                  <h3 className="text-lg font-black text-slate-900 mb-2">{p.title}</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">{p.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Upcoming Events */}
+        {upcomingEvents.length > 0 && (
+          <section className="py-16 bg-slate-50/80">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-end justify-between mb-8">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-jci-blue">What's Coming</span>
+                  <h2 className="text-2xl font-black text-slate-900 mt-1">Upcoming Events</h2>
+                </div>
+                <button onClick={() => onPageChange('events')} className="flex items-center gap-1 text-sm font-bold text-jci-blue hover:text-sky-600 transition-colors">
+                  View All <ChevronRight size={15} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {upcomingEvents.map(event => (
+                  <div key={event.id} onClick={() => onPageChange('events')}
+                    className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer">
+                    <div className="h-36 overflow-hidden relative">
+                      {event.imageUrl ? (
+                        <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className={`w-full h-full bg-gradient-to-br ${eventTypeColor[event.type] || 'from-jci-blue to-sky-500'} flex items-center justify-center`}>
+                          <Calendar size={36} className="text-white/30" />
+                        </div>
+                      )}
+                      <span className="absolute top-3 left-3 text-[9px] font-black uppercase tracking-wider bg-white/90 text-slate-700 px-2.5 py-1 rounded-full shadow-sm">
+                        {event.type}
+                      </span>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-[10px] font-bold text-jci-blue uppercase tracking-wider mb-1">
+                        {new Date(event.date).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                      <h4 className="font-bold text-slate-900 text-sm line-clamp-2 mb-1">{event.title}</h4>
+                      {event.location && <p className="text-[11px] text-slate-400 flex items-center gap-1"><MapPin size={10} />{event.location}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Dual CTA */}
+        <section className="py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="grid md:grid-cols-2 gap-10 items-center">
+              <div>
+                <h2 className="text-3xl font-black text-white mb-3 leading-tight">Ready to Make an Impact?</h2>
+                <p className="text-blue-200 text-base mb-6 leading-relaxed">Join a community of young leaders creating positive change across Malaysia and the world.</p>
+                <Button size="lg" variant="outline" onClick={onRegister} className="bg-white !text-jci-navy border-white hover:bg-sky-50 hover:!text-jci-navy font-black shadow-lg">
+                  Get Started Today
+                </Button>
+              </div>
+              <div className="hidden md:flex flex-col gap-3">
+                {[
+                  { icon: <FolderKanban size={18} className="text-white" />, title: 'Explore Flagship Projects', sub: 'See the initiatives making a difference', page: 'projects' as const },
+                  { icon: <Users size={18} className="text-white" />, title: 'Meet the Board of Directors', sub: 'Leadership driving JCI KL forward', page: 'about' as const },
+                ].map(item => (
+                  <button key={item.page} onClick={() => onPageChange(item.page)}
+                    className="flex items-center gap-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl p-4 transition-all group text-left">
+                    <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0 group-hover:bg-white/20 transition-colors">{item.icon}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-white text-sm">{item.title}</p>
+                      <p className="text-blue-200/70 text-xs">{item.sub}</p>
+                    </div>
+                    <ChevronRight size={15} className="text-white/40 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <GuestFooter />
+    </div>
+  );
+};
 
 // Guest Events Page
 const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
