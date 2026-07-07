@@ -104,7 +104,8 @@ export class PartnershipsService {
           },
           memberBenefits: d.description || '',
           redeemMethod: d.linkUrl || d.description || '',
-          banner: d.logoUrl || '',
+          logo: d.logoUrl || '',
+          banner: d.imageUrl || '',
           eligbleRoles: d.targetCriteria?.tiers || d.targetCriteria?.roles || [
             'probation member', 'official member', 'paid_due_member',
             'associate member', 'lifetime member',

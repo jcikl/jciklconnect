@@ -109,10 +109,11 @@ export const uploadPresidentialLogoToCloudinary = async (
 
 /**
  * Uploads a file directly to Cloudinary using unsigned upload with progress tracking.
- * @param file - The file to upload (e.g. image)
+ * @param file - The file to upload (image or raw)
  * @param folder - Optional Cloudinary folder path
  * @param onProgress - Optional callback function to track upload progress (0-100)
- * @returns The secure URL of the uploaded image
+ * @param options - Optional publicId and resourceType ('image' | 'raw' | 'auto')
+ * @returns The secure URL of the uploaded file
  */
 export const uploadToCloudinary = (
   file: File,
@@ -120,6 +121,7 @@ export const uploadToCloudinary = (
   onProgress?: (progress: number) => void,
   options?: {
     publicId?: string;
+    resourceType?: 'image' | 'raw' | 'auto';
   }
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -134,7 +136,8 @@ export const uploadToCloudinary = (
       formData.append('public_id', sanitizePathSegment(options.publicId));
     }
 
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+    const resourceType = options?.resourceType ?? 'image';
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`;
     xhr.open('POST', url, true);
 
     if (onProgress) {

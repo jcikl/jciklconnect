@@ -243,26 +243,41 @@ export class FinanceService {
     }
 
     try {
-      // First try to fetch from projectTrx collection
+      // First try with orderBy (requires composite index)
       const projectTrxQuery = query(
         collection(db, COLLECTIONS.PROJECT_TRANSACTIONS),
         where('projectId', '==', projectId),
         orderBy('date', 'desc')
       );
       const snapshot = await getDocs(projectTrxQuery);
-
-      const projectTransactions = snapshot.docs.map(doc => ({
+      return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
       } as Transaction));
-
-
-
-      return projectTransactions;
-    } catch (error) {
-      console.error('Error fetching project transactions:', error);
-      throw error;
+    } catch (indexError: any) {
+      if (indexError?.code === 'failed-precondition') {
+        // Index still building — fall back to unordered query, sort client-side
+        try {
+          const fallbackQuery = query(
+            collection(db, COLLECTIONS.PROJECT_TRANSACTIONS),
+            where('projectId', '==', projectId)
+          );
+          const snapshot = await getDocs(fallbackQuery);
+          return snapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
+            } as Transaction))
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        } catch (fallbackError) {
+          console.error('Error fetching project transactions (fallback):', fallbackError);
+          throw fallbackError;
+        }
+      }
+      console.error('Error fetching project transactions:', indexError);
+      throw indexError;
     }
   }
 

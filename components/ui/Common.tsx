@@ -43,8 +43,9 @@ interface DrawerProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  position?: 'left' | 'right';
+  position?: 'left' | 'right' | 'bottom';
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  footer?: React.ReactNode;
 }
 
 interface ToastContextType {
@@ -567,7 +568,8 @@ export const Drawer: React.FC<DrawerProps> = ({
   title,
   children,
   position = 'right',
-  size = 'md'
+  size = 'md',
+  footer,
 }) => {
   if (!isOpen) return null;
 
@@ -577,6 +579,42 @@ export const Drawer: React.FC<DrawerProps> = ({
     lg: 'md:w-[600px]',
     xl: 'md:w-[800px]',
   };
+
+  const heightClasses = {
+    sm: 'max-h-[40vh]',
+    md: 'max-h-[60vh]',
+    lg: 'max-h-[75vh]',
+    xl: 'max-h-[90vh]',
+  };
+
+  if (position === 'bottom') {
+    return createPortal(
+      <>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
+        <div className={`fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl flex flex-col ${heightClasses[size]} md:left-1/2 md:-translate-x-1/2 md:w-[560px] md:rounded-t-2xl`}>
+          {/* drag handle */}
+          <div className="flex-none pt-3 pb-1 flex justify-center">
+            <div className="w-10 h-1 rounded-full bg-slate-300" />
+          </div>
+          <div className="flex-none px-4 pb-3 flex justify-between items-center border-b border-slate-100">
+            <h3 className="font-bold text-slate-900">{title}</h3>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {children}
+          </div>
+          {footer && (
+            <div className="flex-none p-4 border-t border-slate-100 bg-slate-50/80 backdrop-blur-sm">
+              {footer}
+            </div>
+          )}
+        </div>
+      </>,
+      document.body
+    );
+  }
 
   return (
     <>
@@ -601,6 +639,11 @@ export const Drawer: React.FC<DrawerProps> = ({
           <div className="flex-1 overflow-y-auto p-4">
             {children}
           </div>
+          {footer && (
+            <div className="flex-none p-4 border-t border-slate-100 bg-slate-50/80">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </>

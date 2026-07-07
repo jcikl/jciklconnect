@@ -1,18 +1,16 @@
-// Payment Requests – submit, my applications, finance list and review
+﻿// Payment Requests “ submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Trash2, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User } from 'lucide-react';
-import { Button, Card, Modal, useToast, Tabs, Badge, ProgressBar } from '../ui/Common';
+import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User } from 'lucide-react';
+import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
+import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentRequestModal';
 import { Input, Select } from '../ui/Form';
-import { Combobox } from '../ui/Combobox';
-import { MemberSelector } from '../ui/MemberSelector';
 import { FirstUseBanner } from '../ui/FirstUseBanner';
 import { useHelpModal } from '../../contexts/HelpModalContext';
 import { LoadingState } from '../ui/Loading';
 import { PaymentRequestService } from '../../services/paymentRequestService';
-import { getAdministrativeProjectIds } from '../../utils/administrativeProjectsStorage';
-import { FinanceService } from '../../services/financeService';
 import { ProjectsService } from '../../services/projectsService';
-import { PaymentRequest, PaymentRequestStatus, PaymentRequestItem, BankAccount, Project } from '../../types';
+import { FinanceService } from '../../services/financeService';
+import { PaymentRequest, PaymentRequestStatus, Project, BankAccount } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useMembers } from '../../hooks/useMembers';
@@ -20,8 +18,6 @@ import { DEFAULT_LO_ID } from '../../config/constants';
 import { formatCurrency } from '../../utils/formatUtils';
 import { jsPDF } from 'jspdf';
 import { PDFDocument } from 'pdf-lib';
-import { uploadToCloudinary } from '../../services/cloudinaryService';
-import imageCompression from 'browser-image-compression';
 
 const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
   draft: 'Draft',
@@ -107,32 +103,14 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const [financeLoading, setFinanceLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState(0);
-
-  // Form States
-  const [formApplicantId, setFormApplicantId] = useState<string>('');
-  const [formApplicantName, setFormApplicantName] = useState('');
-  const [formApplicantEmail, setFormApplicantEmail] = useState('');
-  const [formApplicantPosition, setFormApplicantPosition] = useState('');
-  const [formCategory, setFormCategory] = useState<'administrative' | 'projects_activities'>('administrative');
-  const [formActivityId, setFormActivityId] = useState('');
-  const [formRemark, setFormRemark] = useState('');
-  const [formItems, setFormItems] = useState<PaymentRequestItem[]>([{ purpose: '', amount: 0 }]);
-  const [formClaimFromBankAccountId, setFormClaimFromBankAccountId] = useState('');
-  const [formBankName, setFormBankName] = useState('');
-  const [formAccountHolder, setFormAccountHolder] = useState('');
-  const [formAccountNumber, setFormAccountNumber] = useState('');
-  const [formAttachments, setFormAttachments] = useState<File[]>([]);
-
-  // Data for Selects
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [adminAccountOptions, setAdminAccountOptions] = useState<string[]>([]);
+  const [submitPreselectedProjectId, setSubmitPreselectedProjectId] = useState<string | undefined>();
+  const [submitPreselectedCategory, setSubmitPreselectedCategory] = useState<'administrative' | 'projects_activities' | undefined>();
 
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewFileName, setPdfPreviewFileName] = useState<string>('payment-request.pdf');
   const [searchRef, setSearchRef] = useState('');
   const [statusFilter, setStatusFilter] = useState<PaymentRequestStatus | ''>('');
 
@@ -142,91 +120,34 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
   const { members: memberOptions } = useMembers(loId);
 
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  useEffect(() => {
+    ProjectsService.getAllProjects().then(setProjects).catch(() => { });
+    FinanceService.getAllBankAccounts(false).then(setBankAccounts).catch(() => { });
+  }, []);
+
   // Check for auto-open and preselected values from Events Management page
   useEffect(() => {
     const autoOpen = sessionStorage.getItem('pr_auto_open_submit');
     if (autoOpen === 'true') {
       const preselectedProj = sessionStorage.getItem('pr_preselected_project_id');
       const preselectedCat = sessionStorage.getItem('pr_preselected_category');
-
-      if (preselectedCat === 'projects_activities' || preselectedCat === 'administrative') {
-        setFormCategory(preselectedCat as 'projects_activities' | 'administrative');
-      }
-      if (preselectedProj) {
-        setFormActivityId(preselectedProj);
-      }
-
-      // Clear the trigger and preselected values so they don't persist next time
       sessionStorage.removeItem('pr_auto_open_submit');
       sessionStorage.removeItem('pr_preselected_project_id');
       sessionStorage.removeItem('pr_preselected_category');
-
-      // Open the submit modal
+      setSubmitPreselectedProjectId(preselectedProj ?? undefined);
+      setSubmitPreselectedCategory(
+        preselectedCat === 'projects_activities' || preselectedCat === 'administrative'
+          ? preselectedCat
+          : undefined
+      );
       setSuccessRef(null);
       setSubmitModalOpen(true);
     }
   }, []);
 
-  // Load Initial Data
-  useEffect(() => {
-    const loadSelectData = async () => {
-      try {
-        const prjList = await ProjectsService.getAllProjects();
-        setProjects(prjList);
-      } catch (err) {
-        console.error('Failed to load projects:', err);
-      }
-
-      // Load bank accounts for the "Claim From" dropdown in the form
-      try {
-        const accounts = await FinanceService.getAllBankAccounts(false);
-        setBankAccounts(accounts);
-      } catch (err) {
-        console.error('Failed to load bank accounts:', err);
-      }
-    };
-    if (member) loadSelectData();
-  }, [member]);
-
-  // Pre-fill applicant details and load saved bank details from localStorage
-  useEffect(() => {
-    if (submitModalOpen && (user || member)) {
-      setFormApplicantName(member?.name || user?.displayName || '');
-      setFormApplicantEmail(user?.email || '');
-
-      const savedBankName = localStorage.getItem('pr_bank_name');
-      const savedAccountHolder = localStorage.getItem('pr_account_holder');
-      const savedAccountNumber = localStorage.getItem('pr_account_number');
-      const savedClaimFromBankAccountId = localStorage.getItem('pr_claim_from_bank_account_id');
-      const savedPosition = localStorage.getItem('pr_applicant_position');
-
-      if (savedBankName) setFormBankName(savedBankName);
-      if (savedAccountHolder) setFormAccountHolder(savedAccountHolder);
-      if (savedAccountNumber) setFormAccountNumber(savedAccountNumber);
-      if (savedClaimFromBankAccountId) setFormClaimFromBankAccountId(savedClaimFromBankAccountId);
-      if (savedPosition) setFormApplicantPosition(savedPosition);
-    }
-  }, [submitModalOpen, user, member]);
-
-  // Load admin account options when modal opens
-  useEffect(() => {
-    const loadAdminAccounts = async () => {
-      if (!submitModalOpen) return;
-      try {
-        const accounts = new Set<string>(getAdministrativeProjectIds());
-        const allTx = await FinanceService.getAllTransactions();
-        allTx.forEach(t => {
-          if (t.category === 'Administrative' && t.projectId && t.projectId.trim() !== '') {
-            accounts.add(t.projectId.trim());
-          }
-        });
-        setAdminAccountOptions(Array.from(accounts).sort());
-      } catch (e) {
-        console.error('Failed to load admin account options:', e);
-      }
-    };
-    loadAdminAccounts();
-  }, [submitModalOpen]);
 
   const loadMyList = useCallback(async () => {
     if (!user?.uid) return;
@@ -360,24 +281,6 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     }
   };
 
-  const addItem = () => {
-    setFormItems([...formItems, { purpose: '', amount: 0 }]);
-  };
-
-  const removeItem = (index: number) => {
-    if (formItems.length > 1) {
-      setFormItems(formItems.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateItem = (index: number, updates: Partial<PaymentRequestItem>) => {
-    const newItems = [...formItems];
-    newItems[index] = { ...newItems[index], ...updates };
-    setFormItems(newItems);
-  };
-
-  const totalAmount = formItems.reduce((sum, item) => sum + (item.amount || 0), 0);
-
   const handlePreviewPDF = async (pr: PaymentRequest) => {
     const doc = new jsPDF();
     const primaryColor = [0, 151, 215]; // JCI Blue
@@ -430,7 +333,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     doc.setTextColor(textSecondary[0], textSecondary[1], textSecondary[2]);
     doc.setFontSize(8);
     doc.text("25-3-2, Jalan 3/50, Off, Jln Gombak, Diamond Square, 53000 Kuala Lumpur", infoX, 21);
-    doc.text("Patron: JCI Senator Dato’ Seri Dr Derek Goh BBM(L)", infoX, 24);
+    doc.text("Patron: JCI Senator Dato™ Seri Dr Derek Goh BBM(L)", infoX, 24);
 
     doc.setTextColor(jciBlue[0], jciBlue[1], jciBlue[2]);
     doc.text("www.jcikl.cc", infoX, 28, { link: { url: "https://www.jcikl.cc" } } as any);
@@ -668,8 +571,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
               });
             }
           } catch (fileErr) {
-            console.error('Failed to attach file:', url, fileErr);
-            showToast(`Failed to load an attachment (CORS or Network error)`, 'error');
+            console.warn('Failed to attach file (skipped):', url, fileErr);
           }
         }
 
@@ -686,130 +588,8 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     }
 
     if (finalBlobUrl) {
-      window.open(finalBlobUrl, '_blank');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (formItems.some(item => !item.purpose || item.amount <= 0)) {
-      showToast('Please fill all item descriptions and amounts', 'error');
-      return;
-    }
-
-    if (formCategory === 'projects_activities' && !formActivityId) {
-      showToast('Please select a project/activity', 'error');
-      return;
-    }
-
-    if (!user?.uid || !member) {
-      showToast('Please log in first', 'error');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const now = new Date();
-      const applicantId = formApplicantId || user.uid;
-
-      const payload: Omit<PaymentRequest, 'id' | 'createdAt' | 'updatedAt' | 'referenceNumber'> = {
-        applicantId,
-        applicantName: formApplicantName,
-        applicantEmail: formApplicantEmail,
-        applicantPosition: formApplicantPosition,
-        date: now.toISOString().split('T')[0],
-        time: now.toTimeString().split(' ')[0],
-        category: formCategory,
-        activityId: formActivityId || null,
-        totalAmount: totalAmount,
-        remark: formRemark,
-        items: formItems,
-        claimFromBankAccountId: formClaimFromBankAccountId || null,
-        bankName: formBankName,
-        accountHolder: formAccountHolder,
-        accountNumber: formAccountNumber,
-        // Legacy
-        amount: totalAmount,
-        purpose: formItems[0].purpose,
-        activityRef: formActivityId || null,
-        status: 'submitted',
-        loId,
-      };
-
-      // Handle Attachments
-      const attachmentUrls: string[] = [];
-      if (formAttachments.length > 0) {
-        setAttachmentUploadProgress(0);
-        for (let i = 0; i < formAttachments.length; i++) {
-          const file = formAttachments[i];
-          let fileToUpload = file;
-
-          // Compress image if it's an image file
-          if (file.type.startsWith('image/')) {
-            try {
-              const options = {
-                maxSizeMB: 0.2, // Compress down to max 1MB
-                maxWidthOrHeight: 1920,
-                useWebWorker: true,
-              };
-              const compressedFile = await imageCompression(file, options);
-              // browser-image-compression returns a File/Blob. Reconstruct File object to maintain original name
-              fileToUpload = new File([compressedFile], file.name, {
-                type: compressedFile.type,
-                lastModified: Date.now(),
-              });
-            } catch (error) {
-              console.error('Image compression failed, using original file:', error);
-            }
-          }
-
-          const baseProgress = (i / formAttachments.length) * 100;
-          const url = await uploadToCloudinary(
-            fileToUpload,
-            `payment-requests/${loId}`,
-            (progress) => {
-              const currentTotalProgress = Math.round(baseProgress + (progress / formAttachments.length));
-              setAttachmentUploadProgress(currentTotalProgress);
-            }
-          );
-          attachmentUrls.push(url);
-        }
-      }
-
-      const { referenceNumber } = await PaymentRequestService.create({
-        ...payload,
-        attachmentUrls
-      }, user.uid);
-
-      // Save details to localStorage for future requests
-      localStorage.setItem('pr_bank_name', formBankName);
-      localStorage.setItem('pr_account_holder', formAccountHolder);
-      localStorage.setItem('pr_account_number', formAccountNumber);
-      localStorage.setItem('pr_claim_from_bank_account_id', formClaimFromBankAccountId || '');
-      localStorage.setItem('pr_applicant_position', formApplicantPosition);
-
-      setSuccessRef(referenceNumber);
-      setSubmitModalOpen(false);
-
-      // Reset form
-      setFormItems([{ purpose: '', amount: 0 }]);
-      setFormRemark('');
-      setFormActivityId('');
-      setFormApplicantPosition('');
-      setFormBankName('');
-      setFormAccountHolder('');
-      setFormAccountNumber('');
-      setFormClaimFromBankAccountId('');
-      setFormAttachments([]);
-
-      showToast(`Application submitted. Reference: ${referenceNumber}`, 'success');
-      await loadMyList();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Submit failed', 'error');
-    } finally {
-      setSubmitting(false);
-      setAttachmentUploadProgress(0);
+      setPdfPreviewFileName(`${pr.referenceNumber || 'payment-request'}.pdf`);
+      setPdfPreviewUrl(finalBlobUrl);
     }
   };
 
@@ -829,24 +609,6 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           <h2 className="text-2xl font-bold text-slate-900">Payment Requests</h2>
           <p className="text-sm text-slate-500">Submit and track reimbursement claims</p>
         </div>
-        {member && (
-          <>
-            <div className="hidden sm:block">
-              <Button onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}>
-                <Plus size={16} className="mr-1.5" /> New Request
-              </Button>
-            </div>
-            <div className="sm:hidden fixed bottom-24 right-5 z-40">
-              <button
-                onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}
-                className="w-14 h-14 rounded-full bg-jci-blue text-white shadow-[0_8px_30px_rgb(0,151,215,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-200 border-none"
-                aria-label="New Payment Request"
-              >
-                <Plus size={26} />
-              </button>
-            </div>
-          </>
-        )}
       </div>
 
       {successRef && (
@@ -865,35 +627,26 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         </Card>
       )}
 
-      {/* Stats */}
-      <Card noPadding className="bg-slate-50 border-slate-200/80">
-        <div className="grid grid-cols-3 divide-x divide-slate-200 py-3">
-          <div className="px-3 sm:px-5 text-center">
-            <div className="flex items-center justify-center gap-1.5 mb-1">
-              <Clock size={12} className="text-amber-500 shrink-0" />
-              <span className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Pending</span>
-            </div>
-            <p className="text-sm sm:text-lg font-bold text-amber-600 truncate">{formatCurrency(stats.pendingAmount)}</p>
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">{stats.pendingCount} request{stats.pendingCount !== 1 ? 's' : ''}</p>
-          </div>
-          <div className="px-3 sm:px-5 text-center">
-            <div className="flex items-center justify-center gap-1.5 mb-1">
-              <CheckCircle size={12} className="text-emerald-500 shrink-0" />
-              <span className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Approved</span>
-            </div>
-            <p className="text-sm sm:text-lg font-bold text-emerald-600 truncate">{formatCurrency(stats.approvedAmount)}</p>
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">{stats.approvedCount} completed</p>
-          </div>
-          <div className="px-3 sm:px-5 text-center">
-            <div className="flex items-center justify-center gap-1.5 mb-1">
-              <XCircle size={12} className="text-slate-400 shrink-0" />
-              <span className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">Rejected</span>
-            </div>
-            <p className="text-sm sm:text-lg font-bold text-slate-600">{stats.rejectedCount}</p>
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">Closed</p>
-          </div>
+      {/* Stats chips */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 shrink-0">
+          <Clock size={12} className="text-amber-500 shrink-0" />
+          <span className="text-xs font-semibold text-amber-700 whitespace-nowrap">Pending</span>
+          <span className="text-xs font-bold text-amber-600 whitespace-nowrap">{formatCurrency(stats.pendingAmount)}</span>
+          <span className="text-[10px] text-amber-400">· {stats.pendingCount}</span>
         </div>
-      </Card>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 shrink-0">
+          <CheckCircle size={12} className="text-emerald-500 shrink-0" />
+          <span className="text-xs font-semibold text-emerald-700 whitespace-nowrap">Approved</span>
+          <span className="text-xs font-bold text-emerald-600 whitespace-nowrap">{formatCurrency(stats.approvedAmount)}</span>
+          <span className="text-[10px] text-emerald-400">· {stats.approvedCount}</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 shrink-0">
+          <XCircle size={12} className="text-slate-400 shrink-0" />
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Rejected</span>
+          <span className="text-xs font-bold text-slate-600">{stats.rejectedCount}</span>
+        </div>
+      </div>
 
       {/* Tabs + List */}
       <div>
@@ -972,52 +725,65 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-slate-100">
-                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reference</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Reference</th>
                           <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Purpose / Project</th>
-                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
-                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
-                          <th className="text-center py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Amount</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Date</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Status / Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
+                        {member && (
+                          <tr className="group cursor-pointer hover:bg-blue-50/50 transition-colors" onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}>
+                            <td colSpan={5} className="py-2.5 px-2">
+                              <div className="flex items-center gap-2 text-slate-400 group-hover:text-jci-blue transition-colors">
+                                <div className="w-6 h-6 rounded border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                                  <Plus size={12} />
+                                </div>
+                                <span className="text-sm font-semibold">New Request</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
                         {filteredMyList.map((pr) => (
                           <React.Fragment key={pr.id}>
                             <tr
                               className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
                               onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
                             >
-                              <td className="py-3 px-2">
+                              <td className="py-3 px-2 w-px whitespace-nowrap">
                                 <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
                               </td>
-                              <td className="py-3 px-2 max-w-[240px]">
+                              <td className="py-3 px-2">
                                 <p className="font-medium text-slate-800 truncate">{pr.purpose}</p>
                                 <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
                                   {pr.category === 'administrative'
-                                    ? <><Building2 size={11} />{pr.activityId || '—'}</>
-                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '—'}</>
+                                    ? <><Building2 size={11} />{pr.activityId || '”'}</>
+                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
                                   }
                                 </p>
                               </td>
-                              <td className="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">{new Date(pr.createdAt).toLocaleDateString()}</td>
-                              <td className="py-3 px-2 text-right font-bold text-jci-blue whitespace-nowrap">{formatCurrency(pr.totalAmount || pr.amount)}</td>
-                              <td className="py-3 px-2 text-center"><StatusBadge status={pr.status} /></td>
-                              <td className="py-3 px-2">
-                                <div className="flex gap-1.5 justify-end">
-                                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
-                                    <Eye size={13} />
-                                  </Button>
-                                  {pr.status === 'submitted' && (
-                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCancel(pr.id); }} disabled={actioningId !== null} className="text-red-500 hover:bg-red-50" title="Cancel">
-                                      <X size={13} />
+                              <td className="py-3 px-2 text-right font-bold text-jci-blue whitespace-nowrap w-px">{formatCurrency(pr.totalAmount || pr.amount)}</td>
+                              <td className="py-3 px-2 text-right text-xs text-slate-500 whitespace-nowrap w-px">{new Date(pr.createdAt).toLocaleDateString()}</td>
+                              <td className="py-3 px-2 w-px">
+                                <div className="flex items-center gap-1.5 justify-end">
+                                  <StatusBadge status={pr.status} />
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
+                                      <Eye size={13} />
                                     </Button>
-                                  )}
+                                    {pr.status === 'submitted' && (
+                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCancel(pr.id); }} disabled={actioningId !== null} className="text-red-500 hover:bg-red-50" title="Cancel">
+                                        <X size={13} />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
                             {expandedId === pr.id && (
                               <tr className="bg-sky-50/30">
-                                <td colSpan={6} className="px-4 pb-4 pt-2">
+                                <td colSpan={5} className="px-4 pb-4 pt-2">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     {pr.items && pr.items.length > 0 && (
                                       <div>
@@ -1043,7 +809,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                   {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
                                     <p className="text-xs text-jci-blue mt-2.5 flex items-center gap-1">
                                       <Paperclip size={11} />
-                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} — view in PDF
+                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} ” view in PDF
                                     </p>
                                   )}
                                 </td>
@@ -1055,38 +821,44 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                     </table>
                   </div>
 
-                  {/* Mobile cards */}
-                  <div className="md:hidden space-y-2.5">
+                  {/* Mobile list */}
+                  <div className="md:hidden divide-y divide-slate-100">
+                    {member && (
+                      <div onClick={() => { setSuccessRef(null); setSubmitModalOpen(true); }}
+                        className="flex items-center gap-3 py-3 text-slate-400 hover:text-jci-blue transition-colors cursor-pointer">
+                        <div className="w-7 h-7 rounded border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                          <Plus size={13} />
+                        </div>
+                        <span className="text-sm font-semibold">New Request</span>
+                      </div>
+                    )}
                     {filteredMyList.map((pr) => (
-                      <div
-                        key={pr.id}
-                        className={`rounded-xl border overflow-hidden transition-all duration-200 ${expandedId === pr.id ? 'border-jci-blue/40 shadow-sm' : 'border-slate-200 bg-white'}`}
-                      >
+                      <div key={pr.id}>
                         <button
                           type="button"
-                          className="w-full text-left p-3.5 active:bg-slate-50"
+                          className="w-full text-left py-3 active:bg-slate-50 group"
                           onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
-                            <StatusBadge status={pr.status} />
-                          </div>
-                          <div className="mt-2 flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-800 text-sm truncate">{pr.purpose}</p>
-                              <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
-                                {pr.category === 'administrative'
-                                  ? <><Building2 size={11} />{pr.activityId || '—'}</>
-                                  : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '—'}</>
-                                }
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-1">{new Date(pr.createdAt).toLocaleDateString()}</p>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <StatusBadge status={pr.status} />
+                              <p className="font-medium text-slate-800 text-sm truncate">{pr.purpose}</p>
                             </div>
-                            <p className="text-lg font-bold text-jci-blue shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                            <p className="font-bold text-jci-blue text-sm shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">{pr.referenceNumber}</span>
+                            <span className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                              {pr.category === 'administrative'
+                                ? <><Building2 size={10} />{pr.activityId || '”'}</>
+                                : <><Sparkles size={10} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
+                              }
+                            </span>
+                            <span className="text-[10px] text-slate-300 ml-auto shrink-0">{new Date(pr.createdAt).toLocaleDateString()}</span>
                           </div>
                         </button>
                         {expandedId === pr.id && (
-                          <div className="border-t border-slate-100 px-3.5 pb-3.5 pt-3 bg-slate-50/60">
+                          <div className="pb-3 pt-1 bg-slate-50/60 rounded-lg px-3 mb-2">
                             {pr.items && pr.items.length > 0 && (
                               <div className="mb-3">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Items</p>
@@ -1139,13 +911,11 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-slate-100">
-                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reference</th>
-                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Applicant</th>
-                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Project / Account</th>
-                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</th>
-                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
-                          <th className="text-center py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Reference</th>
+                          <th className="text-left py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Applicant / Project</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Amount</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Date</th>
+                          <th className="text-right py-2 px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-px whitespace-nowrap">Status / Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -1155,45 +925,44 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                               className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
                               onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
                             >
-                              <td className="py-3 px-2">
+                              <td className="py-3 px-2 w-px whitespace-nowrap">
                                 <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
                               </td>
                               <td className="py-3 px-2">
-                                <p className="font-medium text-slate-800">{pr.applicantName || '—'}</p>
-                                <p className="text-xs text-slate-400">{pr.applicantPosition || ''}</p>
-                              </td>
-                              <td className="py-3 px-2 max-w-[180px]">
-                                <p className="text-xs text-slate-600 truncate flex items-center gap-1">
+                                <p className="font-medium text-slate-800 truncate">{pr.applicantName || '”'}</p>
+                                <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
                                   {pr.category === 'administrative'
-                                    ? <><Building2 size={11} />{pr.activityId || '—'}</>
-                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '—'}</>
+                                    ? <><Building2 size={11} />{pr.activityId || '”'}</>
+                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
                                   }
                                 </p>
                               </td>
-                              <td className="py-3 px-2 text-xs text-slate-500 whitespace-nowrap">{new Date(pr.createdAt).toLocaleDateString()}</td>
-                              <td className="py-3 px-2 text-right font-bold text-jci-blue whitespace-nowrap">{formatCurrency(pr.totalAmount || pr.amount)}</td>
-                              <td className="py-3 px-2 text-center"><StatusBadge status={pr.status} /></td>
-                              <td className="py-3 px-2">
-                                <div className="flex gap-1.5 justify-end items-center">
-                                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
-                                    <Eye size={13} />
-                                  </Button>
-                                  {pr.status === 'submitted' && (
-                                    <>
-                                      <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'approved'); }} disabled={actioningId !== null} title="Approve">
-                                        <CheckCircle size={13} />
-                                      </Button>
-                                      <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'rejected'); }} disabled={actioningId !== null} title="Reject">
-                                        <XCircle size={13} />
-                                      </Button>
-                                    </>
-                                  )}
+                              <td className="py-3 px-2 text-right font-bold text-jci-blue whitespace-nowrap w-px">{formatCurrency(pr.totalAmount || pr.amount)}</td>
+                              <td className="py-3 px-2 text-right text-xs text-slate-500 whitespace-nowrap w-px">{new Date(pr.createdAt).toLocaleDateString()}</td>
+                              <td className="py-3 px-2 w-px">
+                                <div className="flex items-center gap-1.5 justify-end">
+                                  <StatusBadge status={pr.status} />
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
+                                      <Eye size={13} />
+                                    </Button>
+                                    {pr.status === 'submitted' && (
+                                      <>
+                                        <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'approved'); }} disabled={actioningId !== null} title="Approve">
+                                          <CheckCircle size={13} />
+                                        </Button>
+                                        <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'rejected'); }} disabled={actioningId !== null} title="Reject">
+                                          <XCircle size={13} />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
                             {expandedId === pr.id && (
                               <tr className="bg-sky-50/30">
-                                <td colSpan={7} className="px-4 pb-4 pt-2">
+                                <td colSpan={5} className="px-4 pb-4 pt-2">
                                   <div className="grid md:grid-cols-3 gap-4">
                                     {pr.items && pr.items.length > 0 && (
                                       <div>
@@ -1229,7 +998,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                           </div>
                                           <div className="flex justify-between items-center gap-2">
                                             <span className="text-slate-400 shrink-0">Claim From</span>
-                                            <span className="font-medium text-slate-700 truncate">{bankAccounts.find(a => a.id === pr.claimFromBankAccountId)?.name || '—'}</span>
+                                            <span className="font-medium text-slate-700 truncate">{bankAccounts.find(a => a.id === pr.claimFromBankAccountId)?.name || '”'}</span>
                                           </div>
                                         </div>
                                       </div>
@@ -1244,7 +1013,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                   {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
                                     <p className="text-xs text-jci-blue mt-2.5 flex items-center gap-1">
                                       <Paperclip size={11} />
-                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} — view in PDF
+                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} ” view in PDF
                                     </p>
                                   )}
                                 </td>
@@ -1256,38 +1025,35 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                     </table>
                   </div>
 
-                  {/* Mobile cards */}
-                  <div className="md:hidden space-y-2.5">
+                  {/* Mobile list */}
+                  <div className="md:hidden divide-y divide-slate-100">
                     {filteredFinanceList.map((pr) => (
-                      <div
-                        key={pr.id}
-                        className={`rounded-xl border overflow-hidden transition-all duration-200 ${expandedId === pr.id ? 'border-jci-blue/40 shadow-sm' : 'border-slate-200 bg-white'}`}
-                      >
+                      <div key={pr.id}>
                         <button
                           type="button"
-                          className="w-full text-left p-3.5 active:bg-slate-50"
+                          className="w-full text-left py-3 active:bg-slate-50"
                           onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
-                            <StatusBadge status={pr.status} />
-                          </div>
-                          <div className="mt-2 flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-800 text-sm">{pr.applicantName || '—'}</p>
-                              <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
-                                {pr.category === 'administrative'
-                                  ? <><Building2 size={11} />{pr.activityId || '—'}</>
-                                  : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || '—'}</>
-                                }
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-1">{new Date(pr.createdAt).toLocaleDateString()}</p>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <StatusBadge status={pr.status} />
+                              <p className="font-medium text-slate-800 text-sm truncate">{pr.applicantName || '”'}</p>
                             </div>
-                            <p className="text-lg font-bold text-jci-blue shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                            <p className="font-bold text-jci-blue text-sm shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">{pr.referenceNumber}</span>
+                            <span className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                              {pr.category === 'administrative'
+                                ? <><Building2 size={10} />{pr.activityId || '”'}</>
+                                : <><Sparkles size={10} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
+                              }
+                            </span>
+                            <span className="text-[10px] text-slate-300 ml-auto shrink-0">{new Date(pr.createdAt).toLocaleDateString()}</span>
                           </div>
                         </button>
                         {expandedId === pr.id && (
-                          <div className="border-t border-slate-100 px-3.5 pb-3.5 pt-3 bg-slate-50/60">
+                          <div className="pb-3 pt-1 bg-slate-50/60 rounded-lg px-3 mb-2">
                             {pr.bankName && (
                               <div className="mb-3">
                                 <div className="flex items-center justify-between mb-1.5">
@@ -1345,279 +1111,47 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         </div>
       </div>
 
+      {/* PDF Preview Modal */}
       <Modal
-        isOpen={submitModalOpen}
-        onClose={() => setSubmitModalOpen(false)}
+        isOpen={!!pdfPreviewUrl}
+        onClose={() => { setPdfPreviewUrl(null); }}
         title={
-          <div className="flex items-center gap-2 text-jci-blue">
-            <div className="bg-sky-100 p-2 rounded-lg">
-              <FileText size={20} className="text-jci-blue w-5 h-5" />
+          <div className="flex items-center gap-2 text-slate-700">
+            <div className="bg-slate-100 p-2 rounded-lg">
+              <FileText size={18} className="text-slate-500" />
             </div>
-            <span className="font-bold text-lg">Submit Payment Request</span>
+            <span className="font-bold text-base truncate">{pdfPreviewFileName}</span>
           </div>
         }
         size="2xl"
         footer={
-          <div className="flex justify-end gap-3 w-full">
-            <Button type="button" variant="secondary" onClick={() => setSubmitModalOpen(false)} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button type="submit" form="payment-request-form" disabled={submitting} className="min-w-[120px]">
-              {submitting ? (
-                <>
-                  <RefreshCw size={16} className="mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : 'Submit Request'}
-            </Button>
+          <div className="flex justify-between items-center w-full">
+            <Button variant="ghost" onClick={() => setPdfPreviewUrl(null)}>Close</Button>
+            <a href={pdfPreviewUrl || '#'} download={pdfPreviewFileName}>
+              <Button>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                Download PDF
+              </Button>
+            </a>
           </div>
         }
       >
-        <div className="bg-sky-50 p-4 rounded-xl border border-sky-100 mb-6 flex items-start gap-3">
-          <Sparkles className="text-jci-blue mt-0.5 shrink-0" size={18} />
-          <div>
-            <p className="text-sm font-semibold text-sky-900">Tips for Faster Reimbursement</p>
-            <p className="text-xs text-sky-700/90 mt-0.5">Please provide detailed itemization. You can upload multiple receipts as PDF or image files. For mileage claims, please consult the treasurer for the standard rate.</p>
-          </div>
-        </div>
-
-        <form id="payment-request-form" onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-4">
-            <MemberSelector
-              label="Applicant"
-              members={memberOptions}
-              value={formApplicantId}
-              onChange={(id) => {
-                setFormApplicantId(id);
-                const sel = memberOptions.find(m => m.id === id);
-                if (sel) {
-                  setFormApplicantName(sel.name);
-                  setFormApplicantEmail(sel.email);
-                } else if (id === '') {
-                  setFormApplicantName(member?.name || user?.displayName || '');
-                  setFormApplicantEmail(user?.email || '');
-                }
-              }}
-              selfOption
-              selfLabel="Self"
-              placeholder="Select applicant..."
-            />
-            <Input
-              label="Applicant Position"
-              value={formApplicantPosition}
-              onChange={(e) => setFormApplicantPosition(e.target.value)}
-              placeholder="e.g. Project Lead / Secretary"
-              required
-            />
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-              <div className="flex bg-slate-100 p-1 rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => { setFormCategory('administrative'); setFormActivityId(''); }}
-                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${formCategory === 'administrative' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  Administrative
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setFormCategory('projects_activities'); setFormActivityId(''); }}
-                  className={`flex-1 py-1.5 px-2 text-sm font-medium rounded-md transition-all ${formCategory === 'projects_activities' ? 'bg-white text-jci-blue shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  Projects & Activities
-                </button>
-              </div>
-            </div>
-            {formCategory === 'projects_activities' ? (
-              <Select
-                label="Associated Project"
-                value={formActivityId}
-                onChange={(e) => setFormActivityId(e.target.value)}
-                options={[
-                  { value: '', label: 'Select a project...' },
-                  ...projects.map(p => ({ value: p.id, label: p.name })),
-                ]}
-                required
-              />
-            ) : (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Admin Account</label>
-                <Combobox
-                  options={adminAccountOptions}
-                  value={formActivityId}
-                  onChange={(value) => setFormActivityId(value)}
-                  placeholder="Select or type admin account..."
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h4 className="font-bold text-slate-900">Request Items</h4>
-              <Button type="button" size="sm" variant="secondary" onClick={addItem}>
-                <Plus size={14} className="mr-1" /> Add Item
-              </Button>
-            </div>
-
-            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
-              {formItems.map((item, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white p-3 rounded-lg border border-slate-100 shadow-sm w-full">
-                  <div className="flex-1 w-full">
-                    <Input
-                      label={`Item #${idx + 1} Description`}
-                      value={item.purpose}
-                      onChange={(e) => updateItem(idx, { purpose: e.target.value })}
-                      placeholder="e.g. Venue rental, printing, materials..."
-                      required
-                    />
-                  </div>
-                  <div className="w-full sm:w-36">
-                    <Input
-                      label="Amount (RM)"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={item.amount || ''}
-                      onChange={(e) => updateItem(idx, { amount: parseFloat(e.target.value) || 0 })}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                  {formItems.length > 1 && (
-                    <Button type="button" variant="ghost" className="text-red-500 self-end sm:self-center p-2 hover:bg-red-50 rounded-lg mt-4 sm:mt-5" onClick={() => removeItem(idx)}>
-                      <Trash2 size={16} />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
-                <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Claim Amount</span>
-                <span className="text-xl font-bold text-jci-blue">{formatCurrency(totalAmount)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4 border-t pt-4">
-            <div className="flex justify-between items-center">
-              <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
-                <Paperclip size={18} className="text-slate-500" />
-                <span>Attachments (Receipts / Invoices)</span>
-              </h4>
-              <span className="text-xs text-slate-400">Images or PDF only</span>
-            </div>
-
-            <div className="p-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 hover:border-jci-blue hover:bg-blue-50/20 transition-all cursor-pointer relative">
-              <input
-                type="file"
-                multiple
-                accept="image/*,.pdf"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setFormAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
-                  }
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                id="file-upload"
-              />
-              <div className="flex flex-col items-center justify-center text-center">
-                <Paperclip size={28} className="text-slate-400 mb-2" />
-                <span className="text-sm font-semibold text-slate-700">Drag files here or click to upload</span>
-                <span className="text-xs text-slate-400 mt-1">Images or PDFs up to 5MB</span>
-              </div>
-            </div>
-
-            {attachmentUploadProgress > 0 && (
-              <div className="w-full">
-                <ProgressBar progress={attachmentUploadProgress} label={`Uploading attachments... ${attachmentUploadProgress}%`} />
-              </div>
-            )}
-
-            {formAttachments.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {formAttachments.map((file, idx) => {
-                  const isImage = file.type.startsWith('image/');
-                  const fileUrl = isImage ? URL.createObjectURL(file) : null;
-                  return (
-                    <div key={idx} className="relative group bg-white p-2 rounded-lg border border-slate-200 flex flex-col items-center shadow-sm">
-                      {isImage && fileUrl ? (
-                        <img src={fileUrl} className="w-full h-20 object-cover rounded" alt={file.name} onLoad={() => URL.revokeObjectURL(fileUrl)} />
-                      ) : (
-                        <div className="w-full h-20 bg-slate-100 flex items-center justify-center rounded">
-                          <FileText size={32} className="text-red-500" />
-                        </div>
-                      )}
-                      <span className="text-[10px] text-slate-600 truncate w-full text-center mt-1.5 font-medium px-1">{file.name}</span>
-                      <span className="text-[9px] text-slate-400 mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                      <button
-                        type="button"
-                        onClick={() => setFormAttachments(prev => prev.filter((_, i) => i !== idx))}
-                        className="absolute -top-1.5 -right-1.5 bg-red-100 text-red-600 hover:bg-red-200 p-1 rounded-full shadow-md transition-colors"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4 border-t pt-4">
-            <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
-              <Landmark size={18} className="text-slate-500" />
-              <span>Payment Details (Remit to)</span>
-            </h4>
-            <div className="grid md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <Select
-                label="Claim From JCI Account"
-                value={formClaimFromBankAccountId}
-                onChange={(e) => setFormClaimFromBankAccountId(e.target.value)}
-                options={[
-                  { value: '', label: 'Select JCI Account...' },
-                  ...bankAccounts.map(a => ({ value: a.id, label: a.name })),
-                ]}
-                required
-              />
-              <Input
-                label="Your Recipient Bank Name"
-                value={formBankName}
-                onChange={(e) => setFormBankName(e.target.value)}
-                placeholder="e.g. Maybank, CIMB, Public Bank"
-                required
-              />
-              <Input
-                label="Your Account Holder Name"
-                value={formAccountHolder}
-                onChange={(e) => setFormAccountHolder(e.target.value)}
-                placeholder="Must match bank record"
-                required
-              />
-              <Input
-                label="Your Bank Account Number"
-                value={formAccountNumber}
-                onChange={(e) => setFormAccountNumber(e.target.value.replace(/\D/g, ''))}
-                placeholder="Number only (no dashes)"
-                inputMode="numeric"
-                required
-              />
-            </div>
-          </div>
-
-          <Input
-            label="Remark / Special Instructions (Optional)"
-            value={formRemark}
-            onChange={(e) => setFormRemark(e.target.value)}
-            placeholder="Add any additional notes here..."
+        <div className="w-full" style={{ height: '70vh' }}>
+          <iframe
+            src={pdfPreviewUrl || ''}
+            className="w-full h-full rounded border border-slate-200"
+            title="PDF Preview"
           />
-
-        </form>
+        </div>
       </Modal>
+
+      <SubmitPaymentRequestModal
+        isOpen={submitModalOpen}
+        onClose={() => setSubmitModalOpen(false)}
+        preselectedProjectId={submitPreselectedProjectId}
+        preselectedCategory={submitPreselectedCategory}
+        onSuccess={(ref) => { setSuccessRef(ref); loadMyList(); }}
+      />
     </div>
   );
 };

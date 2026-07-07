@@ -6,7 +6,7 @@ import {
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
-  ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw,
+  ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw, ArrowLeft,
   Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
@@ -718,6 +718,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   const { events, loading } = useEvents({ publicMode: true });
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
   const [guestRegistrationData, setGuestRegistrationData] = useState({
     name: '',
     email: '',
@@ -792,119 +793,162 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
         {/* Guest Event Registration Modal */}
       </main>
 
-      {selectedEvent && isRegistrationModalOpen && (
+      {selectedEvent && isRegistrationModalOpen && (() => {
+        const evDate = new Date(selectedEvent.date);
+        const evEndDate = selectedEvent.endDate ? new Date(selectedEvent.endDate) : null;
+        const evIsMultiDay = evEndDate && evEndDate.toDateString() !== evDate.toDateString();
+        const evFormatDay = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const evFormatWeekday = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' });
+        const evTime = selectedEvent.time || (evDate.getHours() !== 0 || evDate.getMinutes() !== 0 ? evDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null);
+        const evPriceMin = selectedEvent.priceMin ?? selectedEvent.price;
+        const evPriceMax = selectedEvent.priceMax;
+        const closeModal = () => {
+          setIsRegistrationModalOpen(false);
+          setSelectedEvent(null);
+          setDescExpanded(false);
+          setGuestRegistrationData({ name: '', email: '', phone: '', organization: '', notes: '' });
+        };
+        return (
         <Modal
           isOpen={isRegistrationModalOpen}
-          onClose={() => {
-            setIsRegistrationModalOpen(false);
-            setSelectedEvent(null);
-            setGuestRegistrationData({
-              name: '',
-              email: '',
-              phone: '',
-              organization: '',
-              notes: '',
-            });
-          }}
+          onClose={closeModal}
           title={null}
-          size="lg"
+          size="2xl"
           bottomSheet={true}
           drawerOnMobile
-          mobileHeight="h-[90vh]"
+          mobileHeight="h-[92vh]"
           scrollInBody={true}
           className="premium-registration-modal"
-          footerClassName="flex-none p-6 bg-white border-t border-slate-50 rounded-t-[40px] shadow-[0_-20px_50px_-12px_rgba(0,0,0,0.15)] z-30 pb-safe"
+          footerClassName="flex-none px-5 py-4 bg-white border-t border-slate-100 z-30 pb-safe shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.08)]"
           footer={(
-            <div className="flex items-center justify-between gap-4 w-full">
-              <div className="flex flex-col">
-                <span className="text-2xl font-black text-slate-900 leading-none">
-                  {selectedEvent.price ? `RM ${selectedEvent.price}` : 'FREE'}
-                </span>
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">per person</span>
+            <div className="flex items-center gap-4 w-full">
+              <div className="shrink-0 min-w-[80px]">
+                {evPriceMin != null ? (
+                  <>
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest block leading-none mb-0.5">From</span>
+                    <span className="text-lg font-black text-slate-900 leading-none">
+                      RM {evPriceMin}{evPriceMax != null && evPriceMax !== evPriceMin ? ` – ${evPriceMax}` : ''}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xl font-black text-green-600 leading-none">FREE</span>
+                )}
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest block leading-none mt-0.5">/ person</span>
               </div>
-              <Button
-                form="guest-registration-form"
-                type="submit"
-                className="flex-1 max-w-[240px] h-14 bg-blue-600 text-white hover:bg-blue-700 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <CheckCircle size={20} className="stroke-[3]" />
-                <span>Confirm Registration</span>
-              </Button>
+              <div className="flex-1">
+                <Button
+                  form="guest-registration-form"
+                  type="submit"
+                  className="w-full h-12 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 font-black uppercase tracking-widest text-sm shadow-lg shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  <CheckCircle size={18} className="stroke-[3]" />
+                  <span>Confirm Registration</span>
+                </Button>
+              </div>
             </div>
           )}
         >
           <div className="-m-4 md:-m-6 relative">
-            {/* Hero Image Section */}
-            <div className="relative h-48 md:h-64 w-full overflow-hidden">
+            {/* Hero Image */}
+            <div className="relative h-56 md:h-72 w-full overflow-hidden">
               <img
                 src={selectedEvent.imageUrl || "https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?auto=format&fit=crop&q=80"}
                 alt={selectedEvent.title}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-
-              {/* Top Controls */}
-              <div className="absolute top-4 left-4">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
                 <button
-                  onClick={() => setIsRegistrationModalOpen(false)}
-                  className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all"
+                  onClick={closeModal}
+                  className="w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all"
                 >
-                  <ChevronLeft size={20} />
+                  <ArrowLeft size={18} />
                 </button>
               </div>
-            </div>
-
-            {/* Content Body - Overlapping Card Style */}
-            <div className="relative bg-white rounded-t-[32px] -mt-10 px-6 pt-8 pb-10">
-              <div className="mb-6">
-                <Badge variant="jci" className="bg-blue-50 text-jci-blue border-none px-3 py-1 text-[11px] font-bold mb-2">
-                  {selectedEvent.type || 'Event Registration'}
+              {/* Title overlay */}
+              <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 md:px-6 md:pb-6">
+                <Badge variant="jci" className="bg-white/20 text-white border-white/30 backdrop-blur-sm px-2.5 py-0.5 text-[10px] font-bold mb-1.5">
+                  {selectedEvent.type || 'Event'}
                 </Badge>
-                <h2 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">
+                <h2 className="text-xl md:text-2xl font-black text-white leading-tight drop-shadow-sm">
                   {selectedEvent.title}
                 </h2>
               </div>
+            </div>
 
-              {/* Event Info Grid - Replicating EventDetailModal Style */}
-              <div className="bg-white border border-slate-100 rounded-[24px] shadow-sm overflow-hidden mb-8">
-                <div className="divide-y divide-slate-50">
-                  <div className="flex items-center gap-4 px-4 py-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue flex-shrink-0">
-                      <Calendar size={18} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
-                      <p className="text-sm font-bold text-slate-800">
-                        {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} • {selectedEvent.time || 'TBA'}
-                      </p>
-                    </div>
+            {/* Content body */}
+            <div className="relative bg-white rounded-t-[28px] -mt-6 px-5 pt-5 pb-10 md:px-6 md:pt-6">
+              {/* Info card */}
+              <div className="divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden mb-6">
+                {/* Date */}
+                <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                    <Calendar size={14} className="text-jci-blue" />
                   </div>
-
-                  <div className="flex items-center gap-4 px-4 py-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue flex-shrink-0">
-                      <MapPin size={18} />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
+                    {evIsMultiDay ? (
+                      <>
+                        <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)} – {evFormatDay(evEndDate!)}</p>
+                        <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} – {evFormatWeekday(evEndDate!)}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)}</p>
+                        {evTime && <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} · {evTime}</p>}
+                      </>
+                    )}
+                  </div>
+                </div>
+                {/* Location */}
+                {selectedEvent.location && (
+                  <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                      <MapPin size={14} className="text-jci-blue" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Location</p>
-                      <p className="text-sm font-bold text-slate-800 truncate">{selectedEvent.location || 'TBA (To Be Announced)'}</p>
+                      <p className="text-sm font-semibold text-slate-800 truncate">{selectedEvent.location}</p>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-4 px-4 py-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-jci-blue flex-shrink-0">
-                      <Tag size={18} />
+                )}
+                {/* Spots */}
+                {selectedEvent.maxAttendees && (
+                  <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                      <Users size={14} className="text-jci-blue" />
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Price</p>
-                      <p className="text-sm font-bold text-slate-800">
-                        {selectedEvent.price ? `RM ${selectedEvent.price}` : 'FREE'}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spots</p>
+                      <p className="text-sm font-semibold text-slate-800">{selectedEvent.attendees || 0} / {selectedEvent.maxAttendees} registered</p>
+                      <div className="mt-1 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <div style={{ width: `${Math.min(100, Math.round(((selectedEvent.attendees || 0) / selectedEvent.maxAttendees) * 100))}%` }} className="h-full bg-jci-blue rounded-full" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
+              {/* Description */}
+              {selectedEvent.description && (
+                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3.5 py-3 mb-6">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">About</p>
+                  <div className={`text-sm text-slate-700 leading-relaxed space-y-2 ${descExpanded ? '' : 'line-clamp-3'}`}>
+                    {selectedEvent.description.split(/\n+/).map((para, i) => (
+                      <p key={i}>{para}</p>
+                    ))}
+                  </div>
+                  <button onClick={() => setDescExpanded(v => !v)} className="text-[11px] font-bold text-jci-blue mt-1.5">
+                    {descExpanded ? 'Show less' : 'Show more'}
+                  </button>
+                </div>
+              )}
+
               {/* Registration Form */}
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 mb-4">
+                <div className="w-1 h-4 bg-jci-blue rounded-full" />
+                Your Particulars
+              </h3>
               <form
                 id="guest-registration-form"
                 onSubmit={async (e) => {
@@ -913,28 +957,14 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                     const { EventsService } = await import('./services/eventsService');
                     await EventsService.registerGuestForEvent(selectedEvent.id, guestRegistrationData);
                     showToast('Registration submitted successfully! We will contact you soon.', 'success');
-                    setIsRegistrationModalOpen(false);
-                    setSelectedEvent(null);
-                    setGuestRegistrationData({
-                      name: '',
-                      email: '',
-                      phone: '',
-                      organization: '',
-                      notes: '',
-                    });
+                    closeModal();
                   } catch (err) {
                     const errorMessage = err instanceof Error ? err.message : 'Failed to register for event';
                     showToast(errorMessage, 'error');
                   }
                 }}
-                className="space-y-6"
+                className="space-y-4"
               >
-                <div className="space-y-5">
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 mb-2">
-                    <div className="w-1 h-4 bg-jci-blue rounded-full"></div>
-                    Your Particulars
-                  </h3>
-
                   {/* Full Name */}
                   <div className="flex flex-row items-center gap-3 sm:gap-6 group">
                     <label className="w-28 sm:w-32 flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400 group-focus-within:text-jci-blue transition-colors leading-tight">
@@ -1015,12 +1045,12 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                       />
                     </div>
                   </div>
-                </div>
               </form>
             </div>
           </div>
         </Modal>
-      )}
+        );
+      })()}
 
       <GuestFooter />
     </div>

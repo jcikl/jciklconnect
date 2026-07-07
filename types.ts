@@ -722,7 +722,9 @@ export interface Event {
   status: 'Upcoming' | 'Completed' | 'Cancelled';
   predictedDemand?: 'Low' | 'Medium' | 'High'; // AI Feature
   location: string;
-  price?: number; // Optional price for paid events
+  price?: number; // Optional price for paid events (legacy, prefer priceMin/priceMax)
+  priceMin?: number; // Minimum ticket price
+  priceMax?: number; // Maximum ticket price
   imageUrl?: string; // Optional hero image URL
   /** 活动负责人/筹委会员 ID（选会员带出，Story 3.2） */
   organizerId?: string | null;
@@ -846,6 +848,8 @@ export interface Project {
   budget?: number;
   spent?: number;
   proposedBudget?: number;
+  priceMin?: number;
+  priceMax?: number;
   completion?: number;
   teamSize?: number;
   team?: string[];
@@ -2002,7 +2006,8 @@ export interface Partnership {
   period: PartnershipPeriod;  // Date validity range
   redeemMethod: string;       // Instructions to redeem benefits (hidden from non-paid)
   memberBenefits: string;     // Promotion details description
-  banner: string;             // Banner image URL
+  logo?: string;              // Partner logo URL
+  banner: string;             // Ad banner image URL
   eligbleRoles: string[];     // Roles eligible for the partnership benefits
   status: 'active' | 'inactive';
   createdAt?: any;

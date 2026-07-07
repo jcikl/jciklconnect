@@ -11,6 +11,7 @@ import {
   where,
   orderBy,
   Timestamp,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -246,39 +247,23 @@ export class AdvertisementService {
 
   // Record advertisement impression
   static async recordImpression(adId: string): Promise<void> {
+    if (isDevMode()) return;
     try {
       const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
-      const adDoc = await getDoc(adRef);
-
-      if (adDoc.exists()) {
-        const currentImpressions = adDoc.data().impressions || 0;
-        await updateDoc(adRef, {
-          impressions: currentImpressions + 1,
-          updatedAt: Timestamp.now(),
-        });
-      }
+      await updateDoc(adRef, { impressions: increment(1), updatedAt: Timestamp.now() });
     } catch (error) {
       console.error('Error recording impression:', error);
-      // Don't throw - this is a non-critical operation
     }
   }
 
   // Record advertisement click
   static async recordClick(adId: string): Promise<void> {
+    if (isDevMode()) return;
     try {
       const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
-      const adDoc = await getDoc(adRef);
-
-      if (adDoc.exists()) {
-        const currentClicks = adDoc.data().clicks || 0;
-        await updateDoc(adRef, {
-          clicks: currentClicks + 1,
-          updatedAt: Timestamp.now(),
-        });
-      }
+      await updateDoc(adRef, { clicks: increment(1), updatedAt: Timestamp.now() });
     } catch (error) {
       console.error('Error recording click:', error);
-      // Don't throw - this is a non-critical operation
     }
   }
 

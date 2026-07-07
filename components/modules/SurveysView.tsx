@@ -13,6 +13,7 @@ import { CommunicationService } from '../../services/communicationService';
 
 export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+    const [createModalTab, setCreateModalTab] = useState<'settings' | 'questions'>('settings');
     const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
     const [questions, setQuestions] = useState<SurveyQuestion[]>([]);
     const [editingQuestion, setEditingQuestion] = useState<SurveyQuestion | null>(null);
@@ -174,16 +175,9 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Feedback & Surveys</h2>
-                    <p className="text-slate-500">Pulse checks, satisfaction surveys, and polls.</p>
-                </div>
-                {canManage && (
-                    <Button onClick={() => setCreateModalOpen(true)} disabled={!member}>
-                        <Plus size={16} className="mr-2" /> Create Survey
-                    </Button>
-                )}
+            <div>
+                <h2 className="text-2xl font-bold text-slate-900">Feedback & Surveys</h2>
+                <p className="text-slate-500 text-sm">Pulse checks, satisfaction surveys, and polls.</p>
             </div>
 
             <Card noPadding>
@@ -201,105 +195,155 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 </div>
                 <div className="p-4">
                     {activeTab === 'surveys' ? (
-                        <LoadingState loading={loading} error={error} empty={filteredSurveys.length === 0} emptyMessage="No surveys available">
-                            <div className="grid md:grid-cols-2 gap-6">
+                        <LoadingState loading={loading} error={error} empty={false}>
+                            {/* ── Desktop table ── */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 bg-slate-50/60">
+                                            <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3 w-[35%]">Survey</th>
+                                            <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Audience</th>
+                                            <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Responses</th>
+                                            <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3">Due</th>
+                                            <th className="px-4 py-3 w-48"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {canManage && (
+                                            <tr className="hover:bg-slate-50/50 transition-colors cursor-pointer group" onClick={() => { setCreateModalTab('settings'); setCreateModalOpen(true); }}>
+                                                <td className="px-4 py-3" colSpan={4}>
+                                                    <div className="flex items-center gap-3 text-slate-400 group-hover:text-jci-blue transition-colors">
+                                                        <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                                                            <Plus size={16} />
+                                                        </div>
+                                                        <span className="text-sm font-semibold">New Survey</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3"></td>
+                                            </tr>
+                                        )}
+                                        {filteredSurveys.map(survey => (
+                                            <tr key={survey.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant={survey.status === 'Active' ? 'success' : survey.status === 'Closed' ? 'neutral' : 'warning'}>{survey.status}</Badge>
+                                                    </div>
+                                                    <p className="font-semibold text-slate-900 mt-1 group-hover:text-jci-blue transition-colors">{survey.title}</p>
+                                                    {survey.description && <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{survey.description}</p>}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-slate-600">{survey.targetAudience || '—'}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className="font-semibold text-slate-900">{survey.responsesCount || 0}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-xs text-slate-500">{formatDate(survey.endDate)}</td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {survey.status === 'Active' && (
+                                                            <button className="inline-flex items-center gap-1 text-xs font-semibold text-jci-blue border border-jci-blue/30 hover:border-jci-blue/60 px-2.5 py-1.5 rounded-lg transition-colors"
+                                                                onClick={() => setSelectedSurvey(survey)} disabled={!member}>
+                                                                Take <ArrowRight size={12} />
+                                                            </button>
+                                                        )}
+                                                        {survey.status !== 'Active' && (
+                                                            <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-200 hover:border-slate-300 px-2.5 py-1.5 rounded-lg transition-colors"
+                                                                onClick={() => { setAnalyticsSurveyId(survey.id); setActiveTab('results'); loadAnalytics(survey.id); }}>
+                                                                <BarChart2 size={12} /> Results
+                                                            </button>
+                                                        )}
+                                                        {canManage && survey.status === 'Draft' && (
+                                                            <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-jci-blue transition-colors" title="Publish"
+                                                                onClick={async () => { try { await updateSurvey(survey.id, { status: 'Active' }); } catch {} }}>
+                                                                <Send size={14} />
+                                                            </button>
+                                                        )}
+                                                        {canManage && survey.status === 'Active' && (
+                                                            <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-jci-blue transition-colors" title="Distribute"
+                                                                onClick={() => { setDistributingSurvey(survey); setIsDistributeModalOpen(true); }}>
+                                                                <Send size={14} />
+                                                            </button>
+                                                        )}
+                                                        {canManage && (
+                                                            <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-jci-blue transition-colors" title="Share"
+                                                                onClick={() => handleShareSurvey(survey)}>
+                                                                <Share2 size={14} />
+                                                            </button>
+                                                        )}
+                                                        {canManage && (
+                                                            <button className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors" title="Delete"
+                                                                onClick={() => { if (window.confirm('Delete this survey?')) deleteSurvey(survey.id); }}>
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* ── Mobile list rows ── */}
+                            <div className="md:hidden divide-y divide-slate-100">
+                                {canManage && (
+                                    <div onClick={() => { setCreateModalTab('settings'); setCreateModalOpen(true); }}
+                                        className="flex items-center gap-3 px-1 py-3 text-slate-400 hover:text-jci-blue transition-colors cursor-pointer group">
+                                        <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                                            <Plus size={16} />
+                                        </div>
+                                        <span className="text-sm font-semibold">New Survey</span>
+                                    </div>
+                                )}
                                 {filteredSurveys.map(survey => (
-                                    <Card key={survey.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <Badge variant={survey.status === 'Active' ? 'success' : survey.status === 'Closed' ? 'neutral' : 'warning'}>{survey.status}</Badge>
-                                            <span className="text-xs text-slate-500">Due {formatDate(survey.endDate)}</span>
-                                        </div>
-                                        <h3 className="text-lg font-bold text-slate-900 mb-2">{survey.title}</h3>
-                                        <p className="text-sm text-slate-600 mb-6 flex-1">{survey.description}</p>
-
-                                        <div className="bg-slate-50 rounded-lg p-3 mb-4 flex items-center justify-between">
-                                            <div className="text-xs text-slate-500">
-                                                <span className="block font-semibold text-slate-700">{survey.responsesCount || 0}</span>
-                                                Responses
-                                            </div>
-                                            <div className="text-xs text-slate-500 text-right">
-                                                <span className="block font-semibold text-slate-700">{survey.targetAudience}</span>
-                                                Audience
+                                    <div key={survey.id} className="py-3 px-1 space-y-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <Badge variant={survey.status === 'Active' ? 'success' : survey.status === 'Closed' ? 'neutral' : 'warning'}>{survey.status}</Badge>
+                                                    <span className="text-[11px] text-slate-400">{survey.responsesCount || 0} responses</span>
+                                                    <span className="text-[11px] text-slate-400">Due {formatDate(survey.endDate)}</span>
+                                                </div>
+                                                <p className="font-semibold text-slate-900 text-sm mt-1">{survey.title}</p>
                                             </div>
                                         </div>
-
-                                        <div className="flex gap-3">
-                                            {survey.status === 'Active' ? (
-                                                <Button
-                                                    className="w-full"
-                                                    onClick={() => setSelectedSurvey(survey)}
-                                                    disabled={!member}
-                                                >
-                                                    Take Survey <ArrowRight size={14} className="ml-2" />
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="outline"
-                                                    className="w-full"
-                                                    onClick={() => {
-                                                        setAnalyticsSurveyId(survey.id);
-                                                        setActiveTab('results');
-                                                        loadAnalytics(survey.id);
-                                                    }}
-                                                >
-                                                    <BarChart2 size={14} className="mr-2" /> View Results
-                                                </Button>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            {survey.status === 'Active' && (
+                                                <button className="inline-flex items-center gap-1 text-xs font-semibold text-jci-blue border border-jci-blue/30 px-2.5 py-1.5 rounded-lg"
+                                                    onClick={() => setSelectedSurvey(survey)} disabled={!member}>
+                                                    Take Survey <ArrowRight size={12} />
+                                                </button>
+                                            )}
+                                            {survey.status !== 'Active' && (
+                                                <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg"
+                                                    onClick={() => { setAnalyticsSurveyId(survey.id); setActiveTab('results'); loadAnalytics(survey.id); }}>
+                                                    <BarChart2 size={12} /> View Results
+                                                </button>
+                                            )}
+                                            {canManage && survey.status === 'Draft' && (
+                                                <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg"
+                                                    onClick={async () => { try { await updateSurvey(survey.id, { status: 'Active' }); } catch {} }}>
+                                                    <Send size={12} /> Publish
+                                                </button>
+                                            )}
+                                            {canManage && survey.status === 'Active' && (
+                                                <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg"
+                                                    onClick={() => { setDistributingSurvey(survey); setIsDistributeModalOpen(true); }}>
+                                                    <Send size={12} /> Distribute
+                                                </button>
                                             )}
                                             {canManage && (
-                                                <>
-                                                    {survey.status === 'Draft' && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={async () => {
-                                                                try {
-                                                                    await updateSurvey(survey.id, { status: 'Active' });
-                                                                } catch (err) {
-                                                                    // Error handled in hook
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Send size={14} /> Publish
-                                                        </Button>
-                                                    )}
-                                                    {survey.status === 'Active' && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setDistributingSurvey(survey);
-                                                                setIsDistributeModalOpen(true);
-                                                            }}
-                                                            title="Distribute survey"
-                                                        >
-                                                            <Send size={14} className="mr-1" />
-                                                            Distribute
-                                                        </Button>
-                                                    )}
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleShareSurvey(survey)}
-                                                        title="Share survey link"
-                                                    >
-                                                        <Share2 size={14} />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            if (window.confirm('Are you sure you want to delete this survey?')) {
-                                                                deleteSurvey(survey.id);
-                                                            }
-                                                        }}
-                                                        className="text-red-500"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </Button>
-                                                </>
+                                                <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+                                                    onClick={() => handleShareSurvey(survey)}>
+                                                    <Share2 size={14} />
+                                                </button>
+                                            )}
+                                            {canManage && (
+                                                <button className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                                                    onClick={() => { if (window.confirm('Delete this survey?')) deleteSurvey(survey.id); }}>
+                                                    <Trash2 size={14} />
+                                                </button>
                                             )}
                                         </div>
-                                    </Card>
+                                    </div>
                                 ))}
                             </div>
                         </LoadingState>
@@ -334,117 +378,92 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </Card>
 
             {/* Create Survey Modal */}
-            <Modal isOpen={isCreateModalOpen} onClose={() => {
-                setCreateModalOpen(false);
-                setQuestions([]);
-            }} title="Create Survey" size="xl" drawerOnMobile>
-                <form onSubmit={handleCreateSurvey} className="space-y-6">
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-slate-900">Basic Information</h3>
-                        <Input name="title" label="Survey Title" placeholder="e.g. Member Satisfaction Survey" required />
-                        <Textarea name="description" label="Description" placeholder="What is this survey about?" required rows={3} />
-                        <div className="grid grid-cols-2 gap-4">
-                            <Input name="startDate" label="Start Date" type="date" required />
-                            <Input name="endDate" label="End Date" type="date" required />
-                        </div>
-                        <Select name="targetAudience" label="Target Audience" options={[
-                            { label: 'All Members', value: 'All Members' },
-                            { label: 'Board', value: 'Board' },
-                            { label: 'Project Leads', value: 'Project Leads' },
-                            { label: 'Specific Group', value: 'Specific Group' },
-                        ]} defaultValue="All Members" required />
-                    </div>
-
-                    <div className="space-y-4 border-t pt-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-semibold text-slate-900">Questions</h3>
-                            <Button type="button" variant="outline" size="sm" onClick={handleAddQuestion}>
-                                <Plus size={16} className="mr-2" /> Add Question
-                            </Button>
-                        </div>
-
-                        {questions.length === 0 ? (
-                            <div className="text-center py-8 border-2 border-dashed border-slate-300 rounded-lg">
-                                <MessageSquare className="mx-auto text-slate-400 mb-2" size={32} />
-                                <p className="text-slate-500 text-sm">No questions added yet</p>
-                                <p className="text-slate-400 text-xs mt-1">Click "Add Question" to start building your survey</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {questions.map((question, index) => (
-                                    <div
-                                        key={question.id}
-                                        className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-jci-blue transition-colors"
-                                    >
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            <GripVertical className="text-slate-400 cursor-move" size={16} />
-                                            <span className="text-xs font-mono bg-white px-2 py-1 rounded text-slate-600">
-                                                {index + 1}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                            <div className="p-2 bg-white rounded text-jci-blue">
-                                                {getQuestionIcon(question.type)}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-semibold text-sm text-slate-900">{question.question || 'Untitled Question'}</p>
-                                                <p className="text-xs text-slate-500">{getQuestionLabel(question.type)} {question.required && '• Required'}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                            {index > 0 && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleMoveQuestion(question.id, 'up')}
-                                                >
-                                                    <ChevronUp size={14} />
-                                                </Button>
-                                            )}
-                                            {index < questions.length - 1 && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleMoveQuestion(question.id, 'down')}
-                                                >
-                                                    <ChevronDown size={14} />
-                                                </Button>
-                                            )}
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleEditQuestion(question)}
-                                            >
-                                                <Edit size={14} />
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleDeleteQuestion(question.id)}
-                                                className="text-red-500 hover:text-red-700"
-                                            >
-                                                <Trash2 size={14} />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="pt-4 flex gap-3 border-t">
-                        <Button className="flex-1" type="submit" disabled={questions.length === 0}>
+            <Modal
+                isOpen={isCreateModalOpen}
+                onClose={() => { setCreateModalOpen(false); setQuestions([]); }}
+                title="Create Survey"
+                size="lg"
+                drawerOnMobile
+                footer={
+                    <div className="flex gap-3">
+                        <Button className="flex-1" type="submit" form="create-survey-form" disabled={questions.length === 0}>
                             Create Survey
+                            {questions.length > 0 && (
+                                <span className="ml-2 text-[11px] bg-white/20 px-1.5 py-0.5 rounded-full">{questions.length}Q</span>
+                            )}
                         </Button>
-                        <Button variant="ghost" type="button" onClick={() => {
-                            setCreateModalOpen(false);
-                            setQuestions([]);
-                        }}>Cancel</Button>
+                        <Button variant="ghost" type="button" onClick={() => { setCreateModalOpen(false); setQuestions([]); }}>Cancel</Button>
                     </div>
+                }
+            >
+                {/* Tabs */}
+                <div className="flex border-b border-slate-100 mb-5 -mt-1">
+                    <button type="button" onClick={() => setCreateModalTab('settings')}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${createModalTab === 'settings' ? 'border-jci-blue text-jci-blue' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                        <FileText size={14} /> Settings
+                    </button>
+                    <button type="button" onClick={() => setCreateModalTab('questions')}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${createModalTab === 'questions' ? 'border-jci-blue text-jci-blue' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                        <MessageSquare size={14} /> Questions
+                        {questions.length > 0 && (
+                            <span className="ml-1 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-bold">{questions.length}</span>
+                        )}
+                    </button>
+                </div>
+
+                <form id="create-survey-form" onSubmit={handleCreateSurvey}>
+                    {createModalTab === 'settings' ? (
+                        <div className="space-y-4">
+                            <Input name="title" label="Survey Title" placeholder="e.g. Member Satisfaction Survey" required />
+                            <Textarea name="description" label="Description" placeholder="What is this survey about?" required rows={3} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input name="startDate" label="Start Date" type="date" required />
+                                <Input name="endDate" label="End Date" type="date" required />
+                            </div>
+                            <Select name="targetAudience" label="Target Audience" options={[
+                                { label: 'All Members', value: 'All Members' },
+                                { label: 'Board', value: 'Board' },
+                                { label: 'Project Leads', value: 'Project Leads' },
+                                { label: 'Specific Group', value: 'Specific Group' },
+                            ]} defaultValue="All Members" required />
+                            <button type="button" onClick={() => setCreateModalTab('questions')}
+                                className="w-full mt-2 flex items-center justify-center gap-2 text-sm font-semibold text-jci-blue border border-jci-blue/30 hover:border-jci-blue/60 hover:bg-sky-50 rounded-xl py-2.5 transition-colors">
+                                Next: Add Questions <ArrowRight size={14} />
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-1">
+                            {questions.map((question, index) => (
+                                <div key={question.id}
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors group">
+                                    <span className="text-xs font-mono text-slate-400 w-5 shrink-0">{index + 1}</span>
+                                    <div className="text-jci-blue shrink-0">{getQuestionIcon(question.type)}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-900 truncate">{question.question || 'Untitled Question'}</p>
+                                        <p className="text-xs text-slate-400">{getQuestionLabel(question.type)}{question.required && ' · Required'}</p>
+                                    </div>
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        <button type="button" onClick={() => handleEditQuestion(question)}
+                                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-jci-blue transition-colors">
+                                            <Edit size={13} />
+                                        </button>
+                                        <button type="button" onClick={() => handleDeleteQuestion(question.id)}
+                                            className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors">
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {/* Add Question row */}
+                            <button type="button" onClick={handleAddQuestion}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-sky-50 transition-colors group mt-1">
+                                <div className="w-6 h-6 rounded border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                                    <Plus size={12} />
+                                </div>
+                                <span className="text-sm font-semibold">Add Question</span>
+                            </button>
+                        </div>
+                    )}
                 </form>
             </Modal>
 

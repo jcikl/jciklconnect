@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift, SlidersHorizontal, CheckSquare, Square } from 'lucide-react';
+import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift, SlidersHorizontal, CheckSquare, Square, Lock } from 'lucide-react';
 
 const BUSINESS_CATEGORIES = [
   'Service Provider',
@@ -104,7 +104,7 @@ const MOCK_SISTER_CHAPTER_MEMBERS = [
   }
 ];
 
-export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection }) => {
+export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void; isGuest?: boolean; onGuestCta?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection, isGuest = false, onGuestCta }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBiz, setSelectedBiz] = useState<BusinessProfile | null>(null);
   const [activeTab, setActiveTab] = useState<'local' | 'international'>('local');
@@ -393,7 +393,10 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                               {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
                             </div>
                           </div>
-                          <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                          {isGuest
+                            ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
+                            : <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                          }
                         </button>
                       );
                     })}
@@ -522,12 +525,23 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                             </div>
                             {/* Card footer */}
                             <div className="px-4 pb-4">
-                              <button
-                                className="w-full bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5"
-                                onClick={(e) => { e.stopPropagation(); setDetailBiz(biz); setIsDetailOpen(true); }}
-                              >
-                                <Send size={11} /> Contact
-                              </button>
+                              {isGuest ? (
+                                <button
+                                  className="w-full bg-slate-100 text-slate-400 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 relative overflow-hidden group/lock"
+                                  onClick={(e) => { e.stopPropagation(); onGuestCta?.(); }}
+                                >
+                                  <span className="absolute inset-0 bg-jci-blue/0 group-hover/lock:bg-jci-blue/5 transition-colors" />
+                                  <Lock size={10} className="text-slate-400 group-hover/lock:text-jci-blue transition-colors" />
+                                  <span className="group-hover/lock:text-jci-blue transition-colors">Join to Contact</span>
+                                </button>
+                              ) : (
+                                <button
+                                  className="w-full bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5"
+                                  onClick={(e) => { e.stopPropagation(); setDetailBiz(biz); setIsDetailOpen(true); }}
+                                >
+                                  <Send size={11} /> Contact
+                                </button>
+                              )}
                             </div>
                           </div>
                         );

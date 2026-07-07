@@ -439,6 +439,16 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
   const conflicts = useMemo(() => checkDependencyConflicts(filteredTasks), [filteredTasks]);
   const criticalPath = useMemo(() => calculateCriticalPath(filteredTasks), [filteredTasks]);
 
+  const tasksByRole = useMemo(() => {
+    const groups: Record<string, GanttTask[]> = {};
+    filteredTasks.forEach(t => {
+      const role = t.role || 'Unassigned';
+      if (!groups[role]) groups[role] = [];
+      groups[role].push(t);
+    });
+    return groups;
+  }, [filteredTasks]);
+
   if (loading) {
     return (
       <div className="max-w-full mx-auto p-6">
@@ -450,13 +460,20 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
     );
   }
 
+  const STATS = [
+    { icon: <CheckCircle className="w-4 h-4 text-green-600" />, label: 'Completed', value: filteredTasks.filter(t => t.status === 'completed').length, color: 'text-green-700' },
+    { icon: <Play className="w-4 h-4 text-blue-600" />,         label: 'In Progress', value: filteredTasks.filter(t => t.status === 'in_progress').length, color: 'text-blue-700' },
+    { icon: <AlertTriangle className="w-4 h-4 text-red-500" />, label: 'Overdue',    value: filteredTasks.filter(t => t.status === 'overdue').length,    color: 'text-red-600' },
+    { icon: <Clock className="w-4 h-4 text-slate-500" />,       label: 'Critical',   value: criticalPath.length,                                          color: 'text-slate-700' },
+  ];
+
   return (
-    <div>
-      {/* Controls */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-gray-600" />
+    <div className="space-y-4">
+      {/* Controls — 2×2 on mobile, 4-col on desktop */}
+      <div className="rounded-xl border border-slate-100 bg-white p-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="flex items-center gap-1.5">
+            <Calendar size={14} className="text-slate-400 flex-shrink-0" />
             <Forms.Select
               value={viewMode}
               onChange={(e) => setViewMode(e.target.value as ViewMode)}
@@ -468,9 +485,8 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
               ]}
             />
           </div>
-
-          <div className="flex items-center gap-2">
-            <Filter size={16} className="text-gray-600" />
+          <div className="flex items-center gap-1.5">
+            <Filter size={14} className="text-slate-400 flex-shrink-0" />
             <Forms.Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -483,24 +499,19 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
               ]}
             />
           </div>
-
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-gray-600" />
+          <div className="flex items-center gap-1.5">
+            <Users size={14} className="text-slate-400 flex-shrink-0" />
             <Forms.Select
               value={assigneeFilter}
               onChange={(e) => setAssigneeFilter(e.target.value)}
               options={[
                 { label: 'All Assignees', value: 'all' },
-                ...uniqueAssignees.map(assignee => ({
-                  label: assignee,
-                  value: assignee,
-                }))
+                ...uniqueAssignees.map(a => ({ label: a, value: a }))
               ]}
             />
           </div>
-
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} className="text-gray-600" />
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle size={14} className="text-slate-400 flex-shrink-0" />
             <Forms.Select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
@@ -512,88 +523,85 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
               ]}
             />
           </div>
-
-          <div className="flex items-center gap-2">
-            <Forms.Checkbox
-              label="Show Dependencies"
-              checked={isChecked}
-              onChange={(e) => setIsChecked(e.target.checked)}
-            />
-          </div>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <Forms.Checkbox
+            label="Show Dependencies"
+            checked={isChecked}
+            onChange={(e) => setIsChecked(e.target.checked)}
+          />
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* Conflict alerts */}
       {conflicts.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <h3 className="font-medium text-red-800">Dependency Conflicts Detected</h3>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+            <h3 className="text-sm font-semibold text-red-800">Dependency Conflicts Detected</h3>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {conflicts.map((conflict, index) => (
-              <p key={index} className="text-sm text-red-700">
-                {conflict.conflict}
-              </p>
+              <p key={index} className="text-xs text-red-700">{conflict.conflict}</p>
             ))}
           </div>
         </div>
       )}
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <div>
-              <p className="text-sm text-gray-600">Completed</p>
-              <p className="text-xl font-bold text-gray-900">
-                {filteredTasks.filter(t => t.status === 'completed').length}
-              </p>
-            </div>
+      {/* Statistics — horizontal scroll chips */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {STATS.map(s => (
+          <div key={s.label} className="min-w-[110px] flex-shrink-0 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">{s.icon}<span className="text-xs text-slate-500">{s.label}</span></div>
+            <div className={`text-xl font-bold tabular-nums ${s.color}`}>{s.value}</div>
           </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
-            <Play className="w-5 h-5 text-blue-600" />
-            <div>
-              <p className="text-sm text-gray-600">In Progress</p>
-              <p className="text-xl font-bold text-gray-900">
-                {filteredTasks.filter(t => t.status === 'in_progress').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <div>
-              <p className="text-sm text-gray-600">Overdue</p>
-              <p className="text-xl font-bold text-gray-900">
-                {filteredTasks.filter(t => t.status === 'overdue').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-gray-600" />
-            <div>
-              <p className="text-sm text-gray-600">Critical Path</p>
-              <p className="text-xl font-bold text-gray-900">
-                {criticalPath.length}
-              </p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Gantt Chart */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="h-[600px] overflow-auto">
+      {/* Mobile: task list fallback */}
+      <div className="md:hidden space-y-3">
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+          <Calendar size={14} className="text-amber-600 flex-shrink-0" />
+          <p className="text-xs text-amber-700">Gantt chart is best viewed on desktop. Showing task list below.</p>
+        </div>
+        {filteredTasks.length === 0 ? (
+          <p className="text-center text-sm text-slate-400 py-6">No tasks found.</p>
+        ) : (
+          Object.entries(tasksByRole).map(([role, roleTasks]) => (
+            <div key={role} className="rounded-xl border border-slate-100 bg-white overflow-hidden">
+              <div className="px-4 py-2 bg-slate-50 border-b border-slate-100">
+                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{role}</span>
+                <span className="ml-2 text-xs text-slate-400">({roleTasks.length})</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {roleTasks.map(task => {
+                  const statusColors: Record<string, string> = {
+                    completed: 'bg-green-400', in_progress: 'bg-blue-500', overdue: 'bg-red-500', not_started: 'bg-slate-300',
+                  };
+                  return (
+                    <div key={task.id} className="px-4 py-2.5">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <span className="text-sm text-slate-800 font-medium leading-snug">{task.name}</span>
+                        <span className={`flex-shrink-0 w-2 h-2 rounded-full mt-1.5 ${statusColors[task.status]}`} />
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-400 mb-1.5">
+                        <span>{formatDateToCustom(task.startDate)} → {formatDateToCustom(task.endDate)}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div className={`h-full rounded-full ${statusColors[task.status]}`} style={{ width: `${task.progress}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: actual Gantt chart */}
+      <div className="hidden md:block rounded-xl border border-slate-100 bg-white overflow-x-auto">
+        <div className="max-h-[600px] overflow-y-auto">
           {ganttTasks.length > 0 ? (
             <Gantt
               tasks={ganttTasks}
@@ -602,7 +610,7 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
               onProgressChange={handleProgressChange}
               onSelect={handleSelect}
               onDoubleClick={handleDoubleClick}
-              listCellWidth={isChecked ? "155px" : ""}
+              listCellWidth={isChecked ? "120px" : ""}
               columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 250 : 65}
               ganttHeight={550}
               barBackgroundColor="#3B82F6"
@@ -621,12 +629,12 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
                   className="flex border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider"
                   style={{ height: headerHeight, fontFamily, fontSize }}
                 >
-                  <div className="w-48 px-3 flex items-center border-r border-gray-200">Name</div>
-                  <div className="w-32 px-3 flex items-center border-r border-gray-200">From</div>
-                  <div className="w-32 px-3 flex items-center">To</div>
+                  <div className="w-36 px-3 flex items-center border-r border-gray-200">Name</div>
+                  <div className="w-28 px-3 flex items-center border-r border-gray-200">From</div>
+                  <div className="w-28 px-3 flex items-center">To</div>
                 </div>
               )}
-              TaskListTable={({ rowHeight, tasks, fontFamily, fontSize, selectedTaskId, onExpanderClick }) => (
+              TaskListTable={({ rowHeight, tasks, fontFamily, fontSize, selectedTaskId }) => (
                 <div style={{ fontFamily, fontSize }}>
                   {tasks.map((t) => {
                     const isSelected = t.id === selectedTaskId;
@@ -637,16 +645,13 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
                         className={`flex border-b border-gray-100 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
                         style={{ height: rowHeight }}
                       >
-                        <div
-                          className={`w-48 px-3 flex items-center border-r border-gray-100 truncate ${isGroup ? 'font-bold bg-gray-50' : 'pl-6'}`}
-                          title={t.name}
-                        >
+                        <div className={`w-36 px-3 flex items-center border-r border-gray-100 truncate ${isGroup ? 'font-bold bg-gray-50' : 'pl-5'}`} title={t.name}>
                           {t.name}
                         </div>
-                        <div className={`w-32 px-3 flex items-center border-r border-gray-100 text-slate-500 ${isGroup ? 'bg-gray-50' : ''}`}>
+                        <div className={`w-28 px-3 flex items-center border-r border-gray-100 text-slate-500 ${isGroup ? 'bg-gray-50' : ''}`}>
                           {formatDateToCustom(t.start)}
                         </div>
-                        <div className={`w-32 px-3 flex items-center text-slate-500 ${isGroup ? 'bg-gray-50' : ''}`}>
+                        <div className={`w-28 px-3 flex items-center text-slate-500 ${isGroup ? 'bg-gray-50' : ''}`}>
                           {formatDateToCustom(t.end)}
                         </div>
                       </div>
@@ -658,13 +663,12 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
           ) : (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
-                <Calendar className="mx-auto text-gray-400 mb-4" size={48} />
-                <p className="text-gray-500">No tasks found</p>
-                <p className="text-sm text-gray-400 mt-1">
+                <Calendar className="mx-auto text-slate-300 mb-3" size={40} />
+                <p className="text-slate-500 text-sm">No tasks found</p>
+                <p className="text-xs text-slate-400 mt-1">
                   {statusFilter !== 'all' || assigneeFilter !== 'all' || priorityFilter !== 'all'
                     ? 'Try adjusting your filters'
-                    : 'Add tasks to see them in the Gantt chart'
-                  }
+                    : 'Add tasks to see them in the Gantt chart'}
                 </p>
               </div>
             </div>
@@ -673,26 +677,18 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Legend</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: getTaskColor('not_started', 'Medium') }}></div>
-            <span className="text-sm">Not Started</span>
+      <div className="flex flex-wrap gap-3 rounded-xl border border-slate-100 bg-white p-3">
+        {[
+          { status: 'not_started' as const, label: 'Not Started', priority: 'Medium' },
+          { status: 'in_progress' as const, label: 'In Progress' },
+          { status: 'completed' as const,   label: 'Completed' },
+          { status: 'overdue' as const,     label: 'Overdue' },
+        ].map(item => (
+          <div key={item.label} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: getTaskColor(item.status, item.priority) }} />
+            <span className="text-xs text-slate-600">{item.label}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: getTaskColor('in_progress') }}></div>
-            <span className="text-sm">In Progress</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: getTaskColor('completed') }}></div>
-            <span className="text-sm">Completed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: getTaskColor('overdue') }}></div>
-            <span className="text-sm">Overdue</span>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );

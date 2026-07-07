@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers, Image } from 'lucide-react';
-import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs } from '../ui/Common';
+import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers, Image, MoreVertical, Info, Tag, ExternalLink } from 'lucide-react';
+import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
@@ -31,6 +31,7 @@ import { Transaction } from '../../types';
 import type { ProjectFinancialAccount as ProjectFinancialAccountType, ProjectTransaction } from '../../types';
 import { useBatchMode } from '../../contexts/BatchModeContext';
 import { projectFinancialService } from '../../services/projectFinancialService';
+import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentRequestModal';
 
 const PENDING_USE_TEMPLATE_KEY = 'jci_pending_use_template_id';
 
@@ -47,6 +48,8 @@ interface RoadmapEventDetails {
   eventStartTime: string;
   eventEndTime: string;
   proposedDate: string;
+  priceMin?: number;
+  priceMax?: number;
 }
 
 const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDetails> => {
@@ -193,8 +196,8 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
         currentParagraph = '';
       }
     } else {
-      // If it starts with a list bullet (e.g. •, -, *, 1.), make it a separate block
-      const isListItem = /^[•\-\*\d+\.]/.test(line);
+      // If it starts with a list bullet (e.g. ¢, -, *, 1.), make it a separate block
+      const isListItem = /^[¢\-\*\d+\.]/.test(line);
       if (isListItem) {
         if (currentParagraph) {
           formattedParagraphs.push(currentParagraph);
@@ -333,6 +336,38 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
     category = parsedCategory;
   }
 
+  // 6. Parse ticket prices from type_ticket radio options
+  let priceMin: number | undefined;
+  let priceMax: number | undefined;
+  const ticketLabels = Array.from(doc.querySelectorAll('label.custom-option-item'));
+  const ticketPrices: number[] = [];
+  const myrPattern = /MYR\s*([\d,]+(?:\.\d{1,2})?)/i;
+  ticketLabels.forEach(label => {
+    const spans = Array.from(label.querySelectorAll('span.fw-bolder'));
+    spans.forEach(span => {
+      const text = span.textContent?.trim() || '';
+      const m = text.match(myrPattern);
+      if (m) {
+        const val = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(val) && val >= 0) ticketPrices.push(val);
+      }
+    });
+  });
+  // Fallback: scan full text for MYR or RM amounts if no structured tickets found
+  if (ticketPrices.length === 0) {
+    const allText = doc.body?.textContent || '';
+    const fallbackMatches = [...allText.matchAll(/(?:MYR|RM)\s*([\d,]+(?:\.\d{1,2})?)/gi)];
+    fallbackMatches.forEach(m => {
+      const val = parseFloat(m[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0 && val < 100000) ticketPrices.push(val);
+    });
+  }
+  if (ticketPrices.length > 0) {
+    priceMin = Math.min(...ticketPrices);
+    priceMax = Math.max(...ticketPrices);
+    if (priceMin === priceMax) priceMax = undefined;
+  }
+
   return {
     logoUrl,
     title,
@@ -345,13 +380,16 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
     eventEndDate,
     eventStartTime,
     eventEndTime,
-    proposedDate: eventStartDate
+    proposedDate: eventStartDate,
+    priceMin,
+    priceMax,
   };
 };
 
 export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searchQuery?: string; initialSelectedProjectId?: string | null; onClearSelection?: () => void }> = ({ onNavigate, searchQuery, initialSelectedProjectId, onClearSelection }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialSelectedProjectId ?? null);
   const [isProposalModalOpen, setProposalModalOpen] = useState(false);
+  const [createProjectStep, setCreateProjectStep] = useState<1 | 2>(1);
   const [newRoadmapUrl, setNewRoadmapUrl] = useState('');
   const [newLogoUrl, setNewLogoUrl] = useState('');
   const [isFetchingPoster, setIsFetchingPoster] = useState(false);
@@ -375,6 +413,9 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const [newEventEndDate, setNewEventEndDate] = useState('');
   const [newEventStartTime, setNewEventStartTime] = useState('');
   const [newEventEndTime, setNewEventEndTime] = useState('');
+  const [newPriceMin, setNewPriceMin] = useState('');
+  const [newPriceMax, setNewPriceMax] = useState('');
+  const [newGalleryUrl, setNewGalleryUrl] = useState('');
 
   const { projects, loading, error, createProject, updateProject, deleteProject } = useProjects();
   const { eventTemplates, loading: templatesLoading, createEventTemplate, updateEventTemplate, deleteEventTemplate } = useTemplates();
@@ -398,6 +439,9 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       setNewEventEndDate('');
       setNewEventStartTime('');
       setNewEventEndTime('');
+      setNewPriceMin('');
+      setNewPriceMax('');
+      setNewGalleryUrl('');
     }
   }, [isProposalModalOpen]);
 
@@ -423,6 +467,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       if (details.eventEndDate) setNewEventEndDate(details.eventEndDate);
       if (details.eventStartTime) setNewEventStartTime(details.eventStartTime);
       if (details.eventEndTime) setNewEventEndTime(details.eventEndTime);
+      if (details.priceMin != null) setNewPriceMin(String(details.priceMin));
+      if (details.priceMax != null) setNewPriceMax(String(details.priceMax));
 
       showToast('Successfully synchronized event details!', 'success');
     } catch (err: any) {
@@ -694,6 +740,9 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         committee: defaultCommittee,
         logoUrl: newLogoUrl || undefined,
         roadmapUrl: newRoadmapUrl || undefined,
+        galleryUrls: newGalleryUrl ? [newGalleryUrl] : undefined,
+        priceMin: newPriceMin !== '' ? Number(newPriceMin) : undefined,
+        priceMax: newPriceMax !== '' ? Number(newPriceMax) : undefined,
       });
 
       // Activity Plan will be created/managed in the Project Detail page's Activity Plan tab
@@ -711,19 +760,24 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     const formData = new FormData(e.currentTarget);
     const checklist = (formData.get('checklist') as string)?.split('\n').filter(Boolean) || [];
     const resources = (formData.get('resources') as string)?.split('\n').filter(Boolean) || [];
+    const payload = {
+      name: formData.get('name') as string,
+      description: formData.get('description') as string || undefined,
+      type: formData.get('type') as any,
+      defaultLocation: formData.get('defaultLocation') as string || undefined,
+      defaultMaxAttendees: parseInt(formData.get('defaultMaxAttendees') as string) || undefined,
+      defaultBudget: parseFloat(formData.get('defaultBudget') as string) || undefined,
+      checklist,
+      requiredResources: resources,
+      estimatedDuration: parseFloat(formData.get('estimatedDuration') as string) || undefined,
+    };
     try {
-      await createEventTemplate({
-        name: formData.get('name') as string,
-        description: formData.get('description') as string || undefined,
-        type: formData.get('type') as any,
-        defaultLocation: formData.get('defaultLocation') as string || undefined,
-        defaultMaxAttendees: parseInt(formData.get('defaultMaxAttendees') as string) || undefined,
-        defaultBudget: parseFloat(formData.get('defaultBudget') as string) || undefined,
-        checklist,
-        requiredResources: resources,
-        estimatedDuration: parseFloat(formData.get('estimatedDuration') as string) || undefined,
-        createdBy: member?.id,
-      });
+      if (selectedTemplate?.id) {
+        const clean = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+        await updateEventTemplate(selectedTemplate.id, clean);
+      } else {
+        await createEventTemplate({ ...payload, createdBy: member?.id });
+      }
       setTemplateModalOpen(false);
       setSelectedTemplate(null);
       e.currentTarget.reset();
@@ -746,9 +800,9 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div>
           {selectedProject ? (
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedProjectId(null)} className="text-slate-400 hover:text-slate-600 text-sm">Events Management /</button>
-              <h2 className="text-2xl font-bold text-slate-900">{selectedProject.name ?? selectedProject.title ?? 'Project'}</h2>
+            <div className="min-w-0">
+              <button onClick={() => setSelectedProjectId(null)} className="text-xs text-slate-400 hover:text-jci-blue font-semibold transition-colors">← Events Management</button>
+              <h2 className="text-lg md:text-2xl font-bold text-slate-900 truncate leading-tight mt-0.5">{selectedProject.name ?? selectedProject.title ?? 'Project'}</h2>
             </div>
           ) : (
             <>
@@ -757,115 +811,96 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             </>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0 self-end sm:self-auto">
           {!selectedProject && (
             <>
-              {/* Desktop buttons */}
-              <div className="hidden md:flex gap-2">
-                <Button onClick={() => setProposalModalOpen(true)}>
-                  <Plus size={16} className="mr-2" /> New Project
-                </Button>
-                {(isBoard || isAdmin) && (
-                  <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-                    <Copy size={16} className="mr-2" /> Paste Import
-                  </Button>
-                )}
-                {activeTab === 'templates' && (isBoard || isAdmin) && (
-                  <Button onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}>
-                    <Plus size={16} className="mr-2" /> Create Template
-                  </Button>
-                )}
-              </div>
+              <div className="hidden md:flex gap-2"></div>
             </>
           )}
           {selectedProject && (
-            <div className="flex gap-2">
-              {/* Member Workflow */}
-              {(selectedProject.status === 'Planning' || selectedProject.status === 'Draft') && (
-                <>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleStatusUpdate('Planning')}
-                    disabled={isStatusUpdating}
-                  >
-                    Save Draft
+            <>
+              {/* Desktop: show all workflow buttons */}
+              <div className="hidden md:flex gap-2">
+                {(selectedProject.status === 'Planning' || selectedProject.status === 'Draft') && (
+                  <>
+                    <Button variant="ghost" onClick={() => handleStatusUpdate('Planning')} disabled={isStatusUpdating}>Save Draft</Button>
+                    <Button onClick={() => handleStatusUpdate('Under Review')} disabled={isStatusUpdating}><Send size={16} className="mr-2" />Submit</Button>
+                  </>
+                )}
+                {selectedProject.status === 'Under Review' && !isPrivileged && (
+                  <Button disabled variant="outline"><Clock size={16} className="mr-2" />Under Review</Button>
+                )}
+                {selectedProject.status === 'Under Review' && isPrivileged && (
+                  <>
+                    <div className="flex items-center px-3 bg-slate-100 rounded-lg text-slate-600 text-sm font-medium"><Clock size={14} className="mr-1" />Under Review</div>
+                    <Button variant="danger" onClick={() => handleStatusUpdate('Planning')} disabled={isStatusUpdating}><X size={16} className="mr-2" />Reject</Button>
+                    <Button variant="primary" onClick={() => handleStatusUpdate('Approved')} disabled={isStatusUpdating}><Check size={16} className="mr-2" />Approve</Button>
+                  </>
+                )}
+                {selectedProject.status === 'Approved' && (
+                  <Button onClick={() => handleStatusUpdate('Active')} disabled={isStatusUpdating}><Globe size={16} className="mr-2" />Publish</Button>
+                )}
+                {selectedProject.status === 'Active' && (
+                  <>
+                    <Badge variant="success" className="h-10 px-4"><Globe size={14} className="mr-1" />Published</Badge>
+                    <Button variant="danger" onClick={() => handleStatusUpdate('Approved')} disabled={isStatusUpdating}><Lock size={16} className="mr-2" />Unpublish</Button>
+                  </>
+                )}
+                {(selectedProject.status === 'Approved' || selectedProject.status === 'Active') && (
+                  <Button variant="outline" onClick={handleClaimReimbursement} className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
+                    <DollarSign size={16} className="mr-2" />Claim Reimbursement
                   </Button>
-                  <Button
-                    onClick={() => handleStatusUpdate('Under Review')}
-                    disabled={isStatusUpdating}
-                  >
-                    <Send size={16} className="mr-2" /> Submit
-                  </Button>
-                </>
-              )}
+                )}
+              </div>
 
-              {selectedProject.status === 'Under Review' && !isPrivileged && (
-                <Button disabled variant="outline">
-                  <Clock size={16} className="mr-2" /> Under Review
-                </Button>
-              )}
-
-              {/* Board Workflow */}
-              {selectedProject.status === 'Under Review' && isPrivileged && (
-                <>
-                  {/* Status indicator for privileged users */}
-                  <div className="flex items-center px-3 bg-slate-100 rounded-lg text-slate-600 text-sm font-medium mr-2">
-                    <Clock size={14} className="mr-1" /> Under Review
+              {/* Mobile: primary CTA + kebab overflow */}
+              <div className="flex md:hidden items-center gap-2">
+                {/* Primary action only */}
+                {(selectedProject.status === 'Planning' || selectedProject.status === 'Draft') && (
+                  <Button size="sm" onClick={() => handleStatusUpdate('Under Review')} disabled={isStatusUpdating}><Send size={14} className="mr-1" />Submit</Button>
+                )}
+                {selectedProject.status === 'Under Review' && !isPrivileged && (
+                  <Badge variant="neutral" className="h-8 px-3 text-xs"><Clock size={12} className="mr-1" />Reviewing</Badge>
+                )}
+                {selectedProject.status === 'Under Review' && isPrivileged && (
+                  <Button size="sm" variant="primary" onClick={() => handleStatusUpdate('Approved')} disabled={isStatusUpdating}><Check size={14} className="mr-1" />Approve</Button>
+                )}
+                {selectedProject.status === 'Approved' && (
+                  <Button size="sm" onClick={() => handleStatusUpdate('Active')} disabled={isStatusUpdating}><Globe size={14} className="mr-1" />Publish</Button>
+                )}
+                {selectedProject.status === 'Active' && (
+                  <Badge variant="success" className="h-8 px-3 text-xs"><Globe size={12} className="mr-1" />Published</Badge>
+                )}
+                {/* Kebab for secondary actions */}
+                <div className="relative group">
+                  <button className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-all">
+                    <MoreVertical size={16} />
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 hidden group-focus-within:block">
+                    {(selectedProject.status === 'Planning' || selectedProject.status === 'Draft') && (
+                      <button onClick={() => handleStatusUpdate('Planning')} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                        <FileText size={14} />Save Draft
+                      </button>
+                    )}
+                    {selectedProject.status === 'Under Review' && isPrivileged && (
+                      <button onClick={() => handleStatusUpdate('Planning')} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                        <X size={14} />Reject
+                      </button>
+                    )}
+                    {selectedProject.status === 'Active' && (
+                      <button onClick={() => handleStatusUpdate('Approved')} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                        <Lock size={14} />Unpublish
+                      </button>
+                    )}
+                    {(selectedProject.status === 'Approved' || selectedProject.status === 'Active') && (
+                      <button onClick={handleClaimReimbursement} className="w-full text-left px-4 py-2.5 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2">
+                        <DollarSign size={14} />Claim Reimbursement
+                      </button>
+                    )}
                   </div>
-                  <Button
-                    variant="danger"
-                    onClick={() => handleStatusUpdate('Planning')}
-                    disabled={isStatusUpdating}
-                  >
-                    <X size={16} className="mr-2" /> Reject
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => handleStatusUpdate('Approved')}
-                    disabled={isStatusUpdating}
-                  >
-                    <Check size={16} className="mr-2" /> Approve
-                  </Button>
-                </>
-              )}
-
-              {/* Publish Workflow */}
-              {selectedProject.status === 'Approved' && (
-                <Button
-                  onClick={() => handleStatusUpdate('Active')}
-                  disabled={isStatusUpdating}
-                >
-                  <Globe size={16} className="mr-2" /> Publish
-                </Button>
-              )}
-
-              {selectedProject.status === 'Active' && (
-                <>
-                  <Badge variant="success" className="h-10 px-4">
-                    <Globe size={14} className="mr-1" /> Published
-                  </Badge>
-                  <Button
-                    variant="danger"
-                    onClick={() => handleStatusUpdate('Approved')}
-                    disabled={isStatusUpdating}
-                  >
-                    <Lock size={16} className="mr-2" /> Unpublish
-                  </Button>
-                </>
-              )}
-
-              {/* Claim Reimbursement button for active/approved projects */}
-              {(selectedProject.status === 'Approved' || selectedProject.status === 'Active') && (
-                <Button
-                  variant="outline"
-                  onClick={handleClaimReimbursement}
-                  className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
-                >
-                  <DollarSign size={16} className="mr-2" /> Claim Reimbursement
-                </Button>
-              )}
-
-            </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -907,7 +942,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                 loading={loading}
                 error={error}
                 onSelect={setSelectedProjectId}
-                onNewProposal={() => setProposalModalOpen(true)}
+                onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
                 onImport={() => setImportModalOpen(true)}
                 isAdminOrBoard={isBoard || isAdmin}
                 selectedIds={selectedProjectIds}
@@ -950,13 +985,17 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                     className="w-48"
                   />
                 </div>
-                <LoadingState
-                  loading={templatesLoading}
-                  error={null}
-                  empty={eventTemplates.length === 0}
-                  emptyMessage="No templates created yet. Create your first template to streamline event planning."
-                >
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <LoadingState loading={templatesLoading} error={null} empty={false}>
+                  <div className="divide-y divide-slate-100">
+                    {(isBoard || isAdmin) && (
+                      <div onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}
+                        className="flex items-center gap-3 px-1 py-3 text-slate-400 hover:text-jci-blue transition-colors cursor-pointer group">
+                        <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                          <Plus size={16} />
+                        </div>
+                        <span className="text-sm font-semibold">New Template</span>
+                      </div>
+                    )}
                     {eventTemplates
                       .filter(template => {
                         const matchesSearch = !templateSearchTerm ||
@@ -966,42 +1005,26 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                         return matchesSearch && matchesType;
                       })
                       .map(template => (
-                        <Card key={template.id} className="hover:shadow-lg transition-all cursor-pointer group">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-bold text-slate-900 group-hover:text-jci-blue transition-colors">{template.name}</h3>
-                              <Badge variant="neutral" className="mt-1">{template.type}</Badge>
+                        <div key={template.id} className="flex items-center gap-3 py-3 px-1">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-slate-900 text-sm">{template.name}</p>
+                              <Badge variant="neutral">{template.type}</Badge>
                             </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewTemplate(template); }} title="Preview Template">
-                                <Eye size={14} />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }} title="Use Template">
-                                <Copy size={14} />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit Template">
-                                <Edit size={14} />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={async (e) => { e.stopPropagation(); if (window.confirm('Are you sure you want to delete this template?')) { await deleteEventTemplate(template.id!); } }} className="text-red-500 hover:text-red-700" title="Delete Template">
-                                <Trash2 size={14} />
-                              </Button>
+                            {template.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{template.description}</p>}
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {template.estimatedDuration && <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500"><Clock size={9} />{template.estimatedDuration}h</span>}
+                              {template.defaultBudget && <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500"><DollarSign size={9} />{formatCurrency(template.defaultBudget)}</span>}
+                              {template.checklist?.length > 0 && <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500"><CheckCircle size={9} />{template.checklist.length} tasks</span>}
                             </div>
                           </div>
-                          {template.description && <p className="text-sm text-slate-600 mb-3 line-clamp-2">{template.description}</p>}
-                          <div className="space-y-2 text-xs text-slate-500">
-                            {template.defaultLocation && <div className="flex items-center gap-1"><MapPin size={12} /><span>{template.defaultLocation}</span></div>}
-                            {template.estimatedDuration && <div className="flex items-center gap-1"><Clock size={12} /><span>{template.estimatedDuration} hours</span></div>}
-                            {template.defaultBudget && <div className="flex items-center gap-1"><DollarSign size={12} /><span>{formatCurrency(template.defaultBudget)}</span></div>}
-                            {template.checklist && template.checklist.length > 0 && <div className="flex items-center gap-1"><CheckCircle size={12} /><span>{template.checklist.length} checklist items</span></div>}
-                            {template.requiredResources && template.requiredResources.length > 0 && <div className="flex items-center gap-1"><FileText size={12} /><span>{template.requiredResources.length} resources</span></div>}
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button variant="ghost" size="sm" onClick={() => setPreviewTemplate(template)} title="Preview"><Eye size={14} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleUseTemplate(template)} title="Use"><Copy size={14} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit"><Edit size={14} /></Button>
+                            <Button variant="ghost" size="sm" onClick={async () => { if (window.confirm('Delete this template?')) { await deleteEventTemplate(template.id!); } }} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
                           </div>
-                          <div className="mt-4 pt-3 border-t border-slate-100">
-                            <Button variant="outline" size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }}>
-                              <Copy size={14} className="mr-2" />
-                              Use This Template
-                            </Button>
-                          </div>
-                        </Card>
+                        </div>
                       ))}
                   </div>
                 </LoadingState>
@@ -1047,7 +1070,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                   loading={loading}
                   error={error}
                   onSelect={setSelectedProjectId}
-                  onNewProposal={() => setProposalModalOpen(true)}
+                  onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
                   onImport={() => setImportModalOpen(true)}
                   isAdminOrBoard={isBoard || isAdmin}
                   selectedIds={selectedProjectIds}
@@ -1090,13 +1113,17 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                       className="w-48"
                     />
                   </div>
-                  <LoadingState
-                    loading={templatesLoading}
-                    error={null}
-                    empty={eventTemplates.length === 0}
-                    emptyMessage="No templates created yet. Create your first template to streamline event planning."
-                  >
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <LoadingState loading={templatesLoading} error={null} empty={false}>
+                    <div className="divide-y divide-slate-100">
+                      {(isBoard || isAdmin) && (
+                        <div onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}
+                          className="flex items-center gap-3 px-2 py-3 text-slate-400 hover:text-jci-blue transition-colors cursor-pointer group">
+                          <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                            <Plus size={16} />
+                          </div>
+                          <span className="text-sm font-semibold">New Template</span>
+                        </div>
+                      )}
                       {eventTemplates
                         .filter(template => {
                           const matchesSearch = !templateSearchTerm ||
@@ -1106,41 +1133,26 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                           return matchesSearch && matchesType;
                         })
                         .map(template => (
-                          <Card key={template.id} className="hover:shadow-lg transition-all cursor-pointer group">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex-1">
-                                <h3 className="text-lg font-bold text-slate-900 group-hover:text-jci-blue transition-colors">{template.name}</h3>
-                                <Badge variant="neutral" className="mt-1">{template.type}</Badge>
+                          <div key={template.id} className="flex items-center gap-4 px-2 py-3 hover:bg-slate-50/50 transition-colors group">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-slate-900 group-hover:text-jci-blue transition-colors text-sm">{template.name}</p>
+                                <Badge variant="neutral">{template.type}</Badge>
                               </div>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setPreviewTemplate(template); }} title="Preview Template">
-                                  <Eye size={14} />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }} title="Use Template">
-                                  <Copy size={14} />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit Template">
-                                  <Edit size={14} />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={async (e) => { e.stopPropagation(); if (window.confirm('Are you sure you want to delete this template?')) { await deleteEventTemplate(template.id!); } }} className="text-red-500 hover:text-red-700" title="Delete Template">
-                                  <Trash2 size={14} />
-                                </Button>
+                              <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                {template.description && <span className="text-xs text-slate-400 line-clamp-1 max-w-xs">{template.description}</span>}
+                                {template.estimatedDuration && <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400"><Clock size={10} />{template.estimatedDuration}h</span>}
+                                {template.defaultBudget && <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400"><DollarSign size={10} />{formatCurrency(template.defaultBudget)}</span>}
+                                {template.checklist?.length > 0 && <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400"><CheckCircle size={10} />{template.checklist.length} tasks</span>}
                               </div>
                             </div>
-                            {template.description && <p className="text-sm text-slate-600 mb-3 line-clamp-2">{template.description}</p>}
-                            <div className="space-y-2 text-xs text-slate-500">
-                              {template.estimatedDuration && <div className="flex items-center gap-1"><Clock size={12} /><span>{template.estimatedDuration} hours</span></div>}
-                              {template.defaultBudget && <div className="flex items-center gap-1"><DollarSign size={12} /><span>{formatCurrency(template.defaultBudget)}</span></div>}
-                              {template.checklist && template.checklist.length > 0 && <div className="flex items-center gap-1"><CheckCircle size={12} /><span>{template.checklist.length} checklist items</span></div>}
-                              {template.requiredResources && template.requiredResources.length > 0 && <div className="flex items-center gap-1"><FileText size={12} /><span>{template.requiredResources.length} resources</span></div>}
+                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="sm" onClick={() => setPreviewTemplate(template)} title="Preview"><Eye size={14} /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleUseTemplate(template)} title="Use"><Copy size={14} /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => { setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit"><Edit size={14} /></Button>
+                              <Button variant="ghost" size="sm" onClick={async () => { if (window.confirm('Delete this template?')) { await deleteEventTemplate(template.id!); } }} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
                             </div>
-                            <div className="mt-4 pt-3 border-t border-slate-100">
-                              <Button variant="outline" size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); handleUseTemplate(template); }}>
-                                <Copy size={14} className="mr-2" />
-                                Use This Template
-                              </Button>
-                            </div>
-                          </Card>
+                          </div>
                         ))}
                     </div>
                   </LoadingState>
@@ -1214,250 +1226,167 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         </div>
       )}
 
-      {/* Mobile FAB: New Project / Paste Import / Create Template */}
-      {!selectedProject && (
-        <div className="md:hidden fixed bottom-24 right-4 z-50 flex flex-col-reverse items-end gap-2">
-          {fabOpen && (
-            <>
-              <button
-                type="button"
-                onClick={() => { setFabOpen(false); setProposalModalOpen(true); }}
-                className="flex items-center gap-2 bg-white text-slate-800 text-sm font-semibold px-4 py-2.5 rounded-full shadow-lg border border-slate-200 active:bg-slate-50 transition-all animate-in slide-in-from-bottom-2"
-              >
-                <Plus size={15} className="text-jci-blue" /> New Project
-              </button>
-              {(isBoard || isAdmin) && (
-                <button
-                  type="button"
-                  onClick={() => { setFabOpen(false); setImportModalOpen(true); }}
-                  className="flex items-center gap-2 bg-white text-slate-800 text-sm font-semibold px-4 py-2.5 rounded-full shadow-lg border border-slate-200 active:bg-slate-50 transition-all animate-in slide-in-from-bottom-2"
-                >
-                  <Copy size={15} className="text-jci-blue" /> Paste Import
-                </button>
-              )}
-              {(isBoard || isAdmin) && (
-                <button
-                  type="button"
-                  onClick={() => { setFabOpen(false); setSelectedTemplate(null); setTemplateModalOpen(true); }}
-                  className="flex items-center gap-2 bg-white text-slate-800 text-sm font-semibold px-4 py-2.5 rounded-full shadow-lg border border-slate-200 active:bg-slate-50 transition-all animate-in slide-in-from-bottom-2"
-                >
-                  <Plus size={15} className="text-jci-blue" /> Create Template
-                </button>
-              )}
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => setFabOpen(v => !v)}
-            className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 ${fabOpen ? 'bg-slate-700 rotate-45' : 'bg-jci-blue'}`}
-          >
-            <Plus size={24} className="text-white" />
-          </button>
-        </div>
-      )}
 
-      {/* Project Creation Modal */}
-      <Modal
-        isOpen={isProposalModalOpen}
-        onClose={() => {
-          setProposalModalOpen(false);
-        }}
-        title="New Project"
-        size="lg"
-        drawerOnMobile
-        footer={
-          <div className="flex gap-3 w-full">
-            <Button className="flex-1" type="submit" form="create-project-form">Create Project</Button>
-            <Button variant="ghost" type="button" onClick={() => setProposalModalOpen(false)}>Cancel</Button>
-          </div>
-        }
-      >
-        <form id="create-project-form" onSubmit={handleCreateProject} className="space-y-4">
-          <p className="text-sm text-slate-500 mb-4 bg-blue-50 p-3 rounded text-blue-800">
-            Create a new project. You can add an Activity Plan later in the project detail page.
-          </p>
-
-          <Input
-            name="title"
-            label="Project Title *"
-            placeholder="e.g. Summer Leadership Summit"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            icon={<FileText size={16} />}
-            required
-          />
-
-          <Textarea
-            name="description"
-            label="Description"
-            placeholder="Brief description of the project..."
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-            rows={3}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-            <Input
-              name="roadmapUrl"
-              label="JCI Malaysia Roadmap Event URL / ID"
-              placeholder="e.g. https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=6274 or 6274"
-              value={newRoadmapUrl}
-              onChange={(e) => setNewRoadmapUrl(e.target.value)}
-              icon={<Globe size={16} />}
-            />
-            <div className="pb-1">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleFetchPosterForCreate}
-                disabled={isFetchingPoster}
-                className="w-full h-10 flex items-center justify-center gap-2 border-jci-blue text-jci-blue hover:bg-sky-50"
-              >
-                {isFetchingPoster ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" />
-                    Fetching Details...
-                  </>
+      {/* Project Creation Drawer */}
+      {(() => {
+        const CREATE_STEPS: { s: 1 | 2; label: string }[] = [
+          { s: 1, label: 'Basics & Media' },
+          { s: 2, label: 'Classification & Schedule' },
+        ];
+        return (
+          <Drawer
+            isOpen={isProposalModalOpen}
+            onClose={() => { setProposalModalOpen(false); setCreateProjectStep(1); }}
+            title={createProjectStep === 1 ? 'New Activity " Basics & Media' : 'New Activity " Classification & Schedule'}
+            position="bottom"
+            size="xl"
+            footer={
+              <div className="flex items-center justify-between">
+                <Button variant="ghost" type="button" onClick={() => {
+                  if (createProjectStep === 1) { setProposalModalOpen(false); setCreateProjectStep(1); }
+                  else setCreateProjectStep(1);
+                }}>
+                  {createProjectStep === 1 ? 'Cancel' : '← Back'}
+                </Button>
+                {createProjectStep === 1 ? (
+                  <Button key="next" type="button" onClick={() => {
+                    if (!newTitle.trim()) { showToast('Project title is required', 'error'); return; }
+                    setCreateProjectStep(2);
+                  }}>Next →</Button>
                 ) : (
-                  <>
-                    <Download size={14} />
-                    Sync Event Details
-                  </>
+                  <Button key="create" type="submit" form="create-project-form">Create Project</Button>
                 )}
-              </Button>
+              </div>
+            }
+          >
+            {/* Stepper */}
+            <div className="flex items-center gap-2 mb-4">
+              {CREATE_STEPS.map(({ s, label }, i) => (
+                <React.Fragment key={s}>
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${s < createProjectStep ? 'bg-jci-blue/10 text-jci-blue' :
+                    s === createProjectStep ? 'bg-jci-blue text-white shadow-sm' :
+                      'bg-slate-100 text-slate-400'
+                    }`}>
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-white/30">
+                      {s < createProjectStep ? 'âœ"' : s}
+                    </span>
+                    <span className="hidden sm:inline">{label}</span>
+                    <span className="sm:hidden">{s === 1 ? 'Media' : 'Details'}</span>
+                  </div>
+                  {i === 0 && <div className={`flex-1 h-px max-w-[24px] ${createProjectStep > 1 ? 'bg-jci-blue' : 'bg-slate-200'}`} />}
+                </React.Fragment>
+              ))}
             </div>
-          </div>
 
-          <Input
-            name="logoUrl"
-            label="Project Logo / Poster URL"
-            placeholder="https://example.com/logo.png"
-            value={newLogoUrl}
-            onChange={(e) => setNewLogoUrl(e.target.value)}
-            icon={<Image size={16} />}
-          />
+            <form id="create-project-form" onSubmit={handleCreateProject} className="space-y-4">
+              {/* Step 1: Basics & Media */}
+              {createProjectStep === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Project Info</p>
+                    <div className="space-y-3">
+                      <Input name="title" label="Title *" placeholder="e.g. Summer Leadership Summit"
+                        value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
+                        icon={<FileText size={16} />} required />
+                      <Textarea name="description" label="Description" placeholder="Brief description of the project..."
+                        value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={3} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Media</p>
+                    <div className="md:grid md:grid-cols-2 md:gap-4 space-y-3 md:space-y-0">
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-500 mb-1.5">JCI Roadmap Sync</p>
+                          <div className="flex gap-2 items-end">
+                            <div className="flex-1">
+                              <Input name="roadmapUrl" label="" placeholder="Roadmap URL or Event ID (e.g. 6274)"
+                                value={newRoadmapUrl} onChange={(e) => setNewRoadmapUrl(e.target.value)} icon={<Globe size={16} />} />
+                            </div>
+                            <Button type="button" variant="outline" onClick={handleFetchPosterForCreate} disabled={isFetchingPoster}
+                              className="h-10 shrink-0 flex items-center gap-1.5 border-jci-blue text-jci-blue hover:bg-sky-50 mb-px">
+                              {isFetchingPoster ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
+                              <span className="text-xs">{isFetchingPoster ? 'Syncing' : 'Sync'}</span>
+                            </Button>
+                          </div>
+                        </div>
+                        <Input name="logoUrl" label="Poster / Logo URL" placeholder="https://example.com/poster.png"
+                          value={newLogoUrl} onChange={(e) => setNewLogoUrl(e.target.value)} icon={<Image size={16} />} />
+                        {newLogoUrl && (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex justify-center p-2">
+                            <img src={newLogoUrl} alt="Preview" className="max-h-36 object-contain rounded-lg" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-[11px] font-semibold text-slate-500">Activity Photo Gallery</p>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">Paste a Google Drive <strong>folder</strong> link shared as "Anyone with the link"</p>
+                        <Input label="" placeholder="https://drive.google.com/drive/folders/"
+                          value={newGalleryUrl} onChange={(e) => setNewGalleryUrl(e.target.value)} />
+                        {newGalleryUrl && (
+                          <p className="text-[11px] text-green-700 font-medium flex items-center gap-1">
+                            <Check size={11} />Folder linked
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-          {newLogoUrl && (
-            <div className="mt-2 border border-slate-200 rounded-xl p-2 bg-slate-50 flex justify-center overflow-hidden">
-              <img src={newLogoUrl} alt="Preview" className="max-h-48 object-contain rounded-lg shadow-sm" />
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              name="level"
-              label="Level *"
-              required
-              value={newLevel}
-              onChange={(e) => setNewLevel(e.target.value as any)}
-              options={[
-                { label: '— Select —', value: '' },
-                ...PROJECT_LEVELS.map(l => ({ label: l, value: l })),
-              ]}
-            />
-            <Select
-              name="pillar"
-              label="Pillar *"
-              required
-              value={newPillar}
-              onChange={(e) => setNewPillar(e.target.value as any)}
-              options={[
-                { label: '— Select —', value: '' },
-                ...PROJECT_PILLARS.map(p => ({ label: p, value: p })),
-              ]}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              name="type"
-              label="Type *"
-              required
-              value={projectType}
-              onChange={(e) => setProjectType(e.target.value)}
-              options={[
-                { label: '— Select —', value: '' },
-                ...PROJECT_TYPES.map(c => ({ label: PROJECT_TYPE_LABELS[c] || c, value: c })),
-              ]}
-            />
-            <Select
-              name="category"
-              label="Category *"
-              required
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              options={[
-                { label: '— Select —', value: '' },
-                ...(projectType ? (PROJECT_CATEGORIES_BY_TYPE[projectType] ?? []) : []).map(t => ({ label: t, value: t })),
-              ]}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              name="proposedDate"
-              label="Proposed Date *"
-              type="date"
-              value={newProposedDate}
-              onChange={(e) => setNewProposedDate(e.target.value)}
-              icon={<Calendar size={16} />}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              name="eventStartDate"
-              label="Event Start Date *"
-              type="date"
-              value={newEventStartDate}
-              onChange={(e) => setNewEventStartDate(e.target.value)}
-              icon={<Calendar size={16} />}
-              required
-            />
-            <Input
-              name="eventEndDate"
-              label="Event End Date"
-              type="date"
-              value={newEventEndDate}
-              onChange={(e) => setNewEventEndDate(e.target.value)}
-              icon={<Calendar size={16} />}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              name="eventStartTime"
-              label="Event Start Time"
-              type="time"
-              value={newEventStartTime}
-              onChange={(e) => setNewEventStartTime(e.target.value)}
-              icon={<Clock size={16} />}
-            />
-            <Input
-              name="eventEndTime"
-              label="Event End Time"
-              type="time"
-              value={newEventEndTime}
-              onChange={(e) => setNewEventEndTime(e.target.value)}
-              icon={<Clock size={16} />}
-            />
-          </div>
-
-
-
-          <Textarea
-            name="objectives"
-            label="Objectives & Goals"
-            placeholder="Describe the goals and expected community impact..."
-            rows={4}
-          />
-
-          <Textarea
-            name="expectedImpact"
-            label="Expected Impact"
-            placeholder="Describe the expected outcomes and impact..."
-            rows={3}
-          />
-        </form>
-      </Modal>
+              {/* Step 2: Classification & Schedule */}
+              {createProjectStep === 2 && (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Classification</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <Select name="level" label="Level *" required value={newLevel}
+                        onChange={(e) => setNewLevel(e.target.value as any)}
+                        options={[{ label: '" Select "', value: '' }, ...PROJECT_LEVELS.map(l => ({ label: l, value: l }))]} />
+                      <Select name="pillar" label="Pillar *" required value={newPillar}
+                        onChange={(e) => setNewPillar(e.target.value as any)}
+                        options={[{ label: '" Select "', value: '' }, ...PROJECT_PILLARS.map(p => ({ label: p, value: p }))]} />
+                      <Select name="type" label="Type *" required value={projectType}
+                        onChange={(e) => { setProjectType(e.target.value); setNewCategory(''); }}
+                        options={[{ label: '" Select "', value: '' }, ...PROJECT_TYPES.map(c => ({ label: PROJECT_TYPE_LABELS[c] || c, value: c }))]} />
+                      <Select name="category" label="Category *" required value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        options={[{ label: '" Select "', value: '' }, ...(projectType ? (PROJECT_CATEGORIES_BY_TYPE[projectType] ?? []) : []).map(t => ({ label: t, value: t }))]} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Schedule</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <Input name="proposedDate" label="Proposed *" type="date" value={newProposedDate}
+                        onChange={(e) => setNewProposedDate(e.target.value)} icon={<Calendar size={16} />} required />
+                      <Input name="eventStartDate" label="Start Date *" type="date" value={newEventStartDate}
+                        onChange={(e) => setNewEventStartDate(e.target.value)} icon={<Calendar size={16} />} required />
+                      <Input name="eventEndDate" label="End Date" type="date" value={newEventEndDate}
+                        onChange={(e) => setNewEventEndDate(e.target.value)} icon={<Calendar size={16} />} />
+                      <div />
+                      <Input name="eventStartTime" label="Start Time" type="time" value={newEventStartTime}
+                        onChange={(e) => setNewEventStartTime(e.target.value)} icon={<Clock size={16} />} />
+                      <Input name="eventEndTime" label="End Time" type="time" value={newEventEndTime}
+                        onChange={(e) => setNewEventEndTime(e.target.value)} icon={<Clock size={16} />} />
+                      <Input name="priceMin" label="Min Price (RM)" type="number" min="0" placeholder="0"
+                        value={newPriceMin} onChange={(e) => setNewPriceMin(e.target.value)} icon={<DollarSign size={16} />} />
+                      <Input name="priceMax" label="Max Price (RM)" type="number" min="0" placeholder="e.g. 150"
+                        value={newPriceMax} onChange={(e) => setNewPriceMax(e.target.value)} icon={<DollarSign size={16} />} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Goals</p>
+                    <div className="md:grid md:grid-cols-2 md:gap-3 space-y-2 md:space-y-0">
+                      <Textarea name="objectives" label="Objectives & Goals" placeholder="Goals and expected community impact..." rows={2} />
+                      <Textarea name="expectedImpact" label="Expected Impact" placeholder="Expected outcomes and impact..." rows={2} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </form>
+          </Drawer>
+        );
+      })()}
 
 
       {/* Create/Edit Event Template Modal */}
@@ -1478,10 +1407,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           <Input name="name" label="Template Name" placeholder="e.g. Monthly Networking Event" defaultValue={selectedTemplate?.name} required />
           <Textarea name="description" label="Description" placeholder="Template description..." defaultValue={selectedTemplate?.description} rows={3} />
           <Select name="type" label="Event Type" options={[{ label: 'Meeting', value: 'Meeting' }, { label: 'Training', value: 'Training' }, { label: 'Social', value: 'Social' }, { label: 'Project', value: 'Project' }, { label: 'International', value: 'International' }]} defaultValue={selectedTemplate?.type} required />
-          <div className="grid grid-cols-2 gap-4">
-            <Input name="defaultLocation" label="Default Location" placeholder="e.g. JCI KL Office" defaultValue={selectedTemplate?.defaultLocation} />
-            <Input name="defaultMaxAttendees" label="Default Max Attendees" type="number" defaultValue={selectedTemplate?.defaultMaxAttendees?.toString()} />
-          </div>
           <div className="grid grid-cols-2 gap-4">
             <Input name="defaultBudget" label="Default Budget (RM)" type="number" step="0.01" defaultValue={selectedTemplate?.defaultBudget?.toString()} />
             <Input name="estimatedDuration" label="Estimated Duration (hours)" type="number" step="0.5" defaultValue={selectedTemplate?.estimatedDuration?.toString()} />
@@ -1598,155 +1523,207 @@ const ProjectGrid: React.FC<{
       }
     };
 
+    const getReconciliation = (project: Project) => {
+      const acc = projectAccounts.find(a => a.projectId === project.id);
+      const bankIncome = acc?.totalIncome || 0;
+      const bankExpenses = acc?.totalExpenses || 0;
+      const bankNet = bankIncome - bankExpenses;
+      const ptData = projectTrackerTransactions.filter(tx => tx.projectId === project.id);
+      const ptIncome = ptData.filter(tx => tx.type === 'income').reduce((s, tx) => s + (tx.amount || 0), 0);
+      const ptExpenses = ptData.filter(tx => tx.type === 'expense').reduce((s, tx) => s + (tx.amount || 0), 0);
+      const ptNet = ptIncome - ptExpenses;
+      const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses;
+      const diff = ptNet - bankNet;
+      return { isMatch, diff, ptNet, bankNet };
+    };
+
     return (
       <LoadingState loading={loading} error={error} empty={false}>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {/* Always show the CTA card first */}
-          <div
-            onClick={onNewProposal}
-            className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors h-full min-h-[300px] cursor-pointer"
-          >
-            <Zap size={32} className="mb-3" />
-            <span className="font-medium">New Project</span>
-            <span className="text-xs mt-1">or submit an activity plan</span>
-            {isAdminOrBoard && (
-              <div className="mt-4 pt-4 border-t border-slate-200 w-full flex justify-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); onImport(); }}
-                  className="text-xs"
-                >
-                  <Copy size={14} className="mr-1" /> Paste Import
-                </Button>
-              </div>
-            )}
-          </div>
 
-          {/* Then render all existing projects (if any) */}
-          {projects.map(project => (
-            <Card
-              key={project.id}
-              noPadding
-              className={`flex flex-col h-full cursor-pointer transition-all group relative overflow-hidden ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'hover:border-jci-blue'}`}
-              onClick={() => onToggleSelection?.(project.id)}
-            >
-              {/* Checkbox for batch selection */}
-              <div
-                className="absolute top-4 right-4 z-20 pointer-events-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Checkbox
-                  checked={selectedIds?.has(project.id)}
-                  onChange={() => onToggleSelection?.(project.id)}
-                />
-              </div>
-
-              {/* Project Poster Image */}
-              <div className="w-full h-40 bg-slate-100 overflow-hidden relative flex-shrink-0">
-                {project.logoUrl ? (
-                  <img
-                    src={project.logoUrl}
-                    alt={project.name || project.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center text-white">
-                    <Zap size={36} className="opacity-45 animate-pulse" />
-                  </div>
-                )}
-                <div className="absolute top-3 left-3 z-10 pointer-events-none">
-                  <Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge>
-                </div>
-              </div>
-
-              {/* Content area with padding */}
-              <div className="p-4 flex flex-col flex-1 pointer-events-none">
-                <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors line-clamp-2 h-14">{project.name ?? project.title ?? 'Unnamed'}</h3>
-                <div className="space-y-4 flex-1">
-                  <div className="bg-slate-50 p-3 rounded-lg space-y-1.5 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Team Size</span>
-                      <span className="font-semibold text-slate-900">{project.teamSize ?? 0} Members</span>
+        {/*  Desktop table  */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60">
+                <th className="w-8 px-4 py-3">
+                  <Checkbox checked={selectedIds?.size === projects.length && projects.length > 0} onChange={onSelectAll} />
+                </th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-3 w-[35%]">Project</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-3">Status</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-3">Team</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-3 w-[18%]">Budget</th>
+                <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-3">Reconciliation</th>
+                <th className="px-3 py-3 w-28"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {/* New Project row */}
+              <tr className="hover:bg-slate-50/50 transition-colors cursor-pointer group" onClick={onNewProposal}>
+                <td className="px-4 py-3"></td>
+                <td className="px-3 py-3" colSpan={5}>
+                  <div className="flex items-center gap-2 text-slate-400 group-hover:text-jci-blue transition-colors">
+                    <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                      <Zap size={16} />
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Budget Used</span>
-                      <span className="font-semibold text-slate-900">{formatCurrency(project.spent ?? 0)} / {formatCurrency(project.budget ?? 0)}</span>
-                    </div>
+                    <span className="text-sm font-semibold">New Project</span>
+                    <span className="text-xs">" or submit an activity plan</span>
                   </div>
+                </td>
+                <td className="px-3 py-3">
+                  {isAdminOrBoard && (
+                    <button onClick={(e) => { e.stopPropagation(); onImport(); }}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-jci-blue transition-colors">
+                      <Copy size={12} /> Import
+                    </button>
+                  )}
+                </td>
+              </tr>
 
-                  {/* PT vs Bank Comparison Box */}
-                  {(() => {
-                    const acc = projectAccounts.find(a => a.projectId === project.id);
-                    const bankIncome = acc?.totalIncome || 0;
-                    const bankExpenses = acc?.totalExpenses || 0;
-                    const bankNet = bankIncome - bankExpenses;
-
-                    const ptData = projectTrackerTransactions.filter(tx => tx.projectId === project.id);
-                    const ptIncome = ptData
-                      .filter(tx => tx.type === 'income')
-                      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
-                    const ptExpenses = ptData
-                      .filter(tx => tx.type === 'expense')
-                      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
-                    const ptNet = ptIncome - ptExpenses;
-
-                    const isMatch = ptIncome === bankIncome && ptExpenses === bankExpenses && ptNet === bankNet;
-
-                    return (
-                      <div className={`p-3 rounded-lg border transition-all ${isMatch
-                        ? 'bg-cyan-50/40 border-cyan-100/70'
-                        : 'bg-slate-50/50 border-slate-100'
-                        }`}>
-                        <div className={`flex justify-between items-center mb-1.5 pb-1.5 border-b ${isMatch ? 'border-cyan-200/60' : 'border-slate-200'
-                          }`}>
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-xs font-semibold ${isMatch ? 'text-cyan-800' : 'text-slate-700'}`}>
-                              PT vs Bank Stats
-                            </span>
-                            {isMatch && (
-                              <CheckCircle size={12} className="text-cyan-600" />
-                            )}
-                          </div>
-                          {isMatch && (
-                            <span className="text-[10px] text-cyan-700 bg-cyan-100/80 px-1.5 py-0.5 rounded font-semibold">
-                              Reconciled
-                            </span>
-                          )}
+              {projects.map(project => {
+                const { isMatch, diff, ptNet, bankNet } = getReconciliation(project);
+                const budget = project.budget ?? 0;
+                const spent = project.spent ?? 0;
+                const budgetPct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+                return (
+                  <tr key={project.id}
+                    className={`hover:bg-slate-50/50 transition-colors cursor-pointer group ${selectedIds?.has(project.id) ? 'bg-blue-50/40' : ''}`}
+                    onClick={() => onToggleSelection?.(project.id)}>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox checked={selectedIds?.has(project.id)} onChange={() => onToggleSelection?.(project.id)} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-600 overflow-hidden shrink-0">
+                          {project.logoUrl
+                            ? <img src={project.logoUrl} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center"><Zap size={16} className="text-white opacity-70" /></div>}
                         </div>
-                        <div className="grid grid-cols-[28px_1fr_1fr] gap-y-1 gap-x-2 text-[10px]">
-                          <div></div>
-                          <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>PT</div>
-                          <div className={`text-right font-semibold uppercase tracking-wider ${isMatch ? 'text-cyan-600/70' : 'text-slate-400'}`}>Bank</div>
-
-                          <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>In</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptIncome)}</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankIncome)}</div>
-
-                          <div className={`${isMatch ? 'text-cyan-700' : 'text-slate-500'} font-medium`}>Out</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(ptExpenses)}</div>
-                          <div className={`text-right font-mono font-medium ${isMatch ? 'text-cyan-900' : 'text-slate-700'}`}>{formatCurrency(bankExpenses)}</div>
-
-                          <div className={`font-bold border-t pt-1 mt-0.5 ${isMatch ? 'text-cyan-955 border-cyan-200/60' : 'text-slate-900 border-slate-200/60'}`}>Net</div>
-                          <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${ptNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(ptNet)}
-                          </div>
-                          <div className={`text-right font-mono font-bold border-t pt-1 mt-0.5 ${isMatch ? 'border-cyan-200/60' : 'border-slate-200/60'} ${bankNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(bankNet)}
-                          </div>
+                        <p className="font-semibold text-slate-900 line-clamp-2 group-hover:text-jci-blue transition-colors leading-tight">
+                          {project.name ?? project.title ?? 'Unnamed'}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-sm font-semibold text-slate-700">{project.teamSize ?? 0}</span>
+                      <span className="text-xs text-slate-400 ml-1">pax</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-slate-700">{formatCurrency(spent)}</span>
+                          <span className="text-slate-400">/ {formatCurrency(budget)}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${budgetPct >= 90 ? 'bg-red-500' : budgetPct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                            style={{ width: `${budgetPct}%` }} />
                         </div>
                       </div>
-                    );
-                  })()}
+                    </td>
+                    <td className="px-3 py-3">
+                      {isMatch ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                          <CheckCircle size={11} /> Reconciled
+                        </span>
+                      ) : (ptNet === 0 && bankNet === 0) ? (
+                        <span className="text-xs text-slate-300">"</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                          âš  {formatCurrency(Math.abs(diff))} diff
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="text-xs font-semibold text-jci-blue hover:text-sky-600 border border-jci-blue/30 hover:border-jci-blue/60 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                        onClick={() => onSelect(project.id)}>
+                        Open Board
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/*  Mobile cards  */}
+        <div className="md:hidden space-y-3">
+          {/* New Project CTA */}
+          <div onClick={onNewProposal}
+            className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex items-center gap-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors cursor-pointer">
+            <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+              <Zap size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">New Project</p>
+              <p className="text-xs">or submit an activity plan</p>
+            </div>
+          </div>
+
+          {projects.map(project => {
+            const { isMatch, diff, ptNet, bankNet } = getReconciliation(project);
+            const budget = project.budget ?? 0;
+            const spent = project.spent ?? 0;
+            const budgetPct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+            return (
+              <div key={project.id}
+                className={`bg-white border rounded-2xl overflow-hidden transition-all ${selectedIds?.has(project.id) ? 'border-jci-blue bg-blue-50/30' : 'border-slate-100'}`}
+                onClick={() => onToggleSelection?.(project.id)}>
+                {/* Top row: thumbnail + title + status */}
+                <div className="flex items-center gap-3 p-3 pb-0">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-600 overflow-hidden shrink-0">
+                    {project.logoUrl
+                      ? <img src={project.logoUrl} alt="" className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center"><Zap size={14} className="text-white opacity-70" /></div>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{project.name ?? project.title ?? 'Unnamed'}</p>
+                    <div className="mt-0.5"><Badge variant={getStatusVariant(project.status)}>{getStatusLabel(project.status)}</Badge></div>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Checkbox checked={selectedIds?.has(project.id)} onChange={() => onToggleSelection?.(project.id)} />
+                  </div>
+                </div>
+
+                {/* Stats row */}
+                <div className="px-3 py-2 flex items-center gap-4 text-xs">
+                  <span className="text-slate-500">{project.teamSize ?? 0} pax</span>
+                  <div className="flex-1">
+                    <div className="flex justify-between mb-0.5">
+                      <span className="font-mono text-slate-600">{formatCurrency(spent)}</span>
+                      <span className="text-slate-400">/ {formatCurrency(budget)}</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${budgetPct >= 90 ? 'bg-red-500' : budgetPct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${budgetPct}%` }} />
+                    </div>
+                  </div>
+                  {isMatch ? (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full shrink-0">
+                      <CheckCircle size={9} /> Reconciled
+                    </span>
+                  ) : (ptNet === 0 && bankNet === 0) ? null : (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0">
+                      âš  {formatCurrency(Math.abs(diff))}
+                    </span>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-slate-50 px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <button className="w-full text-xs font-semibold text-jci-blue border border-jci-blue/30 rounded-lg py-1.5 hover:bg-sky-50 transition-colors"
+                    onClick={() => onSelect(project.id)}>
+                    Open Board
+                  </button>
                 </div>
               </div>
-
-              <div className="border-t border-slate-100 p-4 mt-auto">
-                <Button variant="outline" className="w-full text-sm" onClick={(e) => { e.stopPropagation(); onSelect(project.id); }}>Open Board</Button>
-              </div>
-            </Card>
-          ))}
+            );
+          })}
         </div>
+
       </LoadingState>
     );
   };
@@ -1791,100 +1768,117 @@ const ProjectAIPredictions: React.FC<{ projectId: string }> = ({ projectId }) =>
     }
   };
 
+  const FACTORS = [
+    { key: 'teamExperience', label: 'Team Experience' },
+    { key: 'budgetAdequacy', label: 'Budget Adequacy' },
+    { key: 'timelineRealism', label: 'Timeline Realism' },
+    { key: 'resourceAvailability', label: 'Resources' },
+    { key: 'memberEngagement', label: 'Engagement' },
+  ] as const;
+
   return (
-    <Card>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <BrainCircuit className="text-jci-blue" size={20} />
-          <h3 className="text-lg font-bold text-slate-900">AI Insights & Recommendations</h3>
-        </div>
-        <Tabs
-          tabs={['Success Prediction', 'Sponsor Matching']}
-          activeTab={activeTab === 'success' ? 'Success Prediction' : 'Sponsor Matching'}
-          onTabChange={(tab) => setActiveTab(tab === 'Success Prediction' ? 'success' : 'sponsors')}
-        />
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <BrainCircuit className="text-jci-blue flex-shrink-0" size={18} />
+        <h3 className="text-base font-semibold text-slate-900">AI Insights & Recommendations</h3>
       </div>
 
-      {activeTab === 'success' ? (
+      {/* Toggle tabs */}
+      <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-slate-50 p-0.5 gap-0.5">
+        {(['success', 'sponsors'] as const).map(tab => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === tab
+              ? 'bg-white text-jci-blue shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+              }`}
+          >
+            {tab === 'success' ? 'Prediction' : 'Sponsors'}
+          </button>
+        ))}
+      </div>
+
+      {/* Success Prediction */}
+      {activeTab === 'success' && (
         <LoadingState loading={isLoadingPrediction} error={null} empty={!successPrediction} emptyMessage="No prediction available">
           {successPrediction && (
-            <div className="space-y-2">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-slate-900">Project Success Probability</h4>
-                  <Badge variant="info" className={getRiskColor(successPrediction.riskLevel)}>
-                    {successPrediction.riskLevel} Risk
-                  </Badge>
-                </div>
-                <div className="flex items-end gap-4">
-                  <div className="flex-1">
-                    <div className="text-4xl font-bold text-jci-blue mb-2">
+            <div className="space-y-4">
+              {/* Probability hero card */}
+              <div className="rounded-xl bg-gradient-to-br from-jci-blue/5 to-indigo-50 border border-jci-blue/20 p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-0.5">Success Probability</p>
+                    <div className="text-4xl font-black text-jci-blue tabular-nums leading-none">
                       {successPrediction.successProbability}%
                     </div>
-                    <ProgressBar progress={successPrediction.successProbability} color="bg-jci-blue" />
                   </div>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getRiskColor(successPrediction.riskLevel)}`}>
+                    {successPrediction.riskLevel} Risk
+                  </span>
                 </div>
+                <ProgressBar progress={successPrediction.successProbability} color="primary" />
               </div>
 
+              {/* Success Factors " divide-y list with mini bars */}
               <div>
-                <h4 className="font-semibold text-slate-900 mb-3">Success Factors</h4>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Team Experience</div>
-                    <div className="text-lg font-bold text-slate-900">{successPrediction.factors.teamExperience}%</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Budget Adequacy</div>
-                    <div className="text-lg font-bold text-slate-900">{successPrediction.factors.budgetAdequacy}%</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Timeline Realism</div>
-                    <div className="text-lg font-bold text-slate-900">{successPrediction.factors.timelineRealism}%</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Resources</div>
-                    <div className="text-lg font-bold text-slate-900">{successPrediction.factors.resourceAvailability}%</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-500 mb-1">Engagement</div>
-                    <div className="text-lg font-bold text-slate-900">{successPrediction.factors.memberEngagement}%</div>
-                  </div>
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Success Factors</h4>
+                <div className="rounded-xl border border-slate-100 overflow-hidden bg-white divide-y divide-slate-100">
+                  {FACTORS.map(f => {
+                    const val: number = successPrediction.factors[f.key] ?? 0;
+                    return (
+                      <div key={f.key} className="flex items-center gap-3 px-4 py-2.5">
+                        <span className="text-sm text-slate-600 w-36 flex-shrink-0">{f.label}</span>
+                        <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${val >= 70 ? 'bg-green-400' : val >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                            style={{ width: `${val}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800 tabular-nums w-10 text-right">{val}%</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Identified Risks */}
               {successPrediction.risks && successPrediction.risks.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <AlertTriangle className="text-yellow-600" size={18} />
-                    Identified Risks
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <AlertTriangle size={13} className="text-amber-500" /> Identified Risks
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {successPrediction.risks.map((risk: any, idx: number) => (
-                      <div key={idx} className="border border-slate-200 rounded-lg p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <span className="font-medium text-slate-900">{risk.description}</span>
+                      <div key={idx} className="rounded-xl border border-slate-100 bg-white p-3">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <Badge variant={risk.severity === 'High' ? 'error' : risk.severity === 'Medium' ? 'warning' : 'neutral'}>
                             {risk.severity}
                           </Badge>
+                          <span className="text-sm font-medium text-slate-800">{risk.description}</span>
                         </div>
-                        <p className="text-sm text-slate-600">{risk.mitigation}</p>
+                        {risk.mitigation && (
+                          <p className="text-xs text-slate-400 italic mt-1">Mitigation: {risk.mitigation}</p>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
+              {/* Recommendations */}
               {successPrediction.recommendations && successPrediction.recommendations.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <TrendingUp className="text-jci-blue" size={18} />
-                    Recommendations
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <TrendingUp size={13} className="text-jci-blue" /> Recommendations
                   </h4>
-                  <ul className="space-y-2">
+                  <ul className="space-y-1.5">
                     {successPrediction.recommendations.map((rec: string, idx: number) => (
                       <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
-                        <span className="text-jci-blue mt-1">•</span>
-                        <span>{rec}</span>
+                        <CheckCircle size={14} className="flex-shrink-0 mt-0.5 text-green-500" />
+                        {rec}
                       </li>
                     ))}
                   </ul>
@@ -1893,47 +1887,47 @@ const ProjectAIPredictions: React.FC<{ projectId: string }> = ({ projectId }) =>
             </div>
           )}
         </LoadingState>
-      ) : (
+      )}
+
+      {/* Sponsor Matching */}
+      {activeTab === 'sponsors' && (
         <LoadingState loading={isLoadingSponsors} error={null} empty={sponsorMatches.length === 0} emptyMessage="No sponsor matches found">
-          <div className="space-y-4">
+          <div className="rounded-xl border border-slate-100 overflow-hidden bg-white divide-y divide-slate-100">
             {sponsorMatches.map((match, idx) => (
-              <Card key={idx} className="hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-slate-900 mb-1">{match.sponsorName}</h4>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="info">Match Score: {match.matchScore}%</Badge>
+              <div key={idx} className="p-4">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-slate-900 truncate">{match.sponsorName}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden max-w-[120px]">
+                        <div className="h-full rounded-full bg-jci-blue" style={{ width: `${match.matchScore}%` }} />
+                      </div>
+                      <span className="text-xs font-semibold text-jci-blue tabular-nums">{match.matchScore}% match</span>
                     </div>
-                    {match.reasons && match.reasons.length > 0 && (
-                      <div className="mb-3">
-                        <p className="text-xs text-slate-500 mb-1">Why this match:</p>
-                        <ul className="text-sm text-slate-700 space-y-1">
-                          {match.reasons.map((reason: string, rIdx: number) => (
-                            <li key={rIdx} className="flex items-start gap-2">
-                              <span className="text-jci-blue mt-1">•</span>
-                              <span>{reason}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {match.contactInfo && (
-                      <div className="text-sm text-slate-600">
-                        {match.contactInfo.email && <div>Email: {match.contactInfo.email}</div>}
-                        {match.contactInfo.phone && <div>Phone: {match.contactInfo.phone}</div>}
-                      </div>
-                    )}
                   </div>
-                  <Button variant="outline" size="sm">
-                    Contact
-                  </Button>
+                  <Button variant="outline" size="sm" className="flex-shrink-0">Contact</Button>
                 </div>
-              </Card>
+                {match.reasons && match.reasons.length > 0 && (
+                  <ul className="space-y-1 mt-2">
+                    {match.reasons.map((reason: string, rIdx: number) => (
+                      <li key={rIdx} className="flex items-start gap-2 text-xs text-slate-500">
+                        <span className="text-jci-blue mt-0.5">¢</span>{reason}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {match.contactInfo && (
+                  <div className="mt-2 text-xs text-slate-400 space-y-0.5">
+                    {match.contactInfo.email && <div>{match.contactInfo.email}</div>}
+                    {match.contactInfo.phone && <div>{match.contactInfo.phone}</div>}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </LoadingState>
       )}
-    </Card>
+    </div>
   );
 };
 
@@ -1981,12 +1975,12 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
     });
   };
 
-  // 使用 ref 来防止重复加载
+  // ä½¿ç"¨ ref æ¥é˜²æ­¢é‡å¤åŠ è½½
   const isLoadingRef = useRef(false);
   const lastLoadTimeRef = useRef<number>(0);
 
   const loadTasks = useCallback(async () => {
-    // 防止重复加载：如果正在加载或距离上次加载不到 500ms，则跳过
+    // é˜²æ­¢é‡å¤åŠ è½½ï¼šå¦‚æžœæ­£åœ¨åŠ è½½æˆ–è·ç¦»ä¸Šæ¬¡åŠ è½½ä¸åˆ° 500msï¼Œåˆ™è·³è¿‡
     const now = Date.now();
     if (isLoadingRef.current || (now - lastLoadTimeRef.current < 500)) {
       console.log('[Kanban] Skipping duplicate loadTasks call');
@@ -2024,10 +2018,10 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
 
   const handleTaskStatusChange = async (taskId: string, newStatus: 'Todo' | 'In Progress' | 'Done') => {
     try {
-      // updateTask 会自动记录 statusHistory
+      // updateTask ä¼šè‡ªåŠ¨è®°å½• statusHistory
       await updateTask(taskId, { status: newStatus });
       await loadTasks();
-      // 更新 selectedTask 以反映新状态
+      // æ›´æ–° selectedTask ä»¥åæ˜ æ–°çŠ¶æ€
       if (selectedTask && selectedTask.id === taskId) {
         const updatedTask = await getTaskById(taskId);
         if (updatedTask) {
@@ -2047,11 +2041,11 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
     }
 
     try {
-      // 获取现有 task 以合并 remarks
+      // èŽ·å–çŽ°æœ‰ task ä»¥åˆå¹¶ remarks
       const existingTask = await getTaskById(taskId);
       const existingRemarks = existingTask?.remarks || {};
 
-      // 添加新 remark
+      // æ·»åŠ æ–° remark
       const remarkId = `remark-${Date.now()}`;
       const updatedRemarks = {
         ...existingRemarks,
@@ -2065,7 +2059,7 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
       setNewRemark('');
       await loadTasks();
 
-      // 更新 selectedTask
+      // æ›´æ–° selectedTask
       if (selectedTask && selectedTask.id === taskId) {
         const updatedTask = await getTaskById(taskId);
         if (updatedTask) {
@@ -2130,129 +2124,145 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
     return member?.name || memberId;
   };
 
+  const COL_STYLE: Record<string, { border: string; badge: string; dot: string }> = {
+    'Todo': { border: 'border-l-4 border-slate-400', badge: 'bg-slate-200 text-slate-600', dot: 'bg-slate-400' },
+    'In Progress': { border: 'border-l-4 border-jci-blue', badge: 'bg-jci-blue/10 text-jci-blue', dot: 'bg-jci-blue' },
+    'Done': { border: 'border-l-4 border-green-500', badge: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
+  };
+
+  const [collapsedCols, setCollapsedCols] = useState<Set<string>>(new Set(['Todo', 'Done']));
+  const toggleCol = (col: string) => setCollapsedCols(prev => {
+    const next = new Set(prev);
+    next.has(col) ? next.delete(col) : next.add(col);
+    return next;
+  });
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
   return (
     <>
-      <div className="flex gap-6 overflow-x-auto pb-6">
+      {/* Desktop: horizontal 3-column scroll; Mobile: stacked accordion */}
+      <div className="md:flex md:gap-5 md:overflow-x-auto md:pb-6 space-y-3 md:space-y-0">
         {columns.map(col => {
-          const columnTasks = tasks.filter(t => {
-            const taskStatus = String(t.status || 'Todo').trim();
-            return taskStatus === col;
-          });
-          console.log(`[Kanban] Column ${col}: ${columnTasks.length} tasks`, columnTasks.map(t => ({ id: t.id, title: t.title, status: t.status, statusType: typeof t.status, assignee: t.assignee })));
-          // 调试：显示所有任务的状态
-          if (col === 'Todo' && columnTasks.length === 0 && tasks.length > 0) {
-            console.log('[Kanban] All tasks statuses:', tasks.map(t => ({ id: t.id, title: t.title, status: t.status, statusType: typeof t.status })));
-          }
+          const columnTasks = tasks.filter(t => String(t.status || 'Todo').trim() === col);
+          const style = COL_STYLE[col];
+          const isCollapsed = collapsedCols.has(col);
+
           return (
             <div
               key={col}
-              className={`w-80 flex-shrink-0 flex flex-col bg-slate-100 rounded-xl max-h-[600px] transition-all ${dragOverColumn === col ? 'ring-2 ring-jci-blue ring-offset-2' : ''
-                }`}
+              className={`md:w-80 md:flex-shrink-0 md:flex md:flex-col bg-slate-50 rounded-xl transition-all ${style.border} ${dragOverColumn === col ? 'ring-2 ring-jci-blue ring-offset-2' : ''}`}
               onDragOver={(e) => handleDragOver(e, col)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, col)}
             >
-              <div className="p-4 font-bold text-slate-700 flex justify-between items-center">
-                {col}
-                <span className="bg-slate-200 text-slate-600 text-xs px-2 py-0.5 rounded-full">
-                  {columnTasks.length}
-                </span>
+              {/* Column header */}
+              <div
+                className="px-4 py-3 flex justify-between items-center cursor-pointer md:cursor-default select-none"
+                onClick={() => toggleCol(col)}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
+                  <span className="font-semibold text-sm text-slate-700">{col}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${style.badge}`}>
+                    {columnTasks.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="text-slate-400 hover:text-jci-blue p-1 rounded transition-colors hidden md:block"
+                    onClick={(e) => { e.stopPropagation(); setSelectedTask(null); setIsTaskModalOpen(true); }}
+                    title="Add task"
+                  >
+                    <Plus size={15} />
+                  </button>
+                  <ChevronDown size={16} className={`text-slate-400 transition-transform md:hidden ${isCollapsed ? '' : 'rotate-180'}`} />
+                </div>
               </div>
-              <div className="p-3 space-y-3 overflow-y-auto flex-1">
+
+              {/* Tasks list */}
+              <div className={`${isCollapsed ? 'hidden md:block' : ''} px-3 pb-3 space-y-2 md:overflow-y-auto md:flex-1 md:max-h-[560px]`}>
                 {loading ? (
-                  <div className="text-center py-8 text-slate-400 text-sm">Loading tasks...</div>
+                  <div className="text-center py-6 text-slate-400 text-sm">Loading</div>
                 ) : (
                   <>
-                    {columnTasks.map(task => (
-                      <div
-                        key={task.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, task)}
-                        className={`bg-white p-3 rounded shadow-sm border border-slate-200 cursor-move hover:shadow-md transition-all ${draggedTask?.id === task.id ? 'opacity-50' : ''
-                          }`}
-                        onClick={() => setSelectedTask(task)}
-                      >
-                        {/* Header: Title and Due Date */}
-                        <div className="flex justify-between items-start mb-1">
-                          <h4 className="text-sm font-bold text-slate-800 line-clamp-2 pr-2" title={task.title}>{task.title}</h4>
-                          <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                            {new Date(task.dueDate).toLocaleDateString()}
-                          </span>
-                        </div>
+                    {columnTasks.map(task => {
+                      const due = task.dueDate ? new Date(task.dueDate) : null;
+                      const isOverdue = due && due < today && col !== 'Done';
+                      const latestRemark = getLatestRemark(task);
+                      const allRemarks = getSortedRemarks(task.remarks);
+                      const isExpanded = expandedRemarks.has(task.id);
 
-                        {/* Middle: Role(Name) and Priority */}
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="text-[10px] text-slate-600 truncate mr-2" title={task.role ? `${task.role}(${getMemberName(task.assignee)})` : getMemberName(task.assignee)}>
-                            {task.role ? `${task.role}(${getMemberName(task.assignee)})` : getMemberName(task.assignee)}
-                          </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${task.priority === 'High' ? 'bg-red-50 text-red-600' :
-                            task.priority === 'Medium' ? 'bg-yellow-50 text-yellow-600' :
-                              'bg-blue-50 text-blue-600'
-                            }`}>
-                            {task.priority}
-                          </span>
-                        </div>
+                      return (
+                        <div
+                          key={task.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, task)}
+                          className={`bg-white p-3 rounded-lg shadow-sm border border-slate-200 cursor-move hover:shadow-md transition-all ${draggedTask?.id === task.id ? 'opacity-40' : ''}`}
+                          onClick={() => setSelectedTask(task)}
+                        >
+                          {/* Title row */}
+                          <h4 className="text-sm font-semibold text-slate-800 line-clamp-2 mb-2">{task.title}</h4>
 
-                        {/* Remarks Section */}
-                        {(() => {
-                          const latestRemark = getLatestRemark(task);
-                          const allRemarks = getSortedRemarks(task.remarks);
-                          const isExpanded = expandedRemarks.has(task.id);
-                          const hasRemarks = allRemarks.length > 0;
+                          {/* Meta row */}
+                          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                            {task.role && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">{task.role}</span>
+                            )}
+                            <span className="text-xs text-slate-500 truncate">{getMemberName(task.assignee)}</span>
+                          </div>
 
-                          if (!hasRemarks) return null;
+                          {/* Footer row: priority + due date */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${task.priority === 'High' ? 'bg-red-50 text-red-600' : task.priority === 'Medium' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                              {task.priority}
+                            </span>
+                            {due && (
+                              <span className={`flex items-center gap-0.5 text-[10px] font-medium ${isOverdue ? 'text-red-500' : 'text-slate-400'}`}>
+                                <Calendar size={10} />
+                                {due.toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
 
-                          return (
-                            <div className="mb-2 border-t border-slate-100 pt-2 flex justify-between items-start gap-2">
-                              <div className="flex-1 min-w-0">
-                                {/* Latest Remark */}
-                                {!isExpanded && latestRemark && (
-                                  <div className="text-xs text-slate-600 bg-slate-50 p-2 rounded">
-                                    <div className="line-clamp-2">{latestRemark.content}</div>
-                                    <div className="text-[10px] text-slate-400 mt-1">
-                                      {new Date(latestRemark.timestamp).toLocaleString()}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* All Remarks (when expanded) */}
-                                {isExpanded && (
-                                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                                    {allRemarks.map((remark) => (
-                                      <div key={remark.id} className="text-xs text-slate-600 bg-slate-50 p-2 rounded">
-                                        <div>{remark.content}</div>
-                                        <div className="text-[10px] text-slate-400 mt-1">
-                                          {new Date(remark.timestamp).toLocaleString()}
+                          {/* Latest remark */}
+                          {allRemarks.length > 0 && (
+                            <div className="mt-2 border-t border-slate-100 pt-2">
+                              <div className="flex justify-between items-start gap-1">
+                                <div className="flex-1 min-w-0">
+                                  {!isExpanded && latestRemark && (
+                                    <p className="text-xs text-slate-500 line-clamp-2 bg-slate-50 rounded px-2 py-1">{latestRemark.content}</p>
+                                  )}
+                                  {isExpanded && (
+                                    <div className="space-y-1 max-h-28 overflow-y-auto">
+                                      {allRemarks.map(r => (
+                                        <div key={r.id} className="text-xs text-slate-500 bg-slate-50 rounded px-2 py-1">
+                                          <p>{r.content}</p>
+                                          <p className="text-[10px] text-slate-400 mt-0.5">{new Date(r.timestamp).toLocaleString()}</p>
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {allRemarks.length > 1 && (
+                                  <button
+                                    onClick={(e) => toggleRemarksExpansion(task.id, e)}
+                                    className="flex-shrink-0 text-slate-400 hover:text-jci-blue p-0.5 rounded"
+                                  >
+                                    {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                  </button>
                                 )}
                               </div>
-
-                              {/* Expand/Collapse Button (Icon only, on the right) */}
-                              {allRemarks.length > 1 && (
-                                <button
-                                  onClick={(e) => toggleRemarksExpansion(task.id, e)}
-                                  className="text-jci-blue hover:text-jci-blue-dark mt-1 p-1 hover:bg-slate-100 rounded transition-colors"
-                                  title={isExpanded ? "Show less" : `View all (${allRemarks.length})`}
-                                >
-                                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                </button>
-                              )}
                             </div>
-                          );
-                        })()}
+                          )}
+                        </div>
+                      );
+                    })}
 
-
-                      </div>
-                    ))}
+                    {/* Add task button */}
                     <button
-                      className="w-full py-2 text-slate-400 hover:text-slate-600 text-sm border border-dashed border-slate-300 rounded hover:bg-white transition-colors"
-                      onClick={() => {
-                        setSelectedTask(null);
-                        setIsTaskModalOpen(true);
-                      }}
+                      className="w-full py-2 text-slate-400 hover:text-slate-600 text-sm border border-dashed border-slate-200 rounded-lg hover:bg-white transition-colors"
+                      onClick={(e) => { e.stopPropagation(); setSelectedTask(null); setIsTaskModalOpen(true); }}
                     >
                       + Add Task
                     </button>
@@ -2267,26 +2277,22 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
       {/* Task Modal */}
       <Modal
         isOpen={isTaskModalOpen || !!selectedTask}
-        onClose={() => {
-          setIsTaskModalOpen(false);
-          setSelectedTask(null);
-          setNewRemark('');
-          setShowStatusHistory(false);
-        }}
-        title={selectedTask ? 'Task Details' : 'Create New Task'}
+        onClose={() => { setIsTaskModalOpen(false); setSelectedTask(null); setNewRemark(''); setShowStatusHistory(false); }}
+        title={selectedTask ? 'Task Details' : 'New Task'}
         drawerOnMobile
       >
         {selectedTask ? (
           <div className="space-y-4">
+            {/* Title + meta */}
             <div>
-              <h3 className="font-bold text-lg mb-2">{selectedTask.title}</h3>
-              <div className="flex gap-2 mb-4">
-                <Badge variant={selectedTask.priority === 'High' ? 'error' : selectedTask.priority === 'Medium' ? 'warning' : 'info'}>
-                  {selectedTask.priority}
-                </Badge>
-                <Badge variant="neutral">{selectedTask.status}</Badge>
-                <div className="ml-auto flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Priority:</span>
+              <h3 className="font-bold text-base text-slate-900 mb-3">{selectedTask.title}</h3>
+              <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-slate-500">Status</span>
+                  <Badge variant="neutral">{selectedTask.status}</Badge>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-slate-500">Priority</span>
                   <select
                     value={selectedTask.priority}
                     onChange={(e) => {
@@ -2297,54 +2303,47 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
                         showToast('Priority updated', 'success');
                       });
                     }}
-                    className="text-xs bg-white border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-jci-blue"
+                    className="text-xs bg-white border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-jci-blue"
                   >
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
                   </select>
                 </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="text-slate-500">Assigned to:</span> {selectedTask.role ? `${selectedTask.role}(${getMemberName(selectedTask.assignee)})` : getMemberName(selectedTask.assignee)}
+                <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-slate-500">Assigned to</span>
+                  <span className="font-medium text-slate-800">
+                    {selectedTask.role ? `${selectedTask.role} · ` : ''}{getMemberName(selectedTask.assignee)}
+                  </span>
                 </div>
-                <div>
-                  <span className="text-slate-500">Due date:</span> {new Date(selectedTask.dueDate).toLocaleDateString()}
+                <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="text-slate-500">Due date</span>
+                  <span className="font-medium text-slate-800">{new Date(selectedTask.dueDate).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
 
-
-
-            {/* Remarks Section */}
-            <div className="border-t pt-4">
+            {/* Remarks */}
+            <div>
               <div className="text-sm font-semibold text-slate-700 mb-2">Remarks</div>
-              <div className="space-y-2 mb-3">
-                <Textarea
-                  value={newRemark}
-                  onChange={(e) => setNewRemark(e.target.value)}
-                  placeholder="Add a remark..."
-                  rows={3}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleAddRemark(selectedTask.id)}
-                    disabled={!newRemark.trim()}
-                  >
-                    Add Remark
-                  </Button>
-                </div>
+              <Textarea
+                value={newRemark}
+                onChange={(e) => setNewRemark(e.target.value)}
+                placeholder="Add a remark"
+                rows={3}
+              />
+              <div className="flex justify-end mt-2">
+                <Button type="button" size="sm" onClick={() => handleAddRemark(selectedTask.id)} disabled={!newRemark.trim()}>
+                  Add Remark
+                </Button>
               </div>
               {selectedTask.remarks && Object.keys(selectedTask.remarks).length > 0 && (
-                <div className="space-y-2 max-h-60 overflow-y-auto mt-4">
+                <div className="space-y-2 max-h-52 overflow-y-auto mt-3">
                   {Object.entries(selectedTask.remarks)
                     .sort(([, a], [, b]) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                     .map(([id, remark]) => (
-                      <div key={id} className="text-sm bg-slate-50 p-3 rounded border border-slate-200 flex justify-between items-start gap-3">
-                        <div className="text-slate-800 flex-1">{remark.content}</div>
+                      <div key={id} className="text-sm bg-slate-50 rounded-lg border border-slate-100 px-3 py-2.5 flex justify-between items-start gap-3">
+                        <div className="text-slate-700 flex-1">{remark.content}</div>
                         <div className="text-xs text-slate-400 whitespace-nowrap">{new Date(remark.timestamp).toLocaleString()}</div>
                       </div>
                     ))}
@@ -2352,12 +2351,8 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
               )}
             </div>
 
-            <div className="pt-4 flex justify-end border-t">
-              <Button variant="outline" onClick={() => {
-                setSelectedTask(null);
-                setNewRemark('');
-                setShowStatusHistory(false);
-              }}>Close</Button>
+            <div className="pt-3 flex justify-end border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => { setSelectedTask(null); setNewRemark(''); setShowStatusHistory(false); }}>Close</Button>
             </div>
           </div>
         ) : (
@@ -2384,7 +2379,7 @@ const ProjectKanban: React.FC<{ projectId: string; projectName: string; project:
                 ...members.map(m => ({ label: m.name, value: m.id }))
               ]}
             />
-            <div className="pt-4 flex gap-3">
+            <div className="pt-2 flex gap-3">
               <Button className="flex-1" type="submit">Create Task</Button>
               <Button variant="ghost" type="button" onClick={() => setIsTaskModalOpen(false)}>Cancel</Button>
             </div>
@@ -2474,31 +2469,42 @@ const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, onUpdate
     }
   };
 
+  const TAB_ITEMS: { key: typeof activeTab; label: string; shortLabel: string }[] = [
+    { key: 'activity-plan', label: 'Activity Plan', shortLabel: 'Plan' },
+    { key: 'committee', label: 'Event Committee', shortLabel: 'Committee' },
+    { key: 'trainers', label: 'Trainers', shortLabel: 'Trainers' },
+    { key: 'kanban', label: 'Kanban Board', shortLabel: 'Kanban' },
+    { key: 'gantt', label: 'Gantt Chart', shortLabel: 'Gantt' },
+    { key: 'finance', label: 'Financial Account', shortLabel: 'Finance' },
+    { key: 'reports', label: 'Reports', shortLabel: 'Reports' },
+    { key: 'ai', label: 'AI Insights', shortLabel: 'AI' },
+  ];
+
   return (
     <>
       <Card noPadding>
-        <div className="px-6 pt-4">
+        {/* Mobile: select dropdown */}
+        <div className="md:hidden px-4 pt-4 pb-2 border-b border-slate-100">
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as typeof activeTab)}
+            className="w-full text-sm font-semibold border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:ring-2 focus:ring-jci-blue focus:border-jci-blue outline-none appearance-none cursor-pointer text-slate-800"
+          >
+            {TAB_ITEMS.map(t => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+        {/* Desktop: horizontal underline tabs with short labels */}
+        <div className="hidden md:block px-6 pt-4 border-b border-slate-100">
           <Tabs
-            tabs={['Activity Plan', 'Event Committee', 'Trainers', 'Kanban Board', 'Gantt Chart', 'Financial Account', 'Reports', 'AI Insights']}
-            activeTab={
-              activeTab === 'activity-plan' ? 'Activity Plan' :
-                activeTab === 'committee' ? 'Event Committee' :
-                  activeTab === 'trainers' ? 'Trainers' :
-                    activeTab === 'kanban' ? 'Kanban Board' :
-                      activeTab === 'gantt' ? 'Gantt Chart' :
-                        activeTab === 'finance' ? 'Financial Account' :
-                          activeTab === 'reports' ? 'Reports' : 'AI Insights'
-            }
+            tabs={TAB_ITEMS.map(t => t.shortLabel)}
+            activeTab={TAB_ITEMS.find(t => t.key === activeTab)?.shortLabel ?? 'Plan'}
             onTabChange={(tab) => {
-              if (tab === 'Activity Plan') setActiveTab('activity-plan');
-              else if (tab === 'Event Committee') setActiveTab('committee');
-              else if (tab === 'Trainers') setActiveTab('trainers');
-              else if (tab === 'Kanban Board') setActiveTab('kanban');
-              else if (tab === 'Gantt Chart') setActiveTab('gantt');
-              else if (tab === 'Financial Account') setActiveTab('finance');
-              else if (tab === 'Reports') setActiveTab('reports');
-              else setActiveTab('ai');
+              const found = TAB_ITEMS.find(t => t.shortLabel === tab);
+              if (found) setActiveTab(found.key);
             }}
+            className="border-b-0"
           />
         </div>
         <div className="p-4">
@@ -2605,12 +2611,9 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
 }) => {
   const { showToast } = useToast();
 
-  const handleClaimReimbursement = () => {
-    sessionStorage.setItem('pr_preselected_project_id', projectId);
-    sessionStorage.setItem('pr_preselected_category', 'projects_activities');
-    sessionStorage.setItem('pr_auto_open_submit', 'true');
-    onNavigate?.('PAYMENT_REQUESTS');
-  };
+  const [isClaimDrawerOpen, setIsClaimDrawerOpen] = useState(false);
+
+  const handleClaimReimbursement = () => setIsClaimDrawerOpen(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bankTransactions, setBankTransactions] = useState<Transaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -2618,6 +2621,8 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [newBudget, setNewBudget] = useState(0);
   const [activeFinancialTab, setActiveFinancialTab] = useState('budget');
+  const [activeTrxType, setActiveTrxType] = useState<'Income' | 'Expense'>('Income');
+  const [activeBankTrxType, setActiveBankTrxType] = useState<'Income' | 'Expense'>('Income');
   const [incomePurposeValue, setIncomePurposeValue] = useState('');
   const [expensePurposeValue, setExpensePurposeValue] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -3154,1191 +3159,790 @@ const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = ({
   const remainingBudget = account.budget - totalExpenses;
 
   return (
-    <div className="space-y-6">
-      <Tabs
-        tabs={[
-          { id: 'budget', label: 'Project Budget' },
-          { id: 'projectTrx', label: 'Projects Transactions' },
-          { id: 'bankTrx', label: 'Bank Transactions' }
-        ]}
-        activeTab={activeFinancialTab}
-        onTabChange={setActiveFinancialTab}
-      />
+    <>
+      <div className="space-y-6">
+        <Tabs
+          tabs={[
+            { id: 'budget', label: 'Budget' },
+            { id: 'projectTrx', label: 'Transactions' },
+            { id: 'bankTrx', label: 'Bank Trx' }
+          ]}
+          activeTab={activeFinancialTab}
+          onTabChange={setActiveFinancialTab}
+        />
 
-      {activeFinancialTab === 'budget' && (
-        <div className="space-y-6 animate-in fade-in duration-500">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <div className="flex justify-between items-start mb-1">
-                <div className="text-sm text-slate-500">Budget</div>
-                <button onClick={() => setIsEditingBudget(true)} className="text-slate-400 hover:text-jci-blue transition-colors">
-                  <Edit size={14} />
+        {activeFinancialTab === 'budget' && (
+          <div className="space-y-4 animate-in fade-in duration-500">
+            {/* KPI strip — rows on mobile, 4-col grid on desktop */}
+            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-100 shadow-sm md:bg-transparent md:border-none md:rounded-none md:overflow-visible md:shadow-none md:divide-y-0 md:grid md:grid-cols-4 md:gap-2">
+              {/* Budget */}
+              <div className="flex justify-between items-center px-4 py-2.5 md:block md:rounded-xl md:border md:border-slate-200 md:bg-white md:px-3 md:py-2.5 md:shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-slate-400 md:uppercase md:tracking-wider md:block md:mb-1">Budget</span>
+                  <button onClick={() => setIsEditingBudget(true)} className="text-slate-300 hover:text-jci-blue transition-colors md:hidden"><Edit size={12} /></button>
+                </div>
+                <div className="md:hidden">
+                  {isEditingBudget ? (
+                    <div className="flex gap-1 items-center">
+                      <Input type="number" value={newBudget.toString()} onChange={(e) => setNewBudget(parseFloat(e.target.value) || 0)} className="h-7 text-xs w-28" />
+                      <Button size="sm" onClick={handleSaveBudget}><Check size={12} /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => setIsEditingBudget(false)}><X size={12} /></Button>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-bold font-mono text-slate-900 tabular-nums">{formatCurrency(account.budget, account.currency)}</span>
+                  )}
+                </div>
+                <div className="hidden md:block">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Budget</span>
+                    <button onClick={() => setIsEditingBudget(true)} className="text-slate-300 hover:text-jci-blue transition-colors"><Edit size={12} /></button>
+                  </div>
+                  {isEditingBudget ? (
+                    <div className="flex gap-1 items-center">
+                      <Input type="number" value={newBudget.toString()} onChange={(e) => setNewBudget(parseFloat(e.target.value) || 0)} className="h-7 text-xs" />
+                      <Button size="sm" onClick={handleSaveBudget}><Check size={12} /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => setIsEditingBudget(false)}><X size={12} /></Button>
+                    </div>
+                  ) : (
+                    <div className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(account.budget, account.currency)}</div>
+                  )}
+                </div>
+              </div>
+              {/* Income */}
+              <div className="flex justify-between items-center px-4 py-2.5 md:block md:rounded-xl md:border md:border-green-100 md:bg-green-50 md:px-3 md:py-2.5 md:shadow-sm">
+                <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-green-600 md:uppercase md:tracking-wider md:block md:mb-1">Income</span>
+                <span className="text-sm font-bold font-mono text-green-700 tabular-nums md:text-base">{formatCurrency(totalIncome, account.currency)}</span>
+              </div>
+              {/* Expenses */}
+              <div className="flex justify-between items-center px-4 py-2.5 md:block md:rounded-xl md:border md:border-red-100 md:bg-red-50 md:px-3 md:py-2.5 md:shadow-sm">
+                <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-red-500 md:uppercase md:tracking-wider md:block md:mb-1">Expenses</span>
+                <span className="text-sm font-bold font-mono text-red-600 tabular-nums md:text-base">{formatCurrency(totalExpenses, account.currency)}</span>
+              </div>
+              {/* Balance */}
+              <div className={`flex justify-between items-center px-4 py-2.5 md:block md:rounded-xl md:border md:px-3 md:py-2.5 md:shadow-sm ${remainingBudget >= 0 ? 'md:border-emerald-100 md:bg-emerald-50' : 'md:border-red-100 md:bg-red-50'}`}>
+                <span className={`text-sm text-slate-500 md:text-[10px] md:font-semibold md:uppercase md:tracking-wider md:block md:mb-1 ${remainingBudget >= 0 ? 'md:text-emerald-600' : 'md:text-red-500'}`}>Balance</span>
+                <span className={`text-sm font-bold font-mono tabular-nums md:text-base ${remainingBudget >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(remainingBudget, account.currency)}</span>
+              </div>
+            </div>
+
+            {/* Main card " single unified card, 2-col on desktop */}
+            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+
+                {/* Left: utilization hero */}
+                <div className="px-4 py-5 space-y-4">
+                  {/* Big % + label */}
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Budget Utilization</p>
+                      <p className={`text-4xl font-black tabular-nums leading-none ${budgetUtilization > 100 ? 'text-red-600' : budgetUtilization > 80 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                        {budgetUtilization.toFixed(1)}<span className="text-xl font-bold">%</span>
+                      </p>
+                    </div>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${budgetUtilization > 100 ? 'bg-red-100 text-red-600' : budgetUtilization > 80 ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                      {budgetUtilization > 100 ? 'Over Budget' : budgetUtilization > 80 ? 'High Usage' : 'On Track'}
+                    </span>
+                  </div>
+
+                  {/* Progress bar " thicker */}
+                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${budgetUtilization > 100 ? 'bg-red-500' : budgetUtilization > 80 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(budgetUtilization, 100)}%` }}
+                    />
+                  </div>
+
+                  {/* Breakdown list */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-500">Total Budget</span>
+                      <span className="font-semibold tabular-nums">{formatCurrency(account.budget, account.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-500">Expenses</span>
+                      <span className="font-semibold text-red-600 tabular-nums">{formatCurrency(totalExpenses, account.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
+                      <span className="font-semibold text-slate-800">Remaining</span>
+                      <span className={`font-bold tabular-nums ${remainingBudget >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(remainingBudget, account.currency)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: income vs expense + actions */}
+                <div className="px-4 py-5 space-y-4">
+                  {/* Income vs Expenses visual bar */}
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Income vs Expenses</p>
+                    {(() => {
+                      const total = totalIncome + totalExpenses || 1;
+                      const incomePct = Math.round((totalIncome / total) * 100);
+                      const expensePct = 100 - incomePct;
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5">
+                            <div className="bg-emerald-400 rounded-l-full transition-all" style={{ width: `${incomePct}%` }} />
+                            <div className="bg-red-400 rounded-r-full transition-all" style={{ width: `${expensePct}%` }} />
+                          </div>
+                          <div className="flex justify-between text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Income {incomePct}%</span>
+                            <span className="flex items-center gap-1">Expenses {expensePct}%<span className="w-2 h-2 rounded-full bg-red-400 inline-block" /></span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Net position */}
+                  <div className="rounded-xl bg-slate-50 border border-slate-100 px-3.5 py-3">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Net Position</p>
+                    <p className={`text-xl font-black tabular-nums ${totalIncome - totalExpenses >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {totalIncome - totalExpenses >= 0 ? '+' : ''}{formatCurrency(totalIncome - totalExpenses, account.currency)}
+                    </p>
+                  </div>
+
+                  {account.lastReconciled && (
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Clock size={11} />Last reconciled: {formatDate(toDate(account.lastReconciled))}
+                    </p>
+                  )}
+
+                  {/* Actions */}
+                  <div className="pt-1">
+                    <Button variant="success" size="sm" className="w-full" onClick={handleClaimReimbursement}>
+                      <DollarSign size={13} className="mr-1.5" />Claim Reimbursement
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeFinancialTab === 'projectTrx' && (
+          <div className="space-y-4 animate-in slide-in-from-right-2 duration-300">
+
+            {/* Summary strip — rows on mobile, 3-col on desktop */}
+            <div className="bg-white rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-100 shadow-sm md:bg-transparent md:border-none md:rounded-none md:overflow-visible md:shadow-none md:divide-y-0 md:grid md:grid-cols-3 md:gap-2">
+              <div className="flex justify-between items-center px-4 py-2.5 md:block md:bg-green-50 md:border md:border-green-100 md:rounded-xl md:px-3 md:py-2.5">
+                <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-green-600 md:uppercase md:tracking-wider md:block md:mb-0.5">Income</span>
+                <span className="text-sm font-bold font-mono text-green-700 tabular-nums md:text-base">{formatCurrency(totalIncome, account.currency)}</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2.5 md:block md:bg-red-50 md:border md:border-red-100 md:rounded-xl md:px-3 md:py-2.5">
+                <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-red-500 md:uppercase md:tracking-wider md:block md:mb-0.5">Expenses</span>
+                <span className="text-sm font-bold font-mono text-red-600 tabular-nums md:text-base">{formatCurrency(totalExpenses, account.currency)}</span>
+              </div>
+              <div className={`flex justify-between items-center px-4 py-2.5 md:block md:border md:rounded-xl md:px-3 md:py-2.5 ${(totalIncome - totalExpenses) >= 0 ? 'md:bg-slate-50 md:border-slate-200' : 'md:bg-rose-50 md:border-rose-100'}`}>
+                <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-slate-500 md:uppercase md:tracking-wider md:block md:mb-0.5">Net</span>
+                <span className={`text-sm font-bold font-mono tabular-nums md:text-base ${(totalIncome - totalExpenses) >= 0 ? 'text-slate-800' : 'text-rose-600'}`}>{formatCurrency(totalIncome - totalExpenses, account.currency)}</span>
+              </div>
+            </div>
+
+            {/* Type toggle + Add button */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex bg-slate-100 p-1 rounded-lg gap-1 shrink-0">
+                <button type="button"
+                  onClick={() => { setActiveTrxType('Income'); setSelectedProjectTxIds([]); }}
+                  className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTrxType === 'Income' ? 'bg-white text-green-700 shadow-sm border border-green-200' : 'text-slate-500 hover:text-slate-800'}`}>
+                  Income <span className="ml-1 text-xs font-mono opacity-70">{transactions.filter(t => t.type === 'Income').length}</span>
+                </button>
+                <button type="button"
+                  onClick={() => { setActiveTrxType('Expense'); setSelectedProjectTxIds([]); }}
+                  className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${activeTrxType === 'Expense' ? 'bg-white text-red-600 shadow-sm border border-red-200' : 'text-slate-500 hover:text-slate-800'}`}>
+                  Expenses <span className="ml-1 text-xs font-mono opacity-70">{transactions.filter(t => t.type === 'Expense').length}</span>
                 </button>
               </div>
-              {isEditingBudget ? (
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="number"
-                    value={newBudget.toString()}
-                    onChange={(e) => setNewBudget(parseFloat(e.target.value) || 0)}
-                    className="h-8 text-sm"
-                  />
-                  <Button size="sm" onClick={handleSaveBudget}><Check size={14} /></Button>
-                  <Button size="sm" variant="ghost" onClick={() => setIsEditingBudget(false)}><X size={14} /></Button>
-                </div>
-              ) : (
-                <div className="text-2xl font-bold text-slate-900">{formatCurrency(account.budget, account.currency)}</div>
-              )}
-            </Card>
-            <Card>
-              <div className="text-sm text-slate-500 mb-1">Allocated</div>
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(account.budget, account.currency)}</div>
-            </Card>
-            <Card>
-              <div className="text-sm text-slate-500 mb-1">Expenses</div>
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses, account.currency)}</div>
-            </Card>
-            <Card>
-              <div className="text-sm text-slate-500 mb-1">Balance</div>
-              <div className={`text-2xl font-bold ${remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(remainingBudget, account.currency)}
+              <div className="flex items-center gap-2">
+                <Combobox
+                  className="w-36 hidden sm:block"
+                  placeholder="Purpose..."
+                  options={uniquePurposes}
+                  value={activeTrxType === 'Income' ? incomePurposeValue : expensePurposeValue}
+                  onChange={activeTrxType === 'Income' ? setIncomePurposeValue : setExpensePurposeValue}
+                />
+                <Button size="sm" variant="ghost" className="text-jci-blue hover:bg-jci-blue/10"
+                  onClick={() => activeTrxType === 'Income' ? startInlineAdd('Income', incomePurposeValue) : startInlineAdd('Expense', expensePurposeValue)}>
+                  <Plus size={15} className="mr-1" /> Add
+                </Button>
               </div>
-            </Card>
-          </div>
+            </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card title="Budget Health" className="lg:col-span-1 border-jci-blue/20">
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-slate-500">Budget Utilization</span>
-                    <span className={`font-semibold ${budgetUtilization > 100 ? 'text-red-600' : 'text-slate-700'}`}>
-                      {budgetUtilization.toFixed(1)}%
-                    </span>
-                  </div>
-                  <ProgressBar
-                    progress={Math.min(budgetUtilization, 100)}
-                    color={budgetUtilization > 90 ? (budgetUtilization > 100 ? 'danger' : 'warning') : 'primary'}
+            {loadingTransactions && (
+              <div className="flex justify-center py-8">
+                <RefreshCw className="animate-spin text-jci-blue" size={28} />
+              </div>
+            )}
+
+            {/* Desktop table */}
+            {!loadingTransactions && (
+              <Card className="hidden md:block overflow-hidden border-none shadow-sm" noPadding>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm"
+                    onPaste={(e) => handleTablePaste(e, activeTrxType, activeTrxType === 'Income' ? incomePurposeValue : expensePurposeValue)}>
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="py-2.5 px-3 w-[36px]">
+                          <Checkbox
+                            checked={transactions.filter(t => t.type === activeTrxType).length > 0 && transactions.filter(t => t.type === activeTrxType).every(t => selectedProjectTxIds.includes(t.id))}
+                            onChange={(e) => {
+                              const ids = transactions.filter(t => t.type === activeTrxType).map(t => t.id);
+                              if (e.target.checked) setSelectedProjectTxIds([...new Set([...selectedProjectTxIds, ...ids])]);
+                              else setSelectedProjectTxIds(selectedProjectTxIds.filter(id => !ids.includes(id)));
+                            }}
+                          />
+                        </th>
+                        <th className="py-2.5 px-2 text-xs font-semibold w-[32%]">Item / Category</th>
+                        <th className="py-2.5 px-2 text-xs font-semibold w-[18%]">Ref No.</th>
+                        <th className="py-2.5 px-2 text-xs font-semibold w-[18%]">Account</th>
+                        <th className="py-2.5 px-2 text-xs font-semibold text-right w-[12%]">Amount</th>
+                        <th className="py-2.5 px-2 text-xs font-semibold w-[10%]">Date</th>
+                        <th className="py-2.5 px-2 text-xs font-semibold w-[12%]">Reconciled</th>
+                        <th className="py-2.5 px-2 w-[44px]"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {/* Inline add row */}
+                      {((activeTrxType === 'Income' && isAddingIncome) || (activeTrxType === 'Expense' && isAddingExpense)) && (
+                        <tr className={activeTrxType === 'Income' ? 'bg-green-50/40' : 'bg-red-50/30'}>
+                          <td className="py-2 px-3 w-[36px]"></td>
+                          <td className="py-2 px-2">
+                            <Input className="h-8 text-xs" value={addForm.description || ''} onChange={(e) => setAddForm({ ...addForm, description: e.target.value })} placeholder="Description" />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Input className="h-8 text-xs" value={addForm.referenceNumber || ''} onChange={(e) => setAddForm({ ...addForm, referenceNumber: e.target.value })} placeholder="Ref No." />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Select className="h-8 text-xs" value={addForm.bankAccountId || ''} onChange={(e) => setAddForm({ ...addForm, bankAccountId: e.target.value })}
+                              options={[{ label: 'None', value: '' }, ...bankAccounts.map(acc => ({ label: acc.name, value: acc.id }))]} />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Input className={`h-8 text-xs font-mono text-right ${activeTrxType === 'Expense' ? 'text-red-600' : ''}`} type="number" step="0.01" value={addForm.amount || ''} onChange={(e) => setAddForm({ ...addForm, amount: parseFloat(e.target.value) })} placeholder="0.00" />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Input className="h-8 text-xs" type="date" value={addForm.date || ''} onChange={(e) => setAddForm({ ...addForm, date: e.target.value })} />
+                          </td>
+                          <td className="py-2 px-2"><Badge variant="warning">Pending</Badge></td>
+                          <td className="py-2 px-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => handleInlineSave('', true)} className="p-1 text-green-600 hover:bg-green-100 rounded"><Check size={15} /></button>
+                              <button onClick={() => handleInlineCancel(true)} className="p-1 text-red-500 hover:bg-red-100 rounded"><X size={15} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {/* Grouped rows */}
+                      {(() => {
+                        const grouped = transactions
+                          .filter(t => t.type === activeTrxType)
+                          .reduce((g, t) => { const k = t.purpose || 'Uncategorized'; (g[k] = g[k] || []).push(t); return g; }, {} as Record<string, Transaction[]>);
+                        const entries = Object.entries(grouped);
+                        const isAdding = activeTrxType === 'Income' ? isAddingIncome : isAddingExpense;
+                        if (entries.length === 0 && !isAdding) return (
+                          <tr><td colSpan={8} className="py-10 text-center text-slate-400">
+                            <Layout size={28} className="mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">No {activeTrxType.toLowerCase()} entries yet</p>
+                            <p className="text-xs mt-0.5 opacity-70">Paste cells from Excel or click Add</p>
+                          </td></tr>
+                        );
+                        const accentColor = activeTrxType === 'Income' ? 'text-green-600' : 'text-red-600';
+                        const groupBg = activeTrxType === 'Income' ? 'bg-green-50/60' : 'bg-red-50/40';
+                        return entries.map(([purpose, grpTxs]) => (
+                          <React.Fragment key={purpose}>
+                            <tr>
+                              <td colSpan={4} className={`py-1.5 px-3 text-xs font-bold text-slate-600 ${groupBg}`}>{purpose} <span className="font-normal opacity-60">({grpTxs.length})</span></td>
+                              <td className={`py-1.5 px-2 text-right text-xs font-bold font-mono ${accentColor} ${groupBg}`}>
+                                {formatCurrency(grpTxs.reduce((s, t) => s + Math.abs(t.amount), 0), account.currency)}
+                              </td>
+                              <td colSpan={3} className={groupBg}></td>
+                            </tr>
+                            {grpTxs.map(tx => {
+                              const linkedAmount = bankTransactions.reduce((sum, btx) => {
+                                const ids = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
+                                return ids.includes(tx.id) ? sum + Math.abs(btx.amount) : sum;
+                              }, 0);
+                              const badgeVariant: any = linkedAmount <= 0 ? 'neutral' : Math.abs(linkedAmount - Math.abs(tx.amount)) < 0.01 ? 'success' : linkedAmount > Math.abs(tx.amount) + 0.01 ? 'error' : 'warning';
+                              return (
+                                <tr key={tx.id} className="hover:bg-slate-50/70 group transition-colors">
+                                  {editingId === tx.id ? (
+                                    <>
+                                      <td className="py-2 px-3"></td>
+                                      <td className="py-2 px-2">
+                                        <div className="flex flex-col gap-1">
+                                          <Combobox className="w-full" placeholder="Purpose" options={uniquePurposes} value={editForm.purpose || ''} onChange={(val) => setEditForm({ ...editForm, purpose: val })} />
+                                          <Input className="h-8 text-xs" value={editForm.description || ''} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" />
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-2"><Input className="h-8 text-xs" value={editForm.referenceNumber || ''} onChange={(e) => setEditForm({ ...editForm, referenceNumber: e.target.value })} /></td>
+                                      <td className="py-2 px-2">
+                                        <Select className="h-8 text-xs" value={editForm.bankAccountId || ''} onChange={(e) => setEditForm({ ...editForm, bankAccountId: e.target.value })}
+                                          options={[{ label: 'None', value: '' }, ...bankAccounts.map(acc => ({ label: acc.name, value: acc.id }))]} />
+                                      </td>
+                                      <td className="py-2 px-2"><Input className={`h-8 text-xs text-right font-mono ${activeTrxType === 'Expense' ? 'text-red-600' : ''}`} type="number" step="0.01" value={editForm.amount || ''} onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) })} /></td>
+                                      <td className="py-2 px-2"><Input className="h-8 text-xs" type="date" value={editForm.date ? editForm.date.split('T')[0] : ''} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} /></td>
+                                      <td className="py-2 px-2 text-center text-slate-300">—</td>
+                                      <td className="py-2 px-2 text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                          <button onClick={() => handleInlineSave(tx.id)} className="p-1 text-green-600 hover:bg-green-100 rounded"><Check size={15} /></button>
+                                          <button onClick={() => handleInlineCancel()} className="p-1 text-red-500 hover:bg-red-100 rounded"><X size={15} /></button>
+                                        </div>
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td className="py-1.5 px-3">
+                                        <Checkbox checked={selectedProjectTxIds.includes(tx.id)} onChange={(e) => {
+                                          if (e.target.checked) setSelectedProjectTxIds([...selectedProjectTxIds, tx.id]);
+                                          else setSelectedProjectTxIds(selectedProjectTxIds.filter(id => id !== tx.id));
+                                        }} />
+                                      </td>
+                                      <td className="py-1.5 px-2 text-slate-800 text-sm">{tx.description || '—'}</td>
+                                      <td className="py-1.5 px-2 text-slate-400 text-xs font-mono">{tx.referenceNumber || '—'}</td>
+                                      <td className="py-1.5 px-2 text-slate-500 text-xs truncate max-w-[140px]">{bankAccounts.find(a => a.id === tx.bankAccountId)?.name || '—'}</td>
+                                      <td className={`py-1.5 px-2 text-right font-mono font-semibold text-sm ${accentColor}`}>{formatCurrency(Math.abs(tx.amount), account.currency)}</td>
+                                      <td className="py-1.5 px-2 text-slate-400 text-xs whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
+                                      <td className="py-1.5 px-2">
+                                        <Badge variant={badgeVariant}>{formatCurrency(linkedAmount, account.currency)} / {formatCurrency(Math.abs(tx.amount), account.currency)}</Badge>
+                                      </td>
+                                      <td className="py-1.5 px-2 text-right">
+                                        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button onClick={() => startInlineEdit(tx)} className="text-slate-400 hover:text-jci-blue p-1 rounded transition-colors"><Edit size={13} /></button>
+                                          <button onClick={() => handleDeleteTransaction(tx.id)} className="text-slate-400 hover:text-red-600 p-1 rounded transition-colors"><Trash2 size={13} /></button>
+                                        </div>
+                                      </td>
+                                    </>
+                                  )}
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {/* Mobile card list */}
+            {!loadingTransactions && (
+              <div className="md:hidden space-y-1">
+                {/* Mobile purpose combobox */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Combobox
+                    className="flex-1"
+                    placeholder="Set purpose for new entry..."
+                    options={uniquePurposes}
+                    value={activeTrxType === 'Income' ? incomePurposeValue : expensePurposeValue}
+                    onChange={activeTrxType === 'Income' ? setIncomePurposeValue : setExpensePurposeValue}
                   />
                 </div>
-
-                <div className="space-y-3 font-mono">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Total Budget</span>
-                    <span className="font-medium">{formatCurrency(account.budget, account.currency)}</span>
+                {transactions.filter(t => t.type === activeTrxType).length === 0 ? (
+                  <div className="py-10 text-center text-slate-400">
+                    <Layout size={28} className="mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">No {activeTrxType.toLowerCase()} entries yet</p>
+                    <p className="text-xs mt-0.5 opacity-70">Tap Add to create one</p>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">Expenses</span>
-                    <span className="font-medium text-red-600">-{formatCurrency(totalExpenses, account.currency)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
-                    <span className="font-medium text-slate-900">Remaining</span>
-                    <span className={`font-bold ${remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(remainingBudget, account.currency)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 space-y-2">
-                  <Button variant="outline" className="w-full" onClick={onReconcile}>
-                    <RefreshCw size={16} className="mr-2" /> Reconcile Account
-                  </Button>
-                  <Button
-                    variant="success"
-                    className="w-full"
-                    onClick={handleClaimReimbursement}
-                  >
-                    <DollarSign size={16} className="mr-2" /> Claim Reimbursement
-                  </Button>
-                </div>
-              </div>
-            </Card>
-
-            <Card title="Financial Overview" className="lg:col-span-2">
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Project Income</div>
-                    <div className="text-xl font-bold text-green-600">{formatCurrency(totalIncome, account.currency)}</div>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Project Expenses</div>
-                    <div className="text-xl font-bold text-red-600">{formatCurrency(totalExpenses, account.currency)}</div>
-                  </div>
-                </div>
-
-                <div className="bg-jci-blue/5 p-4 rounded-lg border border-jci-blue/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp size={16} className="text-jci-blue" />
-                    <span className="font-semibold text-jci-blue">Budget Utilization Status</span>
-                  </div>
-                  <p className="text-sm text-slate-600">
-                    {budgetUtilization > 100
-                      ? "The project has exceeded its allocated budget. Please review the expenses."
-                      : budgetUtilization > 80
-                        ? "Warning: Budget utilization is high. More than 80% of funds have been spent."
-                        : "Budget utilization is currently within healthy limits."}
-                  </p>
-                </div>
-
-                {account.lastReconciled && (
-                  <div className="text-xs text-slate-400 flex items-center gap-1">
-                    <Clock size={12} />
-                    Last reconciled: {formatDate(toDate(account.lastReconciled))}
-                  </div>
+                ) : (
+                  transactions.filter(t => t.type === activeTrxType).map(tx => {
+                    const linkedAmount = bankTransactions.reduce((sum, btx) => {
+                      const ids = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
+                      return ids.includes(tx.id) ? sum + Math.abs(btx.amount) : sum;
+                    }, 0);
+                    const badgeVariant: any = linkedAmount <= 0 ? 'neutral' : Math.abs(linkedAmount - Math.abs(tx.amount)) < 0.01 ? 'success' : linkedAmount > Math.abs(tx.amount) + 0.01 ? 'error' : 'warning';
+                    const isIncome = activeTrxType === 'Income';
+                    const isSelected = selectedProjectTxIds.includes(tx.id);
+                    return (
+                      <div key={tx.id}
+                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${isSelected ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}
+                        onClick={() => {
+                          if (isSelected) setSelectedProjectTxIds(selectedProjectTxIds.filter(id => id !== tx.id));
+                          else setSelectedProjectTxIds([...selectedProjectTxIds, tx.id]);
+                        }}>
+                        <Checkbox checked={isSelected} onChange={() => {}} className="mt-0.5 shrink-0 pointer-events-none" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-slate-800 truncate">{tx.description || '—'}</p>
+                            <span className={`text-sm font-bold font-mono shrink-0 ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
+                              {isIncome ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), account.currency)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {tx.purpose && <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{tx.purpose}</span>}
+                            <span className="text-[11px] text-slate-400">{new Date(tx.date).toLocaleDateString()}</span>
+                            {tx.referenceNumber && <span className="text-[11px] font-mono text-slate-400">{tx.referenceNumber}</span>}
+                            <Badge variant={badgeVariant}>{formatCurrency(linkedAmount, account.currency)}/{formatCurrency(Math.abs(tx.amount), account.currency)}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button onClick={(e) => { e.stopPropagation(); startInlineEdit(tx); }} className="p-1.5 text-slate-400 hover:text-jci-blue hover:bg-slate-100 rounded-lg transition-colors"><Edit size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx.id); }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
-            </Card>
-          </div>
-        </div>
-      )}
+            )}
 
-      {activeFinancialTab === 'projectTrx' && (
-        <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
-          {loadingTransactions && (
-            <div className="flex justify-center py-8">
-              <RefreshCw className="animate-spin text-jci-blue" size={32} />
-            </div>
-          )}
-
-          {selectedProjectTxIds.length > 0 && (
-            <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sticky top-0 z-10 shadow-sm">
-              <span className="text-blue-900 text-sm font-bold">
-                {selectedProjectTxIds.length} transactions selected
-              </span>
-              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                <div className="flex items-center gap-2 bg-white rounded-lg p-1 border border-blue-200">
-                  <Combobox
-                    placeholder="Set Purpose..."
-                    options={uniquePurposes}
-                    value={batchProjectPurposeValue}
-                    onChange={setBatchProjectPurposeValue}
-                    className="w-48 border-none"
-                  />
-                  <Button
-                    onClick={handleBatchSetProjectTxPurpose}
-                    disabled={selectedProjectTxIds.length === 0 || !batchProjectPurposeValue.trim() || loadingTransactions}
-                    size="sm"
-                    className="shrink-0"
-                  >
-                    Set Purpose
-                  </Button>
-                </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={handleBatchDeleteProjectTransactions}
-                  disabled={loadingTransactions}
-                  className="shrink-0"
-                >
-                  <Trash2 size={16} className="mr-2" />
-                  Delete Selected
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Incomes Section */}
-          <Card className="overflow-hidden border-none shadow-sm" noPadding>
-            <div className="flex justify-between items-center p-4 border-b-2 border-green-500">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-full text-green-600">
-                  <TrendingUp size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-green-700">Incomes</h3>
-                  <p className="text-xs text-slate-500">{transactions.filter(t => t.type === 'Income').length} Items</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <Combobox
-                  className="w-48"
-                  placeholder="Set Purpose"
-                  options={uniquePurposes}
-                  value={incomePurposeValue}
-                  onChange={setIncomePurposeValue}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-jci-blue hover:bg-jci-blue/10"
-                  onClick={() => startInlineAdd('Income', incomePurposeValue)}
-                >
-                  <Plus size={16} className="mr-1" /> Add
-                </Button>
-              </div>
-            </div>
-
-            <div className="p-0">
-              <table className="w-full text-left text-sm" onPaste={(e) => handleTablePaste(e, 'Income', incomePurposeValue)}>
-                <thead className="bg-slate-50 text-slate-500 font-medium">
-                  <tr>
-                    <th className="py-3 px-4 w-[40px]">
-                      <Checkbox
-                        checked={transactions.filter(t => t.type === 'Income').length > 0 && transactions.filter(t => t.type === 'Income').every(t => selectedProjectTxIds.includes(t.id))}
-                        onChange={(e) => {
-                          const incomeIds = transactions.filter(t => t.type === 'Income').map(t => t.id);
-                          if (e.target.checked) {
-                            setSelectedProjectTxIds([...new Set([...selectedProjectTxIds, ...incomeIds])]);
-                          } else {
-                            setSelectedProjectTxIds(selectedProjectTxIds.filter(id => !incomeIds.includes(id)));
-                          }
-                        }}
+            {/* Batch toolbar — sticky bottom */}
+            {selectedProjectTxIds.length > 0 && (
+              <div className="sticky bottom-2 z-20 mx-1">
+                <div className="bg-slate-900 text-white rounded-2xl px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl">
+                  <span className="text-sm font-semibold shrink-0">{selectedProjectTxIds.length} selected</span>
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <div className="flex items-center gap-1.5 bg-slate-800 rounded-xl px-2 py-1 flex-1 sm:flex-none">
+                      <Combobox
+                        placeholder="Set purpose..."
+                        options={uniquePurposes}
+                        value={batchProjectPurposeValue}
+                        onChange={setBatchProjectPurposeValue}
+                        className="w-44 border-none bg-transparent text-white placeholder-slate-400 text-sm"
                       />
-                    </th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[30%]">Item/Category</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[20%]">Ref No.</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[20%]">Paid Via / To</th>
-                    <th className="py-3 px-2 text-xs font-semibold text-right w-[10%]">Amount</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[10%]">Date</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[10%]">Status</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[50px]"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {isAddingIncome && (
-                    <tr className="bg-blue-50/30">
-                      <td className="py-2 px-4 w-[40px]"></td>
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs"
-                          value={addForm.description || ''}
-                          onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
-                          placeholder="Description"
-                        />
-                      </td>
-
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs"
-                          value={addForm.referenceNumber || ''}
-                          onChange={(e) => setAddForm({ ...addForm, referenceNumber: e.target.value })}
-                          placeholder="Ref No."
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Select
-                          className="h-8 text-xs"
-                          value={addForm.bankAccountId || ''}
-                          onChange={(e) => setAddForm({ ...addForm, bankAccountId: e.target.value })}
-                          options={[
-                            { label: 'None', value: '' },
-                            ...bankAccounts.map(acc => ({ label: acc.name, value: acc.id }))
-                          ]}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs font-mono text-right"
-                          type="number"
-                          step="0.01"
-                          value={addForm.amount || ''}
-                          onChange={(e) => setAddForm({ ...addForm, amount: parseFloat(e.target.value) })}
-                          placeholder="0.00"
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs"
-                          type="date"
-                          value={addForm.date || ''}
-                          onChange={(e) => setAddForm({ ...addForm, date: e.target.value })}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Badge variant="warning">Pending</Badge>
-                      </td>
-                      <td className="py-2 px-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleInlineSave('', true)}
-                            className="p-1 text-green-600 hover:bg-green-100 rounded"
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleInlineCancel(true)}
-                            className="p-1 text-red-600 hover:bg-red-100 rounded"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  {Object.entries(
-                    transactions
-                      .filter(t => t.type === 'Income')
-                      .reduce((groups, t) => {
-                        const purpose = t.purpose || 'Uncategorized';
-                        if (!groups[purpose]) groups[purpose] = [];
-                        groups[purpose].push(t);
-                        return groups;
-                      }, {} as Record<string, Transaction[]>)
-                  ).length === 0 && !isAddingIncome ? (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
-                        <Layout size={32} className="mx-auto mb-2 opacity-20" />
-                        No data available. You can paste cells from Excel directly here.
-                      </td>
-                    </tr>
-                  ) : (
-                    Object.entries(
-                      transactions
-                        .filter(t => t.type === 'Income')
-                        .reduce((groups, t) => {
-                          const purpose = t.purpose || 'Uncategorized';
-                          if (!groups[purpose]) groups[purpose] = [];
-                          groups[purpose].push(t);
-                          return groups;
-                        }, {} as Record<string, Transaction[]>)
-                    ).map(([purpose, groupTransactions]) => (
-                      <React.Fragment key={purpose}>
-                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                          <td colSpan={4} className="py-2 px-4 font-bold text-slate-600 bg-green-100/50">
-                            <span>{purpose} ({groupTransactions.length})</span>
-                          </td>
-                          <td className="py-2 px-2 text-right font-mono font-bold text-green-600 bg-green-100/50">
-                            {formatCurrency(groupTransactions.reduce((sum, t) => sum + t.amount, 0), account.currency)}
-                          </td>
-                          <td colSpan={3} className="bg-green-100/50"></td>
-                        </tr>
-                        {groupTransactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-50 group transition-colors">
-                            {editingId === tx.id ? (
-                              <>
-                                <td className="py-2 px-4 w-[40px]"></td>
-                                <td className="py-2 px-2">
-                                  <div className="flex flex-col gap-1">
-                                    <Combobox
-                                      className="w-full"
-                                      placeholder="Purpose"
-                                      options={uniquePurposes}
-                                      value={editForm.purpose || ''}
-                                      onChange={(val) => setEditForm({ ...editForm, purpose: val })}
-                                    />
-                                    <Input
-                                      className="h-8 text-xs"
-                                      value={editForm.description || ''}
-                                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                      placeholder="Description"
-                                    />
-                                  </div>
-                                </td>
-
-                                <td className="py-2 px-2">
-                                  <Input
-                                    className="h-8 text-xs"
-                                    value={editForm.referenceNumber || ''}
-                                    onChange={(e) => setEditForm({ ...editForm, referenceNumber: e.target.value })}
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <Select
-                                    className="h-8 text-xs"
-                                    value={editForm.bankAccountId || ''}
-                                    onChange={(e) => setEditForm({ ...editForm, bankAccountId: e.target.value })}
-                                    options={[
-                                      { label: 'None', value: '' },
-                                      ...bankAccounts.map(acc => ({ label: acc.name, value: acc.id }))
-                                    ]}
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <Input
-                                    className="h-8 text-xs text-right font-mono"
-                                    type="number"
-                                    step="0.01"
-                                    value={editForm.amount || ''}
-                                    onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) })}
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <Input
-                                    className="h-8 text-xs"
-                                    type="date"
-                                    value={editForm.date ? editForm.date.split('T')[0] : ''}
-                                    onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                                  />
-                                </td>
-                                <td className="py-2 px-2 text-center">-</td>
-                                <td className="py-2 px-2 text-right">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <button
-                                      onClick={() => handleInlineSave(tx.id)}
-                                      className="p-1 text-green-600 hover:bg-green-100 rounded"
-                                    >
-                                      <Check size={16} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleInlineCancel()}
-                                      className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="py-2 px-4 w-[40px]">
-                                  <Checkbox
-                                    checked={selectedProjectTxIds.includes(tx.id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) setSelectedProjectTxIds([...selectedProjectTxIds, tx.id]);
-                                      else setSelectedProjectTxIds(selectedProjectTxIds.filter(id => id !== tx.id));
-                                    }}
-                                  />
-                                </td>
-                                <td className="py-1 px-4 text-slate-900">- {tx.description}</td>
-
-                                <td className="py-1 px-2 text-slate-500 text-xs">{tx.referenceNumber || '-'}</td>
-                                <td className="py-1 px-2 text-slate-500 text-xs">
-                                  {bankAccounts.find(a => a.id === tx.bankAccountId)?.name || '-'}
-                                </td>
-                                <td className="py-1 px-2 text-right font-mono text-green-600">
-                                  {formatCurrency(tx.amount, account.currency)}
-                                </td>
-                                <td className="py-1 px-2 text-slate-500 text-xs">{new Date(tx.date).toLocaleDateString()}</td>
-                                <td className="py-1 px-2">
-                                  {(() => {
-                                    const linkedAmount = bankTransactions.reduce((sum, btx) => {
-                                      const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-                                      return btxLinkedIds.includes(tx.id) ? sum + Math.abs(btx.amount) : sum;
-                                    }, 0);
-
-                                    let statusLabel: string = `${formatCurrency(linkedAmount, account.currency)} / ${formatCurrency(Math.abs(tx.amount), account.currency)}`;
-                                    let badgeVariant: any = 'neutral';
-
-                                    if (linkedAmount > 0) {
-                                      if (Math.abs(linkedAmount - Math.abs(tx.amount)) < 0.01) {
-                                        badgeVariant = 'success';
-                                      } else if (linkedAmount > Math.abs(tx.amount) + 0.01) {
-                                        badgeVariant = 'error';
-                                      } else {
-                                        badgeVariant = 'warning';
-                                      }
-                                    }
-
-                                    return (
-                                      <Badge variant={badgeVariant}>
-                                        {statusLabel}
-                                      </Badge>
-                                    );
-                                  })()}
-                                </td>
-                                <td className="py-1 px-2 text-right">
-                                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                      onClick={() => startInlineEdit(tx)}
-                                      className="text-slate-400 hover:text-jci-blue p-1 transition-colors"
-                                    >
-                                      <Edit size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteTransaction(tx.id)}
-                                      className="text-slate-400 hover:text-red-600 p-1 transition-colors"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        ))}
-                      </React.Fragment>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          {/* Expenses Section */}
-          <Card className="overflow-hidden border-none shadow-sm" noPadding>
-            <div className="flex justify-between items-center p-4 border-b-2 border-red-500">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-full text-red-600">
-                  <TrendingUp size={20} className="rotate-180" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-red-700">Expenses</h3>
-                  <p className="text-xs text-slate-500">{transactions.filter(t => t.type === 'Expense').length} Items</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <Combobox
-                  className="w-48"
-                  placeholder="Set Purpose"
-                  options={uniquePurposes}
-                  value={expensePurposeValue}
-                  onChange={setExpensePurposeValue}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-jci-blue hover:bg-jci-blue/10"
-                  onClick={() => startInlineAdd('Expense', expensePurposeValue)}
-                >
-                  <Plus size={16} className="mr-1" /> Add
-                </Button>
-              </div>
-            </div>
-
-            <div className="p-0">
-              <table className="w-full text-left text-sm" onPaste={(e) => handleTablePaste(e, 'Expense', expensePurposeValue)}>
-                <thead className="bg-slate-50 text-slate-500 font-medium">
-                  <tr>
-                    <th className="py-3 px-4 w-[40px]">
-                      <Checkbox
-                        checked={transactions.filter(t => t.type === 'Expense').length > 0 && transactions.filter(t => t.type === 'Expense').every(t => selectedProjectTxIds.includes(t.id))}
-                        onChange={(e) => {
-                          const expenseIds = transactions.filter(t => t.type === 'Expense').map(t => t.id);
-                          if (e.target.checked) {
-                            setSelectedProjectTxIds([...new Set([...selectedProjectTxIds, ...expenseIds])]);
-                          } else {
-                            setSelectedProjectTxIds(selectedProjectTxIds.filter(id => !expenseIds.includes(id)));
-                          }
-                        }}
-                      />
-                    </th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[30%]">Item/Category</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[20%]">Ref No.</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[20%]">Paid Via / To</th>
-                    <th className="py-3 px-2 text-xs font-semibold text-right w-[10%]">Amount</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[10%]">Date</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[10%]">Status</th>
-                    <th className="py-3 px-2 text-xs font-semibold w-[50px]"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {isAddingExpense && (
-                    <tr className="bg-red-50/30">
-                      <td className="py-2 px-4 w-[40px]"></td>
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs"
-                          value={addForm.description || ''}
-                          onChange={(e) => setAddForm({ ...addForm, description: e.target.value })}
-                          placeholder="Description"
-                        />
-                      </td>
-
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs h-8 text-xs"
-                          value={addForm.referenceNumber || ''}
-                          onChange={(e) => setAddForm({ ...addForm, referenceNumber: e.target.value })}
-                          placeholder="Ref No."
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Select
-                          className="h-8 text-xs"
-                          value={addForm.bankAccountId || ''}
-                          onChange={(e) => setAddForm({ ...addForm, bankAccountId: e.target.value })}
-                          options={[
-                            { label: 'None', value: '' },
-                            ...bankAccounts.map(acc => ({ label: acc.name, value: acc.id }))
-                          ]}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs text-right font-mono text-red-600"
-                          type="number"
-                          step="0.01"
-                          value={addForm.amount || ''}
-                          onChange={(e) => setAddForm({ ...addForm, amount: parseFloat(e.target.value) })}
-                          placeholder="0.00"
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Input
-                          className="h-8 text-xs h-8 text-xs"
-                          type="date"
-                          value={addForm.date || ''}
-                          onChange={(e) => setAddForm({ ...addForm, date: e.target.value })}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Badge variant="warning">Pending</Badge>
-                      </td>
-                      <td className="py-2 px-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleInlineSave('', true)}
-                            className="p-1 text-green-600 hover:bg-green-100 rounded"
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleInlineCancel(true)}
-                            className="p-1 text-red-600 hover:bg-red-100 rounded"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  {Object.entries(
-                    transactions
-                      .filter(t => t.type === 'Expense')
-                      .reduce((groups, t) => {
-                        const purpose = t.purpose || 'Uncategorized';
-                        if (!groups[purpose]) groups[purpose] = [];
-                        groups[purpose].push(t);
-                        return groups;
-                      }, {} as Record<string, Transaction[]>)
-                  ).length === 0 && !isAddingExpense ? (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
-                        <Layout size={32} className="mx-auto mb-2 opacity-20" />
-                        No data available. You can paste cells from Excel directly here.
-                      </td>
-                    </tr>
-                  ) : (
-                    Object.entries(
-                      transactions
-                        .filter(t => t.type === 'Expense')
-                        .reduce((groups, t) => {
-                          const purpose = t.purpose || 'Uncategorized';
-                          if (!groups[purpose]) groups[purpose] = [];
-                          groups[purpose].push(t);
-                          return groups;
-                        }, {} as Record<string, Transaction[]>)
-                    ).map(([purpose, groupTransactions]) => (
-                      <React.Fragment key={purpose}>
-                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                          <td colSpan={4} className="py-2 px-4 font-bold text-slate-600 bg-red-100/50">
-                            <span>{purpose} ({groupTransactions.length})</span>
-                          </td>
-                          <td className="py-2 px-2 text-right font-mono font-bold text-red-600 bg-red-100/50">
-                            {formatCurrency(groupTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0), account.currency)}
-                          </td>
-                          <td colSpan={3} className="bg-red-100/50"></td>
-                        </tr>
-                        {groupTransactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-50 group transition-colors">
-                            {editingId === tx.id ? (
-                              <>
-                                <td className="py-2 px-4 w-[40px]"></td>
-                                <td className="py-2 px-2">
-                                  <div className="flex flex-col gap-1">
-                                    <Combobox
-                                      className="w-full"
-                                      placeholder="Purpose"
-                                      options={uniquePurposes}
-                                      value={editForm.purpose || ''}
-                                      onChange={(val) => setEditForm({ ...editForm, purpose: val })}
-                                    />
-                                    <Input
-                                      className="h-8 text-xs"
-                                      value={editForm.description || ''}
-                                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                    />
-                                  </div>
-                                </td>
-
-                                <td className="py-2 px-2">
-                                  <Input
-                                    className="h-8 text-xs"
-                                    value={editForm.referenceNumber || ''}
-                                    onChange={(e) => setEditForm({ ...editForm, referenceNumber: e.target.value })}
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <Select
-                                    className="h-8 text-xs"
-                                    value={editForm.bankAccountId || ''}
-                                    onChange={(e) => setEditForm({ ...editForm, bankAccountId: e.target.value })}
-                                    options={[
-                                      { label: 'None', value: '' },
-                                      ...bankAccounts.map(acc => ({ label: acc.name, value: acc.id }))
-                                    ]}
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <Input
-                                    className="h-8 text-xs text-right font-mono text-red-600"
-                                    type="number"
-                                    step="0.01"
-                                    value={editForm.amount || ''}
-                                    onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) })}
-                                  />
-                                </td>
-                                <td className="py-2 px-2">
-                                  <Input
-                                    className="h-8 text-xs"
-                                    type="date"
-                                    value={editForm.date ? editForm.date.split('T')[0] : ''}
-                                    onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                                  />
-                                </td>
-                                <td className="py-2 px-2 text-center">-</td>
-                                <td className="py-2 px-2 text-right">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <button
-                                      onClick={() => handleInlineSave(tx.id)}
-                                      className="p-1 text-green-600 hover:bg-green-100 rounded"
-                                    >
-                                      <Check size={16} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleInlineCancel()}
-                                      className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="py-2 px-4 w-[40px]">
-                                  <Checkbox
-                                    checked={selectedProjectTxIds.includes(tx.id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) setSelectedProjectTxIds([...selectedProjectTxIds, tx.id]);
-                                      else setSelectedProjectTxIds(selectedProjectTxIds.filter(id => id !== tx.id));
-                                    }}
-                                  />
-                                </td>
-                                <td className="py-1 px-4 text-slate-900">- {tx.description}</td>
-
-                                <td className="py-1 px-2 text-slate-500 text-xs">{tx.referenceNumber || '-'}</td>
-                                <td className="py-1 px-2 text-slate-500 text-xs">
-                                  {bankAccounts.find(a => a.id === tx.bankAccountId)?.name || '-'}
-                                </td>
-                                <td className="py-1 px-2 text-right font-mono text-red-600">
-                                  {formatCurrency(Math.abs(tx.amount), account.currency)}
-                                </td>
-                                <td className="py-1 px-2 text-slate-500 text-xs">{new Date(tx.date).toLocaleDateString()}</td>
-                                <td className="py-2 px-2">
-                                  {(() => {
-                                    const linkedAmount = bankTransactions.reduce((sum, btx) => {
-                                      const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-                                      return btxLinkedIds.includes(tx.id) ? sum + Math.abs(btx.amount) : sum;
-                                    }, 0);
-
-                                    let statusLabel: string = `${formatCurrency(linkedAmount, account.currency)} / ${formatCurrency(Math.abs(tx.amount), account.currency)}`;
-                                    let badgeVariant: any = 'neutral';
-
-                                    if (linkedAmount > 0) {
-                                      if (Math.abs(linkedAmount - Math.abs(tx.amount)) < 0.01) {
-                                        badgeVariant = 'success';
-                                      } else if (linkedAmount > Math.abs(tx.amount) + 0.01) {
-                                        badgeVariant = 'error';
-                                      } else {
-                                        badgeVariant = 'warning';
-                                      }
-                                    }
-
-                                    return (
-                                      <Badge variant={badgeVariant}>
-                                        {statusLabel}
-                                      </Badge>
-                                    );
-                                  })()}
-                                </td>
-                                <td className="py-1 px-2 text-right">
-                                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                      onClick={() => startInlineEdit(tx)}
-                                      className="text-slate-400 hover:text-jci-blue p-1 transition-colors"
-                                    >
-                                      <Edit size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteTransaction(tx.id)}
-                                      className="text-slate-400 hover:text-red-600 p-1 transition-colors"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        ))}
-                      </React.Fragment>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          {/* Summary Footer Section */}
-          <div className="mt-8 p-6 bg-slate-50 rounded-xl border border-slate-200">
-            <div className="space-y-4 w-full">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold text-slate-700">Total Income</span>
-                <span className="text-xl font-bold text-green-600 font-mono">{formatCurrency(totalIncome, account.currency)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold text-slate-700">Total Expenses</span>
-                <span className="text-xl font-bold text-red-600 font-mono">-{formatCurrency(totalExpenses, account.currency)}</span>
-              </div>
-              <div className="h-px bg-slate-200 my-2"></div>
-              <div className="flex justify-between items-center">
-                <span className="text-xl font-extrabold text-slate-900">Net Profit</span>
-                <span className={`text-2xl font-black font-mono ${(totalIncome - totalExpenses) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(totalIncome - totalExpenses, account.currency)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeFinancialTab === 'bankTrx' && (
-        <div className="space-y-6 animate-in slide-in-from-right-2 duration-300">
-          {/* Action Bar */}
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-            <div className="relative w-full lg:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <Input
-                placeholder="Search description, ref, or amount..."
-                value={bankTxSearchQuery}
-                onChange={(e) => setBankTxSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-              <span className="text-sm text-slate-500 whitespace-nowrap">
-                {selectedBankTxIds.length} selected
-              </span>
-              {isMixedBankTxSelected ? (
-                <span className="text-xs text-rose-600 bg-rose-50 px-2 py-1.5 rounded border border-rose-200 font-medium">
-                  Cannot batch link mixed Income & Expense transactions
-                </span>
-              ) : (
-                <MultiSelectDropdown
-                  selected={batchProjectTxIds}
-                  onChange={setBatchProjectTxIds}
-                  options={(() => {
-                    const selectedTxTypes = selectedBankTxIds.map(id => {
-                      const tx = bankTransactions.find(bt => bt.id === id);
-                      return tx?.type;
-                    }).filter(Boolean);
-
-                    const targetType = selectedTxTypes[0];
-
-                    const opts = (transactions || []).filter(t => {
-                      // Filter by targetType if bank transactions are selected
-                      if (targetType && t.type !== targetType) return false;
-
-                      const totalLinkedAmount = bankTransactions.reduce((sum, btx) => {
-                        const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-                        if (btxLinkedIds.includes(t.id)) {
-                          return sum + Math.abs(btx.amount);
-                        }
-                        return sum;
-                      }, 0);
-                      const isFullyMatched = totalLinkedAmount >= Math.abs(t.amount) - 0.01;
-
-                      return !isFullyMatched || batchProjectTxIds.includes(t.id);
-                    }).map(t => ({
-                      label: `${t.description || t.purpose || 'Txn'}${t.referenceNumber ? ` (${t.referenceNumber})` : ''} • ${formatCurrency(t.amount, account.currency)}`,
-                      value: t.id
-                    }));
-                    opts.sort((a, b) => {
-                      const aSelected = batchProjectTxIds.includes(a.value);
-                      const bSelected = batchProjectTxIds.includes(b.value);
-                      if (aSelected && !bSelected) return -1;
-                      if (!aSelected && bSelected) return 1;
-                      return a.label.localeCompare(b.label);
-                    });
-                    return opts;
-                  })()}
-                  placeholder="Link to Project Trx..."
-                  className="w-56"
-                />
-              )}
-              <Button
-                onClick={handleBatchLinkBankTransactions}
-                disabled={selectedBankTxIds.length === 0 || batchProjectTxIds.length === 0 || isMixedBankTxSelected}
-                className="shrink-0"
-              >
-                Apply
-              </Button>
-              {selectedBankTxIds.length > 0 && bankTransactions.some(t => selectedBankTxIds.includes(t.id) && ((t as any).projectTransactionIds?.length > 0 || (t as any).projectTransactionId || t.status === 'Reconciled')) && (
-                <Button
-                  onClick={handleBatchUnlinkBankTransactions}
-                  variant="outline"
-                  className="shrink-0 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
-                >
-                  Unlink Selected
-                </Button>
-              )}
-              <Button onClick={handleAutoMatch} variant="outline" className="shrink-0 text-jci-blue border-jci-blue hover:bg-jci-blue hover:text-white">
-                <BrainCircuit size={16} className="mr-2" /> Auto Match
-              </Button>
-            </div>
-          </div>
-
-          {loadingBankTransactions ? (
-            <div className="text-center py-8 text-slate-500">
-              <RefreshCw className="animate-spin text-jci-blue mx-auto mb-2" size={32} />
-              Loading bank transactions...
-            </div>
-          ) : bankTransactions.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">No bank transactions linked to this project found</div>
-          ) : (() => {
-            const filteredBankTx = bankTransactions.filter(tx => {
-              if (!bankTxSearchQuery) return true;
-              const q = bankTxSearchQuery.toLowerCase().trim();
-              const isNumericStr = q !== '' && !isNaN(Number(q));
-              const isAmountMatch = isNumericStr && tx.amount === Number(q);
-              return (isAmountMatch ||
-                tx.description?.toLowerCase().includes(q) ||
-                tx.referenceNumber?.toLowerCase().includes(q));
-            });
-
-            const bankIncomes = filteredBankTx.filter(tx => tx.type === 'Income');
-            const bankExpenses = filteredBankTx.filter(tx => tx.type === 'Expense');
-
-            const bankIncomeTotal = bankIncomes.reduce((sum, tx) => sum + tx.amount, 0);
-            const bankExpensesTotal = bankExpenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-
-            const getAvailableProjectTxOptions = (currentBankTx: any) => {
-              const currentLinkedIds = currentBankTx.projectTransactionIds || (currentBankTx.projectTransactionId ? [currentBankTx.projectTransactionId] : []);
-              const opts = (transactions || []).filter(t => {
-                // Only show project transactions that match the bank transaction's type (Income or Expense)
-                if (t.type !== currentBankTx.type) return false;
-                if (currentLinkedIds.includes(t.id)) return true;
-                const totalLinkedAmount = bankTransactions.reduce((sum, btx) => {
-                  const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-                  if (btxLinkedIds.includes(t.id)) {
-                    return sum + Math.abs(btx.amount);
-                  }
-                  return sum;
-                }, 0);
-                const isFullyMatched = totalLinkedAmount >= Math.abs(t.amount) - 0.01;
-                return !isFullyMatched;
-              }).map(t => ({
-                label: `${t.description || t.purpose || 'Txn'}${t.referenceNumber ? ` (${t.referenceNumber})` : ''} • ${formatCurrency(t.amount, account.currency)}`,
-                value: t.id
-              }));
-              opts.sort((a, b) => {
-                const aSelected = currentLinkedIds.includes(a.value);
-                const bSelected = currentLinkedIds.includes(b.value);
-                if (aSelected && !bSelected) return -1;
-                if (!aSelected && bSelected) return 1;
-                return a.label.localeCompare(b.label);
-              });
-              return opts;
-            };
-
-            const renderBankTxTable = (list: Transaction[], isIncome: boolean) => {
-              if (list.length === 0) {
-                return (
-                  <div className="py-8 text-center text-slate-400 text-sm">
-                    <Layout size={32} className="mx-auto mb-2 opacity-20" />
-                    No transactions found in this category.
+                      <Button onClick={handleBatchSetProjectTxPurpose} disabled={!batchProjectPurposeValue.trim() || loadingTransactions} size="sm" className="shrink-0 bg-jci-blue hover:bg-jci-blue/90 border-none text-white">
+                        Apply
+                      </Button>
+                    </div>
+                    <Button variant="danger" size="sm" onClick={handleBatchDeleteProjectTransactions} disabled={loadingTransactions} className="shrink-0">
+                      <Trash2 size={14} className="mr-1.5" /> Delete
+                    </Button>
+                    <button onClick={() => setSelectedProjectTxIds([])} className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors shrink-0">
+                      <X size={16} />
+                    </button>
                   </div>
-                );
-              }
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-              // Group by purpose based on first matched transaction
-              const grouped = list.reduce((groups, tx) => {
+        {activeFinancialTab === 'bankTrx' && (
+          <div className="space-y-4 animate-in slide-in-from-right-2 duration-300">
+            {(() => {
+              const filteredBankTx = bankTransactions.filter(tx => {
+                if (!bankTxSearchQuery) return true;
+                const q = bankTxSearchQuery.toLowerCase().trim();
+                const isNumericStr = q !== '' && !isNaN(Number(q));
+                return (isNumericStr && tx.amount === Number(q)) ||
+                  tx.description?.toLowerCase().includes(q) ||
+                  tx.referenceNumber?.toLowerCase().includes(q);
+              });
+              const bankIncomes = filteredBankTx.filter(tx => tx.type === 'Income');
+              const bankExpenses = filteredBankTx.filter(tx => tx.type === 'Expense');
+              const bankIncomeTotal = bankIncomes.reduce((sum, tx) => sum + tx.amount, 0);
+              const bankExpensesTotal = bankExpenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+              const activeList = activeBankTrxType === 'Income' ? bankIncomes : bankExpenses;
+              const isIncome = activeBankTrxType === 'Income';
+              const accentColor = isIncome ? 'text-green-600' : 'text-red-600';
+              const groupBg = isIncome ? 'bg-green-50/60' : 'bg-red-50/40';
+
+              const getAvailableProjectTxOptions = (currentBankTx: any) => {
+                const currentLinkedIds = currentBankTx.projectTransactionIds || (currentBankTx.projectTransactionId ? [currentBankTx.projectTransactionId] : []);
+                const opts = (transactions || []).filter(t => {
+                  if (t.type !== currentBankTx.type) return false;
+                  if (currentLinkedIds.includes(t.id)) return true;
+                  const totalLinked = bankTransactions.reduce((sum, btx) => {
+                    const ids = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
+                    return ids.includes(t.id) ? sum + Math.abs(btx.amount) : sum;
+                  }, 0);
+                  return totalLinked < Math.abs(t.amount) - 0.01;
+                }).map(t => ({
+                  label: `${t.description || t.purpose || 'Txn'}${t.referenceNumber ? ` (${t.referenceNumber})` : ''} · ${formatCurrency(t.amount, account.currency)}`,
+                  value: t.id
+                }));
+                opts.sort((a, b) => {
+                  const aS = currentLinkedIds.includes(a.value), bS = currentLinkedIds.includes(b.value);
+                  return aS === bS ? a.label.localeCompare(b.label) : aS ? -1 : 1;
+                });
+                return opts;
+              };
+
+              const batchLinkOptions = (() => {
+                const selectedTxTypes = selectedBankTxIds.map(id => bankTransactions.find(bt => bt.id === id)?.type).filter(Boolean);
+                const targetType = selectedTxTypes[0];
+                const opts = (transactions || []).filter(t => {
+                  if (targetType && t.type !== targetType) return false;
+                  const totalLinked = bankTransactions.reduce((sum, btx) => {
+                    const ids = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
+                    return ids.includes(t.id) ? sum + Math.abs(btx.amount) : sum;
+                  }, 0);
+                  return totalLinked < Math.abs(t.amount) - 0.01 || batchProjectTxIds.includes(t.id);
+                }).map(t => ({
+                  label: `${t.description || t.purpose || 'Txn'}${t.referenceNumber ? ` (${t.referenceNumber})` : ''} · ${formatCurrency(t.amount, account.currency)}`,
+                  value: t.id
+                }));
+                opts.sort((a, b) => {
+                  const aS = batchProjectTxIds.includes(a.value), bS = batchProjectTxIds.includes(b.value);
+                  return aS === bS ? a.label.localeCompare(b.label) : aS ? -1 : 1;
+                });
+                return opts;
+              })();
+
+              const grouped = activeList.reduce((g, tx) => {
                 const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
                 const matchedTx = transactions.find(t => linkedIds.includes(t.id));
                 const purpose = tx.purpose || matchedTx?.purpose || 'Unmatched / Uncategorized';
-                if (!groups[purpose]) groups[purpose] = [];
-                groups[purpose].push(tx);
-                return groups;
+                (g[purpose] = g[purpose] || []).push(tx);
+                return g;
               }, {} as Record<string, Transaction[]>);
 
               return (
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
-                    <tr>
-                      <th className="py-2 px-3 pl-4 w-10">
-                        <Checkbox
-                          checked={list.length > 0 && list.every(tx => selectedBankTxIds.includes(tx.id))}
-                          onChange={(e) => {
-                            const ids = list.map(tx => tx.id);
-                            if (e.target.checked) {
-                              setSelectedBankTxIds([...new Set([...selectedBankTxIds, ...ids])]);
-                            } else {
-                              setSelectedBankTxIds(selectedBankTxIds.filter(id => !ids.includes(id)));
-                            }
-                          }}
-                        />
-                      </th>
-                      <th className="py-2 px-3">Date</th>
-                      <th className="py-2 px-3">Description</th>
-                      <th className="py-2 px-3">Ref</th>
-                      <th className="py-2 px-3">Project Trx</th>
-                      <th className="py-2 px-3 text-right">Amount</th>
-                      <th className="py-2 px-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {Object.entries(grouped).map(([purpose, groupTransactions]) => {
-                      const groupBg = isIncome ? 'bg-green-100/50' : 'bg-red-100/50';
-                      const groupText = isIncome ? 'text-green-600' : 'text-red-600';
+                <>
+                  {/* Summary strip — rows on mobile, 3-col on desktop */}
+                  <div className="bg-white rounded-xl border border-slate-100 overflow-hidden divide-y divide-slate-100 shadow-sm md:bg-transparent md:border-none md:rounded-none md:overflow-visible md:shadow-none md:divide-y-0 md:grid md:grid-cols-3 md:gap-2">
+                    <div className="flex justify-between items-center px-4 py-2.5 md:block md:bg-green-50 md:border md:border-green-100 md:rounded-xl md:px-3 md:py-2.5">
+                      <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-green-600 md:uppercase md:tracking-wider md:block md:mb-0.5">Bank Income</span>
+                      <span className="text-sm font-bold font-mono text-green-700 tabular-nums md:text-base">{formatCurrency(bankIncomeTotal, account.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center px-4 py-2.5 md:block md:bg-red-50 md:border md:border-red-100 md:rounded-xl md:px-3 md:py-2.5">
+                      <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-red-500 md:uppercase md:tracking-wider md:block md:mb-0.5">Bank Expenses</span>
+                      <span className="text-sm font-bold font-mono text-red-600 tabular-nums md:text-base">{formatCurrency(bankExpensesTotal, account.currency)}</span>
+                    </div>
+                    <div className={`flex justify-between items-center px-4 py-2.5 md:block md:border md:rounded-xl md:px-3 md:py-2.5 ${(bankIncomeTotal - bankExpensesTotal) >= 0 ? 'md:bg-slate-50 md:border-slate-200' : 'md:bg-rose-50 md:border-rose-100'}`}>
+                      <span className="text-sm text-slate-500 md:text-[10px] md:font-semibold md:text-slate-500 md:uppercase md:tracking-wider md:block md:mb-0.5">Net</span>
+                      <span className={`text-sm font-bold font-mono tabular-nums md:text-base ${(bankIncomeTotal - bankExpensesTotal) >= 0 ? 'text-slate-800' : 'text-rose-600'}`}>{formatCurrency(bankIncomeTotal - bankExpensesTotal, account.currency)}</span>
+                    </div>
+                  </div>
 
-                      return (
-                        <React.Fragment key={purpose}>
-                          <tr className="bg-slate-50/50 border-b border-slate-100">
-                            <td colSpan={5} className={`py-2 px-4 font-bold text-slate-600 ${groupBg}`}>
-                              <div className="flex justify-between items-center">
-                                <span>{purpose} ({groupTransactions.length})</span>
-                              </div>
-                            </td>
-                            <td className={`py-2 px-3 text-right font-mono font-bold ${groupText} ${groupBg}`}>
-                              {formatCurrency(groupTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0), account.currency)}
-                            </td>
-                            <td className={groupBg}></td>
-                          </tr>
-                          {groupTransactions.map((tx) => {
-                            const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
-                            const tempSelected = tempSelectedProjectTxIds[tx.id];
-                            const hasChanged = tempSelected !== undefined && JSON.stringify(tempSelected.slice().sort()) !== JSON.stringify(linkedIds.slice().sort());
-                            const selectedValue = tempSelected !== undefined ? tempSelected : linkedIds;
-                            return (
-                              <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="py-2 px-3 pl-4">
+                  {/* Toggle row */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex bg-slate-100 p-1 rounded-lg gap-1 shrink-0">
+                      <button type="button"
+                        onClick={() => { setActiveBankTrxType('Income'); setSelectedBankTxIds([]); }}
+                        className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${activeBankTrxType === 'Income' ? 'bg-white text-green-700 shadow-sm border border-green-200' : 'text-slate-500 hover:text-slate-800'}`}>
+                        Income <span className="ml-1 text-xs font-mono opacity-70">{bankIncomes.length}</span>
+                      </button>
+                      <button type="button"
+                        onClick={() => { setActiveBankTrxType('Expense'); setSelectedBankTxIds([]); }}
+                        className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-all ${activeBankTrxType === 'Expense' ? 'bg-white text-red-600 shadow-sm border border-red-200' : 'text-slate-500 hover:text-slate-800'}`}>
+                        Expenses <span className="ml-1 text-xs font-mono opacity-70">{bankExpenses.length}</span>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 justify-end">
+                      <div className="relative max-w-xs w-full">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                        <Input placeholder="Search..." value={bankTxSearchQuery} onChange={(e) => setBankTxSearchQuery(e.target.value)} className="pl-8 h-9 text-sm" />
+                      </div>
+                      <Button onClick={handleAutoMatch} variant="outline" size="sm" className="shrink-0 text-jci-blue border-jci-blue hover:bg-jci-blue hover:text-white">
+                        <BrainCircuit size={14} className="mr-1.5" /> Auto Match
+                      </Button>
+                    </div>
+                  </div>
+
+                  {loadingBankTransactions ? (
+                    <div className="flex justify-center py-8">
+                      <RefreshCw className="animate-spin text-jci-blue" size={28} />
+                    </div>
+                  ) : bankTransactions.length === 0 ? (
+                    <div className="py-12 text-center text-slate-400">
+                      <Layout size={28} className="mx-auto mb-2 opacity-20" />
+                      <p className="text-sm">No bank transactions linked to this project</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop table */}
+                      <Card className="hidden md:block overflow-hidden border-none shadow-sm" noPadding>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 text-slate-500">
+                              <tr>
+                                <th className="py-2.5 px-3 w-[36px]">
                                   <Checkbox
-                                    checked={selectedBankTxIds.includes(tx.id)}
+                                    checked={activeList.length > 0 && activeList.every(tx => selectedBankTxIds.includes(tx.id))}
                                     onChange={(e) => {
-                                      if (e.target.checked) setSelectedBankTxIds([...selectedBankTxIds, tx.id]);
-                                      else setSelectedBankTxIds(selectedBankTxIds.filter(id => id !== tx.id));
+                                      const ids = activeList.map(tx => tx.id);
+                                      if (e.target.checked) setSelectedBankTxIds([...new Set([...selectedBankTxIds, ...ids])]);
+                                      else setSelectedBankTxIds(selectedBankTxIds.filter(id => !ids.includes(id)));
                                     }}
                                   />
-                                </td>
-                                <td className="py-2 px-3 text-slate-500 font-mono">{new Date(tx.date).toLocaleDateString()}</td>
-                                <td className="py-2 px-3 font-medium text-slate-900">{tx.description}</td>
-                                <td className="py-2 px-3 text-slate-500">{tx.referenceNumber || '-'}</td>
-                                <td className="py-2 px-3 w-72">
-                                  <div className="flex items-center gap-2">
+                                </th>
+                                <th className="py-2.5 px-2 text-xs font-semibold w-[10%]">Date</th>
+                                <th className="py-2.5 px-2 text-xs font-semibold w-[22%]">Description</th>
+                                <th className="py-2.5 px-2 text-xs font-semibold w-[10%]">Ref</th>
+                                <th className="py-2.5 px-2 text-xs font-semibold w-[30%]">Link to Project Trx</th>
+                                <th className="py-2.5 px-2 text-xs font-semibold text-right w-[12%]">Amount</th>
+                                <th className="py-2.5 px-2 text-xs font-semibold w-[10%]">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {activeList.length === 0 ? (
+                                <tr><td colSpan={7} className="py-10 text-center text-slate-400">
+                                  <p className="text-sm">No {activeBankTrxType.toLowerCase()} bank transactions</p>
+                                </td></tr>
+                              ) : Object.entries(grouped).map(([purpose, grpTxs]) => (
+                                <React.Fragment key={purpose}>
+                                  <tr>
+                                    <td colSpan={4} className={`py-1.5 px-3 text-xs font-bold text-slate-600 ${groupBg}`}>{purpose} <span className="font-normal opacity-60">({grpTxs.length})</span></td>
+                                    <td className={groupBg}></td>
+                                    <td className={`py-1.5 px-2 text-right text-xs font-bold font-mono ${accentColor} ${groupBg}`}>
+                                      {formatCurrency(grpTxs.reduce((s, t) => s + Math.abs(t.amount), 0), account.currency)}
+                                    </td>
+                                    <td className={groupBg}></td>
+                                  </tr>
+                                  {grpTxs.map(tx => {
+                                    const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
+                                    const tempSelected = tempSelectedProjectTxIds[tx.id];
+                                    const hasChanged = tempSelected !== undefined && JSON.stringify(tempSelected.slice().sort()) !== JSON.stringify(linkedIds.slice().sort());
+                                    const selectedValue = tempSelected !== undefined ? tempSelected : linkedIds;
+                                    return (
+                                      <tr key={tx.id} className="hover:bg-slate-50/70 group transition-colors">
+                                        <td className="py-1.5 px-3">
+                                          <Checkbox checked={selectedBankTxIds.includes(tx.id)} onChange={(e) => {
+                                            if (e.target.checked) setSelectedBankTxIds([...selectedBankTxIds, tx.id]);
+                                            else setSelectedBankTxIds(selectedBankTxIds.filter(id => id !== tx.id));
+                                          }} />
+                                        </td>
+                                        <td className="py-1.5 px-2 text-slate-400 text-xs font-mono whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
+                                        <td className="py-1.5 px-2 text-slate-800 text-sm">{tx.description}</td>
+                                        <td className="py-1.5 px-2 text-slate-400 text-xs font-mono">{tx.referenceNumber || '—'}</td>
+                                        <td className="py-1.5 px-2">
+                                          <div className="flex items-center gap-1.5">
+                                            <div className="flex-1 min-w-0">
+                                              <MultiSelectDropdown
+                                                selected={selectedValue}
+                                                onChange={(ids) => setTempSelectedProjectTxIds(prev => ({ ...prev, [tx.id]: ids }))}
+                                                options={getAvailableProjectTxOptions(tx)}
+                                                placeholder="Link..."
+                                              />
+                                            </div>
+                                            {hasChanged && (
+                                              <div className="flex gap-1 shrink-0">
+                                                <button onClick={() => handleLinkBankTransaction(tx.id, selectedValue)} className="p-1 text-green-600 border border-green-200 hover:bg-green-50 rounded shadow-sm"><Check size={14} /></button>
+                                                <button onClick={() => setTempSelectedProjectTxIds(prev => { const c = { ...prev }; delete c[tx.id]; return c; })} className="p-1 text-red-500 border border-red-200 hover:bg-red-50 rounded shadow-sm"><X size={14} /></button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className={`py-1.5 px-2 text-right font-mono font-semibold text-sm ${accentColor}`}>
+                                          {isIncome ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), account.currency)}
+                                        </td>
+                                        <td className="py-1.5 px-2">
+                                          <Badge variant={linkedIds.length > 0 ? 'success' : 'warning'}>
+                                            {linkedIds.length > 0 ? 'Reconciled' : 'Unreconciled'}
+                                          </Badge>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </Card>
+
+                      {/* Mobile card list */}
+                      <div className="md:hidden space-y-1.5">
+                        {activeList.length === 0 ? (
+                          <div className="py-10 text-center text-slate-400">
+                            <p className="text-sm">No {activeBankTrxType.toLowerCase()} bank transactions</p>
+                          </div>
+                        ) : activeList.map(tx => {
+                          const linkedIds = (tx as any).projectTransactionIds || ((tx as any).projectTransactionId ? [(tx as any).projectTransactionId] : []);
+                          const tempSelected = tempSelectedProjectTxIds[tx.id];
+                          const hasChanged = tempSelected !== undefined && JSON.stringify(tempSelected.slice().sort()) !== JSON.stringify(linkedIds.slice().sort());
+                          const selectedValue = tempSelected !== undefined ? tempSelected : linkedIds;
+                          const isSelected = selectedBankTxIds.includes(tx.id);
+                          return (
+                            <div key={tx.id}
+                              className={`rounded-xl border p-3 transition-all ${isSelected ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}
+                              onClick={() => {
+                                if (isSelected) setSelectedBankTxIds(selectedBankTxIds.filter(id => id !== tx.id));
+                                else setSelectedBankTxIds([...selectedBankTxIds, tx.id]);
+                              }}>
+                              <div className="flex items-start gap-3">
+                                <Checkbox checked={isSelected} onChange={() => {}} className="mt-0.5 shrink-0 pointer-events-none" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-slate-800 truncate">{tx.description}</p>
+                                    <span className={`text-sm font-bold font-mono shrink-0 ${accentColor}`}>
+                                      {isIncome ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), account.currency)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    <span className="text-[11px] text-slate-400">{new Date(tx.date).toLocaleDateString()}</span>
+                                    {tx.referenceNumber && <span className="text-[11px] font-mono text-slate-400">{tx.referenceNumber}</span>}
+                                    <Badge variant={linkedIds.length > 0 ? 'success' : 'warning'}>
+                                      {linkedIds.length > 0 ? 'Reconciled' : 'Unreconciled'}
+                                    </Badge>
+                                  </div>
+                                  {/* Link row */}
+                                  <div className="mt-2 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                                     <div className="flex-1 min-w-0">
                                       <MultiSelectDropdown
                                         selected={selectedValue}
-                                        onChange={(selectedIds) => {
-                                          setTempSelectedProjectTxIds(prev => ({
-                                            ...prev,
-                                            [tx.id]: selectedIds
-                                          }));
-                                        }}
+                                        onChange={(ids) => setTempSelectedProjectTxIds(prev => ({ ...prev, [tx.id]: ids }))}
                                         options={getAvailableProjectTxOptions(tx)}
-                                        placeholder="Select Transactions..."
+                                        placeholder="Link to project trx..."
                                       />
                                     </div>
                                     {hasChanged && (
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        <button
-                                          onClick={() => handleLinkBankTransaction(tx.id, selectedValue)}
-                                          className="p-1 hover:bg-green-50 rounded text-green-600 border border-green-200 shadow-sm"
-                                          title="Confirm selection"
-                                        >
-                                          <Check size={16} />
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setTempSelectedProjectTxIds(prev => {
-                                              const copy = { ...prev };
-                                              delete copy[tx.id];
-                                              return copy;
-                                            });
-                                          }}
-                                          className="p-1 hover:bg-red-50 rounded text-red-600 border border-red-200 shadow-sm"
-                                          title="Cancel selection"
-                                        >
-                                          <X size={16} />
-                                        </button>
+                                      <div className="flex gap-1 shrink-0">
+                                        <button onClick={() => handleLinkBankTransaction(tx.id, selectedValue)} className="p-1.5 text-green-600 border border-green-200 hover:bg-green-50 rounded-lg shadow-sm"><Check size={14} /></button>
+                                        <button onClick={() => setTempSelectedProjectTxIds(prev => { const c = { ...prev }; delete c[tx.id]; return c; })} className="p-1.5 text-red-500 border border-red-200 hover:bg-red-50 rounded-lg shadow-sm"><X size={14} /></button>
                                       </div>
                                     )}
                                   </div>
-                                </td>
-                                <td className={`py-2 px-3 text-right font-mono ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                                  {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), account.currency)}
-                                </td>
-                                <td className="py-2 px-3">
-                                  <Badge variant={(linkedIds.length > 0) ? 'success' : 'warning'}>
-                                    {(linkedIds.length > 0) ? 'Reconciled' : 'Unreconciled'}
-                                  </Badge>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Batch toolbar — sticky bottom */}
+                      {selectedBankTxIds.length > 0 && (
+                        <div className="sticky bottom-2 z-20 mx-1">
+                          <div className="bg-slate-900 text-white rounded-2xl px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl">
+                            <span className="text-sm font-semibold shrink-0">{selectedBankTxIds.length} selected</span>
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                              {isMixedBankTxSelected ? (
+                                <span className="text-xs text-rose-300 bg-rose-900/40 px-2.5 py-1.5 rounded-lg border border-rose-700/50 font-medium">
+                                  Cannot link mixed Income & Expense
+                                </span>
+                              ) : (
+                                <div className="flex items-center gap-1.5 bg-slate-800 rounded-xl px-2 py-1 flex-1 sm:flex-none">
+                                  <MultiSelectDropdown
+                                    selected={batchProjectTxIds}
+                                    onChange={setBatchProjectTxIds}
+                                    options={batchLinkOptions}
+                                    placeholder="Link to project trx..."
+                                    className="w-52 border-none bg-transparent text-white text-sm"
+                                  />
+                                  <Button onClick={handleBatchLinkBankTransactions} disabled={batchProjectTxIds.length === 0} size="sm" className="shrink-0 bg-jci-blue hover:bg-jci-blue/90 border-none text-white">
+                                    Apply
+                                  </Button>
+                                </div>
+                              )}
+                              {bankTransactions.some(t => selectedBankTxIds.includes(t.id) && ((t as any).projectTransactionIds?.length > 0 || (t as any).projectTransactionId)) && (
+                                <Button onClick={handleBatchUnlinkBankTransactions} variant="outline" size="sm" className="shrink-0 text-rose-300 border-rose-700/50 hover:bg-rose-900/40">
+                                  Unlink
+                                </Button>
+                              )}
+                              <button onClick={() => setSelectedBankTxIds([])} className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors shrink-0">
+                                <X size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
               );
-            };
+            })()}
+          </div>
+        )}
+      </div>
 
-            return (
-              <div className="space-y-6">
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-green-50/30 rounded-lg border border-green-100 shadow-sm transition-all hover:shadow-md">
-                    <div className="text-xs text-green-700 uppercase tracking-wider mb-1 font-semibold">Total Bank Income</div>
-                    <div className="text-xl font-bold text-green-600">{formatCurrency(bankIncomeTotal, account.currency)}</div>
-                    <div className="text-xs text-slate-400 mt-1">({bankIncomes.length} items matched/filtered)</div>
-                  </div>
-                  <div className="p-4 bg-red-50/30 rounded-lg border border-red-100 shadow-sm transition-all hover:shadow-md">
-                    <div className="text-xs text-red-700 uppercase tracking-wider mb-1 font-semibold">Total Bank Expenses</div>
-                    <div className="text-xl font-bold text-red-600">{formatCurrency(bankExpensesTotal, account.currency)}</div>
-                    <div className="text-xs text-slate-400 mt-1">({bankExpenses.length} items matched/filtered)</div>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 shadow-sm transition-all hover:shadow-md">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-1 font-semibold">Bank Net Balance</div>
-                    <div className={`text-xl font-bold ${(bankIncomeTotal - bankExpensesTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(bankIncomeTotal - bankExpensesTotal, account.currency)}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1">Total Items: {filteredBankTx.length}</div>
-                  </div>
-                </div>
-
-                {/* Incomes Section */}
-                <Card className="overflow-hidden border-none shadow-sm" noPadding>
-                  <div className="flex justify-between items-center p-4 border-b-2 border-green-500 bg-white">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-full text-green-600">
-                        <TrendingUp size={20} />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-green-700">Bank Incomes</h3>
-                        <p className="text-xs text-slate-500">{bankIncomes.length} Items</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-0 overflow-x-auto">
-                    {renderBankTxTable(bankIncomes, true)}
-                  </div>
-                </Card>
-
-                {/* Expenses Section */}
-                <Card className="overflow-hidden border-none shadow-sm" noPadding>
-                  <div className="flex justify-between items-center p-4 border-b-2 border-red-500 bg-white">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-red-100 rounded-full text-red-600">
-                        <TrendingUp size={20} className="rotate-180" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-red-700">Bank Expenses</h3>
-                        <p className="text-xs text-slate-500">{bankExpenses.length} Items</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-0 overflow-x-auto">
-                    {renderBankTxTable(bankExpenses, false)}
-                  </div>
-                </Card>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-    </div>
+      {/* Claim Reimbursement — reuse full Submit Payment Request modal */}
+      <SubmitPaymentRequestModal
+        isOpen={isClaimDrawerOpen}
+        onClose={() => setIsClaimDrawerOpen(false)}
+        preselectedProjectId={projectId}
+        preselectedCategory="projects_activities"
+        onSuccess={() => showToast('Reimbursement claim submitted', 'success')}
+      />
+    </>
   );
 };
 
@@ -4355,25 +3959,39 @@ const ProjectReportsTab: React.FC<ProjectReportsTabProps> = ({
   onGenerateReport,
   loading,
 }) => {
+  const REPORT_SECTIONS = [
+    { icon: <BarChart3 size={16} />, label: 'Executive Summary', color: 'text-jci-blue bg-jci-blue/10' },
+    { icon: <Users size={16} />, label: 'Team Performance', color: 'text-violet-600 bg-violet-100' },
+    { icon: <GitBranch size={16} />, label: 'Risks & Issues', color: 'text-amber-600 bg-amber-100' },
+    { icon: <CheckCircle size={16} />, label: 'Recommendations', color: 'text-green-600 bg-green-100' },
+  ];
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">Project Reports</h3>
-            <p className="text-sm text-slate-500">Generate comprehensive reports for {projectName}</p>
+    <div className="space-y-5">
+      {/* Header row */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">Project Reports</h3>
+          <p className="text-sm text-slate-500 mt-0.5">Comprehensive AI-generated report for <span className="font-medium text-slate-700">{projectName}</span></p>
+        </div>
+        <Button onClick={onGenerateReport} disabled={loading} size="sm">
+          {loading
+            ? <><RefreshCw size={14} className="mr-1.5 animate-spin" /> Generating</>
+            : <><FileText size={14} className="mr-1.5" /> Generate Report</>}
+        </Button>
+      </div>
+
+      {/* Feature chips */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {REPORT_SECTIONS.map(s => (
+          <div key={s.label} className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+            <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${s.color}`}>
+              {s.icon}
+            </div>
+            <span className="text-xs font-medium text-slate-700 leading-tight">{s.label}</span>
           </div>
-          <Button onClick={onGenerateReport} disabled={loading}>
-            <FileText size={16} className="mr-2" />
-            {loading ? 'Generating...' : 'Generate Report'}
-          </Button>
-        </div>
-        <div className="p-4 bg-blue-50 rounded-lg">
-          <p className="text-sm text-blue-800">
-            Reports include executive summary, team performance, timeline analysis, risks and issues, and recommendations.
-          </p>
-        </div>
-      </Card>
+        ))}
+      </div>
     </div>
   );
 };
@@ -4421,67 +4039,71 @@ const ProjectReportModal: React.FC<ProjectReportModalProps> = ({ report, onClose
 
   return (
     <Modal isOpen={true} onClose={onClose} title={`Project Report: ${report.projectName}`} size="xl">
-      <div className="space-y-6 max-h-[80vh] overflow-y-auto">
-        <div className="flex gap-2 pb-4 border-b">
+      <div className="space-y-6 max-h-[80vh] overflow-y-auto pr-1">
+        {/* Export actions */}
+        <div className="flex gap-2 pb-4 border-b border-slate-100">
           <Button variant="outline" size="sm" onClick={handleExportJSON}>
-            Export JSON
+            <Download size={13} className="mr-1.5" /> JSON
           </Button>
           <Button variant="outline" size="sm" onClick={handleExportText}>
-            Export Text
+            <Download size={13} className="mr-1.5" /> Text
           </Button>
         </div>
 
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Executive Summary</h3>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <span className="text-sm text-slate-500">Status:</span>
-              <Badge variant="info" className="ml-2">{report.executiveSummary.status}</Badge>
+        {/* Executive Summary */}
+        <div className="pl-4 border-l-4 border-jci-blue">
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Executive Summary</h3>
+          <div className="flex flex-wrap gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Status</span>
+              <Badge variant="info">{report.executiveSummary.status}</Badge>
             </div>
-            <div>
-              <span className="text-sm text-slate-500">Completion:</span>
-              <span className="ml-2 font-semibold">{report.executiveSummary.completionPercentage.toFixed(1)}%</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Completion</span>
+              <span className="text-sm font-bold text-slate-800">{report.executiveSummary.completionPercentage.toFixed(1)}%</span>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-slate-50 p-3 rounded">
-              <div className="text-sm text-slate-500">Total Tasks</div>
-              <div className="text-xl font-bold">{report.executiveSummary.totalTasks}</div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-slate-50 rounded-xl p-3 min-w-0">
+              <div className="text-xs text-slate-500 mb-1">Total Tasks</div>
+              <div className="text-xl font-bold text-slate-900 tabular-nums">{report.executiveSummary.totalTasks}</div>
             </div>
-            <div className="bg-green-50 p-3 rounded">
-              <div className="text-sm text-green-600">Completed</div>
-              <div className="text-xl font-bold text-green-700">{report.executiveSummary.completedTasks}</div>
+            <div className="bg-green-50 rounded-xl p-3 min-w-0">
+              <div className="text-xs text-green-600 mb-1">Completed</div>
+              <div className="text-xl font-bold text-green-700 tabular-nums">{report.executiveSummary.completedTasks}</div>
             </div>
-            <div className="bg-amber-50 p-3 rounded">
-              <div className="text-sm text-amber-600">In Progress</div>
-              <div className="text-xl font-bold text-amber-700">{report.executiveSummary.inProgressTasks}</div>
+            <div className="bg-amber-50 rounded-xl p-3 min-w-0">
+              <div className="text-xs text-amber-600 mb-1">In Progress</div>
+              <div className="text-xl font-bold text-amber-700 tabular-nums">{report.executiveSummary.inProgressTasks}</div>
             </div>
           </div>
         </div>
 
+        {/* Team Performance */}
         {report.teamPerformance && (
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Team Performance</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Total Members:</span>
-                <span className="font-semibold">{report.teamPerformance.totalMembers}</span>
+          <div className="pl-4 border-l-4 border-violet-400">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Team Performance</h3>
+            <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm bg-white">
+                <span className="text-slate-600">Total Members</span>
+                <span className="font-semibold tabular-nums">{report.teamPerformance.totalMembers}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Active Members:</span>
-                <span className="font-semibold">{report.teamPerformance.activeMembers}</span>
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm bg-white">
+                <span className="text-slate-600">Active Members</span>
+                <span className="font-semibold tabular-nums">{report.teamPerformance.activeMembers}</span>
               </div>
             </div>
           </div>
         )}
 
+        {/* Risks & Issues */}
         {report.risksAndIssues.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Risks & Issues</h3>
+          <div className="pl-4 border-l-4 border-amber-400">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Risks & Issues</h3>
             <div className="space-y-2">
               {report.risksAndIssues.map((risk, index) => (
-                <div key={index} className="p-3 bg-slate-50 rounded">
-                  <div className="flex items-center gap-2 mb-1">
+                <div key={index} className="rounded-xl border border-slate-100 bg-white p-3">
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
                     <Badge variant={risk.severity === 'high' ? 'error' : risk.severity === 'medium' ? 'warning' : 'neutral'}>
                       {risk.severity}
                     </Badge>
@@ -4489,7 +4111,7 @@ const ProjectReportModal: React.FC<ProjectReportModalProps> = ({ report, onClose
                   </div>
                   <p className="text-sm text-slate-700">{risk.description}</p>
                   {risk.mitigation && (
-                    <p className="text-xs text-slate-500 mt-1">Mitigation: {risk.mitigation}</p>
+                    <p className="text-xs text-slate-400 mt-1.5 italic">Mitigation: {risk.mitigation}</p>
                   )}
                 </div>
               ))}
@@ -4497,23 +4119,31 @@ const ProjectReportModal: React.FC<ProjectReportModalProps> = ({ report, onClose
           </div>
         )}
 
+        {/* Recommendations */}
         {report.recommendations.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Recommendations</h3>
-            <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
+          <div className="pl-4 border-l-4 border-green-400">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Recommendations</h3>
+            <ul className="space-y-1.5">
               {report.recommendations.map((rec, index) => (
-                <li key={index}>{rec}</li>
+                <li key={index} className="flex gap-2 text-sm text-slate-700">
+                  <CheckCircle size={14} className="flex-shrink-0 mt-0.5 text-green-500" />
+                  {rec}
+                </li>
               ))}
             </ul>
           </div>
         )}
 
+        {/* Next Steps */}
         {report.nextSteps.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Next Steps</h3>
-            <ul className="list-disc list-inside space-y-1 text-sm text-slate-700">
+          <div className="pl-4 border-l-4 border-slate-300">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Next Steps</h3>
+            <ul className="space-y-1.5">
               {report.nextSteps.map((step, index) => (
-                <li key={index}>{step}</li>
+                <li key={index} className="flex gap-2 text-sm text-slate-700">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center mt-0.5">{index + 1}</span>
+                  {step}
+                </li>
               ))}
             </ul>
           </div>
@@ -4537,6 +4167,7 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
 }) => {
   const { showToast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [editStep, setEditStep] = useState<1 | 2>(1);
   const [formType, setFormType] = useState<string>(project.type || '');
   const [isSaving, setIsSaving] = useState(false);
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
@@ -4556,6 +4187,9 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
   const [editEventEndDate, setEditEventEndDate] = useState(project.eventEndDate || '');
   const [editEventStartTime, setEditEventStartTime] = useState(project.eventStartTime || '');
   const [editEventEndTime, setEditEventEndTime] = useState(project.eventEndTime || '');
+  const [editPriceMin, setEditPriceMin] = useState(project.priceMin != null ? String(project.priceMin) : '');
+  const [editPriceMax, setEditPriceMax] = useState(project.priceMax != null ? String(project.priceMax) : '');
+  const [descExpanded, setDescExpanded] = useState(false);
 
   useEffect(() => {
     setEditRoadmapUrl(project.roadmapUrl || '');
@@ -4571,7 +4205,12 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
     setEditEventEndDate(project.eventEndDate || '');
     setEditEventStartTime(project.eventStartTime || '');
     setEditEventEndTime(project.eventEndTime || '');
-  }, [project, isEditing]);
+    setEditPriceMin(project.priceMin != null ? String(project.priceMin) : '');
+    setEditPriceMax(project.priceMax != null ? String(project.priceMax) : '');
+    // Reset edit mode when project changes so stepper always starts at step 1
+    setIsEditing(false);
+    setEditStep(1);
+  }, [project.id]);
 
   const handleFetchPosterForEdit = async () => {
     if (!editRoadmapUrl) {
@@ -4597,6 +4236,8 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
       if (details.eventEndDate) setEditEventEndDate(details.eventEndDate);
       if (details.eventStartTime) setEditEventStartTime(details.eventStartTime);
       if (details.eventEndTime) setEditEventEndTime(details.eventEndTime);
+      if (details.priceMin != null) setEditPriceMin(String(details.priceMin));
+      if (details.priceMax != null) setEditPriceMax(String(details.priceMax));
 
       showToast('Successfully synchronized event details!', 'success');
     } catch (err: any) {
@@ -4606,8 +4247,20 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
     }
   };
 
+  // Auto-sync when a valid JCI Roadmap URL is pasted
   useEffect(() => {
-    setGalleryPhotos(project.galleryUrls || []);
+    const isJciRoadmapUrl = /jcimalaysia\.cc\/roadmap\/.*[?&]eventid=\d+/.test(editRoadmapUrl)
+      || /^\d{4,6}$/.test(editRoadmapUrl.trim());
+    if (isJciRoadmapUrl && !isFetchingPoster) {
+      handleFetchPosterForEdit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editRoadmapUrl]);
+
+  useEffect(() => {
+    const urls = project.galleryUrls || [];
+    setGalleryPhotos(urls);
+    setNewPhotoUrl(urls[0] || '');
   }, [project.galleryUrls]);
 
   const hasPlanFields =
@@ -4621,29 +4274,40 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Guard: if Enter pressed on step 1, advance instead of saving
+    if (editStep === 1) {
+      if (!editTitle.trim()) { showToast('Title is required', 'error'); return; }
+      setEditStep(2);
+      return;
+    }
     setIsSaving(true);
     try {
       const formData = new FormData(e.currentTarget);
       await onSave({
-        title: formData.get('title') as string,
-        name: formData.get('title') as string,
-        description: (formData.get('description') as string) || '',
+        // Step 1 fields " use state because those inputs are unmounted on step 2
+        title: editTitle,
+        name: editTitle,
+        description: editDescription || '',
         logoUrl: editLogoUrl || '',
         roadmapUrl: editRoadmapUrl || '',
         galleryUrls: galleryPhotos,
+        // Step 2 fields " inputs are mounted at submit time, formData is fine
         level: (formData.get('level') as any) || undefined,
         pillar: (formData.get('pillar') as any) || undefined,
         type: (formData.get('type') as any) || undefined,
         category: (formData.get('category') as string) || undefined,
-        proposedDate: formData.get('proposedDate') as string,
-        objectives: formData.get('objectives') as string,
+        proposedDate: editProposedDate || '',
+        objectives: (formData.get('objectives') as string) || '',
         expectedImpact: (formData.get('expectedImpact') as string) || '',
-        eventStartDate: (formData.get('eventStartDate') as string) || undefined,
-        eventEndDate: (formData.get('eventEndDate') as string) || undefined,
-        eventStartTime: (formData.get('eventStartTime') as string) || undefined,
-        eventEndTime: (formData.get('eventEndTime') as string) || undefined,
+        eventStartDate: editEventStartDate || undefined,
+        eventEndDate: editEventEndDate || undefined,
+        eventStartTime: editEventStartTime || undefined,
+        eventEndTime: editEventEndTime || undefined,
+        priceMin: editPriceMin !== '' ? Number(editPriceMin) : undefined,
+        priceMax: editPriceMax !== '' ? Number(editPriceMax) : undefined,
       });
       setIsEditing(false);
+      setEditStep(1);
     } catch (err) {
       // Error handling is done by caller via toast
     } finally {
@@ -4651,412 +4315,333 @@ const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
     }
   };
 
-  // Empty state (no data yet)
-  if (!hasPlanFields && !isEditing) {
+  // Edit form " bottom drawer (rendered alongside view/empty state)
+  const STEPS: { s: 1 | 2; label: string }[] = [
+    { s: 1, label: 'Basics & Media' },
+    { s: 2, label: 'Classification & Schedule' },
+  ];
+
+  const editDrawer = (
+    <Drawer
+      isOpen={isEditing}
+      onClose={() => { setIsEditing(false); setEditStep(1); }}
+      title={editStep === 1 ? 'Edit Activity Plan " Basics & Media' : 'Edit Activity Plan " Classification & Schedule'}
+      position="bottom"
+      size="xl"
+      footer={
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" type="button" onClick={() => {
+              if (editStep === 1) { setIsEditing(false); setEditStep(1); }
+              else setEditStep(1);
+            }}>
+              {editStep === 1 ? 'Cancel' : '← Back'}
+            </Button>
+            <button
+              type="button"
+              onClick={async () => { await onDelete(); setIsEditing(false); }}
+              className="text-xs font-medium text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={12} className="inline mr-1" />Delete
+            </button>
+          </div>
+          {editStep === 1 ? (
+            <Button key="next" type="button" onClick={() => {
+              if (!editTitle.trim()) { showToast('Title is required', 'error'); return; }
+              setEditStep(2);
+            }}>Next →</Button>
+          ) : (
+            <Button key="save" type="submit" form="plan-edit-form" disabled={isSaving}>{isSaving ? 'Saving' : 'Save Changes'}</Button>
+          )}
+        </div>
+      }
+    >
+      {/* Stepper */}
+      <div className="flex items-center gap-2 mb-4">
+        {STEPS.map(({ s, label }, i) => (
+          <React.Fragment key={s}>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${s < editStep ? 'bg-jci-blue/10 text-jci-blue' :
+              s === editStep ? 'bg-jci-blue text-white shadow-sm' :
+                'bg-slate-100 text-slate-400'
+              }`}>
+              <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-white/30">
+                {s < editStep ? 'âœ"' : s}
+              </span>
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden">{s === 1 ? 'Media' : 'Details'}</span>
+            </div>
+            {i === 0 && <div className={`flex-1 h-px max-w-[24px] ${editStep > 1 ? 'bg-jci-blue' : 'bg-slate-200'}`} />}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <form id="plan-edit-form" onSubmit={handleSubmit} className="space-y-4">
+        {/* Step 1: Basics & Media */}
+        {editStep === 1 && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Project Info</p>
+              <div className="space-y-3">
+                <Input name="title" label="Title *" placeholder="e.g. Summer Leadership Summit"
+                  value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                  icon={<FileText size={16} />} required />
+                <Textarea name="description" label="Description" placeholder="Brief description of the activity plan..."
+                  value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Media</p>
+              <div className="md:grid md:grid-cols-2 md:gap-4 space-y-3 md:space-y-0">
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-500 mb-1.5">JCI Roadmap Sync</p>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Input name="roadmapUrl" label="" placeholder="Roadmap URL or Event ID (e.g. 6274)"
+                          value={editRoadmapUrl} onChange={(e) => setEditRoadmapUrl(e.target.value)} icon={<Globe size={16} />} />
+                      </div>
+                      <Button type="button" variant="outline" onClick={handleFetchPosterForEdit} disabled={isFetchingPoster}
+                        className="h-10 shrink-0 flex items-center gap-1.5 border-jci-blue text-jci-blue hover:bg-sky-50 mb-px">
+                        {isFetchingPoster ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
+                        <span className="text-xs">{isFetchingPoster ? 'Syncing' : 'Sync'}</span>
+                      </Button>
+                    </div>
+                  </div>
+                  <Input name="logoUrl" label="Poster / Logo URL" placeholder="https://example.com/poster.png"
+                    value={editLogoUrl} onChange={(e) => setEditLogoUrl(e.target.value)} icon={<Image size={16} />} />
+                  {editLogoUrl && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex justify-center p-2">
+                      <img src={editLogoUrl} alt="Poster preview" className="max-h-36 object-contain rounded-lg" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] font-semibold text-slate-500">Activity Photo Gallery</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">Paste a Google Drive <strong>folder</strong> link shared as "Anyone with the link"</p>
+                  <Input label="" placeholder="https://drive.google.com/drive/folders/"
+                    value={newPhotoUrl} onChange={(e) => {
+                      setNewPhotoUrl(e.target.value);
+                      setGalleryPhotos(e.target.value.trim() ? [e.target.value.trim()] : []);
+                    }} />
+                  {galleryPhotos.length > 0 && (
+                    <p className="text-[11px] text-green-700 font-medium flex items-center gap-1">
+                      <Check size={11} />Folder linked
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Classification & Schedule */}
+        {editStep === 2 && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Classification</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Select name="level" label="Level *" required value={editLevel} onChange={(e) => setEditLevel(e.target.value as any)}
+                  options={[{ label: '" Select "', value: '' }, ...PROJECT_LEVELS.map(l => ({ label: l, value: l }))]} />
+                <Select name="pillar" label="Pillar *" required value={editPillar} onChange={(e) => setEditPillar(e.target.value as any)}
+                  options={[{ label: '" Select "', value: '' }, ...PROJECT_PILLARS.map(p => ({ label: p, value: p }))]} />
+                <Select name="type" label="Type *" required value={formType}
+                  options={[{ label: '" Select "', value: '' }, ...PROJECT_TYPES.map(c => ({ label: PROJECT_TYPE_LABELS[c] || c, value: c }))]}
+                  onChange={(e) => { setFormType(e.target.value); setEditCategory(''); }} />
+                <Select name="category" label="Category *" required value={editCategory} onChange={(e) => setEditCategory(e.target.value)}
+                  options={[{ label: '" Select "', value: '' }, ...(formType ? (PROJECT_CATEGORIES_BY_TYPE[formType] ?? []) : []).map(t => ({ label: t, value: t }))]} />
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Schedule</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Input name="proposedDate" label="Proposed *" type="date" value={editProposedDate}
+                  onChange={(e) => setEditProposedDate(e.target.value)} icon={<Calendar size={16} />} required />
+                <Input name="eventStartDate" label="Start Date *" type="date" value={editEventStartDate}
+                  onChange={(e) => setEditEventStartDate(e.target.value)} icon={<Calendar size={16} />} required />
+                <Input name="eventEndDate" label="End Date" type="date" value={editEventEndDate}
+                  onChange={(e) => setEditEventEndDate(e.target.value)} icon={<Calendar size={16} />} />
+                <div />
+                <Input name="eventStartTime" label="Start Time" type="time" value={editEventStartTime}
+                  onChange={(e) => setEditEventStartTime(e.target.value)} icon={<Clock size={16} />} />
+                <Input name="eventEndTime" label="End Time" type="time" value={editEventEndTime}
+                  onChange={(e) => setEditEventEndTime(e.target.value)} icon={<Clock size={16} />} />
+                <Input name="priceMin" label="Min Price (RM)" type="number" min="0" placeholder="0"
+                  value={editPriceMin} onChange={(e) => setEditPriceMin(e.target.value)} icon={<DollarSign size={16} />} />
+                <Input name="priceMax" label="Max Price (RM)" type="number" min="0" placeholder="e.g. 150"
+                  value={editPriceMax} onChange={(e) => setEditPriceMax(e.target.value)} icon={<DollarSign size={16} />} />
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Goals</p>
+              <div className="md:grid md:grid-cols-2 md:gap-3 space-y-2 md:space-y-0">
+                <Textarea name="objectives" label="Objectives & Goals" placeholder="Goals and expected community impact..."
+                  defaultValue={project.objectives} rows={2} />
+                <Textarea name="expectedImpact" label="Expected Impact" placeholder="Expected outcomes and impact..."
+                  defaultValue={project.expectedImpact} rows={2} />
+              </div>
+            </div>
+          </div>
+        )}
+      </form>
+    </Drawer>
+  );
+
+  // Empty state (no plan data yet)
+  if (!hasPlanFields) {
     return (
-      <div className="text-center py-12">
-        <FileText className="mx-auto text-slate-400 mb-4" size={48} />
-        <p className="text-slate-500 mb-4">No activity plan data found on this project</p>
-        <Button onClick={() => setIsEditing(true)}>
-          <Plus size={16} className="mr-2" />
-          Create Activity Plan
+      <>
+        <div className="text-center py-12">
+          <FileText className="mx-auto text-slate-400 mb-4" size={48} />
+          <p className="text-slate-500 mb-4">No activity plan data found on this project</p>
+          <Button onClick={() => { setIsEditing(true); setEditStep(1); }}>
+            <Plus size={16} className="mr-2" />
+            Create Activity Plan
+          </Button>
+        </div>
+        {editDrawer}
+      </>
+    );
+  }
+
+  // View mode
+  const scheduleItems: { label: string; date: string; time?: string }[] = [];
+  if (project.proposedDate) scheduleItems.push({ label: 'Proposed', date: formatDate(toDate(project.proposedDate as any)) });
+  if (project.eventStartDate) scheduleItems.push({ label: 'Start', date: formatDate(toDate(project.eventStartDate as any)), time: project.eventStartTime });
+  if (project.eventEndDate) scheduleItems.push({ label: 'End', date: formatDate(toDate(project.eventEndDate as any)), time: project.eventEndTime });
+
+  return (
+    <div className="space-y-4">
+      {/* Action bar */}
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => { setIsEditing(true); setEditStep(1); }}>
+          <Edit size={14} className="mr-1.5" />Edit
+        </Button>
+        <Button variant="danger" size="sm" onClick={onDelete}>
+          <Trash2 size={14} className="mr-1.5" />Delete
         </Button>
       </div>
-    );
-  }
 
-  // Edit mode – inline form
-  if (isEditing) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-slate-900">Edit Activity Plan</h3>
-          <Button
-            variant="danger"
-            onClick={async () => {
-              await onDelete();
-            }}
-          >
-            <Trash2 size={16} className="mr-2" />
-            Delete Project
-          </Button>
-        </div>
-
-        <Card>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              name="title"
-              label="Title *"
-              placeholder="e.g. Summer Leadership Summit"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              icon={<FileText size={16} />}
-              required
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-              <Input
-                name="roadmapUrl"
-                label="JCI Malaysia Roadmap Event URL / ID"
-                placeholder="e.g. https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=6274 or 6274"
-                value={editRoadmapUrl}
-                onChange={(e) => setEditRoadmapUrl(e.target.value)}
-                icon={<Globe size={16} />}
-              />
-              <div className="pb-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleFetchPosterForEdit}
-                  disabled={isFetchingPoster}
-                  className="w-full h-10 flex items-center justify-center gap-2 border-jci-blue text-jci-blue hover:bg-sky-50"
-                >
-                  {isFetchingPoster ? (
-                    <>
-                      <RefreshCw size={14} className="animate-spin" />
-                      Fetching Details...
-                    </>
-                  ) : (
-                    <>
-                      <Download size={14} />
-                      Sync Event Details
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            <Input
-              name="logoUrl"
-              label="Project Logo / Poster URL"
-              placeholder="https://example.com/logo.png"
-              value={editLogoUrl}
-              onChange={(e) => setEditLogoUrl(e.target.value)}
-              icon={<Image size={16} />}
-            />
-
-            {editLogoUrl && (
-              <div className="mt-2 border border-slate-200 rounded-xl p-2 bg-slate-50 flex justify-center overflow-hidden">
-                <img src={editLogoUrl} alt="Preview" className="max-h-48 object-contain rounded-lg shadow-sm" />
-              </div>
-            )}
-
-            <Textarea
-              name="description"
-              label="Description"
-              placeholder="Brief description of the activity plan..."
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-              rows={3}
-            />
-
-            <div className="space-y-2 border border-slate-200 rounded p-4 bg-slate-50">
-              <label className="text-sm font-semibold text-slate-700 block">Activity Photo Gallery</label>
-              <div className="flex gap-2">
-                <Input
-                  label=""
-                  placeholder="https://example.com/photo.jpg"
-                  value={newPhotoUrl}
-                  onChange={(e) => setNewPhotoUrl(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (newPhotoUrl.trim()) {
-                      setGalleryPhotos([...galleryPhotos, newPhotoUrl.trim()]);
-                      setNewPhotoUrl('');
-                    }
-                  }}
-                  className="mt-1"
-                >
-                  Add Photo
-                </Button>
-              </div>
-
-              {galleryPhotos.length > 0 && (
-                <div className="grid grid-cols-4 gap-2 mt-2">
-                  {galleryPhotos.map((url, index) => (
-                    <div key={index} className="relative group border border-slate-200 rounded overflow-hidden aspect-video bg-white">
-                      <img src={url} alt={`Gallery ${index}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setGalleryPhotos(galleryPhotos.filter((_, i) => i !== index))}
-                        className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                name="level"
-                label="Level *"
-                required
-                value={editLevel}
-                onChange={(e) => setEditLevel(e.target.value as any)}
-                options={[
-                  { label: '— Select —', value: '' },
-                  ...PROJECT_LEVELS.map(l => ({ label: l, value: l })),
-                ]}
-              />
-              <Select
-                name="pillar"
-                label="Pillar *"
-                required
-                value={editPillar}
-                onChange={(e) => setEditPillar(e.target.value as any)}
-                options={[
-                  { label: '— Select —', value: '' },
-                  ...PROJECT_PILLARS.map(p => ({ label: p, value: p })),
-                ]}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                name="type"
-                label="Type *"
-                required
-                value={formType}
-                options={[
-                  { label: '— Select —', value: '' },
-                  ...PROJECT_TYPES.map(c => ({ label: PROJECT_TYPE_LABELS[c] || c, value: c })),
-                ]}
-                onChange={(e) => setFormType(e.target.value)}
-              />
-              <Select
-                name="category"
-                label="Category *"
-                required
-                value={editCategory}
-                onChange={(e) => setEditCategory(e.target.value)}
-                options={[
-                  { label: '— Select —', value: '' },
-                  ...(formType
-                    ? (PROJECT_CATEGORIES_BY_TYPE[formType] ?? []).map(t => ({
-                      label: t,
-                      value: t,
-                    }))
-                    : []),
-                ]}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                name="proposedDate"
-                label="Proposed Date *"
-                type="date"
-                value={editProposedDate}
-                onChange={(e) => setEditProposedDate(e.target.value)}
-                icon={<Calendar size={16} />}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                name="eventStartDate"
-                label="Event Start Date *"
-                type="date"
-                value={editEventStartDate}
-                onChange={(e) => setEditEventStartDate(e.target.value)}
-                icon={<Calendar size={16} />}
-                required
-              />
-              <Input
-                name="eventEndDate"
-                label="Event End Date"
-                type="date"
-                value={editEventEndDate}
-                onChange={(e) => setEditEventEndDate(e.target.value)}
-                icon={<Calendar size={16} />}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                name="eventStartTime"
-                label="Event Start Time"
-                type="time"
-                value={editEventStartTime}
-                onChange={(e) => setEditEventStartTime(e.target.value)}
-                icon={<Clock size={16} />}
-              />
-              <Input
-                name="eventEndTime"
-                label="Event End Time"
-                type="time"
-                value={editEventEndTime}
-                onChange={(e) => setEditEventEndTime(e.target.value)}
-                icon={<Clock size={16} />}
-              />
-            </div>
-
-
-
-            <Textarea
-              name="objectives"
-              label="Objectives & Goals"
-              placeholder="Describe the goals and expected community impact..."
-              defaultValue={project.objectives}
-              rows={4}
-            />
-
-            <Textarea
-              name="expectedImpact"
-              label="Expected Impact"
-              placeholder="Describe the expected outcomes and impact..."
-              defaultValue={project.expectedImpact}
-              rows={3}
-            />
-
-            <div className="pt-4 flex gap-3">
-              <Button className="flex-1" type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Activity Plan'}
-              </Button>
-              <Button
-                variant="ghost"
-                type="button"
-                onClick={() => setIsEditing(false)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </Card>
-      </div>
-    );
-  }
-
-  // View mode – read-only card
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-slate-900">Activity Plan Details</h3>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditing(true)}>
-            <Edit size={16} className="mr-2" />
-            Edit
-          </Button>
-          <Button
-            variant="danger"
-            onClick={onDelete}
-          >
-            <Trash2 size={16} className="mr-2" />
-            Delete Project
-          </Button>
-        </div>
+      {/* Classification badges " visible on mobile above poster */}
+      <div className="flex flex-wrap gap-1.5 md:hidden">
+        {project.level && <Badge variant="jci" className="text-xs px-2.5 py-1">{project.level}</Badge>}
+        {project.pillar && <Badge variant="neutral" className="text-xs px-2.5 py-1">{project.pillar}</Badge>}
+        {project.type && <Badge variant="neutral" className="text-xs px-2.5 py-1">{PROJECT_TYPE_LABELS[project.type] || project.type}</Badge>}
+        {project.category && <Badge variant="neutral" className="text-xs px-2.5 py-1">{project.category}</Badge>}
       </div>
 
-      <Card>
-        <div className="space-y-6">
-          <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-2">Title *</h4>
-            <p className="text-slate-900">{project.title ?? project.name ?? '—'}</p>
-          </div>
-
-          <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-2">Description</h4>
-            <p className="text-slate-600 whitespace-pre-wrap">{project.description || '—'}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Level *</h4>
-              <p className="text-slate-600">{project.level || '—'}</p>
+      {/* 2-col on desktop, single col on mobile */}
+      <div className="md:grid md:grid-cols-[240px_1fr] md:gap-5">
+        {/* Left: poster + gallery */}
+        <div className="space-y-3 mb-4 md:mb-0">
+          {project.logoUrl ? (
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 aspect-[4/3] md:aspect-[3/4] w-full shadow-sm">
+              <img src={project.logoUrl} alt="Poster" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Pillar *</h4>
-              <p className="text-slate-600">{project.pillar || '—'}</p>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Type *</h4>
-              <p className="text-slate-600">
-                {project.type ? (PROJECT_TYPE_LABELS[project.type] || project.type) : '—'}
-              </p>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Category *</h4>
-              <p className="text-slate-600">{project.category || '—'}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Proposed Date *</h4>
-              <p className="text-slate-600">
-                {project.proposedDate ? formatDate(toDate(project.proposedDate as any)) : '—'}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Event Start Date *</h4>
-              <p className="text-slate-600">
-                {project.eventStartDate ? formatDate(toDate(project.eventStartDate as any)) : '—'}
-              </p>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Event End Date</h4>
-              <p className="text-slate-600">
-                {project.eventEndDate ? formatDate(toDate(project.eventEndDate as any)) : '—'}
-              </p>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Event Start Time</h4>
-              <p className="text-slate-600">{project.eventStartTime || '—'}</p>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-1">Event End Time</h4>
-              <p className="text-slate-600">{project.eventEndTime || '—'}</p>
-            </div>
-          </div>
-
-
-
-          <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-2">Objectives & Goals</h4>
-            <p className="text-slate-600 whitespace-pre-wrap">{project.objectives || '—'}</p>
-          </div>
-
-          {project.expectedImpact && (
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-2">Expected Impact</h4>
-              <p className="text-slate-600 whitespace-pre-wrap">{project.expectedImpact}</p>
+          ) : (
+            <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 aspect-[4/3] md:aspect-[3/4] w-full flex flex-col items-center justify-center gap-2 text-slate-300">
+              <Image size={32} />
+              <span className="text-xs font-semibold">No poster</span>
             </div>
           )}
-
-          {project.logoUrl && (
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-2">Project Logo</h4>
-              <div className="w-20 h-20 rounded border border-slate-200 overflow-hidden bg-white">
-                <img src={project.logoUrl} alt="Logo" className="w-full h-full object-contain" />
-              </div>
-            </div>
+          {project.galleryUrls && project.galleryUrls.length > 0 && project.galleryUrls[0] && (
+            <a
+              href={project.galleryUrls[0]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-jci-blue hover:bg-sky-50 transition-colors"
+            >
+              <ExternalLink size={14} />
+              Photo Gallery
+            </a>
           )}
+        </div>
 
-          {project.galleryUrls && project.galleryUrls.length > 0 && (
+        {/* Right: metadata + info */}
+        <div className="space-y-4">
+          {/* Classification badges " desktop only */}
+          <div className="hidden md:block">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Classification</p>
+            <div className="flex flex-wrap gap-1.5">
+              {project.level && <Badge variant="jci" className="text-xs px-2.5 py-1">{project.level}</Badge>}
+              {project.pillar && <Badge variant="neutral" className="text-xs px-2.5 py-1">{project.pillar}</Badge>}
+              {project.type && <Badge variant="neutral" className="text-xs px-2.5 py-1">{PROJECT_TYPE_LABELS[project.type] || project.type}</Badge>}
+              {project.category && <Badge variant="neutral" className="text-xs px-2.5 py-1">{project.category}</Badge>}
+              {!project.level && !project.pillar && !project.type && !project.category && <span className="text-xs text-slate-400">"</span>}
+            </div>
+          </div>
+
+          {/* Schedule " compact grid */}
+          {(scheduleItems.length > 0 || project.priceMin != null || project.priceMax != null) && (
             <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-2">Activity Photo Gallery</h4>
-              <div className="grid grid-cols-4 gap-2">
-                {project.galleryUrls.map((url, i) => (
-                  <div key={i} className="border border-slate-200 rounded overflow-hidden aspect-video bg-white">
-                    <img src={url} alt={`Gallery ${i}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Schedule</p>
+              <div className={`grid gap-2 ${scheduleItems.length >= 3 ? 'grid-cols-3' : scheduleItems.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {scheduleItems.map(item => (
+                  <div key={item.label} className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mb-0.5">{item.label}</p>
+                    <p className="text-sm font-semibold text-slate-800 leading-tight">{item.date}</p>
+                    {item.time && <p className="text-xs text-slate-500 mt-0.5">{item.time}</p>}
                   </div>
                 ))}
               </div>
+              {(project.priceMin != null || project.priceMax != null) && (
+                <div className="mt-2 flex items-center gap-2.5 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5">
+                  <DollarSign size={13} className="text-jci-blue shrink-0" />
+                  <div>
+                    <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-wide">Price Range</p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {project.priceMin != null && project.priceMax != null
+                        ? `RM ${project.priceMin} - RM ${project.priceMax}`
+                        : project.priceMin != null
+                          ? `From RM ${project.priceMin}`
+                          : `Up to RM ${project.priceMax}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Description */}
+          {project.description && (() => {
+            const lines = project.description!.split('\n');
+            const isLong = lines.length > 3 || project.description!.length > 180;
+            const preview = isLong && !descExpanded
+              ? lines.slice(0, 3).join('\n').slice(0, 180) + ''
+              : project.description!;
+            return (
+              <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Info size={11} />About</p>
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{preview}</p>
+                {isLong && (
+                  <button type="button" onClick={() => setDescExpanded(v => !v)}
+                    className="mt-1.5 text-xs font-medium text-jci-blue hover:underline">
+                    {descExpanded ? 'Show less' : 'Read more'}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Objectives + Expected Impact */}
+          {(project.objectives || project.expectedImpact) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {project.objectives && (
+                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Objectives</p>
+                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{project.objectives}</p>
+                </div>
+              )}
+              {project.expectedImpact && (
+                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Expected Impact</p>
+                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{project.expectedImpact}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
-      </Card>
+      </div>
+      {editDrawer}
     </div>
   );
 };
@@ -5087,19 +4672,19 @@ const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ project, onSa
   const { showToast } = useToast();
   const { createTask, getTaskById } = useProjects();
   const [rows, setRows] = useState<{ role: string; memberId: string; tasks: { taskId?: string; title: string; dueDate: string }[] }[]>(() => {
-    // 直接使用 project.committee 中的数据，不再自动创建 baseline
-    // DEFAULT_EX_OFFICIO_ROLE 和 DEFAULT_ORGANISING_ROLE 只在创建 project 时添加
+    // ç›´æŽ¥ä½¿ç"¨ project.committee ä¸­çš„æ•°æ®ï¼Œä¸å†è‡ªåŠ¨åˆ›å»º baseline
+    // DEFAULT_EX_OFFICIO_ROLE å’Œ DEFAULT_ORGANISING_ROLE åªåœ¨åˆ›å»º project æ—¶æ·»åŠ 
     const existing = project.committee || [];
 
     if (existing.length === 0) {
-      // 如果没有保存的 committee 数据，返回空数组（用户可以手动添加角色）
+      // å¦‚æžœæ²¡æœ‰ä¿å­˜çš„ committee æ•°æ®ï¼Œè¿"å›žç©ºæ•°ç»„ï¼ˆç"¨æˆ·å¯ä»¥æ‰‹åŠ¨æ·»åŠ è§’è‰²ï¼‰
       return [];
     }
 
-    // 将已保存的 committee 数据转换为 rows 格式
+    // å°†å·²ä¿å­˜çš„ committee æ•°æ®è½¬æ¢ä¸º rows æ ¼å¼
     return existing.map(c => {
       const mappedTasks = (c.tasks || []).map(t => ({
-        taskId: t.taskId, // 保留现有的 taskId
+        taskId: t.taskId, // ä¿ç•™çŽ°æœ‰çš„ taskId
         title: t.title || '',
         dueDate: t.dueDate || '',
       }));
@@ -5107,7 +4692,7 @@ const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ project, onSa
       return {
         role: c.role || '',
         memberId: c.memberId || '',
-        // 确保至少有一个 task 行（即使为空），以便 UI 可以显示和编辑
+        // ç¡®ä¿è‡³å°‘æœ‰ä¸€ä¸ª task è¡Œï¼ˆå³ä½¿ä¸ºç©ºï¼‰ï¼Œä»¥ä¾¿ UI å¯ä»¥æ˜¾ç¤ºå’Œç¼–è¾‘
         tasks: mappedTasks.length > 0 ? mappedTasks : [{ title: '', dueDate: '' }],
       };
     });
@@ -5145,12 +4730,12 @@ const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ project, onSa
             .map(t => {
               const title = t.title.trim();
               if (!title && !t.dueDate) {
-                return null; // 跳过完全空白的 task
+                return null; // è·³è¿‡å®Œå…¨ç©ºç™½çš„ task
               }
 
               const task: { taskId?: string; title: string; dueDate?: string } = { title };
 
-              // 如果 task 有 title，确保它有 taskId（如果没有则生成）
+              // å¦‚æžœ task æœ‰ titleï¼Œç¡®ä¿å®ƒæœ‰ taskIdï¼ˆå¦‚æžœæ²¡æœ‰åˆ™ç"Ÿæˆï¼‰
               if (title) {
                 task.taskId = t.taskId || uuidv4();
               }
@@ -5162,7 +4747,7 @@ const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ project, onSa
               return task;
             })
             .filter((t): t is { taskId?: string; title: string; dueDate?: string } => t !== null)
-            .filter(t => t.title || t.dueDate); // 至少有一个非空字段
+            .filter(t => t.title || t.dueDate); // è‡³å°‘æœ‰ä¸€ä¸ªéžç©ºå­—æ®µ
 
           return {
             role: r.role.trim(),
@@ -5170,7 +4755,7 @@ const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ project, onSa
             ...(cleanedTasks.length > 0 ? { tasks: cleanedTasks } : {}),
           };
         })
-        .filter(r => r.role.trim().length > 0); // 只要 role 存在就保存（即使其他字段为空）
+        .filter(r => r.role.trim().length > 0); // åªè¦ role å­˜åœ¨å°±ä¿å­˜ï¼ˆå³ä½¿å…¶ä»–å­—æ®µä¸ºç©ºï¼‰
 
       // Save committee data to project
       await onSave({ committee });
@@ -5234,229 +4819,219 @@ const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ project, onSa
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <form onSubmit={handleSave} className="space-y-4">
+      {/* Header */}
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-slate-900">Event Committee</h3>
+        <h3 className="text-base font-semibold text-slate-900">Event Committee</h3>
         <div className="flex gap-2">
           {isEditing ? (
             <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setIsEditing(false);
-                  resetRows();
-                }}
-                disabled={isSaving}
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={() => { setIsEditing(false); resetRows(); }} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Committee'}
+              <Button type="submit" size="sm" disabled={isSaving}>
+                {isSaving ? 'Saving' : 'Save'}
               </Button>
             </>
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsEditing(true)}
-            >
-              <Edit size={16} className="mr-2" /> Edit Committee
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+              <Edit size={14} className="mr-1.5" /> Edit
             </Button>
           )}
         </div>
       </div>
 
-      <Card>
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Assign committee members for this project. Role names are pre-filled but can be edited to match your LO&apos;s naming.
-          </p>
+      {/* VIEW MODE " card per member */}
+      {!isEditing && (
+        <div className="space-y-3">
+          {rows.length === 0 ? (
+            <div className="text-center py-10 text-sm text-slate-400">
+              No committee assigned yet.{' '}
+              <button type="button" className="text-jci-blue underline" onClick={() => setIsEditing(true)}>Add members</button>
+            </div>
+          ) : rows.map((row, rowIndex) => {
+            const member = members.find(m => m.id === row.memberId);
+            const initials = member
+              ? (member.name || member.fullName || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+              : '?';
+            const visibleTasks = row.tasks.filter(t => t.title.trim());
+            return (
+              <div key={rowIndex} className="flex gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                {/* Avatar */}
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-jci-blue/10 text-jci-blue font-semibold text-sm flex items-center justify-center">
+                  {initials}
+                </div>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                    <span className="text-sm font-medium text-slate-900 truncate">
+                      {member ? (member.fullName || member.name) : <span className="italic text-slate-400">Unassigned</span>}
+                    </span>
+                    {row.role && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                        {row.role}
+                      </span>
+                    )}
+                  </div>
+                  {visibleTasks.length > 0 && (
+                    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100 mt-2 overflow-hidden">
+                      {visibleTasks.map((task, tIdx) => (
+                        <li key={tIdx} className="flex items-center justify-between px-3 py-1.5 text-xs text-slate-700 bg-slate-50">
+                          <span className="truncate flex-1">{task.title}</span>
+                          {task.dueDate && (
+                            <span className="ml-3 flex-shrink-0 text-slate-400 tabular-nums">{task.dueDate}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-          {/* Single header row for desktop */}
-          <div className="hidden md:grid md:grid-cols-5 gap-2 text-xs font-semibold text-slate-500 px-1">
-            <span>Role</span>
-            <span>Committee Member</span>
-            <span className="md:col-span-2">Task</span>
-            <span className="text-right pr-6">Due Date</span>
-          </div>
-
-          <div className="space-y-4">
-            {rows.map((row, rowIndex) => {
-              const isProtectedRole = row.role === DEFAULT_ORGANISING_ROLE || row.role === DEFAULT_EX_OFFICIO_ROLE;
-              const isEven = rowIndex % 2 === 0;
-              return (
-                <div
-                  key={rowIndex}
-                  className={`
-                  space-y-2 rounded-lg px-2 py-2
-                  ${rowIndex > 0 ? 'border-t border-slate-200' : ''}
-                  ${isEven ? 'bg-slate-100' : 'bg-slate-300'}
-                `}
-                >
-                  {row.tasks.map((task, tIndex) => (
-                    <div
-                      key={tIndex}
-                      className="grid gap-2 md:grid-cols-5 items-end"
-                    >
-                      {/* Role - 1/5 */}
-                      <div className="md:col-span-1">
-                        {tIndex === 0 ? (
-                          <Input
-                            value={row.role}
-                            disabled={isProtectedRole || !isEditing}
-                            onChange={(e) => {
-                              if (isProtectedRole || !isEditing) return;
-                              const value = e.target.value;
-                              setRows(prev => {
-                                const next = [...prev];
-                                next[rowIndex] = { ...next[rowIndex], role: value };
-                                return next;
-                              });
-                            }}
-                          />
-                        ) : (
-                          <div className="hidden md:block" />
-                        )}
-                      </div>
-
-                      {/* Committee - 1/5 */}
-                      <div className="md:col-span-1">
-                        {tIndex === 0 ? (
-                          <MemberSelector
-                            label=""
-                            placeholder="Select member..."
-                            members={members}
-                            value={row.memberId || ''}
-                            disabled={!isEditing}
-                            onChange={(value) => {
-                              if (!isEditing) return;
-                              setRows(prev => {
-                                const next = [...prev];
-                                next[rowIndex] = { ...next[rowIndex], memberId: value };
-                                return next;
-                              });
-                            }}
-                            selfOption={false}
-                            showLookupFields={false}
-                            getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
-                          />
-                        ) : (
-                          <div className="hidden md:block" />
-                        )}
-                      </div>
-
-                      {/* Task - 3/5 */}
-                      <div className="md:col-span-2">
-                        <Input
-                          placeholder="e.g. Book venue"
-                          value={task.title}
-                          disabled={!isEditing}
-                          onChange={(e) => {
-                            if (!isEditing) return;
-                            const value = e.target.value;
-                            setRows(prev => {
-                              const next = [...prev];
-                              const tasks = [...next[rowIndex].tasks];
-                              tasks[tIndex] = { ...tasks[tIndex], title: value, taskId: tasks[tIndex].taskId }; // 保留 taskId
-                              next[rowIndex] = { ...next[rowIndex], tasks };
-                              return next;
-                            });
-                          }}
-                        />
-                      </div>
-
-                      {/* Due Date - 1/5 */}
-                      <div className="md:col-span-1 flex gap-2 items-end">
-                        <Input
-                          type="date"
-                          value={task.dueDate}
-                          disabled={!isEditing}
-                          onChange={(e) => {
-                            if (!isEditing) return;
-                            const value = e.target.value;
-                            setRows(prev => {
-                              const next = [...prev];
-                              const tasks = [...next[rowIndex].tasks];
-                              tasks[tIndex] = { ...tasks[tIndex], dueDate: value, taskId: tasks[tIndex].taskId }; // 保留 taskId
-                              next[rowIndex] = { ...next[rowIndex], tasks };
-                              return next;
-                            });
-                          }}
-                        />
-                        {isEditing && row.tasks.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            onClick={() => {
-                              setRows(prev => {
-                                const next = [...prev];
-                                const tasks = next[rowIndex].tasks.filter((_, i) => i !== tIndex);
-                                next[rowIndex] = { ...next[rowIndex], tasks };
-                                return next;
-                              });
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        )}
-                      </div>
+      {/* EDIT MODE " accordion sections */}
+      {isEditing && (
+        <div className="space-y-3">
+          {rows.map((row, rowIndex) => {
+            const isProtectedRole = row.role === DEFAULT_ORGANISING_ROLE || row.role === DEFAULT_EX_OFFICIO_ROLE;
+            return (
+              <div key={rowIndex} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                {/* Role + Member header row */}
+                <div className="flex flex-wrap gap-2 items-center p-3 bg-slate-50 border-b border-slate-100">
+                  <div className="flex-1 min-w-[120px]">
+                    <Input
+                      placeholder="Role title"
+                      value={row.role}
+                      disabled={isProtectedRole}
+                      className="text-sm h-8"
+                      onChange={(e) => {
+                        if (isProtectedRole) return;
+                        const value = e.target.value;
+                        setRows(prev => { const next = [...prev]; next[rowIndex] = { ...next[rowIndex], role: value }; return next; });
+                      }}
+                    />
+                  </div>
+                  <div className="flex-[2] min-w-[160px] flex items-center gap-1">
+                    <div className="flex-1">
+                      <MemberSelector
+                        label=""
+                        placeholder="Select member"
+                        members={members}
+                        value={row.memberId || ''}
+                        onChange={(value) => {
+                          setRows(prev => { const next = [...prev]; next[rowIndex] = { ...next[rowIndex], memberId: value }; return next; });
+                        }}
+                        selfOption={false}
+                        showLookupFields={false}
+                        getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
+                      />
                     </div>
-                  ))}
-
-                  {isEditing && (
-                    <div className="flex justify-between gap-2">
-                      <Button
+                    {row.memberId && (
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
+                        className="flex-shrink-0 self-stretch flex items-center gap-1 px-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 text-xs font-semibold transition-colors"
+                        title="Clear member"
+                        onClick={() => setRows(prev => { const next = [...prev]; next[rowIndex] = { ...next[rowIndex], memberId: '' }; return next; })}
+                      >
+                        <X size={12} />
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {!isProtectedRole && (
+                    <button
+                      type="button"
+                      className="flex-shrink-0 text-slate-400 hover:text-red-500 transition-colors p-1 rounded"
+                      title="Remove role"
+                      onClick={() => setRows(prev => prev.filter((_, i) => i !== rowIndex))}
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Tasks compact table */}
+                <div className="divide-y divide-slate-100">
+                  {row.tasks.map((task, tIndex) => (
+                    <div key={tIndex} className="flex gap-2 items-center px-3 py-2">
+                      <Input
+                        placeholder="Task title"
+                        value={task.title}
+                        className="flex-1 text-sm h-8"
+                        onChange={(e) => {
+                          const value = e.target.value;
                           setRows(prev => {
                             const next = [...prev];
-                            const tasks = [...next[rowIndex].tasks, { title: '', dueDate: '' }]; // 新 task 没有 taskId，保存时会自动生成
+                            const tasks = [...next[rowIndex].tasks];
+                            tasks[tIndex] = { ...tasks[tIndex], title: value };
                             next[rowIndex] = { ...next[rowIndex], tasks };
                             return next;
                           });
                         }}
-                      >
-                        + Add Task
-                      </Button>
-                      {!isProtectedRole && (
-                        <Button
+                      />
+                      <Input
+                        type="date"
+                        value={task.dueDate}
+                        className="w-36 text-sm h-8"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setRows(prev => {
+                            const next = [...prev];
+                            const tasks = [...next[rowIndex].tasks];
+                            tasks[tIndex] = { ...tasks[tIndex], dueDate: value };
+                            next[rowIndex] = { ...next[rowIndex], tasks };
+                            return next;
+                          });
+                        }}
+                      />
+                      {row.tasks.length > 1 && (
+                        <button
                           type="button"
-                          variant="danger"
-                          size="sm"
-                          onClick={() => {
-                            setRows(prev => prev.filter((_, i) => i !== rowIndex));
-                          }}
+                          className="flex-shrink-0 text-slate-300 hover:text-red-400 transition-colors p-1 rounded"
+                          onClick={() => setRows(prev => {
+                            const next = [...prev];
+                            next[rowIndex] = { ...next[rowIndex], tasks: next[rowIndex].tasks.filter((_, i) => i !== tIndex) };
+                            return next;
+                          })}
                         >
-                          Delete Role
-                        </Button>
+                          <X size={13} />
+                        </button>
                       )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              )
-            })}
-            {isEditing && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setRows(prev => [
-                    ...prev,
-                    { role: '', memberId: '', tasks: [{ title: '', dueDate: '' }] },
-                  ]);
-                }}
-              >
-                + Add Role
-              </Button>
-            )}
-          </div>
+
+                {/* Add Task inline link */}
+                <div className="px-3 pb-2.5">
+                  <button
+                    type="button"
+                    className="text-xs text-jci-blue hover:underline"
+                    onClick={() => setRows(prev => {
+                      const next = [...prev];
+                      next[rowIndex] = { ...next[rowIndex], tasks: [...next[rowIndex].tasks, { title: '', dueDate: '' }] };
+                      return next;
+                    })}
+                  >
+                    + Add task
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Add Role dashed row */}
+          <button
+            type="button"
+            className="w-full rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors"
+            onClick={() => setRows(prev => [...prev, { role: '', memberId: '', tasks: [{ title: '', dueDate: '' }] }])}
+          >
+            + Add Role
+          </button>
         </div>
-      </Card>
+      )}
     </form>
   );
 };
@@ -5508,148 +5083,155 @@ const ProjectTrainerTab: React.FC<ProjectTrainerTabProps> = ({ project, onSave }
   };
 
   return (
-    <form onSubmit={handleSave}>
-      <Card
-        title="Trainers & Facilitators"
-        action={
-          isEditing ? (
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={() => { setIsEditing(false); resetRows(); }}>
+    <form onSubmit={handleSave} className="space-y-4">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-base font-semibold text-slate-900">Trainers & Facilitators</h3>
+        <div className="flex gap-2">
+          {isEditing ? (
+            <>
+              <Button type="button" variant="ghost" size="sm" onClick={() => { setIsEditing(false); resetRows(); }} disabled={isSaving}>
                 Cancel
               </Button>
               <Button type="submit" size="sm" isLoading={isSaving}>
-                Save Changes
+                Save
               </Button>
-            </div>
+            </>
           ) : (
             <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-              Edit Trainers
+              <Edit size={14} className="mr-1.5" /> Edit
             </Button>
-          )
-        }
-      >
-        <div className="space-y-4">
-          {!isEditing && rows.length === 0 && (
-            <div className="text-center py-8 text-slate-500">
-              No trainers have been assigned yet.
-            </div>
           )}
+        </div>
+      </div>
 
-          <div className="space-y-4">
-            {rows.map((row, rowIndex) => (
-              <div key={rowIndex} className="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-4">
-                {isEditing ? (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <Input
-                      name={`trainer-name-${rowIndex}`}
-                      label="Trainer Name *"
-                      required
-                      value={row.name}
-                      onChange={(e) => {
-                        setRows(prev => {
-                          const next = [...prev];
-                          next[rowIndex].name = e.target.value;
-                          return next;
-                        });
-                      }}
-                      placeholder="e.g. John Doe"
-                    />
-                    <Input
-                      name={`trainer-role-${rowIndex}`}
-                      label="Role"
-                      value={row.role}
-                      onChange={(e) => {
-                        setRows(prev => {
-                          const next = [...prev];
-                          next[rowIndex].role = e.target.value;
-                          return next;
-                        });
-                      }}
-                      placeholder="e.g. Head Trainer"
-                    />
-                    <Input
-                      name={`trainer-duration-${rowIndex}`}
-                      label="Duration (Hours)"
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      value={row.durationHours}
-                      onChange={(e) => {
-                        setRows(prev => {
-                          const next = [...prev];
-                          next[rowIndex].durationHours = e.target.value;
-                          return next;
-                        });
-                      }}
-                      placeholder="e.g. 2.5"
-                    />
-                    <MemberSelector
-                      label="Link to Member (Optional)"
-                      placeholder="Search member..."
-                      members={members}
-                      value={row.memberId || ''}
-                      onChange={(value) => {
-                        setRows(prev => {
-                          const next = [...prev];
-                          next[rowIndex].memberId = value;
-                          if (value) {
-                            const member = members.find(m => m.id === value);
-                            if (member) next[rowIndex].name = member.name || '';
-                          }
-                          return next;
-                        });
-                      }}
-                      selfOption={false}
-                      showLookupFields={false}
-                      getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                    <div>
-                      <div className="font-medium text-slate-900">{row.name}</div>
-                      {(row.role || row.durationHours) && (
-                        <div className="text-sm text-slate-500">
-                          {row.role}
-                          {row.role && row.durationHours && ' • '}
-                          {row.durationHours && `${row.durationHours} hours`}
-                        </div>
-                      )}
-                    </div>
+      {/* VIEW MODE */}
+      {!isEditing && (
+        <div className="space-y-3">
+          {rows.length === 0 ? (
+            <div className="text-center py-10 text-sm text-slate-400">
+              No trainers assigned yet.{' '}
+            </div>
+          ) : rows.map((row, rowIndex) => {
+            const initials = row.name
+              ? row.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+              : '?';
+            return (
+              <div key={rowIndex} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-violet-100 text-violet-600 font-semibold text-sm flex items-center justify-center">
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-slate-900 truncate">{row.name}</span>
+                    {row.role && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">{row.role}</span>
+                    )}
                     {row.memberId && (
-                      <Badge variant="success">JCI Member</Badge>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">JCI Member</span>
                     )}
                   </div>
-                )}
-
-                {isEditing && (
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => setRows(prev => prev.filter((_, i) => i !== rowIndex))}
-                    >
-                      Remove Trainer
-                    </Button>
-                  </div>
-                )}
+                  {row.durationHours && (
+                    <div className="text-xs text-slate-400 mt-0.5 tabular-nums">{row.durationHours} hrs</div>
+                  )}
+                </div>
               </div>
-            ))}
-
-            {isEditing && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setRows(prev => [...prev, { name: '', role: '', memberId: '', durationHours: '' }])}
-              >
-                + Add Trainer
-              </Button>
-            )}
-          </div>
+            );
+          })}
         </div>
-      </Card>
+      )}
+
+      {/* EDIT MODE */}
+      {isEditing && (
+        <div className="space-y-3">
+          {rows.map((row, rowIndex) => (
+            <div key={rowIndex} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+              {/* Top row: member selector + name */}
+              <div className="flex flex-wrap gap-2 items-end p-3 bg-slate-50 border-b border-slate-100">
+                <div className="flex-[2] min-w-[160px]">
+                  <MemberSelector
+                    label="Link to Member"
+                    placeholder="Search member"
+                    members={members}
+                    value={row.memberId || ''}
+                    onChange={(value) => {
+                      setRows(prev => {
+                        const next = [...prev];
+                        next[rowIndex].memberId = value;
+                        if (value) {
+                          const member = members.find(m => m.id === value);
+                          if (member) next[rowIndex].name = member.name || '';
+                        }
+                        return next;
+                      });
+                    }}
+                    selfOption={false}
+                    showLookupFields={false}
+                    getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
+                  />
+                </div>
+                <div className="flex-1 min-w-[120px]">
+                  <Input
+                    label="Trainer Name *"
+                    required
+                    value={row.name}
+                    className="text-sm h-8"
+                    placeholder="e.g. John Doe"
+                    onChange={(e) => {
+                      setRows(prev => { const next = [...prev]; next[rowIndex].name = e.target.value; return next; });
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="flex-shrink-0 mb-1 text-slate-300 hover:text-red-400 transition-colors p-1 rounded"
+                  title="Remove trainer"
+                  onClick={() => setRows(prev => prev.filter((_, i) => i !== rowIndex))}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              {/* Bottom row: role + duration */}
+              <div className="flex flex-wrap gap-2 items-end p-3">
+                <div className="flex-1 min-w-[120px]">
+                  <Input
+                    label="Role"
+                    value={row.role}
+                    className="text-sm h-8"
+                    placeholder="e.g. Head Trainer"
+                    onChange={(e) => {
+                      setRows(prev => { const next = [...prev]; next[rowIndex].role = e.target.value; return next; });
+                    }}
+                  />
+                </div>
+                <div className="w-32">
+                  <Input
+                    label="Duration (hrs)"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={row.durationHours}
+                    className="text-sm h-8"
+                    placeholder="e.g. 2.5"
+                    onChange={(e) => {
+                      setRows(prev => { const next = [...prev]; next[rowIndex].durationHours = e.target.value; return next; });
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Add Trainer dashed row */}
+          <button
+            type="button"
+            className="w-full rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors"
+            onClick={() => setRows(prev => [...prev, { name: '', role: '', memberId: '', durationHours: '' }])}
+          >
+            + Add Trainer
+          </button>
+        </div>
+      )}
     </form>
   );
 };
