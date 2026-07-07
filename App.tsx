@@ -403,32 +403,50 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 
               {/* Content overlay */}
               <div className="absolute inset-0 z-10 flex flex-col">
-                {/* Logo centred in upper half */}
+
+                {/* Upper zone: logo centred as identity anchor */}
                 <div className="flex-1 flex items-center justify-center">
                   {termSettings?.logoUrl && (
                     <div className="relative flex items-center justify-center">
                       <div className="absolute w-52 h-52 rounded-full bg-amber-400/20 blur-2xl animate-pulse" />
                       <img src={termSettings.logoUrl} alt="Presidential theme logo"
-                        className="relative z-10 h-32 w-auto object-contain drop-shadow-2xl" />
+                        className="relative z-10 h-28 w-auto object-contain drop-shadow-2xl" />
                     </div>
                   )}
                 </div>
 
-                {/* Bottom: eyebrow → headline → tagline → name/badge → CTA */}
-                <div className="flex flex-col items-center text-center px-6 pb-8">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-4 h-px bg-amber-400/50" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/80">Presidential Theme {currentYear}</span>
-                    <div className="w-4 h-px bg-amber-400/50" />
+                {/* Lower zone: president identity → theme content → CTA */}
+                <div className="px-5 pb-7 space-y-3">
+
+                  {/* President identity row */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-white font-black text-base leading-tight">{president.name}</p>
+                      <p className="text-white/45 text-[11px] mt-0.5">{president.company}</p>
+                    </div>
+                    <div className="bg-amber-400 text-jci-navy text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full shadow-lg whitespace-nowrap">
+                      President {currentYear}
+                    </div>
                   </div>
 
+                  {/* Amber divider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-amber-400/25" />
+                    <div className="w-1 h-1 rounded-full bg-amber-400/50" />
+                    <div className="flex-1 h-px bg-amber-400/25" />
+                  </div>
+
+                  {/* Eyebrow */}
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-400/75">Presidential Theme {currentYear}</p>
+
+                  {/* Headline */}
                   {(() => {
                     const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
                     const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
                     return (
-                      <div className="mb-3">
+                      <div>
                         {parts.map((part: string, i: number) => (
-                          <h2 key={i} className={`text-3xl font-black leading-[0.92] tracking-tight ${
+                          <h2 key={i} className={`text-[2rem] font-black leading-[0.9] tracking-tight whitespace-nowrap ${
                             i === Math.floor(parts.length / 2)
                               ? 'bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent'
                               : 'text-white'
@@ -440,25 +458,14 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                     );
                   })()}
 
-                  {termSettings?.tagline && (
-                    <p className="text-amber-300/75 text-[10px] font-black uppercase tracking-widest mb-3">{termSettings.tagline}</p>
-                  )}
-
-                  {/* Description */}
-                  <p className="text-white/55 text-xs leading-relaxed max-w-xs mb-4">
-                    {termSettings?.shortDescription || 'This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose and transforms Kuala Lumpur for generations to come.'}
+                  {/* Description — capped at 2 lines */}
+                  <p className="text-white/50 text-[11px] leading-relaxed line-clamp-2">
+                    {termSettings?.shortDescription || 'This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose.'}
                   </p>
 
-                  <div className="flex flex-col items-center gap-0.5 mb-5">
-                    <p className="text-white font-black text-base drop-shadow">{president.name}</p>
-                    <p className="text-white/50 text-xs">{president.company}</p>
-                    <div className="mt-1.5 bg-amber-400 text-jci-navy text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-lg">
-                      President {currentYear}
-                    </div>
-                  </div>
-
+                  {/* CTA full-width */}
                   <button onClick={() => onPageChange('about')}
-                    className="inline-flex items-center gap-2 text-xs font-black text-jci-navy bg-amber-400 hover:bg-amber-300 active:scale-95 px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-400/20">
+                    className="w-full flex items-center justify-center gap-2 text-xs font-black text-jci-navy bg-amber-400 hover:bg-amber-300 active:scale-95 py-3 rounded-xl transition-all shadow-lg shadow-amber-400/20">
                     <Users size={13} /> Meet the Board
                   </button>
                 </div>
