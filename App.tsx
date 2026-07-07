@@ -38,7 +38,7 @@ import { MembersService } from './services/membersService';
 import { registerPushNotifications, unregisterPushNotifications, onForegroundMessage } from './services/notificationService';
 import { DEFAULT_LO_ID } from './config/constants';
 
-// Module Imports — lazy-loaded for code splitting (each view is a separate chunk)
+// Module Imports &#8212; lazy-loaded for code splitting (each view is a separate chunk)
 const FinanceView = lazy(() => import('./components/modules/FinanceView').then(m => ({ default: m.FinanceView })));
 const PaymentRequestsView = lazy(() => import('./components/modules/PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
 const GamificationView = lazy(() => import('./components/modules/GamificationView').then(m => ({ default: m.GamificationView })));
@@ -340,7 +340,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   Be Better.<br /><span className="text-sky-300">Do Better.</span>
                 </h1>
                 <p className="text-lg text-slate-300 max-w-xl mb-8 leading-relaxed">
-                  The first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954.
+                  The first Malaysia Junior Chamber Chapter &#8212; a global network of young active citizens creating positive change since 1954.
                 </p>
                 <div className="flex gap-4 flex-wrap justify-center md:justify-start">
                   <Button size="lg" onClick={onRegister} className="shadow-lg shadow-jci-blue/30 font-bold">
@@ -1515,7 +1515,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
       );
     }
 
-    // default — Secretary, Treasurer, GLC, EVP
+    // default &#8212; Secretary, Treasurer, GLC, EVP
     return (
       <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md hover:border-jci-blue/25 transition-all flex flex-col items-center text-center w-full h-full group">
         <div className="mb-3">
@@ -2029,95 +2029,131 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
     }
   };
 
+  const totalIssues = newsletters.reduce((sum, g) => sum + g.items.length, 0);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <GuestHeader currentPage="enewsletters" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="py-8 bg-gradient-to-r from-jci-navy to-jci-blue text-white" aria-label="Page header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">E-Newsletters</h1>
-            <p className="text-base text-blue-100 max-w-2xl mx-auto">
-              Stories, projects, achievements and impact from JCI Kuala Lumpur.
-            </p>
+        {/* Hero */}
+        <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 text-white">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/5 rounded-full" />
+            <div className="absolute -bottom-16 -left-16 w-72 h-72 bg-white/5 rounded-full" />
+          </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
+              <div className="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shadow-lg">
+                <BookOpen size={36} className="text-white/80" />
+              </div>
+              <div className="text-center sm:text-left">
+                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider text-white/80 mb-3">
+                  JCI KL Publications Archive
+                </div>
+                <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-2">
+                  E-<span className="text-sky-200">Newsletters</span>
+                </h1>
+                <p className="text-base text-blue-100 max-w-xl leading-relaxed">
+                  Stories, projects, achievements and impact from JCI Kuala Lumpur &#8212; curated every term.
+                </p>
+                {!loadingPubs && totalIssues > 0 && (
+                  <div className="flex items-center gap-6 mt-4 justify-center sm:justify-start">
+                    <div>
+                      <span className="text-2xl font-black text-white">{totalIssues}</span>
+                      <span className="text-sky-200/80 text-sm font-semibold ml-1.5">Issue{totalIssues !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="w-px h-6 bg-white/20" />
+                    <div>
+                      <span className="text-2xl font-black text-white">{newsletters.length}</span>
+                      <span className="text-sky-200/80 text-sm font-semibold ml-1.5">Year{newsletters.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="py-16">
+        <section className="py-14">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {newsletters.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto p-8 animate-in fade-in duration-300">
-                <BookOpen size={48} className="text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-slate-800">No Publications Yet</h3>
-                <p className="text-sm text-slate-500 mt-2 leading-relaxed max-w-sm mx-auto">
-                  There are currently no active publications. Please check back later or contact local chapter administrators!
+            {loadingPubs ? (
+              <div className="text-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue mx-auto mb-4" />
+                <p className="text-slate-500 text-sm">Loading publications...</p>
+              </div>
+            ) : newsletters.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto p-10">
+                <BookOpen size={44} className="text-slate-200 mx-auto mb-4" />
+                <h3 className="text-lg font-black text-slate-800 mb-2">No Publications Yet</h3>
+                <p className="text-sm text-slate-400 leading-relaxed max-w-sm mx-auto">
+                  There are currently no published newsletters. Please check back later!
                 </p>
               </div>
             ) : (
-              <div className="space-y-12">
+              <div className="space-y-10">
                 {/* Year tab filter */}
                 {newsletters.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                    {newsletters.map(g => (
-                      <button
-                        key={g.year}
-                        onClick={() => setActiveYearTab(g.year)}
-                        className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex-shrink-0 ${activeYearTab === g.year ? 'bg-jci-blue text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-jci-blue hover:text-jci-blue'}`}
-                      >
-                        {g.year}
-                        <span className="ml-1.5 text-xs opacity-70">({g.items.length})</span>
-                      </button>
-                    ))}
+                  <div className="flex items-end justify-between mb-2">
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                      {newsletters.map(g => (
+                        <button
+                          key={g.year}
+                          onClick={() => setActiveYearTab(g.year)}
+                          className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all flex-shrink-0 ${activeYearTab === g.year ? 'bg-jci-blue text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-jci-blue hover:text-jci-blue'}`}
+                        >
+                          {g.year}
+                          <span className="ml-1.5 text-xs opacity-60">({g.items.length})</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
+
                 {displayedNewsletters.map((yearGroup) => (
-                  <div key={yearGroup.year} className="animate-in fade-in slide-in-from-bottom-6 duration-500">
-                    <div className="flex items-center gap-4 mb-8 pb-3 border-b border-slate-200">
-                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                        JCI KL {yearGroup.year} Publications
+                  <div key={yearGroup.year}>
+                    <div className="flex items-center gap-3 mb-6">
+                      <h2 className="text-xl font-black text-slate-900">
+                        {yearGroup.year} Publications
                       </h2>
-                      <span className="bg-sky-100 text-jci-blue font-bold px-3 py-1 rounded-full text-xs uppercase tracking-wider">
+                      <span className="bg-blue-50 text-jci-blue font-bold px-3 py-1 rounded-full text-xs border border-blue-100">
                         {yearGroup.items.length} {yearGroup.items.length === 1 ? 'Issue' : 'Issues'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
                       {yearGroup.items.map((item, index) => (
-                        <Card
+                        <div
                           key={index}
                           onClick={() => setSelectedNewsletter({ ...item, year: yearGroup.year })}
-                          className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer border border-slate-200 hover:border-jci-blue group overflow-hidden bg-white flex flex-col h-full"
+                          className="group cursor-pointer flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
                         >
-                          {/* Thumbnail / Header Preview Image */}
-                          <div
-                            className="w-full bg-slate-100 overflow-hidden relative border-b border-slate-100 flex items-center justify-center"
-                            style={{ aspectRatio: '210/297' }}
-                          >
+                          {/* Thumbnail */}
+                          <div className="relative overflow-hidden bg-slate-100 border-b border-slate-100" style={{ aspectRatio: '210/297' }}>
                             <NewsletterThumbnail src={item.thumbnail} alt={`${item.title} Cover`} />
-                            {/* Floating Badge */}
-                            <div className="absolute top-3 left-3 z-10">
-                              <Badge variant="jci">{item.issue}</Badge>
-                            </div>
-                          </div>
-
-                          <div className="p-5 flex flex-col flex-1 justify-between">
-                            <div>
-                              <h3 className="text-base font-bold text-slate-900 mb-2 group-hover:text-jci-blue transition-colors leading-snug line-clamp-2" title={item.title}>
-                                {item.title}
-                              </h3>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-4">
-                              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                                {yearGroup.year} Edition
+                            <div className="absolute top-2 left-2 z-10">
+                              <span className="text-[9px] font-black uppercase tracking-wider bg-jci-blue text-white px-2.5 py-1 rounded-full shadow-sm">
+                                {item.issue}
                               </span>
-                              <span className="text-jci-blue font-bold text-xs inline-flex items-center gap-1 group-hover:underline">
-                                Read Online
-                                <FileText size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                            </div>
+                            {/* Hover overlay */}
+                            <div className="absolute inset-0 bg-jci-navy/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                              <span className="flex items-center gap-1.5 bg-white text-jci-navy text-xs font-black px-4 py-2 rounded-full shadow-lg">
+                                <BookOpen size={12} /> Read
                               </span>
                             </div>
                           </div>
-                        </Card>
+
+                          <div className="p-3 flex flex-col flex-1">
+                            <h3 className="text-xs font-black text-slate-900 group-hover:text-jci-blue transition-colors leading-snug line-clamp-2 mb-2" title={item.title}>
+                              {item.title}
+                            </h3>
+                            <div className="mt-auto flex items-center justify-between">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{yearGroup.year}</span>
+                              <ChevronRight size={12} className="text-slate-300 group-hover:text-jci-blue transition-colors" />
+                            </div>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -2126,19 +2162,39 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
             )}
           </div>
         </section>
+
+        {/* CTA */}
+        <section className="py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
+            <div className="shrink-0 w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
+              <FileText size={28} className="text-white/80" />
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-2xl font-black text-white mb-2">Want to stay updated?</h2>
+              <p className="text-blue-200 text-sm leading-relaxed max-w-lg">
+                Become a JCI KL member to receive our newsletters directly and be part of the stories we tell every term.
+              </p>
+            </div>
+            <Button size="lg" variant="outline" onClick={onRegister}
+              className="shrink-0 bg-white !text-jci-navy border-white hover:bg-sky-50 hover:!text-jci-navy font-black shadow-lg">
+              Join JCI KL
+            </Button>
+          </div>
+        </section>
       </main>
+
+      <GuestFooter />
 
       {/* PDF Viewer Interactive Modal */}
       {selectedNewsletter && (
         <Modal
           isOpen={!!selectedNewsletter}
-          onClose={() => {
-            setSelectedNewsletter(null);
-          }}
+          onClose={() => setSelectedNewsletter(null)}
           title={
             <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
               <span className="bg-sky-100 text-jci-blue text-xs font-bold px-2.5 py-1 rounded-md uppercase self-start md:self-auto">
-                {selectedNewsletter.year} â€¢ {selectedNewsletter.issue}
+                {selectedNewsletter.year} &middot; {selectedNewsletter.issue}
               </span>
               <h2 className="text-lg font-bold text-slate-800 line-clamp-1">{selectedNewsletter.title}</h2>
             </div>
@@ -2147,235 +2203,132 @@ const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
           scrollInBody={false}
           className="h-[92vh] max-h-[92vh] md:max-h-[92vh] flex flex-col"
         >
-          {/* Main split dashboard pane */}
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 h-full">
 
             {/* Left Viewer pane */}
             <div className="flex-1 flex flex-col overflow-hidden bg-slate-900 border-b md:border-b-0 md:border-r border-slate-200 relative min-h-[400px] md:min-h-0">
 
-              {/* Floating interactive toolbar */}
+              {/* Toolbar */}
               <div className="bg-slate-950/90 text-white px-4 py-3 flex items-center justify-between border-b border-slate-800 z-10 backdrop-blur-md">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-800">
-                    <button
-                      onClick={() => setReaderTheme('light')}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${readerTheme === 'light' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                      Light
-                    </button>
-                    <button
-                      onClick={() => setReaderTheme('dark')}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${readerTheme === 'dark' ? 'bg-slate-950 text-white shadow' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                      Dark
-                    </button>
+                    {(['light', 'dark'] as const).map(t => (
+                      <button key={t} onClick={() => setReaderTheme(t)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize ${readerTheme === t ? (t === 'light' ? 'bg-white text-slate-900 shadow' : 'bg-slate-950 text-white shadow') : 'text-slate-400 hover:text-white'}`}>
+                        {t}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 {activeUrl && (
                   <div className="hidden sm:flex items-center gap-2 bg-slate-900 rounded-lg p-0.5 border border-slate-800">
-                    <button
-                      onClick={() => setReaderZoom('fit')}
-                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${readerZoom === 'fit' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                      Standard
-                    </button>
-                    <button
-                      onClick={() => setReaderZoom('wide')}
-                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${readerZoom === 'wide' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                      Wide
-                    </button>
-                    <button
-                      onClick={() => setReaderZoom('full')}
-                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${readerZoom === 'full' ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                      Full Width
-                    </button>
+                    {([['fit', 'Standard'], ['wide', 'Wide'], ['full', 'Full Width']] as const).map(([z, label]) => (
+                      <button key={z} onClick={() => setReaderZoom(z)}
+                        className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${readerZoom === z ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}>
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 )}
 
                 <div className="flex items-center gap-2.5">
                   {activeUrl && (
                     <>
-                      <button
-                        onClick={handlePrint}
-                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
-                        title="Print PDF"
-                      >
+                      <button onClick={handlePrint} className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all" title="Print PDF">
                         <Printer size={16} />
                       </button>
-                      <a
-                        href={activeUrl}
-                        download={`${selectedNewsletter.title.replace(/\s+/g, '_')}.pdf`}
-                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
-                        title="Download PDF"
-                      >
+                      <a href={activeUrl} download={`${selectedNewsletter.title.replace(/\s+/g, '_')}.pdf`}
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all" title="Download PDF">
                         <Download size={16} />
                       </a>
-                      <a
-                        href={activeUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
-                        title="Open in new tab"
-                      >
+                      <a href={activeUrl} target="_blank" rel="noopener noreferrer"
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all" title="Open in new tab">
                         <ExternalLink size={16} />
                       </a>
                     </>
                   )}
-                  <button
-                    onClick={handleCopyLink}
-                    className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all button-press"
-                    title="Share Newsletter"
-                  >
+                  <button onClick={handleCopyLink} className="p-2 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all" title="Share">
                     <Share2 size={16} />
                   </button>
                 </div>
               </div>
 
               {/* Reader viewport */}
-              <div className={`flex-1 h-full flex flex-col justify-between p-4 ${readerTheme === 'dark' ? 'bg-slate-950' : 'bg-slate-100'
-                } transition-colors duration-300 relative overflow-y-auto`}>
-
+              <div className={`flex-1 h-full flex flex-col justify-between p-4 ${readerTheme === 'dark' ? 'bg-slate-950' : 'bg-slate-100'} transition-colors duration-300 relative overflow-y-auto`}>
                 {activeUrl ? (
                   <div className="flex-grow w-full flex justify-center items-center h-full min-h-[300px]">
                     <iframe
                       ref={iframeRef}
                       src={activeUrl}
                       title={selectedNewsletter.title}
-                      className={`h-full rounded-lg border shadow-2xl transition-all duration-300 ${readerTheme === 'dark' ? 'border-slate-800 bg-slate-900' : 'border-slate-300 bg-white'
-                        } ${readerZoom === 'fit' ? 'w-full max-w-3xl' : readerZoom === 'wide' ? 'w-full max-w-5xl' : 'w-full'
-                        }`}
+                      className={`h-full rounded-lg border shadow-2xl transition-all duration-300 ${readerTheme === 'dark' ? 'border-slate-800 bg-slate-900' : 'border-slate-300 bg-white'} ${readerZoom === 'fit' ? 'w-full max-w-3xl' : readerZoom === 'wide' ? 'w-full max-w-5xl' : 'w-full'}`}
                       style={{ height: '100%', minHeight: '520px' }}
                     />
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-4 text-slate-800 rounded-lg min-h-[480px]">
-
-                    {/* Beautiful digital newsletter cover style */}
-                    <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 transform hover:scale-[1.01] transition-transform duration-300">
-
-                      {/* Cover Header */}
-                      <div className="bg-gradient-to-br from-jci-navy via-jci-blue to-sky-600 p-6 text-white text-center relative overflow-hidden">
-                        <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
-                        <div className="absolute -left-10 -top-10 w-28 h-28 bg-white/5 rounded-full blur-xl"></div>
-
-                        <div className="inline-block bg-white/15 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 backdrop-blur-md">
-                          Digital Issue simulation
+                  <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[480px]">
+                    <div className="w-full max-w-xs bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+                      <div className="bg-gradient-to-br from-jci-navy via-jci-blue to-sky-500 p-8 text-white text-center relative overflow-hidden">
+                        <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-white/10 rounded-full" />
+                        <div className="absolute -left-10 -top-10 w-28 h-28 bg-white/5 rounded-full" />
+                        <div className="w-14 h-14 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-4">
+                          <BookOpen size={28} className="text-white/80" />
                         </div>
-                        <h2 className="text-xl font-extrabold tracking-tight leading-snug">{selectedNewsletter.title}</h2>
-                        <div className="flex items-center justify-center gap-2 mt-3 text-xs text-sky-100 font-medium">
-                          <span>{selectedNewsletter.issue}</span>
-                          <span>â€¢</span>
-                          <span>{selectedNewsletter.year}</span>
-                        </div>
+                        <h2 className="text-base font-black leading-snug mb-1">{selectedNewsletter.title}</h2>
+                        <p className="text-xs text-sky-200/80 font-semibold">{selectedNewsletter.issue} &middot; {selectedNewsletter.year}</p>
                       </div>
-
-                      {/* Cover Body */}
-                      <div className="p-5 space-y-5 bg-white">
-                        <div className="space-y-2">
-                          <h4 className="text-[10px] font-bold text-jci-blue uppercase tracking-widest">Featured Highlights Inside</h4>
-                          <div className="grid grid-cols-1 gap-2.5 mt-2">
-                            <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100 hover:bg-sky-50/40 hover:border-sky-100 transition-colors">
-                              <span className="flex-shrink-0 w-5.5 h-5.5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xs">1</span>
-                              <div>
-                                <h5 className="font-bold text-xs text-slate-900 leading-none">President's Term Message</h5>
-                                <p className="text-[10px] text-slate-500 mt-1 leading-normal">Core directives and welcoming visions for term growth.</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100 hover:bg-sky-50/40 hover:border-sky-100 transition-colors">
-                              <span className="flex-shrink-0 w-5.5 h-5.5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xs">2</span>
-                              <div>
-                                <h5 className="font-bold text-xs text-slate-900 leading-none">Sustainable Outreach</h5>
-                                <p className="text-[10px] text-slate-500 mt-1 leading-normal">Community campaigns, project impact matrices, and SDG reviews.</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-100 hover:bg-sky-50/40 hover:border-sky-100 transition-colors">
-                              <span className="flex-shrink-0 w-5.5 h-5.5 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-xs">3</span>
-                              <div>
-                                <h5 className="font-bold text-xs text-slate-900 leading-none">Banquet & Awards Compilation</h5>
-                                <p className="text-[10px] text-slate-500 mt-1 leading-normal">Review of banquet highlights and local organization awardees.</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
+                      <div className="p-5 text-center">
+                        <p className="text-xs text-slate-500 leading-relaxed">PDF preview is not available for this issue. Use the buttons above to open or download.</p>
+                        {activeUrl === null && selectedNewsletter.link !== '#' && (
+                          <a href={selectedNewsletter.link} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 mt-4 text-xs font-black text-jci-blue hover:underline">
+                            <ExternalLink size={12} /> Open in Google Drive
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* PDF Page navigation toolbar simulation */}
-                <div className="bg-slate-900/85 px-4 py-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-white text-xs max-w-sm mx-auto w-full mt-4 backdrop-blur shadow-xl relative z-10">
-                  <button
-                    onClick={handlePrevNewsletter}
-                    disabled={currentIdx <= 0}
-                    className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold"
-                    title="Previous newsletter publication"
-                  >
-                    <ChevronLeft size={16} />
-                    <span>Prev Issue</span>
+                {/* Issue navigation bar */}
+                <div className="bg-slate-900/85 px-4 py-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-white text-xs max-w-sm mx-auto w-full mt-4 backdrop-blur shadow-xl">
+                  <button onClick={handlePrevNewsletter} disabled={currentIdx <= 0}
+                    className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold">
+                    <ChevronLeft size={16} /><span>Prev</span>
                   </button>
-
                   <span className="font-bold text-slate-400 select-none">
-                    Issue {currentIdx + 1} of {flatNewsletters.length}
+                    {currentIdx + 1} / {flatNewsletters.length}
                   </span>
-
-                  <button
-                    onClick={handleNextNewsletter}
-                    disabled={currentIdx >= flatNewsletters.length - 1}
-                    className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold"
-                    title="Next newsletter publication"
-                  >
-                    <span>Next Issue</span>
-                    <ChevronRight size={16} />
+                  <button onClick={handleNextNewsletter} disabled={currentIdx >= flatNewsletters.length - 1}
+                    className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 font-semibold">
+                    <span>Next</span><ChevronRight size={16} />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Right Control & Metadata Panel (Desktop) */}
-            <div className="w-full md:w-80 bg-white flex flex-col overflow-hidden">
+            {/* Right archive panel */}
+            <div className="w-full md:w-72 bg-white flex flex-col overflow-hidden">
               <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <BookOpen size={14} className="text-jci-blue" />
-                  Available Archives
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <BookOpen size={13} className="text-jci-blue" /> All Issues
                 </h3>
-                <span className="bg-sky-100 text-jci-blue font-bold px-2 py-0.5 rounded-full text-[10px] uppercase">
-                  {flatNewsletters.length} Issues
+                <span className="bg-blue-50 text-jci-blue font-bold px-2 py-0.5 rounded-full text-[10px] border border-blue-100">
+                  {flatNewsletters.length}
                 </span>
               </div>
-
-              {/* Sidebar Content viewport */}
-              <div className="flex-1 overflow-y-auto p-4">
-                <div className="space-y-2.5">
+              <div className="flex-1 overflow-y-auto p-3">
+                <div className="space-y-2">
                   {flatNewsletters.map((item, idx) => {
                     const isCurrent = item.title === selectedNewsletter.title && item.issue === selectedNewsletter.issue;
                     return (
-                      <div
-                        key={idx}
-                        onClick={() => {
-                          setSelectedNewsletter(item);
-                        }}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${isCurrent
-                          ? 'bg-sky-50/80 border-jci-blue text-jci-blue shadow-sm'
-                          : 'bg-slate-50/50 border-slate-200/60 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
-                          }`}
-                      >
-                        <FileText size={16} className={`flex-shrink-0 mt-0.5 ${isCurrent ? 'text-jci-blue' : 'text-slate-400'}`} />
+                      <div key={idx} onClick={() => setSelectedNewsletter(item)}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-2.5 ${isCurrent ? 'bg-blue-50 border-jci-blue shadow-sm' : 'bg-slate-50/50 border-slate-200/60 hover:bg-slate-50 hover:border-slate-300'}`}>
+                        <FileText size={14} className={`flex-shrink-0 mt-0.5 ${isCurrent ? 'text-jci-blue' : 'text-slate-400'}`} />
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-extrabold truncate leading-tight">{item.title}</p>
-                          <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400">
-                            <span>{item.year}</span>
-                            <span>â€¢</span>
-                            <span>{item.issue}</span>
-                          </div>
+                          <p className={`text-xs font-black truncate leading-tight ${isCurrent ? 'text-jci-blue' : 'text-slate-700'}`}>{item.title}</p>
+                          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{item.year} &middot; {item.issue}</p>
                         </div>
                       </div>
                     );
@@ -2533,7 +2486,7 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                   Member <span className="text-sky-200">Perks</span>
                 </h1>
                 <p className="text-base text-blue-100 max-w-xl leading-relaxed">
-                  Exclusive discounts and rewards from our merchant partners — curated for JCI Kuala Lumpur members.
+                  Exclusive discounts and rewards from our merchant partners &#8212; curated for JCI Kuala Lumpur members.
                 </p>
                 {!loading && partnerships.length > 0 && (
                   <div className="flex items-center gap-2 mt-4 justify-center sm:justify-start">
@@ -2684,7 +2637,7 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
                   <div className="flex items-center gap-2 text-emerald-700 text-sm font-bold">
                     <Unlock size={15} className="shrink-0" />
-                    Eligibility verified — benefit unlocked
+                    Eligibility verified &#8212; benefit unlocked
                   </div>
                   <p className="text-sm font-black text-slate-900 bg-white px-4 py-3 rounded-lg border border-emerald-100 shadow-sm">{selectedPartner.redeemMethod}</p>
                 </div>
