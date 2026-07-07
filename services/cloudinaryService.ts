@@ -54,7 +54,7 @@ export const uploadMemberAvatarToCloudinary = async (
   const compressedFile = await imageCompression(file, {
     maxSizeMB: 0.2,
     maxWidthOrHeight: 1024,
-    useWebWorker: true,
+    useWebWorker: false,
   });
 
   const folder = getMemberAvatarFolder(member);
