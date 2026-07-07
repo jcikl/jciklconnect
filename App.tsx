@@ -660,7 +660,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
                       <p className="text-sm font-bold text-slate-800">
-                        {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} â€¢ {selectedEvent.time || 'TBA'}
+                        {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} • {selectedEvent.time || 'TBA'}
                       </p>
                     </div>
                   </div>
@@ -1623,27 +1623,27 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                   <h3 className="text-2xl font-bold text-slate-900 mb-6">JCI Creed</h3>
                   <ul className="space-y-4 text-slate-600">
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">â€¢</span>
+                      <span className="text-jci-blue mr-2">•</span>
                       <span>That faith in God gives meaning and purpose to human life;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">â€¢</span>
+                      <span className="text-jci-blue mr-2">•</span>
                       <span>That the brotherhood of man transcends the sovereignty of nations;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">â€¢</span>
+                      <span className="text-jci-blue mr-2">•</span>
                       <span>That economic justice can best be won by free men through free enterprise;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">â€¢</span>
+                      <span className="text-jci-blue mr-2">•</span>
                       <span>That government should be of laws rather than of men;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">â€¢</span>
+                      <span className="text-jci-blue mr-2">•</span>
                       <span>That earth's great treasure lies in human personality;</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-jci-blue mr-2">â€¢</span>
+                      <span className="text-jci-blue mr-2">•</span>
                       <span>And that service to humanity is the best work of life.</span>
                     </li>
                   </ul>
