@@ -150,6 +150,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   };
 
   const currentAvatar = formValues.avatar;
+  const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -164,6 +165,10 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     setAvatarUploading(true);
     setAvatarUploadProgress(0);
     try {
+      // If a new avatar was uploaded this session (different from the saved one), clean it up first
+      if (currentAvatar && currentAvatar !== originalAvatar) {
+        deleteFromCloudinary(currentAvatar).catch(() => {});
+      }
       const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
       handleChange('avatar', uploadedUrl);
     } catch (err) {

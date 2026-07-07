@@ -1976,6 +1976,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     setAvatarUploading(true);
     setAvatarUploadProgress(0);
     try {
+      const originalMemberAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+      if (inlineValues.avatar && inlineValues.avatar !== originalMemberAvatar) {
+        deleteFromCloudinary(inlineValues.avatar).catch(() => {});
+      }
       const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
       setInlineValues({ ...inlineValues, avatar: uploadedUrl });
     } catch (err) {
