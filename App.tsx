@@ -448,7 +448,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="relative shrink-0 self-stretch">
                         <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/20 blur-xl animate-pulse" />
                         <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
-                          className="absolute inset-0 h-full w-auto object-contain drop-shadow-2xl"
+                          className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
                           onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
                       </div>
                     )}
@@ -532,7 +532,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <div className="relative shrink-0 self-stretch">
                         <div className="absolute inset-0 scale-[2.5] rounded-full bg-amber-400/15 blur-2xl animate-pulse" />
                         <img src={trimCloudinaryImage(termSettings.logoUrl)} alt="Presidential theme logo"
-                          className="absolute inset-0 h-full w-auto object-contain drop-shadow-2xl"
+                          className="relative z-10 h-full w-auto object-contain drop-shadow-2xl"
                           onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }} />
                       </div>
                     )}
