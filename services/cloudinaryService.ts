@@ -103,9 +103,8 @@ export const uploadPresidentialLogoToCloudinary = async (
   });
 
   const folder = `${sanitizeFolderPath(MEMBER_AVATAR_ASSET_ROOT)}/presidential-logos`;
-  const publicId = `${sanitizePathSegment(term)}-logo`;
 
-  return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
+  return uploadToCloudinary(compressedFile, folder, onProgress);
 };
 
 /**
