@@ -378,60 +378,111 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
         {/* President Spotlight */}
         {president && (
           <section className="relative bg-jci-navy overflow-hidden">
-            {/* Decorative diagonal bands */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-sky-500/10 blur-3xl" />
-              <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full bg-jci-blue/20 blur-3xl" />
-              <div className="absolute inset-0 opacity-[0.03]"
+
+            {/* ── Background layer ── */}
+            <div className="absolute inset-0 pointer-events-none select-none">
+              {/* Ghost year — bottom-right anchor */}
+              <div className="absolute bottom-0 right-0 leading-none font-black text-white/[0.04] text-[140px] lg:text-[200px]">
+                {currentYear}
+              </div>
+              {/* Diagonal texture */}
+              <div className="absolute inset-0 opacity-[0.025]"
                 style={{ backgroundImage: 'repeating-linear-gradient(135deg, white 0px, white 1px, transparent 1px, transparent 40px)' }} />
+              {/* Glow blobs */}
+              <div className="absolute top-0 left-1/2 w-96 h-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-jci-blue/15 blur-3xl" />
+              <div className="absolute bottom-0 right-1/4 w-64 h-64 rounded-full bg-sky-600/10 blur-3xl" />
             </div>
 
-            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
-              <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
+            {/* ── Two-panel layout ── */}
+            <div className="relative flex flex-col lg:grid lg:grid-cols-[5fr_7fr] lg:min-h-[440px]">
 
-                {/* Photo column */}
-                <div className="shrink-0 flex flex-col items-center">
-                  <div className="relative">
-                    {/* Outer glow ring */}
-                    <div className="absolute -inset-3 rounded-2xl border border-amber-400/25" />
-                    <div className="absolute -inset-6 rounded-3xl border border-white/10" />
-                    {president.avatar ? (
-                      <img src={president.avatar} alt={president.name}
-                        className="relative z-10 w-36 h-36 lg:w-52 lg:h-52 rounded-2xl object-cover border-2 border-white/20 shadow-2xl" />
-                    ) : (
-                      <div className="relative z-10 w-36 h-36 lg:w-52 lg:h-52 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center shadow-2xl">
-                        <span className="text-5xl font-black text-white/30">{president.name.charAt(0)}</span>
-                      </div>
-                    )}
-                    {/* President year badge */}
-                    <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-20 bg-amber-400 text-jci-navy text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full whitespace-nowrap shadow-lg">
-                      President {currentYear}
-                    </div>
+              {/* ── LEFT: photo panel ── */}
+
+              {/* Desktop — full-height bleed photo */}
+              <div className="hidden lg:block relative overflow-hidden">
+                {president.avatar ? (
+                  <img src={president.avatar} alt={president.name}
+                    className="absolute inset-0 w-full h-full object-cover object-top scale-105" />
+                ) : (
+                  <div className="absolute inset-0 bg-white/5 flex items-center justify-center">
+                    <span className="text-8xl font-black text-white/20">{president.name.charAt(0)}</span>
                   </div>
-                  {/* Name + company under photo (mobile) */}
-                  <div className="mt-7 text-center lg:hidden">
-                    <p className="text-white font-black text-base leading-snug">{president.name}</p>
-                    <p className="text-white/45 text-xs mt-0.5">{president.company}</p>
+                )}
+                {/* Right-side gradient blends photo into navy content panel */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-jci-navy/20 to-jci-navy" />
+                {/* Bottom gradient */}
+                <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-jci-navy/70 to-transparent" />
+                {/* Name + badge pinned to bottom of photo */}
+                <div className="absolute bottom-8 inset-x-0 flex flex-col items-center gap-1 z-10">
+                  <p className="text-white font-black text-xl drop-shadow-lg leading-snug">{president.name}</p>
+                  <p className="text-white/55 text-sm drop-shadow">{president.company}</p>
+                  <div className="mt-2 bg-amber-400 text-jci-navy text-[9px] font-black uppercase tracking-wider px-4 py-1.5 rounded-full shadow-lg whitespace-nowrap">
+                    President {currentYear}
                   </div>
                 </div>
+                {/* Vertical amber divider on the right edge */}
+                <div className="absolute right-0 inset-y-0 flex flex-col items-center py-10">
+                  <div className="flex-1 w-px bg-gradient-to-b from-transparent via-amber-400/35 to-transparent" />
+                  <div className="w-1 h-1 rounded-full bg-amber-400/50 my-1" />
+                  <div className="flex-1 w-px bg-gradient-to-b from-transparent via-amber-400/35 to-transparent" />
+                </div>
+              </div>
 
-                {/* Content column */}
-                <div className="flex-1 text-center lg:text-left">
-                  {/* Eyebrow */}
-                  <div className="flex items-center gap-2 justify-center lg:justify-start mb-4">
-                    <div className="w-5 h-px bg-amber-400/50" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/80">Presidential Theme {currentYear}</span>
-                    <div className="w-5 h-px bg-amber-400/50" />
+              {/* Mobile — full-width photo card with fade */}
+              <div className="lg:hidden relative">
+                {president.avatar ? (
+                  <>
+                    <img src={president.avatar} alt={president.name}
+                      className="w-full h-56 object-cover object-top" />
+                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-jci-navy to-transparent" />
+                  </>
+                ) : (
+                  <div className="h-40 bg-white/5" />
+                )}
+                <div className="absolute bottom-4 inset-x-0 flex flex-col items-center gap-0.5 z-10">
+                  <p className="text-white font-black text-base drop-shadow">{president.name}</p>
+                  <p className="text-white/50 text-xs drop-shadow">{president.company}</p>
+                  <div className="mt-1.5 bg-amber-400 text-jci-navy text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full shadow-lg whitespace-nowrap">
+                    President {currentYear}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── RIGHT: content panel ── */}
+              <div className="flex items-center px-6 sm:px-10 lg:px-12 xl:px-16 py-12 lg:py-16">
+                <div className="w-full max-w-lg mx-auto lg:mx-0">
+
+                  {/* Top row: eyebrow (left) + logo (right, desktop) */}
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-px bg-amber-400/50 shrink-0" />
+                      <span className="text-[9px] font-black uppercase tracking-widest text-amber-400/80 whitespace-nowrap">Presidential Theme {currentYear}</span>
+                    </div>
+                    {termSettings?.logoUrl && (
+                      <div className="hidden lg:flex shrink-0 items-center relative">
+                        <div className="absolute inset-0 scale-[2] rounded-full bg-amber-400/10 blur-xl" />
+                        <img src={termSettings.logoUrl} alt="Presidential theme logo"
+                          className="relative z-10 h-16 xl:h-20 w-auto object-contain drop-shadow-xl" />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Theme stacked headline — split by "." for multi-line display */}
+                  {/* Logo — mobile: centred between eyebrow and headline */}
+                  {termSettings?.logoUrl && (
+                    <div className="flex justify-center lg:hidden mb-5">
+                      <img src={termSettings.logoUrl} alt="Presidential theme logo"
+                        className="h-14 w-auto object-contain opacity-90 drop-shadow-lg" />
+                    </div>
+                  )}
+
+                  {/* Theme headline */}
                   {(() => {
                     const raw = termSettings?.presidentTheme || 'Ignite. Lead. Transform.';
                     const parts = raw.split('.').map((s: string) => s.trim()).filter(Boolean);
                     return (
-                      <div className="mb-5">
+                      <div className="mb-4 text-center lg:text-left">
                         {parts.map((part: string, i: number) => (
-                          <h2 key={i} className={`text-4xl lg:text-6xl font-black leading-[0.95] tracking-tight ${i === Math.floor(parts.length / 2) ? 'text-amber-400' : 'text-white'}`}>
+                          <h2 key={i} className={`text-4xl lg:text-5xl xl:text-[3.5rem] font-black leading-[0.92] tracking-tight ${i === Math.floor(parts.length / 2) ? 'text-amber-400' : 'text-white'}`}>
                             {part}.
                           </h2>
                         ))}
@@ -441,31 +492,26 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 
                   {/* Tagline */}
                   {termSettings?.tagline && (
-                    <p className="text-amber-300/80 text-xs font-bold uppercase tracking-widest mb-4 -mt-2">{termSettings.tagline}</p>
+                    <p className="text-amber-300/75 text-[10px] font-black uppercase tracking-widest mb-4 text-center lg:text-left">{termSettings.tagline}</p>
                   )}
 
-                  {/* Divider */}
                   <div className="w-10 h-0.5 bg-amber-400/40 mx-auto lg:mx-0 mb-5" />
 
-                  {/* Name + company (desktop) */}
-                  <div className="mb-3 hidden lg:block">
-                    <p className="text-white font-black text-lg leading-snug">{president.name}</p>
-                    <p className="text-white/45 text-sm">{president.company}</p>
-                  </div>
-
-                  {/* Presidential message */}
-                  <p className="text-white/55 text-sm leading-relaxed max-w-md mx-auto lg:mx-0 mb-7">
+                  {/* Description */}
+                  <p className="text-white/50 text-sm leading-relaxed max-w-sm mx-auto lg:mx-0 mb-7 text-center lg:text-left">
                     {termSettings?.shortDescription || 'This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose and transforms Kuala Lumpur for generations to come.'}
                   </p>
 
-                  {/* CTA */}
-                  <button onClick={() => onPageChange('about')}
-                    className="inline-flex items-center gap-2 text-xs font-black text-jci-navy bg-amber-400 hover:bg-amber-300 active:scale-95 px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-400/20">
-                    <Users size={13} /> Meet the Board
-                  </button>
-                </div>
+                  <div className="flex justify-center lg:justify-start">
+                    <button onClick={() => onPageChange('about')}
+                      className="inline-flex items-center gap-2 text-xs font-black text-jci-navy bg-amber-400 hover:bg-amber-300 active:scale-95 px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-400/20">
+                      <Users size={13} /> Meet the Board
+                    </button>
+                  </div>
 
+                </div>
               </div>
+
             </div>
           </section>
         )}
