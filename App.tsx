@@ -407,7 +407,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
             </div>
             {/* Mobile: 2-col short landscape | Desktop: 4-col taller portrait */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
-              {pillars.map((p, i) => (
+              {pillars.map((p) => (
                 <div
                   key={p.title}
                   className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-default
@@ -422,10 +422,6 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   <div className={`absolute inset-0 bg-gradient-to-t ${p.accent} via-transparent opacity-60`} />
                   {/* Dark legibility gradient */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/10" />
-                  {/* Number badge */}
-                  <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/20 border border-white/30 backdrop-blur-sm flex items-center justify-center">
-                    <span className="text-[10px] font-black text-white leading-none">0{i + 1}</span>
-                  </div>
                   {/* Text */}
                   <div className="absolute bottom-0 left-0 right-0 p-3 md:p-5">
                     <h3 className="text-sm md:text-lg font-black text-white mb-0.5 md:mb-1 leading-tight">{p.title}</h3>
