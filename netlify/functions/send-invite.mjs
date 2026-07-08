@@ -1,13 +1,24 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
+const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+const clientEmail = process.env.VITE_FIREBASE_CLIENT_EMAIL;
+const privateKey = process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+console.log('[send-invite] init check:', {
+  hasProjectId: !!projectId,
+  hasClientEmail: !!clientEmail,
+  hasPrivateKey: !!privateKey,
+  privateKeyStart: privateKey?.slice(0, 40),
+});
+
+if (!projectId || !clientEmail || !privateKey) {
+  console.error('[send-invite] Missing Firebase Admin env vars');
+}
+
 if (!getApps().length) {
   initializeApp({
-    credential: cert({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.VITE_FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
+    credential: cert({ projectId, clientEmail, privateKey }),
   });
 }
 
