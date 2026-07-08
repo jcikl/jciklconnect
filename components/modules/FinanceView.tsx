@@ -2685,7 +2685,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <select
                           value={bankAccountFilter}
                           onChange={(e) => setBankAccountFilter(e.target.value)}
-                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors w-[118px] ${
+                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
                             bankAccountFilter !== 'All'
                               ? 'bg-jci-blue text-white border-jci-blue'
                               : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
@@ -2701,7 +2701,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <select
                           value={txCategoryFilter}
                           onChange={(e) => setTxCategoryFilter(e.target.value)}
-                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors w-[122px] ${
+                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
                             txCategoryFilter !== 'All'
                               ? 'bg-jci-blue text-white border-jci-blue'
                               : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
