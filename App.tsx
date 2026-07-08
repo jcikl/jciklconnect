@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
@@ -2902,249 +2903,377 @@ const NotificationDrawer: React.FC<{
   isOpen: boolean,
   onClose: () => void,
   notifications: Notification[],
-  onMarkAsRead: (id: string) => Promise<void>
+  onMarkAsRead: (id: string) => Promise<void>,
 }> = ({ isOpen, onClose, notifications, onMarkAsRead }) => {
-  const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'Active' | 'History'>('Active');
+  const [visible, setVisible] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const dragStartY = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const markedRef = useRef(false);
 
-  const handleAction = async (id: string, type: string) => {
-    try {
-      await onMarkAsRead(id);
-      showToast(type === 'dismiss' ? 'Notification moved to history' : 'Action taken successfully', type === 'dismiss' ? 'info' : 'success');
-    } catch (error) {
-      showToast('Failed to update notification', 'error');
+  useEffect(() => {
+    if (isOpen) {
+      setVisible(true);
+      // Mark all real unread notifications as read when panel opens
+      if (!markedRef.current) {
+        markedRef.current = true;
+        notifications
+          .filter(n => !n.read && !n.id.startsWith('birthday-'))
+          .forEach(n => onMarkAsRead(n.id).catch(() => {}));
+      }
+    } else {
+      markedRef.current = false;
+      const t = setTimeout(() => setVisible(false), 320);
+      return () => clearTimeout(t);
     }
-  }
+  }, [isOpen]);
 
-  const filteredNotifications = notifications.filter(n =>
-    activeTab === 'Active' ? !n.read : n.read
-  );
+  const handleTouchStart = (e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY;
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const scrollTop = scrollRef.current?.scrollTop ?? 0;
+    const delta = e.touches[0].clientY - dragStartY.current;
+    if (delta > 0 && scrollTop === 0) setDragY(delta);
+  };
+  const handleTouchEnd = () => {
+    if (dragY > 90) onClose();
+    setDragY(0);
+  };
 
-  return (
-    <Drawer isOpen={isOpen} onClose={onClose} title="Action Center">
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex bg-slate-100 p-1 rounded-lg">
+  const isBirthday = (note: Notification) =>
+    note.title.toLowerCase().includes('birthday') || note.id.startsWith('birthday-');
+
+  const noteIcon = (note: Notification) => {
+    if (note.type === 'ai') return { icon: <Sparkles size={15} />, bg: 'bg-violet-100', fg: 'text-violet-600', accent: 'bg-violet-400' };
+    if (note.type === 'warning') return { icon: <AlertTriangle size={15} />, bg: 'bg-amber-100', fg: 'text-amber-600', accent: 'bg-amber-400' };
+    if (isBirthday(note)) return { icon: <Gift size={15} />, bg: 'bg-pink-100', fg: 'text-pink-500', accent: 'bg-pink-400' };
+    return { icon: <Bell size={15} />, bg: 'bg-sky-100', fg: 'text-jci-blue', accent: 'bg-jci-blue' };
+  };
+
+  const fmtTime = (ts: string) => {
+    if (!ts || ts === 'Today') return 'Today';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diffDays === 1) return 'Yesterday';
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  if (!visible && !isOpen) return null;
+
+  const sheetStyle: React.CSSProperties = {
+    transform: `translateY(${dragY > 0 ? dragY : isOpen ? 0 : '100%'}px)`,
+    transition: dragY > 0 ? 'none' : isOpen ? 'transform 0.35s cubic-bezier(0.32,0.72,0,1)' : 'transform 0.28s cubic-bezier(0.4,0,1,1)',
+  };
+
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-[54] bg-black/40 backdrop-blur-[2px]"
+        style={{ opacity: isOpen ? 1 : 0, transition: 'opacity 0.3s ease', pointerEvents: isOpen ? 'auto' : 'none' }}
+        onClick={onClose}
+      />
+
+      {/* Sheet */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[55] flex flex-col rounded-t-[28px] bg-white shadow-2xl md:left-auto md:right-0 md:top-0 md:bottom-0 md:w-96 md:rounded-none md:rounded-l-2xl"
+        style={sheetStyle}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Drag handle (mobile only) */}
+        <div className="md:hidden pt-3 pb-1 flex justify-center shrink-0">
+          <div className="w-9 h-1 rounded-full bg-slate-300/80" />
+        </div>
+
+        {/* Header */}
+        <div className="shrink-0 px-5 pt-2 pb-4 md:pt-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[15px] font-black text-slate-900">Notifications</h2>
             <button
-              onClick={() => setActiveTab('Active')}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'Active' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 active:scale-95 transition-all"
             >
-              Active ({notifications.filter(n => !n.read).length})
-            </button>
-            <button
-              onClick={() => setActiveTab('History')}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'History' ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              History
+              <X size={15} strokeWidth={2.5} />
             </button>
           </div>
         </div>
 
-        <div className="space-y-3">
-          {filteredNotifications.map(note => (
-            <div key={note.id} className={`p-4 border rounded-lg shadow-sm transition-colors ${note.read ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-jci-blue'}`}>
-              <div className="flex items-start gap-3 mb-3">
-                <div className={`p-2 rounded-full flex-shrink-0 ${note.type === 'ai' ? 'bg-purple-100 text-purple-600' : note.type === 'warning' ? 'bg-amber-100 text-amber-600' : note.title.includes('ðŸŽ‚') ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
-                  {note.type === 'ai' ? <Sparkles size={16} /> : note.type === 'warning' ? <AlertTriangle size={16} /> : note.title.includes('ðŸŽ‚') ? <Gift size={16} /> : <Bell size={16} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className={`text-sm font-bold truncate ${note.read ? 'text-slate-600' : 'text-slate-900'}`}>{note.title}</h4>
-                  <p className="text-[10px] text-slate-500">
-                    {note.timestamp === 'Today' ? 'Today' : (isNaN(new Date(note.timestamp).getTime()) ? note.timestamp : new Date(note.timestamp).toLocaleString())}
-                  </p>
-                </div>
-              </div>
-              <p className={`text-sm mb-4 ${note.read ? 'text-slate-500' : 'text-slate-600'}`}>{note.message}</p>
+        {/* Divider */}
+        <div className="h-px bg-slate-100 shrink-0 mx-5" />
 
-              {!note.read && !note.id.startsWith('birthday-') && (
-                <div className="flex gap-2">
-                  <Button size="sm" className="flex-1 text-xs h-8" onClick={() => handleAction(note.id, 'act')}><Check size={14} className="mr-1" /> Approve/Act</Button>
-                  <Button size="sm" variant="outline" className="flex-1 text-xs h-8" onClick={() => handleAction(note.id, 'dismiss')}><X size={14} className="mr-1" /> Dismiss</Button>
+        {/* Scrollable list */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4" style={{ maxHeight: 'calc(88vh - 100px)' }}>
+          {(() => {
+            if (notifications.length === 0) {
+              return (
+                <div className="flex flex-col items-center py-16 gap-3">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+                    <Bell size={26} className="text-slate-300" />
+                  </div>
+                  <p className="text-[14px] font-bold text-slate-400">All caught up!</p>
+                  <p className="text-[12px] text-slate-300 text-center max-w-[200px] leading-relaxed">No notifications right now.</p>
                 </div>
-              )}
-            </div>
-          ))}
+              );
+            }
 
-          {filteredNotifications.length === 0 && (
-            <div className="text-center py-10 text-slate-400">
-              <Bell size={32} className="mx-auto mb-2 opacity-20" />
-              <p>{activeTab === 'Active' ? 'No new notifications.' : 'No notification history.'}</p>
-            </div>
-          )}
+            const groupKey = (ts: string) => {
+              if (!ts || ts === 'Today') return 'Today';
+              const d = new Date(ts);
+              if (isNaN(d.getTime())) return 'Today';
+              const now = new Date();
+              const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+              if (diffDays === 0) return 'Today';
+              if (diffDays === 1) return 'Yesterday';
+              return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+            };
+
+            const groups: { label: string; items: Notification[] }[] = [];
+            notifications.forEach(note => {
+              const label = groupKey(note.timestamp);
+              const existing = groups.find(g => g.label === label);
+              if (existing) existing.items.push(note);
+              else groups.push({ label, items: [note] });
+            });
+
+            const typeLabel = (note: Notification) => {
+              if (note.type === 'ai') return 'AI Insights';
+              if (note.type === 'warning') return 'Alerts';
+              if (isBirthday(note)) return 'Birthdays';
+              return 'General';
+            };
+            const typeOrder = ['Alerts', 'AI Insights', 'General', 'Birthdays'];
+
+            return groups.map(group => {
+              const typeGroups: { label: string; items: Notification[] }[] = [];
+              group.items.forEach(note => {
+                const tl = typeLabel(note);
+                const existing = typeGroups.find(g => g.label === tl);
+                if (existing) existing.items.push(note);
+                else typeGroups.push({ label: tl, items: [note] });
+              });
+              typeGroups.sort((a, b) => typeOrder.indexOf(a.label) - typeOrder.indexOf(b.label));
+
+              return (
+                <div key={group.label} className="mb-5">
+                  {/* Date label */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">{group.label}</span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+
+                  {/* Type sub-groups */}
+                  <div className="space-y-4">
+                    {typeGroups.map(tg => (
+                      <div key={tg.label}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-2 px-1">{tg.label}</p>
+                        <div className="space-y-2">
+                          {tg.items.map(note => {
+                            const { icon, bg, fg, accent } = noteIcon(note);
+                            return (
+                              <div
+                                key={note.id}
+                                className="relative rounded-2xl overflow-hidden bg-white shadow-sm shadow-slate-200/60 border border-slate-100"
+                              >
+                                <div className={`absolute top-0 left-0 right-0 h-[2px] ${accent} opacity-50`} />
+                                <div className="px-4 pt-3.5 pb-3.5">
+                                  <div className="flex items-start gap-3">
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${bg} ${fg}`}>
+                                      {icon}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[12px] leading-relaxed text-slate-600">{note.message.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').trim()}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+
+          <div className="h-20 md:h-4" />
         </div>
       </div>
-    </Drawer>
-  )
+    </>,
+    document.body
+  );
 }
 
-const SearchDrawer: React.FC<{
+const SearchDropdown: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   searchQuery: string;
-  onSearchChange: (query: string) => void;
   onNavigate: (view: ViewType, selectedId?: string) => void;
-}> = ({ isOpen, onClose, searchQuery, onSearchChange, onNavigate }) => {
-  const { members } = useMembers(); // These hooks are already imported or available
+}> = ({ isOpen, onClose, searchQuery, onNavigate }) => {
+  const { members } = useMembers();
   const { events } = useEvents();
   const { projects } = useProjects();
   const { businesses } = useBusinessDirectory();
 
-  const filteredMembers = searchQuery ? members.filter(m =>
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.email.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5) : [];
+  const q = searchQuery.toLowerCase().trim();
+  const filteredMembers = q ? members.filter(m =>
+    m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+  ).slice(0, 4) : [];
+  const filteredEvents = q ? events.filter(e =>
+    e.title.toLowerCase().includes(q)
+  ).slice(0, 3) : [];
+  const filteredProjects = q ? projects.filter(p =>
+    p.name.toLowerCase().includes(q)
+  ).slice(0, 3) : [];
+  const filteredBusinesses = q ? businesses.filter(b =>
+    (b.companyName || '').toLowerCase().includes(q) || (b.industry || '').toLowerCase().includes(q)
+  ).slice(0, 3) : [];
 
-  const filteredEvents = searchQuery ? events.filter(e =>
-    e.title.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5) : [];
+  const total = filteredMembers.length + filteredEvents.length + filteredProjects.length + filteredBusinesses.length;
+  const hasQuery = q.length > 0;
 
-  const filteredProjects = searchQuery ? projects.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5) : [];
+  if (!isOpen) return null;
 
-  const filteredBusinesses = searchQuery ? businesses.filter(b =>
-    (b.companyName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (b.industry || '').toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5) : [];
+  const SectionLabel = ({ color, label }: { color: string; label: string }) => (
+    <div className="flex items-center gap-1.5 px-4 pt-3 pb-1">
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
+      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+    </div>
+  );
 
-  const totalResults = filteredMembers.length + filteredEvents.length + filteredProjects.length + filteredBusinesses.length;
+  const ResultRow = ({ icon, title, meta, onClick }: { icon: React.ReactNode; title: string; meta: string; onClick: () => void }) => (
+    <button onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-jci-blue/5 active:bg-jci-blue/10 transition-colors group text-left">
+      <div className="shrink-0">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-slate-800 truncate group-hover:text-jci-blue transition-colors leading-tight">{title}</p>
+        <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{meta}</p>
+      </div>
+    </button>
+  );
 
   return (
-    <Drawer isOpen={isOpen} onClose={onClose} title="Global Search">
-      <div className="space-y-6">
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-            <Search size={18} className="text-slate-400 group-focus-within:text-jci-blue transition-colors" />
-          </div>
-          <input
-            autoFocus
-            type="text"
-            placeholder="Search members, events, or projects..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-12 pr-4 focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none transition-all text-sm"
-          />
-        </div>
+    <div
+      className="fixed inset-x-3 top-14 z-[49] mx-auto max-w-md"
+      style={{ animation: 'searchDropIn 0.22s cubic-bezier(0.16,1,0.3,1) both' }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl shadow-black/20 border border-slate-100 overflow-hidden">
 
-        {searchQuery && totalResults === 0 && (
-          <div className="text-center py-10 text-slate-400">
-            <Search size={32} className="mx-auto mb-2 opacity-20" />
-            <p>No results found for "{searchQuery}"</p>
+        {/* Top bar: result count */}
+        {hasQuery && (
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+            <span className="text-[11px] text-slate-400">
+              {total > 0
+                ? <><span className="font-bold text-slate-700">{total}</span> result{total !== 1 ? 's' : ''} for <span className="font-semibold text-jci-blue">"{searchQuery}"</span></>
+                : <>No results for <span className="font-semibold text-slate-600">"{searchQuery}"</span></>
+              }
+            </span>
+            <span className="text-[10px] text-slate-300 hidden sm:block">Esc to close</span>
           </div>
         )}
 
-        {filteredMembers.length > 0 && (
-          <div>
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <Users size={12} /> Members
-            </h4>
-            <div className="space-y-2">
+        <div className="max-h-[60vh] overflow-y-auto">
+          {/* Empty / hint state */}
+          {!hasQuery && (
+            <div className="flex flex-col items-center py-8 gap-2 text-slate-400">
+              <Search size={22} className="opacity-20" />
+              <p className="text-[13px]">Search members, events, projects…</p>
+            </div>
+          )}
+
+          {hasQuery && total === 0 && (
+            <div className="flex flex-col items-center py-8 gap-2 text-slate-400">
+              <Search size={22} className="opacity-20" />
+              <p className="text-[13px]">Nothing found</p>
+            </div>
+          )}
+
+          {/* Members */}
+          {filteredMembers.length > 0 && (
+            <div>
+              <SectionLabel color="bg-purple-400" label="Members" />
               {filteredMembers.map(m => (
-                <div
-                  key={m.id}
+                <ResultRow key={m.id}
                   onClick={() => { onNavigate('MEMBERS', m.id); onClose(); }}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
-                >
-                  <img
-                    src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=0097D7&color=fff`}
-                    className="w-8 h-8 rounded-full object-cover"
-                    alt=""
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{m.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{m.email}</p>
-                  </div>
-                </div>
+                  icon={
+                    <img
+                      src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=0097D7&color=fff`}
+                      className="w-9 h-9 rounded-xl object-cover" alt="" />
+                  }
+                  title={m.name}
+                  meta={m.email}
+                />
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {filteredEvents.length > 0 && (
-          <div>
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <Calendar size={12} /> Events
-            </h4>
-            <div className="space-y-2">
+          {/* Events */}
+          {filteredEvents.length > 0 && (
+            <div className={filteredMembers.length > 0 ? 'border-t border-slate-50' : ''}>
+              <SectionLabel color="bg-jci-blue" label="Events" />
               {filteredEvents.map(e => (
-                <div
-                  key={e.id}
+                <ResultRow key={e.id}
                   onClick={() => { onNavigate('EVENTS', e.id); onClose(); }}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-jci-blue flex items-center justify-center flex-shrink-0">
-                    <Calendar size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{e.title}</p>
-                    <p className="text-xs text-slate-500 truncate">{new Date(e.date).toLocaleDateString()}</p>
-                  </div>
-                </div>
+                  icon={
+                    e.imageUrl
+                      ? <img src={e.imageUrl} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                      : <div className="w-9 h-9 rounded-xl bg-blue-50 text-jci-blue flex items-center justify-center"><Calendar size={16} /></div>
+                  }
+                  title={e.title}
+                  meta={new Date(e.date).toLocaleDateString()}
+                />
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {filteredProjects.length > 0 && (
-          <div>
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <Briefcase size={12} /> Projects
-            </h4>
-            <div className="space-y-2">
+          {/* Projects */}
+          {filteredProjects.length > 0 && (
+            <div className={(filteredMembers.length > 0 || filteredEvents.length > 0) ? 'border-t border-slate-50' : ''}>
+              <SectionLabel color="bg-green-400" label="Projects" />
               {filteredProjects.map(p => (
-                <div
-                  key={p.id}
+                <ResultRow key={p.id}
                   onClick={() => { onNavigate('PROJECTS', p.id); onClose(); }}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center flex-shrink-0">
-                    <Briefcase size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{p.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{p.status}</p>
-                  </div>
-                </div>
+                  icon={
+                    p.logoUrl
+                      ? <img src={p.logoUrl} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                      : <div className="w-9 h-9 rounded-xl bg-green-50 text-green-600 flex items-center justify-center"><Briefcase size={16} /></div>
+                  }
+                  title={p.name || p.title || ''}
+                  meta={p.status}
+                />
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {filteredBusinesses.length > 0 && (
-          <div>
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <Building2 size={12} /> Directory
-            </h4>
-            <div className="space-y-2">
+          {/* Directory */}
+          {filteredBusinesses.length > 0 && (
+            <div className={total > filteredBusinesses.length ? 'border-t border-slate-50' : ''}>
+              <SectionLabel color="bg-indigo-400" label="Directory" />
               {filteredBusinesses.map(b => (
-                <div
-                  key={b.id}
+                <ResultRow key={b.id}
                   onClick={() => { onNavigate('DIRECTORY', b.id); onClose(); }}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 cursor-pointer transition-all group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                    <Building2 size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate group-hover:text-jci-blue transition-colors">{b.companyName}</p>
-                    <p className="text-xs text-slate-500 truncate">{b.industry}</p>
-                  </div>
-                </div>
+                  icon={<div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center"><Building2 size={16} /></div>}
+                  title={b.companyName || ''}
+                  meta={b.industry || ''}
+                />
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {!searchQuery && (
-          <div className="text-center py-10 text-slate-400">
-            <Search size={32} className="mx-auto mb-2 opacity-20" />
-            <p className="text-sm">Start typing to search across the platform</p>
-          </div>
-        )}
+          {/* bottom padding */}
+          {hasQuery && total > 0 && <div className="h-2" />}
+        </div>
       </div>
-    </Drawer>
-  )
-}
+    </div>
+  );
+};
 
 // --- Main App Shell ---
 
@@ -3162,6 +3291,8 @@ export const JCIKLApp: React.FC = () => {
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [isSearchDrawerOpen, setSearchDrawerOpen] = useState(false);
+  const [headerSearchActive, setHeaderSearchActive] = useState(false);
+  const headerSearchRef = useRef<HTMLInputElement>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [initialSelectedMemberId, setInitialSelectedMemberId] = useState<string | null>(null);
@@ -3298,12 +3429,16 @@ export const JCIKLApp: React.FC = () => {
       }));
   }, [members]);
 
-  // Combined notifications (stable order: birthdays first)
+  // Combined notifications — skip client-side birthdays if Firestore already has any birthday notifications
   const allNotifications = React.useMemo(() => {
-    return [...birthdayNotifications, ...notifications];
+    const firestoreHasBirthday = notifications.some(n =>
+      n.title?.toLowerCase().includes('birthday') || n.message?.toLowerCase().includes('birthday')
+    );
+    const clientBirthdays = firestoreHasBirthday ? [] : birthdayNotifications;
+    return [...clientBirthdays, ...notifications];
   }, [birthdayNotifications, notifications]);
 
-  const unreadNotifications = allNotifications.filter(n => !n.read);
+  const unreadNotifications = allNotifications.filter(n => !n.read && !n.id.startsWith('birthday-'));
 
   // Background trigger for daily 1 PM birthday notifications
   React.useEffect(() => {
@@ -3947,10 +4082,20 @@ export const JCIKLApp: React.FC = () => {
 
               <div className="relative z-10 flex items-center justify-between h-14 px-4 sm:px-6 max-w-7xl mx-auto">
                 {/* Left: Brand mark + chapter / page label */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 bg-white/15 rounded-lg border border-white/25 flex items-center justify-center shrink-0 shadow-sm">
-                    <span className="text-[10px] font-black text-white tracking-tight leading-none">JCI</span>
-                  </div>
+                <div className="flex items-center gap-3 min-w-0 h-9">
+                  {(isBoard || isAdmin) ? (
+                    <button
+                      onClick={() => setShowBoardDashboard(v => !v)}
+                      title="Toggle Board Dashboard"
+                      className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 shadow-sm transition-all duration-200 ${showBoardDashboard ? 'bg-white border-white/40 shadow-white/20' : 'bg-white/15 border-white/25 hover:bg-white/25'}`}
+                    >
+                      <span className={`text-[10px] font-black tracking-tight leading-none ${showBoardDashboard ? 'text-jci-navy' : 'text-white'}`}>JCI</span>
+                    </button>
+                  ) : (
+                    <div className="w-9 h-9 bg-white/15 rounded-lg border border-white/25 flex items-center justify-center shrink-0 shadow-sm">
+                      <span className="text-[10px] font-black text-white tracking-tight leading-none">JCI</span>
+                    </div>
+                  )}
                   <div className="hidden sm:flex flex-col leading-none gap-0.5 min-w-0">
                     <span className="text-[10px] font-bold text-white/55 uppercase tracking-widest">Kuala Lumpur</span>
                     <span className="text-sm font-semibold text-white truncate">
@@ -3960,13 +4105,13 @@ export const JCIKLApp: React.FC = () => {
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center gap-0.5 h-9">
                   {/* Role simulator */}
                   {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
                     <div className="relative z-30">
                       <button
                         onClick={() => setIsSimulateDropdownOpen(!isSimulateDropdownOpen)}
-                        className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-white/25 rounded-lg px-2.5 py-1.5 transition-all text-white text-[11px] font-bold"
+                        className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-white/25 rounded-lg px-2.5 h-9 transition-all text-white text-[11px] font-bold"
                         title="Simulate Role"
                       >
                         <Shield size={11} className="text-purple-300 shrink-0" />
@@ -4009,26 +4154,49 @@ export const JCIKLApp: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Board toggle */}
-                  {(isBoard || isAdmin) && (
-                    <button
-                      onClick={() => setShowBoardDashboard(v => !v)}
-                      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all text-[11px] font-bold border ml-1 ${showBoardDashboard ? 'bg-white text-jci-navy border-white/30 shadow-sm' : 'bg-white/10 hover:bg-white/20 border-white/15 hover:border-white/25 text-white'}`}
-                      title="Toggle Board Dashboard"
-                    >
-                      <LayoutDashboard size={11} className="shrink-0" />
-                      <span className="hidden sm:inline">Board</span>
-                    </button>
-                  )}
-
                   {/* Search */}
-                  <button
-                    onClick={() => setSearchDrawerOpen(true)}
-                    className="p-2 rounded-lg hover:bg-white/15 transition-all ml-1"
-                    title="Search"
+                  <div
+                    className={`flex items-center ml-1 rounded-xl border ${headerSearchActive ? 'bg-white/15 border-white/25' : 'border-transparent'}`}
+                    style={{
+                      width: headerSearchActive ? 'min(280px, 52vw)' : '34px',
+                      overflow: 'hidden',
+                      transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
+                    }}
                   >
-                    <Search size={18} />
-                  </button>
+                    {headerSearchActive && (
+                      <input
+                        ref={headerSearchRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setSearchDrawerOpen(e.target.value.length > 0); }}
+                        onFocus={() => setSearchDrawerOpen(searchQuery.length > 0)}
+                        onKeyDown={e => { if (e.key === 'Escape') { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); } }}
+                        placeholder="Search…"
+                        className="flex-1 bg-transparent text-white placeholder-white/35 text-sm outline-none pl-3 py-1.5 min-w-0"
+                        style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
+                      />
+                    )}
+                    <button
+                      onClick={() => {
+                        if (headerSearchActive) {
+                          setHeaderSearchActive(false);
+                          setSearchQuery('');
+                          setSearchDrawerOpen(false);
+                        } else {
+                          setHeaderSearchActive(true);
+                          setSearchQuery('');
+                          setSearchDrawerOpen(false);
+                          setTimeout(() => headerSearchRef.current?.focus(), 50);
+                        }
+                      }}
+                      className="p-2 rounded-lg hover:bg-white/15 transition-colors shrink-0"
+                      title="Search"
+                    >
+                      <span style={{ display: 'inline-flex', transition: 'transform 0.2s', transform: headerSearchActive ? 'rotate(90deg) scale(0.85)' : 'none' }}>
+                        {headerSearchActive ? <X size={16} /> : <Search size={17} />}
+                      </span>
+                    </button>
+                  </div>
 
                   {/* Notifications */}
                   <button
@@ -4075,20 +4243,17 @@ export const JCIKLApp: React.FC = () => {
           isOpen={isNotificationDrawerOpen}
           onClose={() => setNotificationDrawerOpen(false)}
           notifications={allNotifications}
-          onMarkAsRead={async (id) => {
-            if (id.startsWith('birthday-')) {
-              // Virtual notification, just close or ignore
-              return;
-            }
-            await markNotificationAsRead(id);
-          }}
+          onMarkAsRead={markNotificationAsRead}
         />
 
-        <SearchDrawer
+        {/* Search dropdown — backdrop tap to close */}
+        {isSearchDrawerOpen && (
+          <div className="fixed inset-0 z-[48]" onClick={() => { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); }} />
+        )}
+        <SearchDropdown
           isOpen={isSearchDrawerOpen}
-          onClose={() => setSearchDrawerOpen(false)}
+          onClose={() => { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); }}
           searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
           onNavigate={handleViewChange}
         />
 
