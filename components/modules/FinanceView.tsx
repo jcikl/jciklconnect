@@ -64,6 +64,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [txCategoryFilter, setTxCategoryFilter] = useState('All');
   const [bankAccountFilter, setBankAccountFilter] = useState('All');
+  const [txTypeFilter, setTxTypeFilter] = useState<'All' | 'Income' | 'Expense'>('All');
+  const [txStatusFilter, setTxStatusFilter] = useState<'All' | 'Pending' | 'Cleared'>('All');
   const [transactionLimit, setTransactionLimit] = useState(50); // Initial display limit
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -742,6 +744,15 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     const totalTransactions = [...withBalance].reverse();
     return totalTransactions.slice(0, transactionLimit);
   }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, accounts, transactionSplits, transactionLimit, historicalNetFlows]);
+
+  // Apply type + status quick-filters on top of displayTransactions (balance calc is preserved)
+  const visibleTransactions = useMemo(() => {
+    return displayTransactions.filter(tx => {
+      if (txTypeFilter !== 'All' && tx.type !== txTypeFilter) return false;
+      if (txStatusFilter !== 'All' && tx.status !== txStatusFilter) return false;
+      return true;
+    });
+  }, [displayTransactions, txTypeFilter, txStatusFilter]);
 
   const hasMoreTransactions = useMemo(() => {
     // We need to know if there are more than current limit
@@ -2628,7 +2639,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Transactions' && (
         <div className="space-y-4">
           <Card>
-            <div className="mb-4 space-y-2">
+            <div className="mb-3 space-y-2.5">
               {/* Search — always on top, full width */}
               <Input
                 type="text"
@@ -2638,7 +2649,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 icon={<Search size={18} />}
                 className="w-full"
               />
-              {/* Filters — horizontal scroll on mobile, flex wrap on desktop */}
+              {/* Filters — horizontal scroll on mobile */}
               <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
                 <div className="shrink-0 w-28">
                   <Select
@@ -2678,7 +2689,66 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   />
                 </div>
               </div>
+              {/* Quick-filter chips: Type + Status */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                  {(['All', 'Income', 'Expense'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTxTypeFilter(t)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                        txTypeFilter === t
+                          ? t === 'Income' ? 'bg-green-500 text-white' : t === 'Expense' ? 'bg-red-500 text-white' : 'bg-white text-slate-700 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {t === 'Income' ? '↑ Income' : t === 'Expense' ? '↓ Expense' : 'All'}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                  {(['All', 'Pending', 'Cleared'] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setTxStatusFilter(s)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                        txStatusFilter === s
+                          ? s === 'Pending' ? 'bg-amber-500 text-white' : s === 'Cleared' ? 'bg-blue-500 text-white' : 'bg-white text-slate-700 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                {/* Active filter count */}
+                {(txTypeFilter !== 'All' || txStatusFilter !== 'All') && (
+                  <button
+                    onClick={() => { setTxTypeFilter('All'); setTxStatusFilter('All'); }}
+                    className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Summary strip */}
+            {visibleTransactions.length > 0 && (() => {
+              const incomeTotal = visibleTransactions.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+              const expenseTotal = visibleTransactions.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
+              const pendingCount = visibleTransactions.filter(t => t.status === 'Pending').length;
+              return (
+                <div className="flex items-center gap-3 px-1 pb-3 border-b border-slate-100 flex-wrap">
+                  <span className="text-xs text-slate-400">{visibleTransactions.length} transactions</span>
+                  <span className="text-xs font-mono font-semibold text-green-600">+{formatCurrency(incomeTotal)}</span>
+                  <span className="text-xs font-mono font-semibold text-red-500">−{formatCurrency(expenseTotal)}</span>
+                  {pendingCount > 0 && (
+                    <span className="text-xs text-amber-600 font-semibold">{pendingCount} pending</span>
+                  )}
+                </div>
+              );
+            })()}
 
             <LoadingState loading={loading} error={error} empty={transactions.length === 0} emptyMessage="No transactions found">
               {/* Desktop View */}
@@ -2698,8 +2768,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <input
                           type="checkbox"
                           checked={(() => {
-                            const allVisibleTxIds = displayTransactions.map(t => t.id);
-                            const allVisibleSplitIds = displayTransactions.flatMap(t =>
+                            const allVisibleTxIds = visibleTransactions.map(t => t.id);
+                            const allVisibleSplitIds = visibleTransactions.flatMap(t =>
                               t.isSplit && transactionSplits[t.id] ? transactionSplits[t.id].map(s => s.id) : []
                             );
                             return allVisibleTxIds.length > 0 && allVisibleTxIds.every(id => selectedTxIds.has(id)) &&
@@ -2717,10 +2787,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     </tr>
                   </thead>
                   <tbody>
-                    {displayTransactions.map(tx => (
+                    {visibleTransactions.map(tx => (
                       <React.Fragment key={tx.id}>
                         {/* Parent Transaction Row */}
-                        <tr className={`hover:bg-slate-50 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-50/60' : ''}`}>
+                        <tr className={`hover:bg-slate-50/80 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-50/60' : tx.status === 'Pending' ? 'bg-amber-50/40' : ''}`}>
                           <td className="py-4 px-2 w-8">
                             <input
                               type="checkbox"
@@ -2769,19 +2839,20 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                               )}
                             </div>
                             <div
-                              className="mt-1 overflow-hidden text-xs text-slate-500 whitespace-nowrap text-ellipsis"
+                              className="mt-1 overflow-hidden text-xs text-slate-500 whitespace-nowrap text-ellipsis flex items-center gap-1.5"
                               title={`${tx.isSplit ? 'Split' : (tx.category || '—')} | ${getTransactionAccountLabel(tx)} | ${tx.purpose || '—'}`}
                             >
+                              {tx.status === 'Pending' && <span className="shrink-0 inline-flex items-center px-1.5 py-0 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">Pending</span>}
                               <span className="font-medium text-slate-600">
                                 {tx.isSplit ? 'Split' : (tx.category || '—')}
                               </span>
-                              <span className="mx-1 text-slate-300">|</span>
+                              <span className="text-slate-300">|</span>
                               <span>{getTransactionAccountLabel(tx)}</span>
-                              <span className="mx-1 text-slate-300">|</span>
+                              <span className="text-slate-300">|</span>
                               <span>{tx.purpose || '—'}</span>
                               {tx.isSplit && (
                                 <>
-                                  <span className="mx-1 text-slate-300">|</span>
+                                  <span className="text-slate-300">|</span>
                                   <span className="text-blue-600">Split into {transactionSplits[tx.id]?.length || 0} parts</span>
                                 </>
                               )}
@@ -2917,8 +2988,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
               {/* Mobile View */}
               <div className="md:hidden space-y-2.5 p-1">
-                {displayTransactions.map(tx => (
-                  <div key={tx.id} className={`bg-white border rounded-xl overflow-hidden shadow-sm relative flex ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200' : 'border-slate-100'}`}>
+                {visibleTransactions.map(tx => (
+                  <div key={tx.id} className={`bg-white border rounded-xl overflow-hidden shadow-sm relative flex ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200' : tx.status === 'Pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-100'}`}>
                     {/* Left color bar: green = income, red = expense */}
                     <div className={`w-1 shrink-0 ${tx.type === 'Income' ? 'bg-green-400' : 'bg-red-400'}`} />
                     <div className="flex-1 p-3">
@@ -2955,7 +3026,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                             </span>
                           </div>
                           {/* Description */}
-                          <p className="text-sm font-semibold text-slate-900 leading-snug mb-1.5">{tx.description}</p>
+                          <p className="text-sm font-semibold text-slate-900 leading-snug mb-1.5 truncate">{tx.description}</p>
                           {/* Badges + balance row */}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
