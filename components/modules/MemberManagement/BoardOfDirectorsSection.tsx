@@ -443,7 +443,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                                 setLogoUploading(true); setLogoUploadProgress(0);
                                 try {
                                   const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
-                                  if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
+                                  if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => { });
                                   setTermSettings(prev => ({ ...prev, logoUrl: url }));
                                   showToast('Logo uploaded', 'success');
                                 } catch { showToast('Upload failed', 'error'); }
@@ -477,13 +477,6 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                     />
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
-                <Shield className="text-blue-500 shrink-0 mt-1" size={20} />
-                <p className="text-sm text-blue-700 font-medium">
-                  Only members assigned to the board for the current active year will receive <strong>Board Permissions</strong>. Commission Directors do not receive Board Permissions.
-                </p>
               </div>
 
               {positions.map(position => (
@@ -639,13 +632,12 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       .filter(Boolean) as Member[];
 
                     return (
-                      <div 
-                        key={position} 
-                        className={`rounded-2xl border p-4 transition-all relative overflow-hidden flex flex-col justify-between ${
-                          isPresident 
-                            ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-md col-span-1 sm:col-span-2' 
+                      <div
+                        key={position}
+                        className={`rounded-2xl border p-4 transition-all relative overflow-hidden flex flex-col justify-between ${isPresident
+                            ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-md col-span-1 sm:col-span-2'
                             : 'bg-white border-slate-100 shadow-sm'
-                        }`}
+                          }`}
                       >
                         {isPresident && (
                           <div className="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-bl-xl">
@@ -656,9 +648,8 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                           <img
                             src={data.boardAvatarUrl || bm.avatar || bm.avatarUrl || undefined}
                             alt={bm.name}
-                            className={`rounded-xl object-cover bg-slate-100 border shrink-0 ${
-                              isPresident ? 'w-16 h-16 border-blue-300' : 'w-12 h-12 border-slate-200'
-                            }`} 
+                            className={`rounded-xl object-cover bg-slate-100 border shrink-0 ${isPresident ? 'w-16 h-16 border-blue-300' : 'w-12 h-12 border-slate-200'
+                              }`}
                           />
                           <div className="min-w-0 flex-1">
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{position}</p>

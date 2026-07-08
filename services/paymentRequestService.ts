@@ -20,6 +20,7 @@ import { PaymentRequest, PaymentRequestStatus } from '../types';
 import { removeUndefined } from '../utils/dataUtils';
 import { isDevMode } from '../utils/devMode';
 import { MOCK_PAYMENT_REQUESTS } from './mockData';
+import { FinanceService } from './financeService';
 
 /** In-memory store for dev mode so create/updateStatus persist during session. */
 let devPaymentRequests: PaymentRequest[] = [...MOCK_PAYMENT_REQUESTS];
@@ -210,6 +211,10 @@ export class PaymentRequestService {
         devPaymentRequests = [...devPaymentRequests];
         devPaymentRequests[idx] = { ...devPaymentRequests[idx], status, reviewedBy, reviewedAt: now, updatedAt: now };
       }
+      if (status === 'approved') {
+        const pr = devPaymentRequests.find((p) => p.id === id);
+        if (pr) await this._createExpenseTransaction(pr, reviewedBy);
+      }
       return;
     }
     const now = Timestamp.now();
@@ -219,6 +224,45 @@ export class PaymentRequestService {
       reviewedAt: now,
       updatedAt: now,
     });
+    if (status === 'approved') {
+      const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+      if (snap.exists()) {
+        const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
+        await this._createExpenseTransaction(pr, reviewedBy);
+      }
+    }
+  }
+
+  // Auto-create a Pending expense transaction when a PR is approved.
+  // Idempotent: skips if a transaction already references this PR.
+  private static async _createExpenseTransaction(pr: PaymentRequest, approvedBy: string): Promise<void> {
+    try {
+      const category = pr.category === 'projects_activities' ? 'Projects & Activities' : 'Administrative';
+      const projectId = pr.activityId || pr.activityRef || undefined;
+      const year = new Date(pr.date || pr.createdAt).getFullYear();
+      const description = pr.items?.length
+        ? pr.items.map((i) => i.purpose).filter(Boolean).join(', ')
+        : (pr.purpose || pr.referenceNumber);
+
+      await FinanceService.createTransaction({
+        date: pr.date || pr.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+        description,
+        referenceNumber: pr.referenceNumber,
+        amount: pr.totalAmount || pr.amount,
+        type: 'Expense',
+        category,
+        status: 'Pending',
+        paymentRequestId: pr.id,
+        projectId: projectId || (category === 'Administrative' ? 'Administrative' : undefined),
+        bankAccountId: pr.claimFromBankAccountId || undefined,
+        purpose: pr.purpose || undefined,
+        year,
+        source: 'manual',
+      } as any);
+    } catch (err) {
+      // Non-fatal: log but don't block the approval
+      console.error('[PaymentRequestService] Failed to auto-create expense transaction for PR', pr.id, err);
+    }
   }
 
   static async update(id: string, updates: Partial<Pick<PaymentRequest, 'purpose' | 'amount' | 'activityRef' | 'status'>>, updatedBy?: string | null): Promise<void> {

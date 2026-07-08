@@ -210,7 +210,7 @@ export class PromotionService {
         id: 'jci_inspire',
         type: 'jci_inspire_completion',
         name: 'Course Completion',
-        description: 'Complete the JCIM Inspire course OR JCI KL New Membersâ€™ Orientation',
+        description: 'Complete the JCIM Inspire course OR JCI KL New Members™ Orientation',
         isCompleted: false
       }
     ];
@@ -872,17 +872,17 @@ export class PromotionService {
   private static async updateMemberDues(memberId: string, newAmount: number): Promise<void> {
     const currentYear = new Date().getFullYear();
     const member = await this.getMemberById(memberId);
-    
+
     if (member?.membership) {
       const yearStr = currentYear.toString();
       const updatedMembership = { ...member.membership };
-      
+
       if (updatedMembership[yearStr]) {
         updatedMembership[yearStr] = {
           ...updatedMembership[yearStr],
           dues: newAmount
         };
-        
+
         await MembersService.updateMember(memberId, { membership: updatedMembership });
       }
     }

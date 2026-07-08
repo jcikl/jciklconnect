@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search } from 'lucide-react';
+import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -77,6 +77,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const [reconciliationPRs, setReconciliationPRs] = useState<PaymentRequest[]>([]);
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [reconcilingId, setReconcilingId] = useState<string | null>(null);
+  // PR reconciliation panel
+  const [prPendingReconciliation, setPrPendingReconciliation] = useState<PaymentRequest[]>([]);
+  const [prReconcileLoading, setPrReconcileLoading] = useState(false);
+  const [prBankSuggestions, setPrBankSuggestions] = useState<Record<string, Transaction[]>>({});
+  const [prSelectedBankTx, setPrSelectedBankTx] = useState<Record<string, string>>({});
+  const [prLinkingId, setPrLinkingId] = useState<string | null>(null);
   const [addDefaultCategory, setAddDefaultCategory] = useState<string | null>(null);
   const [recordFormCategory, setRecordFormCategory] = useState<string>('Projects & Activities');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -386,6 +392,13 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     };
     loadSelectedProjectTransactions();
   }, [selectedProjectFilter]);
+
+  useEffect(() => {
+    if (moduleTab === 'Reconciliation' && transactions.length > 0) {
+      loadPrPendingReconciliation();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleTab, transactions]);
 
   useEffect(() => {
     const loadYears = async () => {
@@ -1367,6 +1380,70 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     }
   };
 
+  // Load approved PRs that don't yet have a linked bank transaction
+  const loadPrPendingReconciliation = async () => {
+    setPrReconcileLoading(true);
+    try {
+      const { items } = await PaymentRequestService.list({ pageSize: 200 });
+      const approved = items.filter(pr => pr.status === 'approved');
+      // Find which ones already have a matching expense transaction with paymentRequestId
+      const linkedPrIds = new Set(
+        transactions.filter(t => t.paymentRequestId && t.status === 'Reconciled').map(t => t.paymentRequestId!)
+      );
+      const pending = approved.filter(pr => !linkedPrIds.has(pr.id));
+      setPrPendingReconciliation(pending);
+      // Build auto-suggestions: bank_import expense txs within ±14 days with same amount
+      const bankExpenses = transactions.filter(t => t.source === 'bank_import' && t.type === 'Expense' && t.status !== 'Reconciled');
+      const suggestions: Record<string, Transaction[]> = {};
+      for (const pr of pending) {
+        const prDate = new Date(pr.date || pr.createdAt);
+        const prAmount = pr.totalAmount || pr.amount;
+        suggestions[pr.id] = bankExpenses
+          .filter(t => Math.abs(t.amount - prAmount) < 0.01 && Math.abs(new Date(t.date).getTime() - prDate.getTime()) <= 14 * 86400000)
+          .sort((a, b) => Math.abs(new Date(a.date).getTime() - prDate.getTime()) - Math.abs(new Date(b.date).getTime() - prDate.getTime()));
+      }
+      setPrBankSuggestions(suggestions);
+      // Pre-select first suggestion
+      const initial: Record<string, string> = {};
+      for (const pr of pending) { if (suggestions[pr.id]?.[0]) initial[pr.id] = suggestions[pr.id][0].id; }
+      setPrSelectedBankTx(initial);
+    } catch (e) {
+      showToast('Failed to load PR reconciliation data', 'error');
+    } finally {
+      setPrReconcileLoading(false);
+    }
+  };
+
+  // Link an approved PR's expense transaction to a bank import transaction
+  const handleLinkPrToBankTx = async (prId: string) => {
+    const bankTxId = prSelectedBankTx[prId];
+    if (!bankTxId || !user?.uid) return;
+    setPrLinkingId(prId);
+    try {
+      // Find the expense transaction for this PR (auto-created on approval)
+      const expenseTx = transactions.find(t => t.paymentRequestId === prId && t.type === 'Expense');
+      if (expenseTx?.id) {
+        // Link expense tx to bank tx
+        await FinanceService.matchTransactions(expenseTx.id, bankTxId, user.uid);
+      } else {
+        // No auto-created tx yet — just mark bank tx as reconciled and tag it
+        await FinanceService.updateTransaction(bankTxId, {
+          paymentRequestId: prId,
+          status: 'Reconciled',
+          reconciledAt: new Date().toISOString(),
+          reconciledBy: user.uid,
+        });
+      }
+      showToast('PR linked to bank transaction', 'success');
+      await loadData();
+      await loadPrPendingReconciliation();
+    } catch (e) {
+      showToast('Failed to link', 'error');
+    } finally {
+      setPrLinkingId(null);
+    }
+  };
+
   const handleReconciliationQuery = async () => {
     const ref = refNumberQuery.trim();
     if (!ref) {
@@ -2044,6 +2121,94 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
 
       {moduleTab === 'Reconciliation' && hasPermission('canViewFinance') && (
+        <>
+        {/* PR → Bank Transaction reconciliation panel */}
+        <Card title="Payment Request Reconciliation" action={
+          <Button variant="ghost" size="sm" onClick={loadPrPendingReconciliation} disabled={prReconcileLoading}>
+            <RefreshCw size={13} className={prReconcileLoading ? 'animate-spin' : ''} />
+          </Button>
+        }>
+          <p className="text-xs text-slate-500 mb-4">
+            Approved Payment Requests that have not yet been linked to a bank payment. Match each PR to its corresponding bank import transaction to complete the expense trail.
+          </p>
+          {prReconcileLoading ? (
+            <LoadingState loading>{null}</LoadingState>
+          ) : prPendingReconciliation.length === 0 ? (
+            <div className="flex items-center gap-2 py-5 text-sm text-green-600">
+              <CheckCircle size={15} />
+              All approved Payment Requests have been reconciled.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {prPendingReconciliation.map(pr => {
+                const suggestions = prBankSuggestions[pr.id] || [];
+                const selectedId = prSelectedBankTx[pr.id] ?? '';
+                const bankExpenses = transactions.filter(t => t.source === 'bank_import' && t.type === 'Expense' && t.status !== 'Reconciled');
+                return (
+                  <div key={pr.id} className="rounded-xl border border-slate-200 overflow-hidden">
+                    {/* PR row */}
+                    <div className="flex items-start gap-3 p-3 bg-white">
+                      <div className="w-1.5 self-stretch rounded-full shrink-0 bg-amber-400" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="warning" className="text-[10px] shrink-0">PR</Badge>
+                          <span className="text-[11px] text-slate-400 font-mono">{pr.referenceNumber}</span>
+                          <span className="text-[11px] text-slate-400">{formatDate(pr.date)}</span>
+                        </div>
+                        <p className="text-sm text-slate-800 font-medium mt-0.5 truncate">{pr.purpose || pr.items?.[0]?.purpose || '—'}</p>
+                        <p className="text-sm font-semibold text-rose-600 mt-0.5">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                      </div>
+                    </div>
+                    {/* Match area */}
+                    <div className="border-t border-slate-100 px-3 pb-3 pt-2 bg-slate-50/60 space-y-2">
+                      {suggestions.length > 0 && (
+                        <p className="text-[11px] text-slate-500 uppercase tracking-wide font-semibold">
+                          {suggestions.length} suggested bank transaction{suggestions.length > 1 ? 's' : ''}
+                        </p>
+                      )}
+                      <select
+                        value={selectedId}
+                        onChange={e => setPrSelectedBankTx(prev => ({ ...prev, [pr.id]: e.target.value }))}
+                        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white"
+                      >
+                        <option value="">— select bank transaction —</option>
+                        {/* Suggestions first */}
+                        {suggestions.length > 0 && (
+                          <optgroup label="Suggested (same amount, ±14 days)">
+                            {suggestions.map(t => (
+                              <option key={t.id} value={t.id}>
+                                {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {/* All other unreconciled bank expenses */}
+                        {bankExpenses.filter(t => !suggestions.find(s => s.id === t.id)).length > 0 && (
+                          <optgroup label="Other bank expenses">
+                            {bankExpenses.filter(t => !suggestions.find(s => s.id === t.id)).map(t => (
+                              <option key={t.id} value={t.id}>
+                                {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                      <Button
+                        size="sm"
+                        onClick={() => handleLinkPrToBankTx(pr.id)}
+                        disabled={!selectedId || prLinkingId === pr.id}
+                        className="w-full"
+                      >
+                        <Link2 size={13} className="mr-1.5" />
+                        {prLinkingId === pr.id ? 'Linking…' : 'Confirm — PR paid via this bank transaction'}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
         <Card title="Reconcile by Reference Number">
           <FirstUseBanner flowId="reconciliation" dismissLabel="Got it" variant="teal" onHelpClick={helpModal?.openHelp}>
             Enter a reference number (e.g. PR-default-lo-20250216-001) to search both bank transactions and payment requests. Once verified, click "Mark Reconciled" to record the action.
@@ -2119,6 +2284,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
           )}
         </Card>
+        </>
       )}
 
 
@@ -3596,7 +3762,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           <Input name="projectId" label="Account Name" placeholder="e.g. National Due, Maintenance" required />
         </form>
       </Modal>
-    </div >
+    </div>
   );
 };
 
