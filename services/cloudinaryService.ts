@@ -107,6 +107,40 @@ export const uploadPresidentialLogoToCloudinary = async (
   return uploadToCloudinary(compressedFile, folder, onProgress);
 };
 
+export const uploadMemberGroupPhotoToCloudinary = async (
+  file: File,
+  term: string,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 1.5,
+    maxWidthOrHeight: 2400,
+    useWebWorker: false,
+  });
+
+  const folder = `${sanitizeFolderPath(MEMBER_AVATAR_ASSET_ROOT)}/member-group-photos`;
+  const publicId = `members-${sanitizePathSegment(term)}-${Math.floor(Date.now() / 1000)}`;
+
+  return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
+};
+
+export const uploadBodGroupPhotoToCloudinary = async (
+  file: File,
+  term: string,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 1.5,
+    maxWidthOrHeight: 2400,
+    useWebWorker: false,
+  });
+
+  const folder = `${sanitizeFolderPath(MEMBER_AVATAR_ASSET_ROOT)}/bod-group-photos`;
+  const publicId = `bod-${sanitizePathSegment(term)}-${Math.floor(Date.now() / 1000)}`;
+
+  return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
+};
+
 /**
  * Uploads a file directly to Cloudinary using unsigned upload with progress tracking.
  * @param file - The file to upload (image or raw)

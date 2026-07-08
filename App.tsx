@@ -287,7 +287,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 }) => {
   const currentYear = String(new Date().getFullYear());
   const [president, setPresident] = useState<{ name: string; avatar: string; company: string } | null>(null);
-  const [termSettings, setTermSettings] = useState<{ presidentTheme?: string; tagline?: string; shortDescription?: string; logoUrl?: string } | null>(null);
+  const [termSettings, setTermSettings] = useState<{ presidentTheme?: string; tagline?: string; shortDescription?: string; logoUrl?: string; memberGroupPhotoUrl?: string } | null>(null);
   const { events } = useEvents({ publicMode: true });
 
   const upcomingEvents = useMemo(() => {
@@ -330,47 +330,73 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 
       <main id="main-content">
         {/* Hero */}
-        <section className="relative bg-jci-navy py-20 overflow-hidden" aria-label="Hero">
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-20" />
-          <div className="absolute inset-0 bg-gradient-to-r from-jci-navy via-jci-navy/90 to-jci-navy/50 pointer-events-none" />
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-jci-blue/10 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <section className="relative bg-jci-navy overflow-hidden min-h-[580px] md:min-h-[680px] flex items-center" aria-label="Hero">
+          {/* Geometric background pattern */}
+          <div className="absolute inset-0 pointer-events-none select-none opacity-[0.06]"
+            style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+          <div className="absolute inset-0 bg-gradient-to-br from-jci-navy via-jci-navy to-[#0a2a6e] pointer-events-none" />
+          {/* Glow orbs */}
+          <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-jci-blue/20 rounded-full -translate-y-1/2 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-sky-600/10 rounded-full translate-y-1/2 -translate-x-1/4 blur-3xl pointer-events-none" />
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="flex flex-col md:flex-row items-center gap-12 md:gap-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full py-16 md:py-20">
+            <div className="flex flex-col md:flex-row items-center gap-10 md:gap-20 lg:gap-24">
+              {/* Left: text */}
               <div className="flex-1 text-center md:text-left">
-                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs font-bold uppercase tracking-wider text-white/80 mb-6">
+                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/70 mb-7">
                   <span>JCI Kuala Lumpur</span>
-                  <span className="w-1 h-1 rounded-full bg-white/50" />
+                  <span className="w-1 h-1 rounded-full bg-white/40" />
                   <span>Est. 1954</span>
                 </div>
-                <h1 className="text-5xl md:text-6xl font-black text-white mb-5 leading-tight tracking-tight">
+                <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white mb-5 leading-[0.92] tracking-tight">
                   Be Better.<br /><span className="text-sky-300">Do Better.</span>
                 </h1>
-                <p className="text-lg text-slate-300 max-w-xl mb-8 leading-relaxed">
-                  The first Malaysia Junior Chamber Chapter &#8212; a global network of young active citizens creating positive change since 1954.
+                <p className="text-base md:text-lg text-slate-300/80 max-w-lg mb-9 leading-relaxed">
+                  The first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954.
                 </p>
-                <div className="flex gap-4 flex-wrap justify-center md:justify-start">
-                  <Button size="lg" onClick={onRegister} className="shadow-lg shadow-jci-blue/30 font-bold">
+                <div className="flex gap-3 flex-wrap justify-center md:justify-start">
+                  <Button size="lg" onClick={onRegister} className="shadow-xl shadow-jci-blue/30 font-black px-7">
                     Become a Member
                   </Button>
                   <Button size="lg" variant="outline"
-                    className="border-2 border-white/60 text-white bg-transparent hover:bg-white hover:text-jci-navy font-bold"
+                    className="border-2 border-white/40 text-white bg-transparent hover:bg-white hover:text-jci-navy font-black px-7"
                     onClick={() => onPageChange('events')}>
                     View Activity Calendar
                   </Button>
                 </div>
-                <div className="flex items-center gap-8 mt-10 pt-8 border-t border-white/10 justify-center md:justify-start flex-wrap">
+                {/* Stats strip */}
+                <div className="flex items-center gap-6 md:gap-10 mt-12 pt-8 border-t border-white/[0.12] justify-center md:justify-start flex-wrap">
                   {[{ v: '1954', l: 'Founded' }, { v: '200+', l: 'Members' }, { v: '50+', l: 'Events / Year' }, { v: '70+', l: 'Years Active' }].map((s, i) => (
                     <div key={i} className="text-center md:text-left">
-                      <p className="text-2xl font-black text-white leading-none">{s.v}</p>
-                      <p className="text-[10px] text-sky-300/80 uppercase tracking-widest mt-0.5 font-bold">{s.l}</p>
+                      <p className="text-3xl font-black text-white leading-none tracking-tight">{s.v}</p>
+                      <p className="text-[9px] text-sky-300/70 uppercase tracking-widest mt-1 font-black">{s.l}</p>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="shrink-0 hidden md:flex">
-                <div className="w-52 h-52 rounded-3xl bg-white/5 border border-white/10 p-8 flex items-center justify-center shadow-2xl shadow-black/30 backdrop-blur-sm">
-                  <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" className="w-full h-full object-contain drop-shadow-lg" />
+
+              {/* Right: photo */}
+              <div className="shrink-0 hidden md:flex items-center justify-center">
+                <div className="relative">
+                  {/* Outer glow ring */}
+                  <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-sky-400/20 to-jci-blue/10 blur-xl" />
+                  {/* Decorative corner accents */}
+                  <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-sky-400/40 rounded-tl-xl pointer-events-none" />
+                  <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-sky-400/40 rounded-br-xl pointer-events-none" />
+                  <div className="relative w-72 h-80 lg:w-80 lg:h-96 rounded-[1.75rem] overflow-hidden shadow-2xl shadow-black/40 border border-white/[0.12]">
+                    {termSettings?.memberGroupPhotoUrl ? (
+                      <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-white/5 backdrop-blur-sm flex items-center justify-center p-10">
+                        <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" className="w-full h-full object-contain drop-shadow-lg" />
+                      </div>
+                    )}
+                    {/* Photo overlay label */}
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-jci-navy/80 to-transparent pt-10 pb-4 px-5">
+                      <p className="text-white text-xs font-black tracking-wide">JCI Kuala Lumpur</p>
+                      <p className="text-white/50 text-[10px]">Young Active Citizens</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1482,6 +1508,13 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   const [selectedYear, setSelectedYear] = useState<string>(() => String(new Date().getFullYear()));
   const [boardMembers, setBoardMembers] = useState<any[]>([]);
   const [loadingBoard, setLoadingBoard] = useState<boolean>(true);
+  const [currentTermGroupPhoto, setCurrentTermGroupPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    BoardManagementService.getBoardTermSettings(String(new Date().getFullYear()))
+      .then(s => { if (s?.groupPhotoUrl) setCurrentTermGroupPhoto(s.groupPhotoUrl); })
+      .catch(() => {});
+  }, []);
 
   // Available years: from JCI KL's founding year to the current calendar year.
   const currentYear = new Date().getFullYear();
@@ -1821,12 +1854,22 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                   Contact Us
                 </Button>
               </div>
-              <div className="bg-gradient-to-br from-jci-navy to-jci-blue rounded-2xl p-8 h-96 flex items-center justify-center">
-                <img
-                  src="/JCI Kuala Lumpur-transparent.png"
-                  alt="JCI Kuala Lumpur"
-                  className="max-w-full max-h-full object-contain opacity-90"
-                />
+              <div className="rounded-2xl h-96 overflow-hidden">
+                {currentTermGroupPhoto ? (
+                  <img
+                    src={currentTermGroupPhoto}
+                    alt="JCI Kuala Lumpur Board of Directors"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="bg-gradient-to-br from-jci-navy to-jci-blue w-full h-full p-8 flex items-center justify-center">
+                    <img
+                      src="/JCI Kuala Lumpur-transparent.png"
+                      alt="JCI Kuala Lumpur"
+                      className="max-w-full max-h-full object-contain opacity-90"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

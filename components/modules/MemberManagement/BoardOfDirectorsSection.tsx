@@ -4,7 +4,7 @@ import { Card, Button, useToast, Badge, Modal } from '../../ui/Common';
 import { Select, Input } from '../../ui/Form';
 import { MemberSelector } from '../../ui/MemberSelector';
 import { BoardManagementService } from '../../../services/boardManagementService';
-import { uploadBoardAvatarToCloudinary, uploadPresidentialLogoToCloudinary, deleteFromCloudinary } from '../../../services/cloudinaryService';
+import { uploadBoardAvatarToCloudinary, uploadPresidentialLogoToCloudinary, uploadBodGroupPhotoToCloudinary, uploadMemberGroupPhotoToCloudinary, deleteFromCloudinary } from '../../../services/cloudinaryService';
 import { BoardMember, BoardTermSettings, Member } from '../../../types';
 
 const POSITION_ORDER: Record<string, number> = {
@@ -51,6 +51,10 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const [uploadProgress, setUploadProgress] = useState(0);
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoUploadProgress, setLogoUploadProgress] = useState(0);
+  const [groupPhotoUploading, setGroupPhotoUploading] = useState(false);
+  const [groupPhotoUploadProgress, setGroupPhotoUploadProgress] = useState(0);
+  const [memberGroupPhotoUploading, setMemberGroupPhotoUploading] = useState(false);
+  const [memberGroupPhotoUploadProgress, setMemberGroupPhotoUploadProgress] = useState(0);
   const [termSettings, setTermSettings] = useState<Partial<BoardTermSettings>>({});
   const { showToast } = useToast();
 
@@ -227,6 +231,8 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           tagline: termSettings.tagline,
           shortDescription: termSettings.shortDescription,
           logoUrl: termSettings.logoUrl,
+          groupPhotoUrl: termSettings.groupPhotoUrl,
+          memberGroupPhotoUrl: termSettings.memberGroupPhotoUrl,
         }),
       ]);
       showToast(`Board for ${selectedTerm} updated successfully`, 'success');
@@ -389,8 +395,8 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                     <p className="text-[10px] text-slate-500">Displayed on the guest home page President Spotlight</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-3">
                     <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
                       <Quote size={11} /> Presidential Theme
                     </label>
@@ -402,7 +408,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       onChange={e => setTermSettings(prev => ({ ...prev, presidentTheme: e.target.value }))}
                     />
                   </div>
-                  <div>
+                  <div className="sm:col-span-3">
                     <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
                       <Tag size={11} /> Tagline
                     </label>
@@ -414,56 +420,162 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       onChange={e => setTermSettings(prev => ({ ...prev, tagline: e.target.value }))}
                     />
                   </div>
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                      <ImageIcon size={11} /> Theme Logo
-                    </label>
-                    <div className="flex items-center gap-3">
-                      {/* Preview */}
-                      <div className="w-12 h-12 rounded-xl border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
-                        {termSettings.logoUrl
-                          ? <img src={termSettings.logoUrl} alt="logo" className="w-full h-full object-contain p-1" />
-                          : <ImageIcon size={18} className="text-slate-300" />}
+                  {/* Theme Logo card */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
+                        <ImageIcon size={11} /> Theme Logo
+                      </label>
+                    </div>
+                    <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200" style={{ aspectRatio: '16/9' }}>
+                      {termSettings.logoUrl
+                        ? <img src={termSettings.logoUrl} alt="logo" className="w-full h-full object-contain p-4" />
+                        : <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><ImageIcon size={20} className="text-slate-300" /><span className="text-[10px] text-slate-400 font-medium">No logo</span></div>}
+                      <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
+                        <label className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-white/90 text-slate-700 cursor-pointer hover:bg-white transition-colors shadow-sm">
+                          <Camera size={10} /> {termSettings.logoUrl ? 'Replace' : 'Upload'}
+                          <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                            const f = e.target.files?.[0]; e.target.value = '';
+                            if (!f || !selectedTerm) return;
+                            setLogoUploading(true); setLogoUploadProgress(0);
+                            try {
+                              const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
+                              if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
+                              setTermSettings(prev => ({ ...prev, logoUrl: url }));
+                              showToast('Logo uploaded', 'success');
+                            } catch { showToast('Upload failed', 'error'); }
+                            finally { setLogoUploading(false); setLogoUploadProgress(0); }
+                          }} />
+                        </label>
+                        {termSettings.logoUrl && (
+                          <button onClick={() => setTermSettings(prev => ({ ...prev, logoUrl: '' }))} className="w-7 h-7 rounded-lg bg-white/90 hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        {logoUploading ? (
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-slate-500 font-medium">Uploading...</p>
-                            <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                              <div className="h-full bg-amber-400 transition-all" style={{ width: `${logoUploadProgress}%` }} />
+                      {logoUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-4">
+                          <p className="text-xs text-white font-bold">Uploading…</p>
+                          <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden"><div className="h-full bg-white transition-all rounded-full" style={{ width: `${logoUploadProgress}%` }} /></div>
+                        </div>
+                      )}
+                    </div>
+                    {!logoUploading && (
+                      <label className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold border border-dashed border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-700 cursor-pointer transition-colors bg-white">
+                        <Camera size={11} /> {termSettings.logoUrl ? 'Replace logo' : 'Upload logo'}
+                        <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                          const f = e.target.files?.[0]; e.target.value = '';
+                          if (!f || !selectedTerm) return;
+                          setLogoUploading(true); setLogoUploadProgress(0);
+                          try {
+                            const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
+                            if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
+                            setTermSettings(prev => ({ ...prev, logoUrl: url }));
+                            showToast('Logo uploaded', 'success');
+                          } catch { showToast('Upload failed', 'error'); }
+                          finally { setLogoUploading(false); setLogoUploadProgress(0); }
+                        }} />
+                      </label>
+                    )}
+                  </div>
+                  {/* Group Photos — side by side cards */}
+                  {([
+                    {
+                      key: 'groupPhotoUrl' as const,
+                      label: 'BOD Group Photo',
+                      dest: 'About page',
+                      color: 'blue',
+                      uploading: groupPhotoUploading,
+                      progress: groupPhotoUploadProgress,
+                      onUpload: async (f: File) => {
+                        setGroupPhotoUploading(true); setGroupPhotoUploadProgress(0);
+                        try {
+                          const url = await uploadBodGroupPhotoToCloudinary(f, selectedTerm!, p => setGroupPhotoUploadProgress(p));
+                          if (termSettings.groupPhotoUrl) deleteFromCloudinary(termSettings.groupPhotoUrl).catch(() => {});
+                          setTermSettings(prev => ({ ...prev, groupPhotoUrl: url }));
+                          showToast('BOD group photo uploaded', 'success');
+                        } catch { showToast('Upload failed', 'error'); }
+                        finally { setGroupPhotoUploading(false); setGroupPhotoUploadProgress(0); }
+                      },
+                      onClear: () => setTermSettings(prev => ({ ...prev, groupPhotoUrl: '' })),
+                      url: termSettings.groupPhotoUrl,
+                    },
+                    {
+                      key: 'memberGroupPhotoUrl' as const,
+                      label: 'Member Group Photo',
+                      dest: 'Home hero',
+                      color: 'sky',
+                      uploading: memberGroupPhotoUploading,
+                      progress: memberGroupPhotoUploadProgress,
+                      onUpload: async (f: File) => {
+                        setMemberGroupPhotoUploading(true); setMemberGroupPhotoUploadProgress(0);
+                        try {
+                          const url = await uploadMemberGroupPhotoToCloudinary(f, selectedTerm!, p => setMemberGroupPhotoUploadProgress(p));
+                          if (termSettings.memberGroupPhotoUrl) deleteFromCloudinary(termSettings.memberGroupPhotoUrl).catch(() => {});
+                          setTermSettings(prev => ({ ...prev, memberGroupPhotoUrl: url }));
+                          showToast('Member group photo uploaded', 'success');
+                        } catch { showToast('Upload failed', 'error'); }
+                        finally { setMemberGroupPhotoUploading(false); setMemberGroupPhotoUploadProgress(0); }
+                      },
+                      onClear: () => setTermSettings(prev => ({ ...prev, memberGroupPhotoUrl: '' })),
+                      url: termSettings.memberGroupPhotoUrl,
+                    },
+                  ] as const).map(item => (
+                    <div key={item.key} className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
+                          <Camera size={11} /> {item.label}
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-medium">{item.dest}</span>
+                      </div>
+                      <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200" style={{ aspectRatio: '16/9' }}>
+                        {item.url
+                          ? <img src={item.url} alt={item.label} className="w-full h-full object-cover" />
+                          : (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
+                              <Camera size={20} className="text-slate-300" />
+                              <span className="text-[10px] text-slate-400 font-medium">No photo</span>
+                            </div>
+                          )}
+                        {/* Overlay actions */}
+                        <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
+                          <label className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-white/90 text-slate-700 cursor-pointer hover:bg-white transition-colors shadow-sm">
+                            <Camera size={10} /> {item.url ? 'Replace' : 'Upload'}
+                            <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                              const f = e.target.files?.[0]; e.target.value = '';
+                              if (!f) return;
+                              await item.onUpload(f);
+                            }} />
+                          </label>
+                          {item.url && (
+                            <button onClick={item.onClear} className="w-7 h-7 rounded-lg bg-white/90 hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                        {/* Upload progress overlay */}
+                        {item.uploading && (
+                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-6">
+                            <p className="text-xs text-white font-bold">Uploading…</p>
+                            <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden">
+                              <div className="h-full bg-white transition-all rounded-full" style={{ width: `${item.progress}%` }} />
                             </div>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <label className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 cursor-pointer transition-colors">
-                              <Camera size={11} /> {termSettings.logoUrl ? 'Replace' : 'Upload'}
-                              <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                                const f = e.target.files?.[0]; e.target.value = '';
-                                if (!f || !selectedTerm) return;
-                                setLogoUploading(true); setLogoUploadProgress(0);
-                                try {
-                                  const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
-                                  if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => { });
-                                  setTermSettings(prev => ({ ...prev, logoUrl: url }));
-                                  showToast('Logo uploaded', 'success');
-                                } catch { showToast('Upload failed', 'error'); }
-                                finally { setLogoUploading(false); setLogoUploadProgress(0); }
-                              }} />
-                            </label>
-                            {termSettings.logoUrl && (
-                              <button onClick={() => setTermSettings(prev => ({ ...prev, logoUrl: '' }))}
-                                className="text-slate-300 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50">
-                                <Trash2 size={12} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {termSettings.logoUrl && !logoUploading && (
-                          <p className="text-[10px] text-amber-600 font-medium mt-0.5 truncate">Logo set</p>
                         )}
                       </div>
+                      {/* Static fallback upload button (touch-friendly, no hover needed) */}
+                      {!item.uploading && (
+                        <label className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold border border-dashed border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-700 cursor-pointer transition-colors bg-white">
+                          <Camera size={11} /> {item.url ? 'Replace photo' : 'Upload photo'}
+                          <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                            const f = e.target.files?.[0]; e.target.value = '';
+                            if (!f) return;
+                            await item.onUpload(f);
+                          }} />
+                        </label>
+                      )}
                     </div>
-                  </div>
+                  ))}
                   <div className="sm:col-span-2">
                     <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
                       <AlignLeft size={11} /> Short Description
@@ -595,19 +707,58 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           ) : (
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
               {/* Presidential Identity summary */}
-              {(termSettings.presidentTheme || termSettings.tagline || termSettings.shortDescription) && (
-                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 flex gap-3">
-                  <Award size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    {termSettings.presidentTheme && (
-                      <p className="text-sm font-black text-slate-800 leading-snug">{termSettings.presidentTheme}</p>
-                    )}
-                    {termSettings.tagline && (
-                      <p className="text-xs font-semibold text-amber-600 mt-0.5">{termSettings.tagline}</p>
-                    )}
-                    {termSettings.shortDescription && (
-                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">{termSettings.shortDescription}</p>
-                    )}
+              {(termSettings.presidentTheme || termSettings.tagline || termSettings.shortDescription || termSettings.logoUrl || termSettings.groupPhotoUrl || termSettings.memberGroupPhotoUrl) && (
+                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 space-y-3">
+                  {(termSettings.presidentTheme || termSettings.tagline || termSettings.shortDescription) && (
+                    <div className="min-w-0">
+                      {termSettings.presidentTheme && (
+                        <p className="text-sm font-black text-slate-800 leading-snug">{termSettings.presidentTheme}</p>
+                      )}
+                      {termSettings.tagline && (
+                        <p className="text-xs font-semibold text-amber-600 mt-0.5">{termSettings.tagline}</p>
+                      )}
+                      {termSettings.shortDescription && (
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{termSettings.shortDescription}</p>
+                      )}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="relative rounded-lg overflow-hidden border border-amber-200 bg-white" style={{ aspectRatio: '16/9' }}>
+                      {termSettings.logoUrl ? (
+                        <img src={termSettings.logoUrl} alt="Theme Logo" className="w-full h-full object-contain p-2" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Award size={14} className="text-amber-300" />
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5">
+                        <p className="text-[8px] font-black text-white uppercase tracking-wide leading-none">Logo</p>
+                      </div>
+                    </div>
+                    <div className="relative rounded-lg overflow-hidden border border-amber-200 bg-amber-50" style={{ aspectRatio: '16/9' }}>
+                      {termSettings.groupPhotoUrl ? (
+                        <img src={termSettings.groupPhotoUrl} alt="BOD Group" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Users size={14} className="text-amber-300" />
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5">
+                        <p className="text-[8px] font-black text-white uppercase tracking-wide leading-none">BOD</p>
+                      </div>
+                    </div>
+                    <div className="relative rounded-lg overflow-hidden border border-amber-200 bg-amber-50" style={{ aspectRatio: '16/9' }}>
+                      {termSettings.memberGroupPhotoUrl ? (
+                        <img src={termSettings.memberGroupPhotoUrl} alt="Member Group" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Users size={14} className="text-amber-300" />
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5">
+                        <p className="text-[8px] font-black text-white uppercase tracking-wide leading-none">Members</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

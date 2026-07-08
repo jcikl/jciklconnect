@@ -268,6 +268,8 @@ export interface BoardTermSettings {
   tagline?: string;
   shortDescription?: string;
   logoUrl?: string;
+  groupPhotoUrl?: string;
+  memberGroupPhotoUrl?: string;
   updatedAt: string;
 }
 
