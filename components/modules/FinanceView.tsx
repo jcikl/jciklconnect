@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2 } from 'lucide-react';
+import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -67,6 +67,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   const [txTypeFilter, setTxTypeFilter] = useState<'All' | 'Income' | 'Expense'>('All');
   const [txStatusFilter, setTxStatusFilter] = useState<'All' | 'Pending' | 'Cleared'>('All');
   const [transactionLimit, setTransactionLimit] = useState(50); // Initial display limit
+  const [txFiltersOpen, setTxFiltersOpen] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -753,6 +754,22 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       return true;
     });
   }, [displayTransactions, txTypeFilter, txStatusFilter]);
+
+  const groupedTransactions = useMemo(() => {
+    const groups: { key: string; label: string; txs: typeof visibleTransactions }[] = [];
+    let currentKey = '';
+    for (const tx of visibleTransactions) {
+      const d = new Date(tx.date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const label = d.toLocaleDateString('en-MY', { month: 'long', year: 'numeric' });
+      if (key !== currentKey) {
+        groups.push({ key, label, txs: [] });
+        currentKey = key;
+      }
+      groups[groups.length - 1].txs.push(tx);
+    }
+    return groups;
+  }, [visibleTransactions]);
 
   const hasMoreTransactions = useMemo(() => {
     // We need to know if there are more than current limit
@@ -2639,99 +2656,119 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Transactions' && (
         <div className="space-y-4">
           <Card>
-            <div className="mb-3 space-y-2.5">
-              {/* Search — always on top, full width */}
-              <Input
-                type="text"
-                placeholder="Search date, description, ref no…"
-                value={txSearchTerm}
-                onChange={(e) => setTxSearchTerm(e.target.value)}
-                icon={<Search size={18} />}
-                className="w-full"
-              />
-              {/* Filters — horizontal scroll on mobile */}
-              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
-                <div className="shrink-0 w-28">
-                  <Select
-                    value={reportYear.toString()}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setReportYear(val);
-                      setProjectAccountYearFilter(val);
-                    }}
-                    options={[
-                      { label: 'All Years', value: '0' },
-                      ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
-                    ]}
-                  />
-                </div>
-                <div className="shrink-0 w-40">
-                  <Select
-                    value={bankAccountFilter}
-                    onChange={(e) => setBankAccountFilter(e.target.value)}
-                    options={[
-                      { label: 'All Accounts', value: 'All' },
-                      ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
-                    ]}
-                  />
-                </div>
-                <div className="shrink-0 w-44">
-                  <Select
-                    value={txCategoryFilter}
-                    onChange={(e) => setTxCategoryFilter(e.target.value)}
-                    options={[
-                      { label: 'All Categories', value: 'All' },
-                      { label: 'Projects & Activities', value: 'Projects & Activities' },
-                      { label: 'Membership', value: 'Membership' },
-                      { label: 'Administrative', value: 'Administrative' },
-                      { label: 'Uncategorized', value: 'Uncategorized' }
-                    ]}
-                  />
-                </div>
-              </div>
-              {/* Quick-filter chips: Type + Status */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
-                  {(['All', 'Income', 'Expense'] as const).map(t => (
+            {(() => {
+              const activeFilterCount = [
+                txTypeFilter !== 'All',
+                txStatusFilter !== 'All',
+                txCategoryFilter !== 'All',
+                bankAccountFilter !== 'All',
+                reportYear !== 0,
+              ].filter(Boolean).length;
+              return (
+                <div className="mb-3 space-y-2">
+                  {/* Row 1: Search + mobile filter toggle */}
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1">
+                      <Input
+                        type="text"
+                        placeholder="Search date, description, ref no…"
+                        value={txSearchTerm}
+                        onChange={(e) => setTxSearchTerm(e.target.value)}
+                        icon={<Search size={16} />}
+                        className="w-full"
+                      />
+                    </div>
                     <button
-                      key={t}
-                      onClick={() => setTxTypeFilter(t)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
-                        txTypeFilter === t
-                          ? t === 'Income' ? 'bg-green-500 text-white' : t === 'Expense' ? 'bg-red-500 text-white' : 'bg-white text-slate-700 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-700'
-                      }`}
+                      onClick={() => setTxFiltersOpen(p => !p)}
+                      className={`md:hidden shrink-0 relative flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${txFiltersOpen ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
                     >
-                      {t === 'Income' ? '↑ Income' : t === 'Expense' ? '↓ Expense' : 'All'}
+                      <SlidersHorizontal size={15} />
+                      {activeFilterCount > 0 && (
+                        <span className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${txFiltersOpen ? 'bg-white text-jci-blue' : 'bg-jci-blue text-white'}`}>{activeFilterCount}</span>
+                      )}
                     </button>
-                  ))}
+                  </div>
+
+                  {/* Filter panel: always on desktop, toggle on mobile */}
+                  <div className={`space-y-2 ${txFiltersOpen ? 'block' : 'hidden'} md:block`}>
+                    {/* Dropdowns */}
+                    <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+                      <div className="shrink-0 w-28">
+                        <Select
+                          value={reportYear.toString()}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setReportYear(val);
+                            setProjectAccountYearFilter(val);
+                          }}
+                          options={[
+                            { label: 'All Years', value: '0' },
+                            ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
+                          ]}
+                        />
+                      </div>
+                      <div className="shrink-0 w-40">
+                        <Select
+                          value={bankAccountFilter}
+                          onChange={(e) => setBankAccountFilter(e.target.value)}
+                          options={[
+                            { label: 'All Accounts', value: 'All' },
+                            ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
+                          ]}
+                        />
+                      </div>
+                      <div className="shrink-0 w-44">
+                        <Select
+                          value={txCategoryFilter}
+                          onChange={(e) => setTxCategoryFilter(e.target.value)}
+                          options={[
+                            { label: 'All Categories', value: 'All' },
+                            { label: 'Projects & Activities', value: 'Projects & Activities' },
+                            { label: 'Membership', value: 'Membership' },
+                            { label: 'Administrative', value: 'Administrative' },
+                            { label: 'Uncategorized', value: 'Uncategorized' }
+                          ]}
+                        />
+                      </div>
+                    </div>
+                    {/* Chips — Type + Status in one row */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                        {(['All', 'Income', 'Expense'] as const).map(t => (
+                          <button key={t} onClick={() => setTxTypeFilter(t)}
+                            className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                              txTypeFilter === t
+                                ? t === 'Income' ? 'bg-green-500 text-white' : t === 'Expense' ? 'bg-red-500 text-white' : 'bg-white text-slate-700 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}>
+                            {t === 'Income' ? '↑ Inc' : t === 'Expense' ? '↓ Exp' : 'All'}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="w-px h-4 bg-slate-200 shrink-0" />
+                      <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                        {(['All', 'Pending', 'Cleared'] as const).map(s => (
+                          <button key={s} onClick={() => setTxStatusFilter(s)}
+                            className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                              txStatusFilter === s
+                                ? s === 'Pending' ? 'bg-amber-500 text-white' : s === 'Cleared' ? 'bg-blue-500 text-white' : 'bg-white text-slate-700 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}>{s}</button>
+                        ))}
+                      </div>
+                      {activeFilterCount > 0 && (
+                        <button
+                          onClick={() => { setTxTypeFilter('All'); setTxStatusFilter('All'); setTxCategoryFilter('All'); setBankAccountFilter('All'); setReportYear(new Date().getFullYear()); }}
+                          className="text-xs text-blue-500 hover:text-blue-700 font-medium ml-1"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
-                  {(['All', 'Pending', 'Cleared'] as const).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setTxStatusFilter(s)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
-                        txStatusFilter === s
-                          ? s === 'Pending' ? 'bg-amber-500 text-white' : s === 'Cleared' ? 'bg-blue-500 text-white' : 'bg-white text-slate-700 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-700'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                {/* Active filter count */}
-                {(txTypeFilter !== 'All' || txStatusFilter !== 'All') && (
-                  <button
-                    onClick={() => { setTxTypeFilter('All'); setTxStatusFilter('All'); }}
-                    className="text-xs text-blue-500 hover:text-blue-700 font-medium"
-                  >
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Summary strip */}
             {visibleTransactions.length > 0 && (() => {
@@ -2739,12 +2776,19 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               const expenseTotal = visibleTransactions.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
               const pendingCount = visibleTransactions.filter(t => t.status === 'Pending').length;
               return (
-                <div className="flex items-center gap-3 px-1 pb-3 border-b border-slate-100 flex-wrap">
-                  <span className="text-xs text-slate-400">{visibleTransactions.length} transactions</span>
-                  <span className="text-xs font-mono font-semibold text-green-600">+{formatCurrency(incomeTotal)}</span>
-                  <span className="text-xs font-mono font-semibold text-red-500">−{formatCurrency(expenseTotal)}</span>
+                <div className="flex items-center gap-2 px-1 pb-3 border-b border-slate-100 overflow-x-auto no-scrollbar">
+                  <span className="text-xs text-slate-500 font-medium whitespace-nowrap shrink-0">{visibleTransactions.length} txns</span>
+                  <span className="w-px h-3.5 bg-slate-200 shrink-0" />
+                  <span className="text-xs font-mono font-semibold text-green-600 whitespace-nowrap shrink-0">+{formatCurrency(incomeTotal)}</span>
+                  <span className="text-xs font-mono font-semibold text-red-500 whitespace-nowrap shrink-0">−{formatCurrency(expenseTotal)}</span>
                   {pendingCount > 0 && (
-                    <span className="text-xs text-amber-600 font-semibold">{pendingCount} pending</span>
+                    <>
+                      <span className="w-px h-3.5 bg-slate-200 shrink-0" />
+                      <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 whitespace-nowrap shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                        {pendingCount} pending
+                      </span>
+                    </>
                   )}
                 </div>
               );
@@ -2787,10 +2831,17 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleTransactions.map(tx => (
+                    {groupedTransactions.map(group => (
+                      <React.Fragment key={group.key}>
+                        <tr>
+                          <td colSpan={6} className="py-1.5 px-3 bg-slate-50 border-y border-slate-100">
+                            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{group.label}</span>
+                          </td>
+                        </tr>
+                        {group.txs.map(tx => (
                       <React.Fragment key={tx.id}>
                         {/* Parent Transaction Row */}
-                        <tr className={`hover:bg-slate-50/80 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-50/60' : tx.status === 'Pending' ? 'bg-amber-50/40' : ''}`}>
+                        <tr className={`border-l-2 ${tx.type === 'Income' ? 'border-l-green-400' : 'border-l-red-400'} hover:bg-slate-50/80 transition-colors ${selectedTxIds.has(tx.id) ? 'bg-blue-50/60' : tx.status === 'Pending' ? 'bg-amber-50/40' : ''}`}>
                           <td className="py-4 px-2 w-8">
                             <input
                               type="checkbox"
@@ -2981,14 +3032,21 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                           </tr>
                         ))}
                       </React.Fragment>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile View */}
-              <div className="md:hidden space-y-2.5 p-1">
-                {visibleTransactions.map(tx => (
+              <div className="md:hidden space-y-3 p-1">
+                {groupedTransactions.map(group => (
+                  <div key={group.key}>
+                    <div className="py-1 px-1 mb-1.5">
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{group.label}</span>
+                    </div>
+                    {group.txs.map(tx => (
                   <div key={tx.id} className={`bg-white border rounded-xl overflow-hidden shadow-sm relative flex ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200' : tx.status === 'Pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-100'}`}>
                     {/* Left color bar: green = income, red = expense */}
                     <div className={`w-1 shrink-0 ${tx.type === 'Income' ? 'bg-green-400' : 'bg-red-400'}`} />
@@ -3018,27 +3076,33 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                           className="accent-blue-600 w-4 h-4 cursor-pointer mt-0.5 shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          {/* Top row: date + amount */}
-                          <div className="flex justify-between items-baseline gap-2 mb-0.5">
-                            <span className="text-[11px] text-slate-400 font-medium">{formatDate(tx.date)}</span>
+                          {/* Top row: date + Pending dot + amount */}
+                          <div className="flex justify-between items-center gap-2 mb-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-slate-400 font-medium">{formatDate(tx.date)}</span>
+                              {tx.status === 'Pending' && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-0">
+                                  <span className="w-1 h-1 rounded-full bg-amber-400 inline-block" />
+                                  Pending
+                                </span>
+                              )}
+                            </div>
                             <span className={`font-mono font-bold text-sm shrink-0 ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
                               {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
                             </span>
                           </div>
                           {/* Description */}
                           <p className="text-sm font-semibold text-slate-900 leading-snug mb-1.5 truncate">{tx.description}</p>
-                          {/* Badges + balance row */}
+                          {/* Meta row: category + account + balance | actions */}
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Badge variant={tx.isSplit ? "info" : "neutral"} className="text-[10px]">{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
+                            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                              <Badge variant={tx.isSplit ? "info" : "neutral"} className="text-[10px] shrink-0">{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
                               {(() => {
-                                const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                                const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                                if (tx.isSplit) return null;
-                                if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Linked</Badge>;
-                                return <Badge variant="warning" className="text-[10px]">Unlinked</Badge>;
+                                const acc = accounts.find(a => a.id === tx.bankAccountId);
+                                if (acc) return <span className="text-[10px] text-slate-400 truncate">{acc.name}</span>;
+                                return null;
                               })()}
-                              <span className="text-[10px] text-slate-400 font-mono">Bal {formatCurrency(tx.runningBalance)}</span>
+                              <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap shrink-0">Bal {formatCurrency(tx.runningBalance)}</span>
                             </div>
                             {/* Action buttons */}
                             <div className="flex gap-1 shrink-0">
@@ -3078,6 +3142,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         </div>
                       </div>
                     </div>
+                  </div>
+                    ))}
                   </div>
                 ))}
               </div>
