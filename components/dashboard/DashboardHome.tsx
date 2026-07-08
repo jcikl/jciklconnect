@@ -296,13 +296,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         <Skeleton className="h-[72px]" rounded="2xl" />
         {/* Stats grid skeleton */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-[80px]" rounded="xl" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[80px]" rounded="xl" />)}
         </div>
         {/* Events section skeleton */}
         <div className="space-y-3">
           <Skeleton className="h-5 w-24" rounded="md" />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[1,2,3,4].map(i => <Skeleton key={i} className="h-[200px]" rounded="2xl" />)}
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[200px]" rounded="2xl" />)}
           </div>
         </div>
         {/* Bottom cards skeleton */}
@@ -340,13 +340,72 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   return (
     <div className="space-y-4">
 
+      {/* Birthday This Month — top of dashboard */}
+      {birthdayMembers.length > 0 && (
+        <div
+          onClick={() => setShowBirthdayDrawer(true)}
+          className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
+        >
+          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(190,18,60,0.82) 0%, rgba(134,25,143,0.78) 50%, rgba(79,70,229,0.75) 100%)' }} />
+          <div className="relative z-10 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-3xl leading-none select-none drop-shadow-md">🎂</span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-200/80 leading-none mb-0.5">This Month</p>
+                  <h3 className="font-extrabold text-white text-lg leading-tight drop-shadow-sm">Birthdays</h3>
+                </div>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
+                {now.toLocaleString('default', { month: 'long' })}
+              </span>
+            </div>
+            {todayBirthdays.length > 0 ? (
+              <div className="mb-3 flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl px-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse flex-shrink-0" />
+                <span className="text-[12px] font-bold text-white truncate">🎉 Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(', ')}</span>
+              </div>
+            ) : nextBirthdayMember ? (
+              <div className="mb-3 flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
+                <span className="text-[12px] font-semibold text-white/90 truncate">📅 Next: {nextBirthdayMember.general?.name?.split(' ')[0] || nextBirthdayMember.name?.split(' ')[0]} — {new Date(getDob(nextBirthdayMember)!).getDate()} {now.toLocaleString('default', { month: 'short' })}</span>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center">
+                  {birthdayMembers.slice(0, 5).map((m, i) => {
+                    const name = m.general?.name || m.name || '';
+                    const avatarUrl = m.general?.avatarUrl || m.avatar;
+                    const sharedStyle = { width: '36px', height: '36px', marginLeft: i > 0 ? '-10px' : '0px', zIndex: 10 - i };
+                    if (avatarUrl) return <img key={m.id} src={avatarUrl} alt={name} className="rounded-full object-cover border-2 border-white/60 shadow-md flex-shrink-0 group-hover:-translate-y-0.5 transition-transform" style={sharedStyle} />;
+                    const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+                    let hash = 0; for (let j = 0; j < name.length; j++) hash = name.charCodeAt(j) + ((hash << 5) - hash);
+                    const gradients = ['from-pink-400 to-rose-500','from-violet-400 to-purple-500','from-sky-400 to-blue-500','from-teal-400 to-emerald-500','from-amber-400 to-orange-500'];
+                    return <div key={m.id} className={`rounded-full bg-gradient-to-br ${gradients[Math.abs(hash) % gradients.length]} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white/60 shadow-md flex-shrink-0 group-hover:-translate-y-0.5 transition-transform`} style={sharedStyle}>{initials}</div>;
+                  })}
+                  {birthdayMembers.length > 5 && <div className="rounded-full border-2 border-white/60 bg-white/25 flex items-center justify-center text-[10px] font-bold text-white shadow-md flex-shrink-0" style={{ width: '36px', height: '36px', marginLeft: '-10px', zIndex: 5 }}>+{birthdayMembers.length - 5}</div>}
+                </div>
+                <span className="text-[11px] font-semibold text-white/80">{birthdayMembers.length} celebrating</span>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Partners Banner (Swiper) */}
       {(adsLoading || homepageAds.length > 0) && (
-        <h2 className="text-base font-bold text-slate-800">Partners</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">Partners</span>
+          <div className="flex-1 h-px bg-slate-100" />
+        </div>
       )}
       {adsLoading ? (
         <div className="flex gap-3 overflow-hidden">
-          {[1,2,3].map(i => <Skeleton key={i} className="flex-none w-[58%] sm:w-[30%] lg:w-[23%] h-36 sm:h-40" rounded="2xl" />)}
+          {[1, 2, 3].map(i => <Skeleton key={i} className="flex-none w-[58%] sm:w-[30%] lg:w-[23%] h-36 sm:h-40" rounded="2xl" />)}
         </div>
       ) : homepageAds.length > 0 && (
         <div className="w-full">
@@ -383,10 +442,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
                   {/* Overlay Gradient */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-                  {/* Ad Tag */}
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-xs font-bold px-2 py-1 rounded-md text-slate-800 shadow-sm z-10">
-                    Partnership
-                  </div>
                   {/* Content */}
                   <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
                     <h3 className="text-white font-bold text-sm sm:text-base line-clamp-1">{ad.title}</h3>
@@ -411,9 +466,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <h3 className="font-semibold text-sm text-slate-900">Membership journey</h3>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                journeyIsComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-              }`}>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${journeyIsComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                }`}>
                 {isProbationMember ? 'Probation' : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
               </span>
               <ChevronRight size={14} className="text-slate-400 ml-auto flex-shrink-0" />
@@ -441,156 +495,22 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         </div>
       )}
 
-      {/* Birthday This Month */}
-      {birthdayMembers.length > 0 && (
-        <Card
-          onClick={() => setShowBirthdayDrawer(true)}
-          className="relative overflow-hidden bg-gradient-to-r from-rose-50/60 via-fuchsia-50/40 to-indigo-50/20 dark:from-rose-950/10 dark:via-fuchsia-950/5 dark:to-transparent border border-rose-100/80 hover:border-rose-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group cursor-pointer"
-        >
-          {/* Decorative Background Glows */}
-          <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-pink-400/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute -left-10 -top-10 w-32 h-32 bg-purple-400/10 rounded-full blur-2xl pointer-events-none" />
-
-          <div className="flex items-center justify-between gap-3 relative z-10">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Birthday Icon / Visual */}
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-nowrap">
-                  <h3 className="font-extrabold text-slate-800 text-sm tracking-tight flex-shrink-0">
-                    Birthdays This Month
-                  </h3>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-pink-600 bg-pink-50 px-1.5 py-0.5 rounded-full border border-pink-100 flex-shrink-0">
-                    {now.toLocaleString('default', { month: 'long' })}
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
-                  {birthdayMembers.length} members celebrate birthdays
-                </p>
-
-                {todayBirthdays.length > 0 ? (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
-                      <span className="w-1 h-1 rounded-full bg-orange-500" />
-                      Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(', ')} 🎉
-                    </span>
-                  </div>
-                ) : nextBirthdayMember ? (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 bg-purple-50/50 border border-purple-100/50 px-2 py-0.5 rounded-full">
-                      📅 Next: {nextBirthdayMember.general?.name?.split(' ')[0] || nextBirthdayMember.name?.split(' ')[0]} ({new Date(getDob(nextBirthdayMember)!).getDate()} {now.toLocaleString('default', { month: 'short' })})
-                    </span>
-                  </div>
-                ) : (
-                  <div className="mt-1 flex items-center gap-1">
-                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">
-                      ✨ Click to view calendar
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right Side: Avatar Stack + Chevron */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Overlapping Avatars */}
-              <div className="flex items-center">
-                {birthdayMembers.slice(0, 4).map((m, i) => {
-                  const name = m.general?.name || m.name || '';
-                  const avatarUrl = m.general?.avatarUrl || m.avatar;
-
-                  if (avatarUrl) {
-                    return (
-                      <img
-                        key={m.id}
-                        src={avatarUrl}
-                        alt={name}
-                        className="rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5"
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          marginLeft: i > 0 ? '-10px' : '0px',
-                          zIndex: 10 - i
-                        }}
-                      />
-                    );
-                  } else {
-                    const initials = name
-                      .split(' ')
-                      .map((n: string) => n[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase();
-
-                    let hash = 0;
-                    for (let j = 0; j < name.length; j++) {
-                      hash = name.charCodeAt(j) + ((hash << 5) - hash);
-                    }
-                    const gradients = [
-                      'from-pink-500 to-rose-500',
-                      'from-purple-500 to-indigo-500',
-                      'from-blue-500 to-sky-500',
-                      'from-teal-500 to-emerald-500',
-                      'from-amber-500 to-orange-500',
-                    ];
-                    const gradient = gradients[Math.abs(hash) % gradients.length];
-
-                    return (
-                      <div
-                        key={m.id}
-                        className={`rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white shadow-sm ring-1 ring-pink-100/30 flex-shrink-0 transition-transform group-hover:-translate-y-0.5`}
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          marginLeft: i > 0 ? '-10px' : '0px',
-                          zIndex: 10 - i
-                        }}
-                      >
-                        {initials}
-                      </div>
-                    );
-                  }
-                })}
-
-                {birthdayMembers.length > 4 && (
-                  <div
-                    className="rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm ring-1 ring-pink-100/30 flex-shrink-0"
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      marginLeft: '-10px',
-                      zIndex: 5
-                    }}
-                  >
-                    +{birthdayMembers.length - 4}
-                  </div>
-                )}
-              </div>
-
-              {/* Chevron */}
-              <div className="text-slate-400 group-hover:text-pink-500 transition-colors pl-0.5 transform group-hover:translate-x-0.5 transition-transform duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-3">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-slate-900">Events</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">Events</span>
+            <div className="flex-1 h-px bg-slate-100" />
             <button
               onClick={() => onNavigate?.('EVENTS')}
-              className="text-xs font-black text-jci-blue uppercase tracking-widest hover:opacity-70 transition-opacity"
+              className="text-[10px] font-black text-jci-blue uppercase tracking-widest hover:opacity-70 transition-opacity shrink-0"
             >
               View All
             </button>
           </div>
           {eventsLoading ? (
             <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4">
-              {[1,2,3,4].map(i => <Skeleton key={i} className="flex-none w-[60.6%] sm:w-auto h-[200px]" rounded="2xl" />)}
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="flex-none w-[60.6%] sm:w-auto h-[200px]" rounded="2xl" />)}
             </div>
           ) : (eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length === 0 ? (
             <div className="text-center py-8 text-slate-400 font-medium">
@@ -624,7 +544,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           </div>
                         )}
                         <div className="absolute top-2 left-2 flex items-center gap-1">
-                          <Badge variant="neutral" className="text-[9px] px-1.5 py-0.5 bg-white/90 backdrop-blur-sm shadow-sm border-0 text-slate-700">{event.type}</Badge>
                           {event.predictedDemand === 'High' && isUpcoming && (
                             <Badge variant="jci" className="text-[9px] px-1.5 py-0.5 bg-jci-blue/90 backdrop-blur-sm shadow-sm border-0 text-white">Hot</Badge>
                           )}
@@ -766,18 +685,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
                   onClick={() => setJourneyActiveTab('probation')}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    isFullMember ? 'bg-green-500 text-white'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isFullMember ? 'bg-green-500 text-white'
                     : journeyActiveTab === 'probation' ? 'bg-amber-500 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                  }`}>
+                      : 'bg-slate-200 text-slate-500'
+                    }`}>
                     {isFullMember ? <CheckCircle size={14} /> : 'P'}
                   </div>
-                  <span className={`text-[10px] font-semibold ${
-                    journeyActiveTab === 'probation' ? 'text-amber-700'
+                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'probation' ? 'text-amber-700'
                     : isFullMember ? 'text-green-700'
-                    : 'text-slate-400'
-                  }`}>Probation</span>
+                      : 'text-slate-400'
+                    }`}>Probation</span>
                   <span className={`text-[10px] ${isFullMember ? 'text-green-600' : 'text-amber-600'}`}>
                     {isProbationMember
                       ? `${promotionProgress?.overallProgress?.toFixed(0) ?? 0}%`
@@ -794,18 +711,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   onClick={() => !isProbationMember && setJourneyActiveTab('firstYear')}
                   disabled={isProbationMember}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    engagementFirst?.isCompleted ? 'bg-green-500 text-white'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementFirst?.isCompleted ? 'bg-green-500 text-white'
                     : journeyActiveTab === 'firstYear' ? 'bg-blue-500 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                  }`}>
+                      : 'bg-slate-200 text-slate-500'
+                    }`}>
                     {engagementFirst?.isCompleted ? <CheckCircle size={14} /> : '1'}
                   </div>
-                  <span className={`text-[10px] font-semibold ${
-                    journeyActiveTab === 'firstYear' ? 'text-blue-700'
+                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'firstYear' ? 'text-blue-700'
                     : engagementFirst?.isCompleted ? 'text-green-700'
-                    : 'text-slate-400'
-                  }`}>1st Year</span>
+                      : 'text-slate-400'
+                    }`}>1st Year</span>
                   {!isProbationMember && engagementFirst && (
                     <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-green-600' : 'text-blue-600'}`}>
                       {engagementFirst.overallProgress.toFixed(0)}%
@@ -822,18 +737,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   onClick={() => !isProbationMember && setJourneyActiveTab('secondYear')}
                   disabled={isProbationMember}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    engagementSecond?.isCompleted ? 'bg-green-500 text-white'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementSecond?.isCompleted ? 'bg-green-500 text-white'
                     : journeyActiveTab === 'secondYear' ? 'bg-indigo-500 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                  }`}>
+                      : 'bg-slate-200 text-slate-500'
+                    }`}>
                     {engagementSecond?.isCompleted ? <CheckCircle size={14} /> : '2'}
                   </div>
-                  <span className={`text-[10px] font-semibold ${
-                    journeyActiveTab === 'secondYear' ? 'text-indigo-700'
+                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'secondYear' ? 'text-indigo-700'
                     : engagementSecond?.isCompleted ? 'text-green-700'
-                    : 'text-slate-400'
-                  }`}>2nd Year</span>
+                      : 'text-slate-400'
+                    }`}>2nd Year</span>
                   {!isProbationMember && engagementSecond && (
                     <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-green-600' : 'text-indigo-600'}`}>
                       {engagementSecond.overallProgress.toFixed(0)}%
@@ -863,9 +776,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         {(promotionProgress.requirements || []).map((req: any, i: number) => (
                           <div
                             key={i}
-                            className={`flex-1 h-2 rounded-full transition-all duration-500 ${
-                              req.isCompleted ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-slate-200'
-                            }`}
+                            className={`flex-1 h-2 rounded-full transition-all duration-500 ${req.isCompleted ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-slate-200'
+                              }`}
                           />
                         ))}
                       </div>
@@ -958,15 +870,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           return (
                             <div
                               key={i}
-                              className={`flex-1 h-2 rounded-full transition-all duration-500 ${
-                                req.isCompleted
-                                  ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                                  : isPending
-                                    ? 'bg-amber-300'
-                                    : summary.isCompleted
-                                      ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                                      : `bg-gradient-to-r ${accentDot} opacity-20`
-                              }`}
+                              className={`flex-1 h-2 rounded-full transition-all duration-500 ${req.isCompleted
+                                ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                                : isPending
+                                  ? 'bg-amber-300'
+                                  : summary.isCompleted
+                                    ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                                    : `bg-gradient-to-r ${accentDot} opacity-20`
+                                }`}
                             />
                           );
                         })}
@@ -985,9 +896,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <button
                             key={g}
                             onClick={() => setJourneyGroupTab(g)}
-                            className={`flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold transition-all flex flex-col items-center gap-0.5 ${
-                              isActive ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
-                            }`}
+                            className={`flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold transition-all flex flex-col items-center gap-0.5 ${isActive ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                              }`}
                           >
                             <span>{label}</span>
                             <span className={`text-[9px] font-black ${doneCount === gReqs.length ? 'text-green-600' : isActive ? accentPct : 'text-slate-400'}`}>
@@ -1012,9 +922,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <div key={req.key} className={`p-3 rounded-xl border ${cardClass}`}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                  req.isCompleted ? 'bg-green-500' : isPending ? 'bg-amber-400' : 'bg-slate-200'
-                                }`}>
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-green-500' : isPending ? 'bg-amber-400' : 'bg-slate-200'
+                                  }`}>
                                   {req.isCompleted
                                     ? <CheckCircle size={11} className="text-white" />
                                     : <Clock size={11} className={isPending ? 'text-white' : 'text-slate-400'} />}
@@ -1065,7 +974,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {selectedAdForDetail && (
         <PartnershipDetailModal
           ad={selectedAdForDetail}
+          ads={homepageAds}
           onClose={() => setSelectedAdForDetail(null)}
+          onNavigate={(ad) => setSelectedAdForDetail(ad)}
         />
       )}
 
