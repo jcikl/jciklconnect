@@ -1563,41 +1563,38 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
           <p className="text-slate-500 text-sm">Bookkeeping · dues collection · budgeting</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {/* Primary row: year + new transaction CTA */}
-          <div className="flex items-center gap-2">
-            <div className="w-28 shrink-0">
-              <Select
-                value={reportYear.toString()}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  setReportYear(val);
-                  setProjectAccountYearFilter(val);
-                }}
-                options={[
-                  { label: 'All Years', value: '0' },
-                  ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
-                ]}
-              />
-            </div>
-            <Button onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}><DollarSign size={16} className="mr-2" /> New Transaction</Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="w-28 shrink-0">
+            <Select
+              value={reportYear.toString()}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                setReportYear(val);
+                setProjectAccountYearFilter(val);
+              }}
+              options={[
+                { label: 'All Years', value: '0' },
+                ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
+              ]}
+            />
           </div>
-          {/* Secondary row: Reports + admin buttons (separate row on mobile, inline on desktop) */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Button variant="outline" size="sm" onClick={() => setIsReportsModalOpen(true)}>
-              <FileText size={14} className="mr-1.5" /> Reports
-            </Button>
-            {hasPermission('canEditFinance') && (
-              <>
-                <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)}>
-                  <Calendar size={14} className="mr-1.5" /> Renew Dues
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
-                  <Upload size={14} className="mr-1.5" /> Batch Import
-                </Button>
-              </>
-            )}
-          </div>
+          {/* Secondary actions: icon-only on mobile, text+icon on sm+ */}
+          <Button variant="outline" size="sm" onClick={() => setIsReportsModalOpen(true)} title="Reports" className="px-2 sm:px-3">
+            <FileText size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Reports</span>
+          </Button>
+          {hasPermission('canEditFinance') && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)} title="Renew Dues" className="px-2 sm:px-3">
+                <Calendar size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Renew Dues</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} title="Batch Import" className="px-2 sm:px-3">
+                <Upload size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Batch Import</span>
+              </Button>
+            </>
+          )}
+          <Button onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}>
+            <DollarSign size={16} className="mr-2" /><span className="hidden xs:inline">New </span>Transaction
+          </Button>
         </div>
       </div>
 
@@ -1617,7 +1614,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               {/* Total Cash — full width on mobile/tablet, 1-col on lg+ */}
               <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-jci-navy to-jci-blue rounded-xl p-4 text-white shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Total Cash on Hand</p>
-                <p className="text-2xl font-bold mt-1 truncate">{formatCurrency(dashboardStats.totalCash, accounts[0]?.currency || 'MYR')}</p>
+                <p className="text-2xl font-bold mt-1 tabular-nums">{formatCurrency(dashboardStats.totalCash, accounts[0]?.currency || 'MYR')}</p>
                 <p className="text-xs text-white/60 mt-1">Across all accounts</p>
               </div>
               {/* Net Balance */}
@@ -1641,8 +1638,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           </LoadingState>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {/* Main Content: Transactions */}
-            <div className="md:col-span-2 space-y-6">
+            {/* Main Content: Transactions — order-2 on mobile so Bank Accounts appears first */}
+            <div className="md:col-span-2 space-y-6 order-2 md:order-1">
               <Card
                 title="Recent Transactions"
                 action={
@@ -1784,7 +1781,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
 
             {/* Sidebar: Accounts */}
-            <div>
+            <div className="order-1 md:order-2">
               <Card title="Bank Accounts" action={
                 <Button variant="ghost" size="sm" onClick={() => setIsAddAccountModalOpen(true)}>
                   <Plus size={14} className="mr-1" /> Add
@@ -1896,9 +1893,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     </Button>
                   )}
                 >
-                  <div className="flex flex-row gap-4 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {adminByProjectId.length === 0 ? (
-                      <p className="py-4 text-sm text-slate-500">No admin accounts found.</p>
+                      <p className="py-4 text-sm text-slate-500 col-span-full">No admin accounts found.</p>
                     ) : (
                       adminByProjectId.map(({ projectId, income, expenses, net }) => {
                         const isActive = adminProjectIdFilter === projectId;
@@ -1909,7 +1906,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                             tabIndex={0}
                             onClick={() => setAdminProjectIdFilter(isActive ? null : projectId)}
                             onKeyDown={(e) => e.key === 'Enter' && setAdminProjectIdFilter(isActive ? null : projectId)}
-                            className={`p-4 cursor-pointer rounded-xl transition-all border shrink-0 min-w-[280px] max-w-[320px] shadow-sm flex flex-col justify-between ${isActive
+                            className={`p-4 cursor-pointer rounded-xl transition-all border shadow-sm flex flex-col justify-between ${isActive
                               ? 'bg-jci-blue/5 border-jci-blue ring-1 ring-jci-blue/20 shadow-md shadow-jci-blue/5'
                               : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow'
                               }`}
@@ -2169,7 +2166,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                       <select
                         value={selectedId}
                         onChange={e => setPrSelectedBankTx(prev => ({ ...prev, [pr.id]: e.target.value }))}
-                        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white"
+                        className="w-full text-sm border border-slate-200 rounded-lg px-2 py-2 bg-white"
                       >
                         <option value="">— select bank transaction —</option>
                         {/* Suggestions first */}
@@ -2294,7 +2291,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           {/* Top: Project Accounts Card (Full Width) */}
           <Card title="Project Accounts">
             <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
-              <div className="flex flex-row gap-4 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[
                   ...(uncategorizedProjectTxCount > 0 ? [{
                     id: 'uncategorized',
@@ -2329,7 +2326,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                       tabIndex={0}
                       onClick={() => setSelectedProjectFilter(isActive ? null : acc.projectId)}
                       onKeyDown={(e) => e.key === 'Enter' && setSelectedProjectFilter(isActive ? null : acc.projectId)}
-                      className={`p-4 cursor-pointer rounded-xl transition-all border shrink-0 min-w-[280px] max-w-[320px] shadow-sm flex flex-col justify-between ${isActive
+                      className={`p-4 cursor-pointer rounded-xl transition-all border shadow-sm flex flex-col justify-between ${isActive
                         ? 'bg-jci-blue/5 border-jci-blue ring-1 ring-jci-blue/20 shadow-md shadow-jci-blue/5'
                         : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow'
                         }`}
@@ -2610,53 +2607,55 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Transactions' && (
         <div className="space-y-4">
           <Card>
-            <div className="grid grid-cols-2 md:flex md:flex-row gap-3 mb-6 md:items-center">
-              <div className="md:w-32">
-                <Select
-                  value={reportYear.toString()}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setReportYear(val);
-                    setProjectAccountYearFilter(val);
-                  }}
-                  options={[
-                    { label: 'All Years', value: '0' },
-                    ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
-                  ]}
-                />
-              </div>
-              <div className="md:w-44">
-                <Select
-                  value={bankAccountFilter}
-                  onChange={(e) => setBankAccountFilter(e.target.value)}
-                  options={[
-                    { label: 'All Accounts', value: 'All' },
-                    ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
-                  ]}
-                />
-              </div>
-              <div className="md:w-44">
-                <Select
-                  value={txCategoryFilter}
-                  onChange={(e) => setTxCategoryFilter(e.target.value)}
-                  options={[
-                    { label: 'All Categories', value: 'All' },
-                    { label: 'Projects & Activities', value: 'Projects & Activities' },
-                    { label: 'Membership', value: 'Membership' },
-                    { label: 'Administrative', value: 'Administrative' },
-                    { label: 'Uncategorized', value: 'Uncategorized' }
-                  ]}
-                />
-              </div>
-              <div className="col-span-2 md:flex-1">
-                <Input
-                  type="text"
-                  placeholder="Search date, description, ref no…"
-                  value={txSearchTerm}
-                  onChange={(e) => setTxSearchTerm(e.target.value)}
-                  icon={<Search size={18} />}
-                  className="w-full"
-                />
+            <div className="mb-4 space-y-2">
+              {/* Search — always on top, full width */}
+              <Input
+                type="text"
+                placeholder="Search date, description, ref no…"
+                value={txSearchTerm}
+                onChange={(e) => setTxSearchTerm(e.target.value)}
+                icon={<Search size={18} />}
+                className="w-full"
+              />
+              {/* Filters — horizontal scroll on mobile, flex wrap on desktop */}
+              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+                <div className="shrink-0 w-28">
+                  <Select
+                    value={reportYear.toString()}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setReportYear(val);
+                      setProjectAccountYearFilter(val);
+                    }}
+                    options={[
+                      { label: 'All Years', value: '0' },
+                      ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
+                    ]}
+                  />
+                </div>
+                <div className="shrink-0 w-40">
+                  <Select
+                    value={bankAccountFilter}
+                    onChange={(e) => setBankAccountFilter(e.target.value)}
+                    options={[
+                      { label: 'All Accounts', value: 'All' },
+                      ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
+                    ]}
+                  />
+                </div>
+                <div className="shrink-0 w-44">
+                  <Select
+                    value={txCategoryFilter}
+                    onChange={(e) => setTxCategoryFilter(e.target.value)}
+                    options={[
+                      { label: 'All Categories', value: 'All' },
+                      { label: 'Projects & Activities', value: 'Projects & Activities' },
+                      { label: 'Membership', value: 'Membership' },
+                      { label: 'Administrative', value: 'Administrative' },
+                      { label: 'Uncategorized', value: 'Uncategorized' }
+                    ]}
+                  />
+                </div>
               </div>
             </div>
 
@@ -2896,94 +2895,96 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               </div>
 
               {/* Mobile View */}
-              <div className="md:hidden space-y-4 p-2">
+              <div className="md:hidden space-y-2.5 p-1">
                 {displayTransactions.map(tx => (
-                  <div key={tx.id} className={`bg-white border border-slate-100 rounded-xl p-4 shadow-sm relative ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}`}>
-                    <div className="absolute top-4 left-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedTxIds.has(tx.id)}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          const nextTx = new Set(selectedTxIds);
-                          const nextSplits = new Set(selectedSplitIds);
-                          if (checked) {
-                            nextTx.add(tx.id);
-                            if (tx.isSplit && transactionSplits[tx.id]) {
-                              transactionSplits[tx.id].forEach(s => nextSplits.add(s.id));
+                  <div key={tx.id} className={`bg-white border rounded-xl overflow-hidden shadow-sm relative flex ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200' : 'border-slate-100'}`}>
+                    {/* Left color bar: green = income, red = expense */}
+                    <div className={`w-1 shrink-0 ${tx.type === 'Income' ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <div className="flex-1 p-3">
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedTxIds.has(tx.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            const nextTx = new Set(selectedTxIds);
+                            const nextSplits = new Set(selectedSplitIds);
+                            if (checked) {
+                              nextTx.add(tx.id);
+                              if (tx.isSplit && transactionSplits[tx.id]) {
+                                transactionSplits[tx.id].forEach(s => nextSplits.add(s.id));
+                              }
+                            } else {
+                              nextTx.delete(tx.id);
+                              if (tx.isSplit && transactionSplits[tx.id]) {
+                                transactionSplits[tx.id].forEach(s => nextSplits.delete(s.id));
+                              }
                             }
-                          } else {
-                            nextTx.delete(tx.id);
-                            if (tx.isSplit && transactionSplits[tx.id]) {
-                              transactionSplits[tx.id].forEach(s => nextSplits.delete(s.id));
-                            }
-                          }
-                          setSelectedTxIds(nextTx);
-                          setSelectedSplitIds(nextSplits);
-                        }}
-                        className="accent-blue-600 w-4 h-4 cursor-pointer"
-                      />
-                    </div>
-                    <div className="pl-8">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-slate-500 font-medium">{formatDate(tx.date)}</span>
-                          <span className="text-sm font-bold text-slate-900 mt-1 leading-tight">{tx.description}</span>
-                        </div>
-                        <div className={`text-right font-mono font-bold text-base ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                          {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <Badge variant={tx.isSplit ? "info" : "neutral"} className="text-[10px]">{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
-                        {(() => {
-                          const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
-                          const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
-                          if (tx.isSplit) return <Badge variant="info" className="text-[10px]">Split Details</Badge>;
-                          if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Categorized</Badge>;
-                          return <Badge variant="warning" className="text-[10px]">Uncategorized</Badge>;
-                        })()}
-                      </div>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          Bal: {formatCurrency(tx.runningBalance)}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="p-1.5 h-8 w-8">
-                            <Edit size={16} className="text-slate-500" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 h-8 w-8">
-                            <Trash2 size={16} className="text-red-500" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            setSelectedTransaction(tx);
-                            setIsSplitModalOpen(true);
-                            if (members.length === 0) loadMembers();
-                            if (projects.length === 0) loadProjects();
-                          }} className="text-blue-600 text-xs px-2 font-bold h-8">
-                            {tx.isSplit ? 'Edit' : 'Split'}
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Mobile Split Details */}
-                      {tx.isSplit && transactionSplits[tx.id] && (
-                        <div className="mt-3 space-y-2 bg-blue-50/30 p-2 rounded-lg border border-blue-100/50">
-                          {transactionSplits[tx.id].map((split, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-[11px]">
-                              <div className="flex items-center gap-1 min-w-0">
-                                <span className="text-blue-400">↳</span>
-                                <span className="text-slate-600 truncate">{split.description}</span>
-                              </div>
-                              <span className={`font-mono font-medium whitespace-nowrap ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                                {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
-                              </span>
+                            setSelectedTxIds(nextTx);
+                            setSelectedSplitIds(nextSplits);
+                          }}
+                          className="accent-blue-600 w-4 h-4 cursor-pointer mt-0.5 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          {/* Top row: date + amount */}
+                          <div className="flex justify-between items-baseline gap-2 mb-0.5">
+                            <span className="text-[11px] text-slate-400 font-medium">{formatDate(tx.date)}</span>
+                            <span className={`font-mono font-bold text-sm shrink-0 ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                              {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                            </span>
+                          </div>
+                          {/* Description */}
+                          <p className="text-sm font-semibold text-slate-900 leading-snug mb-1.5">{tx.description}</p>
+                          {/* Badges + balance row */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge variant={tx.isSplit ? "info" : "neutral"} className="text-[10px]">{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
+                              {(() => {
+                                const hasProjectId = tx.projectId && tx.projectId.trim() !== '';
+                                const hasPurpose = tx.purpose && tx.purpose.trim() !== '';
+                                if (tx.isSplit) return null;
+                                if (hasProjectId && hasPurpose) return <Badge variant="success" className="text-[10px]">Linked</Badge>;
+                                return <Badge variant="warning" className="text-[10px]">Unlinked</Badge>;
+                              })()}
+                              <span className="text-[10px] text-slate-400 font-mono">Bal {formatCurrency(tx.runningBalance)}</span>
                             </div>
-                          ))}
+                            {/* Action buttons */}
+                            <div className="flex gap-1 shrink-0">
+                              <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                <Trash2 size={14} />
+                              </button>
+                              <button onClick={() => {
+                                setSelectedTransaction(tx);
+                                setIsSplitModalOpen(true);
+                                if (members.length === 0) loadMembers();
+                                if (projects.length === 0) loadProjects();
+                              }} className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors">
+                                {tx.isSplit ? 'Edit' : 'Split'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Mobile Split Details */}
+                          {tx.isSplit && transactionSplits[tx.id] && (
+                            <div className="mt-2 space-y-1.5 bg-blue-50/40 p-2 rounded-lg border border-blue-100/60">
+                              {transactionSplits[tx.id].map((split, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-[11px]">
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <span className="text-blue-400">↳</span>
+                                    <span className="text-slate-600 truncate">{split.description}</span>
+                                  </div>
+                                  <span className={`font-mono font-medium whitespace-nowrap ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 ))}

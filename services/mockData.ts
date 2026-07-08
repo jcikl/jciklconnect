@@ -180,7 +180,7 @@ export const MOCK_MEMBERS: Member[] = [
 
 export const MOCK_EVENTS: Event[] = [
   { id: 'e1', title: 'Annual General Meeting', date: '2023-12-15T18:00:00', type: 'Meeting', attendees: 85, maxAttendees: 150, status: 'Upcoming', predictedDemand: 'High', location: 'Grand Hall', price: 0, imageUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80' },
-  { id: 'e2', title: 'Public Speaking Masterclass', date: '2023-12-20T10:00:00', type: 'Training', attendees: 24, maxAttendees: 30, status: 'Upcoming', predictedDemand: 'Medium', location: 'Room 3B', price: 50, imageUrl: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80' },
+  { id: 'e2', title: 'Public Speaking Masterclass', date: '2023-12-20T10:00:00', type: 'Training', attendees: 24, maxAttendees: 30, status: 'Upcoming', predictedDemand: 'Medium', location: 'Room 3B', price: 50, priceMin: 50, priceMax: 150, imageUrl: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80' },
   { id: 'e3', title: 'Community Clean-up', date: '2024-01-05T08:00:00', type: 'Project', attendees: 45, status: 'Upcoming', predictedDemand: 'Low', location: 'Central Park', price: 0, imageUrl: 'https://images.unsplash.com/photo-1558522195-e1201b090344?auto=format&fit=crop&q=80' },
   { id: 'e4', title: 'Networking Night', date: '2023-11-30T19:00:00', type: 'Social', attendees: 110, status: 'Completed', location: 'The Rooftop Bar', price: 30, imageUrl: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&q=80' },
 ];
