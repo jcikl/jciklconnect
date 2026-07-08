@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal } from 'lucide-react';
+import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -2691,44 +2691,58 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
                   {/* Filter panel: always on desktop, toggle on mobile */}
                   <div className={`space-y-2 ${txFiltersOpen ? 'block' : 'hidden'} md:block`}>
-                    {/* Dropdowns */}
-                    <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
-                      <div className="shrink-0 w-28">
-                        <Select
+                    {/* Dropdowns — pill style */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {/* Year */}
+                      <div className="relative">
+                        <select
                           value={reportYear.toString()}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            setReportYear(val);
-                            setProjectAccountYearFilter(val);
-                          }}
-                          options={[
-                            { label: 'All Years', value: '0' },
-                            ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
-                          ]}
-                        />
+                          onChange={(e) => { const v = parseInt(e.target.value, 10); setReportYear(v); setProjectAccountYearFilter(v); }}
+                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
+                            reportYear !== 0
+                              ? 'bg-jci-blue text-white border-jci-blue'
+                              : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
+                          }`}
+                        >
+                          <option value="0">All Years</option>
+                          {allTransactionYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+                        </select>
+                        <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${reportYear !== 0 ? 'text-white' : 'text-slate-400'}`} />
                       </div>
-                      <div className="shrink-0 w-40">
-                        <Select
+                      {/* Account */}
+                      <div className="relative">
+                        <select
                           value={bankAccountFilter}
                           onChange={(e) => setBankAccountFilter(e.target.value)}
-                          options={[
-                            { label: 'All Accounts', value: 'All' },
-                            ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
-                          ]}
-                        />
+                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors max-w-[140px] truncate ${
+                            bankAccountFilter !== 'All'
+                              ? 'bg-jci-blue text-white border-jci-blue'
+                              : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
+                          }`}
+                        >
+                          <option value="All">All Accounts</option>
+                          {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                        </select>
+                        <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${bankAccountFilter !== 'All' ? 'text-white' : 'text-slate-400'}`} />
                       </div>
-                      <div className="shrink-0 w-44">
-                        <Select
+                      {/* Category */}
+                      <div className="relative">
+                        <select
                           value={txCategoryFilter}
                           onChange={(e) => setTxCategoryFilter(e.target.value)}
-                          options={[
-                            { label: 'All Categories', value: 'All' },
-                            { label: 'Projects & Activities', value: 'Projects & Activities' },
-                            { label: 'Membership', value: 'Membership' },
-                            { label: 'Administrative', value: 'Administrative' },
-                            { label: 'Uncategorized', value: 'Uncategorized' }
-                          ]}
-                        />
+                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors max-w-[150px] truncate ${
+                            txCategoryFilter !== 'All'
+                              ? 'bg-jci-blue text-white border-jci-blue'
+                              : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
+                          }`}
+                        >
+                          <option value="All">All Categories</option>
+                          <option value="Projects & Activities">Projects & Activities</option>
+                          <option value="Membership">Membership</option>
+                          <option value="Administrative">Administrative</option>
+                          <option value="Uncategorized">Uncategorized</option>
+                        </select>
+                        <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${txCategoryFilter !== 'All' ? 'text-white' : 'text-slate-400'}`} />
                       </div>
                     </div>
                     {/* Chips — Type + Status in one row */}
