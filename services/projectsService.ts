@@ -109,6 +109,9 @@ export class ProjectsService {
       if (projectData.submittedBy != null) payload.submittedBy = projectData.submittedBy;
       if (projectData.logoUrl != null) payload.logoUrl = projectData.logoUrl;
       if (projectData.galleryUrls != null) payload.galleryUrls = projectData.galleryUrls;
+      if (projectData.priceMin != null) payload.priceMin = projectData.priceMin;
+      if (projectData.priceMax != null) payload.priceMax = projectData.priceMax;
+      if (projectData.roadmapUrl != null) payload.roadmapUrl = projectData.roadmapUrl;
 
       const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
       this.invalidateProjectsCache();
