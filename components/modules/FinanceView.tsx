@@ -3047,100 +3047,94 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                       <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{group.label}</span>
                     </div>
                     {group.txs.map(tx => (
-                  <div key={tx.id} className={`bg-white border rounded-xl overflow-hidden shadow-sm relative flex ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200' : tx.status === 'Pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-100'}`}>
-                    {/* Left color bar: green = income, red = expense */}
-                    <div className={`w-1 shrink-0 ${tx.type === 'Income' ? 'bg-green-400' : 'bg-red-400'}`} />
-                    <div className="flex-1 p-3">
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedTxIds.has(tx.id)}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            const nextTx = new Set(selectedTxIds);
-                            const nextSplits = new Set(selectedSplitIds);
-                            if (checked) {
-                              nextTx.add(tx.id);
-                              if (tx.isSplit && transactionSplits[tx.id]) {
-                                transactionSplits[tx.id].forEach(s => nextSplits.add(s.id));
+                  <div key={tx.id} className={`bg-white border rounded-xl overflow-hidden shadow-sm relative ${selectedTxIds.has(tx.id) ? 'ring-2 ring-blue-500 bg-blue-50/20 border-blue-200' : tx.status === 'Pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-100'}`}>
+                    {/* Left color bar: absolute positioned */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${tx.type === 'Income' ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+                      {/* Row 1: checkbox + date + pending | amount */}
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedTxIds.has(tx.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const nextTx = new Set(selectedTxIds);
+                              const nextSplits = new Set(selectedSplitIds);
+                              if (checked) {
+                                nextTx.add(tx.id);
+                                if (tx.isSplit && transactionSplits[tx.id]) {
+                                  transactionSplits[tx.id].forEach(s => nextSplits.add(s.id));
+                                }
+                              } else {
+                                nextTx.delete(tx.id);
+                                if (tx.isSplit && transactionSplits[tx.id]) {
+                                  transactionSplits[tx.id].forEach(s => nextSplits.delete(s.id));
+                                }
                               }
-                            } else {
-                              nextTx.delete(tx.id);
-                              if (tx.isSplit && transactionSplits[tx.id]) {
-                                transactionSplits[tx.id].forEach(s => nextSplits.delete(s.id));
-                              }
-                            }
-                            setSelectedTxIds(nextTx);
-                            setSelectedSplitIds(nextSplits);
-                          }}
-                          className="accent-blue-600 w-4 h-4 cursor-pointer mt-0.5 shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          {/* Top row: date + Pending dot + amount */}
-                          <div className="flex justify-between items-center gap-2 mb-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] text-slate-400 font-medium">{formatDate(tx.date)}</span>
-                              {tx.status === 'Pending' && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-0">
-                                  <span className="w-1 h-1 rounded-full bg-amber-400 inline-block" />
-                                  Pending
-                                </span>
-                              )}
-                            </div>
-                            <span className={`font-mono font-bold text-sm shrink-0 ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                              {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                              setSelectedTxIds(nextTx);
+                              setSelectedSplitIds(nextSplits);
+                            }}
+                            className="accent-blue-600 w-4 h-4 cursor-pointer shrink-0"
+                          />
+                          <span className="text-[11px] text-slate-400 font-medium shrink-0">{formatDate(tx.date)}</span>
+                          {tx.status === 'Pending' && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 shrink-0">
+                              <span className="w-1 h-1 rounded-full bg-amber-400 inline-block" />
+                              Pending
                             </span>
-                          </div>
-                          {/* Description */}
-                          <p className="text-sm font-semibold text-slate-900 leading-snug mb-1.5 truncate">{tx.description}</p>
-                          {/* Meta row: category + account + balance | actions */}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-                              <Badge variant={tx.isSplit ? "info" : "neutral"} className="text-[10px] shrink-0">{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
-                              {(() => {
-                                const acc = accounts.find(a => a.id === tx.bankAccountId);
-                                if (acc) return <span className="text-[10px] text-slate-400 truncate">{acc.name}</span>;
-                                return null;
-                              })()}
-                              <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap shrink-0">Bal {formatCurrency(tx.runningBalance)}</span>
-                            </div>
-                            {/* Action buttons */}
-                            <div className="flex gap-1 shrink-0">
-                              <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                                <Edit size={14} />
-                              </button>
-                              <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                <Trash2 size={14} />
-                              </button>
-                              <button onClick={() => {
-                                setSelectedTransaction(tx);
-                                setIsSplitModalOpen(true);
-                                if (members.length === 0) loadMembers();
-                                if (projects.length === 0) loadProjects();
-                              }} className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors">
-                                {tx.isSplit ? 'Edit' : 'Split'}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Mobile Split Details */}
-                          {tx.isSplit && transactionSplits[tx.id] && (
-                            <div className="mt-2 space-y-1.5 bg-blue-50/40 p-2 rounded-lg border border-blue-100/60">
-                              {transactionSplits[tx.id].map((split, idx) => (
-                                <div key={idx} className="flex justify-between items-center text-[11px]">
-                                  <div className="flex items-center gap-1 min-w-0">
-                                    <span className="text-blue-400">↳</span>
-                                    <span className="text-slate-600 truncate">{split.description}</span>
-                                  </div>
-                                  <span className={`font-mono font-medium whitespace-nowrap ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
                           )}
                         </div>
+                        <span className={`font-mono font-bold text-sm shrink-0 ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                          {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                        </span>
                       </div>
+                      {/* Row 2: description */}
+                      <p className="text-sm font-semibold text-slate-900 leading-snug truncate mb-2">{tx.description}</p>
+                      {/* Row 3: meta (category + account + balance) | actions */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                          <Badge variant={tx.isSplit ? "info" : "neutral"} className="text-[10px] shrink-0">{tx.isSplit ? "Split" : (tx.category || "—")}</Badge>
+                          {(() => {
+                            const acc = accounts.find(a => a.id === tx.bankAccountId);
+                            if (acc) return <span className="text-[10px] text-slate-400 truncate">{acc.name}</span>;
+                            return null;
+                          })()}
+                          <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap shrink-0">Bal {formatCurrency(tx.runningBalance)}</span>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" title="Edit">
+                            <Edit size={14} />
+                          </button>
+                          <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                            <Trash2 size={14} />
+                          </button>
+                          <button onClick={() => {
+                            setSelectedTransaction(tx);
+                            setIsSplitModalOpen(true);
+                            if (members.length === 0) loadMembers();
+                            if (projects.length === 0) loadProjects();
+                          }} className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors">
+                            {tx.isSplit ? 'Edit Split' : 'Split'}
+                          </button>
+                        </div>
+                      </div>
+                      {/* Split details */}
+                      {tx.isSplit && transactionSplits[tx.id] && (
+                        <div className="mt-2 space-y-1.5 bg-blue-50/40 p-2 rounded-lg border border-blue-100/60">
+                          {transactionSplits[tx.id].map((split, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-[11px]">
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className="text-blue-400 shrink-0">↳</span>
+                                <span className="text-slate-600 truncate">{split.description}</span>
+                              </div>
+                              <span className={`font-mono font-medium whitespace-nowrap shrink-0 ${(split.type || tx.type) === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                {(split.type || tx.type) === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(split.amount))}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                     ))}
