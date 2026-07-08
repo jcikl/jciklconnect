@@ -1479,40 +1479,46 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
-          <p className="text-slate-500">Automated bookkeeping, dues collection, and budgeting.</p>
+          <p className="text-slate-500 text-sm">Automated bookkeeping, dues collection, and budgeting.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-28 shrink-0">
-            <Select
-              value={reportYear.toString()}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                setReportYear(val);
-                setProjectAccountYearFilter(val);
-              }}
-              options={[
-                { label: 'All Years', value: '0' },
-                ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
-              ]}
-            />
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          {/* Primary row: year + new transaction CTA */}
+          <div className="flex items-center gap-2">
+            <div className="w-28 shrink-0">
+              <Select
+                value={reportYear.toString()}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setReportYear(val);
+                  setProjectAccountYearFilter(val);
+                }}
+                options={[
+                  { label: 'All Years', value: '0' },
+                  ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
+                ]}
+              />
+            </div>
+            <Button onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}><DollarSign size={16} className="mr-2" /> New Transaction</Button>
           </div>
-          <Button variant="outline" onClick={() => setIsReportsModalOpen(true)}>
-            <FileText size={16} className="mr-2" /> Reports
-          </Button>
-          {hasPermission('canEditFinance') && (
-            <>
-              <Button variant="outline" onClick={() => setIsDuesRenewalModalOpen(true)}>
-                <Calendar size={16} className="mr-2" /> Renew Dues
-              </Button>
-              <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
-                <Upload size={16} className="mr-2" /> Batch Import
-              </Button>
-            </>
-          )}
-          <Button onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}><DollarSign size={16} className="mr-2" /> New Transaction</Button>
+          {/* Secondary row: Reports + admin buttons (separate row on mobile, inline on desktop) */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setIsReportsModalOpen(true)}>
+              <FileText size={14} className="mr-1.5" /> Reports
+            </Button>
+            {hasPermission('canEditFinance') && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)}>
+                  <Calendar size={14} className="mr-1.5" /> Renew Dues
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
+                  <Upload size={14} className="mr-1.5" /> Batch Import
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1874,9 +1880,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 </Card>
 
                 {/* Bottom Section: Summary on Left, Transactions Table on Right */}
-                <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-7 gap-6">
                   {/* Left Column: Summary */}
-                  <div className="lg:col-span-2">
+                  <div className="md:col-span-2">
                     <Card title={`Administrative Summary ${activeYear === 0 ? '(All Time)' : `(${activeYear})`}`}>
 
                       <div className="space-y-3">
@@ -1898,7 +1904,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   </div>
 
                   {/* Right Column: Admin Transactions Table */}
-                  <div className="lg:col-span-5">
+                  <div className="md:col-span-5">
                     <Card
                       title={adminProjectIdFilter === UNASSIGNED_PROJECT_ID ? 'Admin Transactions · Unassigned' : (adminProjectIdFilter ? `Admin Transactions · ${adminProjectIdFilter}` : 'Admin Transactions')}
                       action={adminProjectIdFilter && (
@@ -2055,35 +2061,37 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             Enter a reference number (e.g. PR-default-lo-20250216-001) to search both bank transactions and payment requests. Once verified, click "Mark Reconciled" to record the action.
           </FirstUseBanner>
           <p className="text-sm text-slate-500 mb-4 mt-4">Enter a reference number (e.g. PR-default-lo-20250216-001) to find matching transactions and payment requests, then mark as received.</p>
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex gap-2 mb-4">
             <Input
               placeholder="Reference Number"
               value={refNumberQuery}
               onChange={(e) => setRefNumberQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleReconciliationQuery()}
-              className="max-w-xs"
+              className="flex-1 sm:max-w-sm"
               aria-label="Search transactions and payment requests by reference number"
             />
-            <Button onClick={handleReconciliationQuery} disabled={reconciliationLoading}>{reconciliationLoading ? 'Searching…' : 'Search'}</Button>
+            <Button onClick={handleReconciliationQuery} disabled={reconciliationLoading} className="shrink-0">{reconciliationLoading ? 'Searching…' : 'Search'}</Button>
           </div>
           {reconciliationLoading ? (
             <LoadingState loading>{null}</LoadingState>
           ) : (
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <h4 className="font-medium text-slate-800 mb-2">Transactions ({reconciliationTx.length})</h4>
-                <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                  <span>Transactions</span>
+                  {reconciliationTx.length > 0 && <Badge variant="neutral" className="text-[10px]">{reconciliationTx.length}</Badge>}
+                </h4>
+                <ul className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
                   {reconciliationTx.length === 0 ? (
-                    <li className="py-4 px-4 text-slate-500 text-sm">No matching transactions found.</li>
+                    <li className="py-5 px-4 text-slate-400 text-sm text-center">No matching transactions found.</li>
                   ) : (
                     reconciliationTx.map((tx) => (
-                      <li key={tx.id} className="py-3 px-4 flex flex-wrap items-center justify-between gap-2 bg-white">
-                        <div>
-                          <span className="font-medium">{formatDate(tx.date)}</span>
-                          <span className="text-slate-600 ml-2">{tx.description}</span>
-                          <span className="text-slate-500 ml-2">{formatCurrency(tx.amount)}</span>
+                      <li key={tx.id} className="py-3 px-4 bg-white flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{tx.description}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{formatDate(tx.date)} · <span className={`font-mono font-semibold ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-700'}`}>{formatCurrency(tx.amount)}</span></p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="shrink-0">
                           {tx.status === 'Reconciled' ? (
                             <Badge variant="success">Reconciled</Badge>
                           ) : (
@@ -2098,17 +2106,23 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 </ul>
               </div>
               <div>
-                <h4 className="font-medium text-slate-800 mb-2">Payment Requests ({reconciliationPRs.length})</h4>
-                <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                  <span>Payment Requests</span>
+                  {reconciliationPRs.length > 0 && <Badge variant="neutral" className="text-[10px]">{reconciliationPRs.length}</Badge>}
+                </h4>
+                <ul className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
                   {reconciliationPRs.length === 0 ? (
-                    <li className="py-4 px-4 text-slate-500 text-sm">No matching payment requests found.</li>
+                    <li className="py-5 px-4 text-slate-400 text-sm text-center">No matching payment requests found.</li>
                   ) : (
                     reconciliationPRs.map((pr) => (
-                      <li key={pr.id} className="py-3 px-4 bg-white">
-                        <span className="font-medium">{pr.referenceNumber}</span>
-                        <span className="text-slate-600 ml-2">{pr.purpose}</span>
-                        <span className="text-slate-500 ml-2">{formatCurrency(pr.amount)}</span>
-                        <Badge variant={pr.status === 'approved' ? 'success' : 'warning'} className="ml-2">{pr.status === 'approved' ? 'Approved' : pr.status === 'rejected' ? 'Rejected' : 'Pending'}</Badge>
+                      <li key={pr.id} className="py-3 px-4 bg-white flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{pr.purpose}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 font-mono">{pr.referenceNumber} · <span className="font-semibold text-slate-700">{formatCurrency(pr.amount)}</span></p>
+                        </div>
+                        <div className="shrink-0">
+                          <Badge variant={pr.status === 'approved' ? 'success' : pr.status === 'rejected' ? 'error' : 'warning'}>{pr.status === 'approved' ? 'Approved' : pr.status === 'rejected' ? 'Rejected' : 'Pending'}</Badge>
+                        </div>
                       </li>
                     ))
                   )}
@@ -2214,9 +2228,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           </Card>
 
           {/* Bottom Section: Stats on Left, Transactions Table on Right */}
-          <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-6">
             {/* Left Column: Project Statistics */}
-            <div className="lg:col-span-2">
+            <div className="md:col-span-2">
               <Card title="Project Statistics">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -2293,7 +2307,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
 
             {/* Right Column: Project Transactions Table */}
-            <div className="lg:col-span-5">
+            <div className="md:col-span-5">
               <Card
                 title={selectedProjectFilter === UNASSIGNED_PROJECT_ID ? 'Project Transactions · Unassigned' : (selectedProjectFilter ? `Project Transactions · ${projectAccounts.find(p => p.projectId === selectedProjectFilter)?.projectName || selectedProjectFilter}` : 'Project Transactions')}
                 action={selectedProjectFilter && (
@@ -2442,50 +2456,48 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Transactions' && (
         <div className="space-y-4">
           <Card>
-            <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
-              <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                <div className="w-full md:w-32">
-                  <Select
-                    value={reportYear.toString()}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      setReportYear(val);
-                      setProjectAccountYearFilter(val);
-                    }}
-                    options={[
-                      { label: 'All Years', value: '0' },
-                      ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
-                    ]}
-                  />
-                </div>
-                <div className="w-full md:w-48">
-                  <Select
-                    value={bankAccountFilter}
-                    onChange={(e) => setBankAccountFilter(e.target.value)}
-                    options={[
-                      { label: 'All Accounts', value: 'All' },
-                      ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
-                    ]}
-                  />
-                </div>
-                <div className="w-full md:w-48">
-                  <Select
-                    value={txCategoryFilter}
-                    onChange={(e) => setTxCategoryFilter(e.target.value)}
-                    options={[
-                      { label: 'All Categories', value: 'All' },
-                      { label: 'Projects & Activities', value: 'Projects & Activities' },
-                      { label: 'Membership', value: 'Membership' },
-                      { label: 'Administrative', value: 'Administrative' },
-                      { label: 'Uncategorized', value: 'Uncategorized' }
-                    ]}
-                  />
-                </div>
+            <div className="grid grid-cols-2 md:flex md:flex-row gap-3 mb-6 md:items-center">
+              <div className="md:w-32">
+                <Select
+                  value={reportYear.toString()}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setReportYear(val);
+                    setProjectAccountYearFilter(val);
+                  }}
+                  options={[
+                    { label: 'All Years', value: '0' },
+                    ...allTransactionYears.map(y => ({ label: y.toString(), value: y.toString() }))
+                  ]}
+                />
               </div>
-              <div className="w-full md:w-72">
+              <div className="md:w-44">
+                <Select
+                  value={bankAccountFilter}
+                  onChange={(e) => setBankAccountFilter(e.target.value)}
+                  options={[
+                    { label: 'All Accounts', value: 'All' },
+                    ...accounts.map(acc => ({ label: acc.name, value: acc.id }))
+                  ]}
+                />
+              </div>
+              <div className="md:w-44">
+                <Select
+                  value={txCategoryFilter}
+                  onChange={(e) => setTxCategoryFilter(e.target.value)}
+                  options={[
+                    { label: 'All Categories', value: 'All' },
+                    { label: 'Projects & Activities', value: 'Projects & Activities' },
+                    { label: 'Membership', value: 'Membership' },
+                    { label: 'Administrative', value: 'Administrative' },
+                    { label: 'Uncategorized', value: 'Uncategorized' }
+                  ]}
+                />
+              </div>
+              <div className="col-span-2 md:flex-1">
                 <Input
                   type="text"
-                  placeholder="Search Date, Desc, Ref No, Account, Purpose..."
+                  placeholder="Search date, description, ref no…"
                   value={txSearchTerm}
                   onChange={(e) => setTxSearchTerm(e.target.value)}
                   icon={<Search size={18} />}
