@@ -2164,170 +2164,233 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
 
       {moduleTab === 'Reconciliation' && hasPermission('canViewFinance') && (
-        <>
-        {/* PR → Bank Transaction reconciliation panel */}
-        <Card title="Payment Request Reconciliation" action={
-          <Button variant="ghost" size="sm" onClick={loadPrPendingReconciliation} disabled={prReconcileLoading}>
-            <RefreshCw size={13} className={prReconcileLoading ? 'animate-spin' : ''} />
-          </Button>
-        }>
-          <p className="text-xs text-slate-500 mb-4">
-            Approved Payment Requests that have not yet been linked to a bank payment. Match each PR to its corresponding bank import transaction to complete the expense trail.
-          </p>
-          {prReconcileLoading ? (
-            <LoadingState loading>{null}</LoadingState>
-          ) : prPendingReconciliation.length === 0 ? (
-            <div className="flex items-center gap-2 py-5 text-sm text-green-600">
-              <CheckCircle size={15} />
-              All approved Payment Requests have been reconciled.
+        <div className="space-y-4">
+          {/* ── Section 1: PR → Bank Transaction ── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                  <Link2 size={14} className="text-amber-600" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-800">Payment Request Reconciliation</h3>
+                  <p className="text-[11px] text-slate-400 hidden sm:block">Match approved PRs to bank import transactions</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {!prReconcileLoading && prPendingReconciliation.length > 0 && (
+                  <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{prPendingReconciliation.length} pending</span>
+                )}
+                <button onClick={loadPrPendingReconciliation} disabled={prReconcileLoading} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-blue-50 transition-colors">
+                  <RefreshCw size={14} className={prReconcileLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {prPendingReconciliation.map(pr => {
-                const suggestions = prBankSuggestions[pr.id] || [];
-                const selectedId = prSelectedBankTx[pr.id] ?? '';
-                const bankExpenses = transactions.filter(t => t.source === 'bank_import' && t.type === 'Expense' && t.status !== 'Reconciled');
-                return (
-                  <div key={pr.id} className="rounded-xl border border-slate-200 overflow-hidden">
-                    {/* PR row */}
-                    <div className="flex items-start gap-3 p-3 bg-white">
-                      <div className="w-1.5 self-stretch rounded-full shrink-0 bg-amber-400" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="warning" className="text-[10px] shrink-0">PR</Badge>
-                          <span className="text-[11px] text-slate-400 font-mono">{pr.referenceNumber}</span>
-                          <span className="text-[11px] text-slate-400">{formatDate(pr.date)}</span>
+            {/* Body */}
+            <div className="p-4">
+              {prReconcileLoading ? (
+                <LoadingState loading>{null}</LoadingState>
+              ) : prPendingReconciliation.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <div className="w-10 h-10 rounded-full bg-green-50 border border-green-200 flex items-center justify-center">
+                    <CheckCircle size={18} className="text-green-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700">All caught up!</p>
+                  <p className="text-xs text-slate-400">All approved Payment Requests have been reconciled.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {prPendingReconciliation.map(pr => {
+                    const suggestions = prBankSuggestions[pr.id] || [];
+                    const selectedId = prSelectedBankTx[pr.id] ?? '';
+                    const bankExpenses = transactions.filter(t => t.source === 'bank_import' && t.type === 'Expense' && t.status !== 'Reconciled');
+                    const hasSuggestion = suggestions.length > 0;
+                    return (
+                      <div key={pr.id} className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        {/* PR info row */}
+                        <div className="relative flex items-start gap-3 px-4 py-3 bg-white">
+                          <div className={`absolute left-0 top-0 bottom-0 w-1 ${hasSuggestion ? 'bg-green-400' : 'bg-amber-400'}`} />
+                          <div className="flex-1 min-w-0 pl-1">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                                <Badge variant="warning" className="text-[10px] shrink-0">PR</Badge>
+                                <span className="text-[11px] text-slate-400 font-mono truncate">{pr.referenceNumber}</span>
+                              </div>
+                              <span className="text-sm font-bold text-rose-600 shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                            </div>
+                            <p className="text-sm font-semibold text-slate-800 leading-snug truncate">{pr.purpose || pr.items?.[0]?.purpose || '—'}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[11px] text-slate-400">{formatDate(pr.date)}</span>
+                              {hasSuggestion && (
+                                <span className="text-[10px] font-semibold text-green-600 bg-green-50 border border-green-200 rounded px-1.5 py-0.5 shrink-0">{suggestions.length} suggestion{suggestions.length > 1 ? 's' : ''}</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm text-slate-800 font-medium mt-0.5 truncate">{pr.purpose || pr.items?.[0]?.purpose || '—'}</p>
-                        <p className="text-sm font-semibold text-rose-600 mt-0.5">{formatCurrency(pr.totalAmount || pr.amount)}</p>
+                        {/* Match area */}
+                        <div className="border-t border-slate-100 px-4 pb-3 pt-2.5 bg-slate-50/60 space-y-2.5">
+                          <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Select bank transaction</p>
+                          <select
+                            value={selectedId}
+                            onChange={e => setPrSelectedBankTx(prev => ({ ...prev, [pr.id]: e.target.value }))}
+                            className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+                          >
+                            <option value="">— select bank transaction —</option>
+                            {hasSuggestion && (
+                              <optgroup label={`Suggested (same amount, ±14 days)`}>
+                                {suggestions.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    ✓ {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {bankExpenses.filter(t => !suggestions.find(s => s.id === t.id)).length > 0 && (
+                              <optgroup label="Other bank expenses">
+                                {bankExpenses.filter(t => !suggestions.find(s => s.id === t.id)).map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
+                          <Button
+                            size="sm"
+                            onClick={() => handleLinkPrToBankTx(pr.id)}
+                            disabled={!selectedId || prLinkingId === pr.id}
+                            className="w-full"
+                          >
+                            <Link2 size={13} className="mr-1.5" />
+                            {prLinkingId === pr.id ? 'Linking…' : 'Confirm Match'}
+                          </Button>
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Section 2: Reconcile by Reference Number ── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-slate-100">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                <Search size={14} className="text-blue-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Reconcile by Reference Number</h3>
+                <p className="text-[11px] text-slate-400 hidden sm:block">Search transactions and PRs by reference number</p>
+              </div>
+            </div>
+            {/* Search bar */}
+            <div className="px-4 pt-3 pb-3 border-b border-slate-100 bg-slate-50/40">
+              <FirstUseBanner flowId="reconciliation" dismissLabel="Got it" variant="teal" onHelpClick={helpModal?.openHelp}>
+                Enter a reference number (e.g. PR-default-lo-20250216-001) to search both bank transactions and payment requests. Once verified, click "Mark Reconciled" to record the action.
+              </FirstUseBanner>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="e.g. PR-default-lo-20250216-001"
+                  value={refNumberQuery}
+                  onChange={(e) => setRefNumberQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleReconciliationQuery()}
+                  className="flex-1"
+                  aria-label="Search transactions and payment requests by reference number"
+                />
+                <Button onClick={handleReconciliationQuery} disabled={reconciliationLoading} className="shrink-0">
+                  {reconciliationLoading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
+                  <span className="ml-1.5 hidden sm:inline">{reconciliationLoading ? 'Searching…' : 'Search'}</span>
+                </Button>
+              </div>
+            </div>
+            {/* Results */}
+            <div className="p-4">
+              {reconciliationLoading ? (
+                <LoadingState loading>{null}</LoadingState>
+              ) : reconciliationTx.length === 0 && reconciliationPRs.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-4">Enter a reference number above to search.</p>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* Transactions column */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Transactions</h4>
+                      {reconciliationTx.length > 0 && <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5">{reconciliationTx.length}</span>}
                     </div>
-                    {/* Match area */}
-                    <div className="border-t border-slate-100 px-3 pb-3 pt-2 bg-slate-50/60 space-y-2">
-                      {suggestions.length > 0 && (
-                        <p className="text-[11px] text-slate-500 uppercase tracking-wide font-semibold">
-                          {suggestions.length} suggested bank transaction{suggestions.length > 1 ? 's' : ''}
-                        </p>
+                    <div className="space-y-2">
+                      {reconciliationTx.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-200 py-5 text-center text-xs text-slate-400">No matching transactions</div>
+                      ) : (
+                        reconciliationTx.map((tx) => (
+                          <div key={tx.id} className="relative rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${tx.type === 'Income' ? 'bg-green-400' : 'bg-red-400'}`} />
+                            <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="text-[11px] text-slate-400">{formatDate(tx.date)}</span>
+                                <span className={`font-mono font-bold text-sm shrink-0 ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                                </span>
+                              </div>
+                              <p className="text-sm font-semibold text-slate-900 leading-snug truncate mb-1.5">{tx.description}</p>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  {tx.status === 'Reconciled'
+                                    ? <Badge variant="success" className="text-[10px]">Reconciled</Badge>
+                                    : <Badge variant="warning" className="text-[10px]">{tx.status || 'Pending'}</Badge>
+                                  }
+                                  {tx.referenceNumber && <span className="text-[10px] text-slate-400 font-mono truncate">{tx.referenceNumber}</span>}
+                                </div>
+                                {tx.status !== 'Reconciled' && (
+                                  <Button size="sm" onClick={() => handleMarkReconciled(tx.id)} disabled={reconcilingId !== null} className="shrink-0 text-[11px] px-2 py-1">
+                                    {reconcilingId === tx.id ? 'Processing…' : 'Mark Reconciled'}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
                       )}
-                      <select
-                        value={selectedId}
-                        onChange={e => setPrSelectedBankTx(prev => ({ ...prev, [pr.id]: e.target.value }))}
-                        className="w-full text-sm border border-slate-200 rounded-lg px-2 py-2 bg-white"
-                      >
-                        <option value="">— select bank transaction —</option>
-                        {/* Suggestions first */}
-                        {suggestions.length > 0 && (
-                          <optgroup label="Suggested (same amount, ±14 days)">
-                            {suggestions.map(t => (
-                              <option key={t.id} value={t.id}>
-                                {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {/* All other unreconciled bank expenses */}
-                        {bankExpenses.filter(t => !suggestions.find(s => s.id === t.id)).length > 0 && (
-                          <optgroup label="Other bank expenses">
-                            {bankExpenses.filter(t => !suggestions.find(s => s.id === t.id)).map(t => (
-                              <option key={t.id} value={t.id}>
-                                {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
-                      <Button
-                        size="sm"
-                        onClick={() => handleLinkPrToBankTx(pr.id)}
-                        disabled={!selectedId || prLinkingId === pr.id}
-                        className="w-full"
-                      >
-                        <Link2 size={13} className="mr-1.5" />
-                        {prLinkingId === pr.id ? 'Linking…' : 'Confirm — PR paid via this bank transaction'}
-                      </Button>
                     </div>
                   </div>
-                );
-              })}
+                  {/* Payment Requests column */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Payment Requests</h4>
+                      {reconciliationPRs.length > 0 && <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5">{reconciliationPRs.length}</span>}
+                    </div>
+                    <div className="space-y-2">
+                      {reconciliationPRs.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-200 py-5 text-center text-xs text-slate-400">No matching payment requests</div>
+                      ) : (
+                        reconciliationPRs.map((pr) => (
+                          <div key={pr.id} className="relative rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${pr.status === 'approved' ? 'bg-green-400' : pr.status === 'rejected' ? 'bg-red-400' : 'bg-amber-400'}`} />
+                            <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="text-[11px] text-slate-400 font-mono truncate">{pr.referenceNumber}</span>
+                                <span className="font-mono font-bold text-sm shrink-0 text-slate-700">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                              </div>
+                              <p className="text-sm font-semibold text-slate-900 leading-snug truncate mb-1.5">{pr.purpose || '—'}</p>
+                              <div className="flex items-center gap-1.5">
+                                <Badge variant={pr.status === 'approved' ? 'success' : pr.status === 'rejected' ? 'error' : 'warning'} className="text-[10px]">
+                                  {pr.status === 'approved' ? 'Approved' : pr.status === 'rejected' ? 'Rejected' : 'Pending'}
+                                </Badge>
+                                <span className="text-[11px] text-slate-400">{formatDate(pr.date)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </Card>
-        <Card title="Reconcile by Reference Number">
-          <FirstUseBanner flowId="reconciliation" dismissLabel="Got it" variant="teal" onHelpClick={helpModal?.openHelp}>
-            Enter a reference number (e.g. PR-default-lo-20250216-001) to search both bank transactions and payment requests. Once verified, click "Mark Reconciled" to record the action.
-          </FirstUseBanner>
-          <p className="text-sm text-slate-500 mb-4 mt-4">Enter a reference number (e.g. PR-default-lo-20250216-001) to find matching transactions and payment requests, then mark as received.</p>
-          <div className="flex gap-2 mb-4">
-            <Input
-              placeholder="Reference Number"
-              value={refNumberQuery}
-              onChange={(e) => setRefNumberQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleReconciliationQuery()}
-              className="flex-1 sm:max-w-sm"
-              aria-label="Search transactions and payment requests by reference number"
-            />
-            <Button onClick={handleReconciliationQuery} disabled={reconciliationLoading} className="shrink-0">{reconciliationLoading ? 'Searching…' : 'Search'}</Button>
           </div>
-          {reconciliationLoading ? (
-            <LoadingState loading>{null}</LoadingState>
-          ) : (
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-                  <span>Transactions</span>
-                  {reconciliationTx.length > 0 && <Badge variant="neutral" className="text-[10px]">{reconciliationTx.length}</Badge>}
-                </h4>
-                <ul className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                  {reconciliationTx.length === 0 ? (
-                    <li className="py-5 px-4 text-slate-400 text-sm text-center">No matching transactions found.</li>
-                  ) : (
-                    reconciliationTx.map((tx) => (
-                      <li key={tx.id} className="py-3 px-4 bg-white flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{tx.description}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{formatDate(tx.date)} · <span className={`font-mono font-semibold ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-700'}`}>{formatCurrency(tx.amount)}</span></p>
-                        </div>
-                        <div className="shrink-0">
-                          {tx.status === 'Reconciled' ? (
-                            <Badge variant="success">Reconciled</Badge>
-                          ) : (
-                            <Button size="sm" onClick={() => handleMarkReconciled(tx.id)} disabled={reconcilingId !== null}>
-                              {reconcilingId === tx.id ? 'Processing…' : 'Mark Reconciled'}
-                            </Button>
-                          )}
-                        </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-                  <span>Payment Requests</span>
-                  {reconciliationPRs.length > 0 && <Badge variant="neutral" className="text-[10px]">{reconciliationPRs.length}</Badge>}
-                </h4>
-                <ul className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                  {reconciliationPRs.length === 0 ? (
-                    <li className="py-5 px-4 text-slate-400 text-sm text-center">No matching payment requests found.</li>
-                  ) : (
-                    reconciliationPRs.map((pr) => (
-                      <li key={pr.id} className="py-3 px-4 bg-white flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{pr.purpose}</p>
-                          <p className="text-xs text-slate-500 mt-0.5 font-mono">{pr.referenceNumber} · <span className="font-semibold text-slate-700">{formatCurrency(pr.amount)}</span></p>
-                        </div>
-                        <div className="shrink-0">
-                          <Badge variant={pr.status === 'approved' ? 'success' : pr.status === 'rejected' ? 'error' : 'warning'}>{pr.status === 'approved' ? 'Approved' : pr.status === 'rejected' ? 'Rejected' : 'Pending'}</Badge>
-                        </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-            </div>
-          )}
-        </Card>
-        </>
+        </div>
       )}
 
 
