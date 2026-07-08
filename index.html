@@ -3,11 +3,115 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JCI Kuala Lumpur - Intelligent LO Management</title>
+    <title>JCI Kuala Lumpur</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
-</head>
+
+    <!-- Preconnect: Firebase services (saves ~300ms DNS+TLS on first data fetch) -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+    <link rel="preconnect" href="https://securetoken.googleapis.com" />
+    <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+
+    <!-- Preload above-fold logo so it renders with the shell, not after -->
+    <link rel="preload" as="image" href="/JCI%20Kuala%20Lumpur-transparent.png" />
+
+    <style>
+      /* Shell styles — inline so they apply before any JS or CSS bundle loads */
+      *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+      body{background:#f8fafc;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased}
+
+      /* Header — matches GuestHeader exactly: bg-white shadow-sm sticky h-16 md:h-20 */
+      #sh{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.1);position:sticky;top:0;z-index:50;height:64px;display:flex;align-items:center;padding:0 1rem}
+      @media(min-width:768px){#sh{height:80px;padding:0 1.5rem}}
+      #sh img{height:32px;width:auto;object-fit:contain}
+      @media(min-width:768px){#sh img{height:40px}}
+      #sh .sp{flex:1}
+
+      /* Desktop nav pills */
+      #sh .dn{display:none;gap:2rem;align-items:center}
+      @media(min-width:768px){#sh .dn{display:flex}}
+      .np{height:.875rem;border-radius:4px;background:#e2e8f0;animation:sh 1.6s ease-in-out infinite}
+
+      /* Login button skeleton */
+      .sb{height:2rem;width:4.5rem;border-radius:.5rem;background:#e2e8f0;animation:sh 1.6s ease-in-out infinite;display:none}
+      @media(min-width:640px){.sb{display:block}}
+
+      /* Mobile hamburger */
+      .hb{width:2.5rem;height:2.5rem;background:#f1f5f9;border-radius:.625rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+      @media(min-width:768px){.hb{display:none}}
+
+      /* Hero — matches bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue */
+      #hro{background:linear-gradient(135deg,#130f2d 0%,#1a3d7c 55%,#1e56c4 100%);padding:3.5rem 1rem 4rem;text-align:center;overflow:hidden}
+      @media(min-width:768px){#hro{padding:5rem 1.5rem 5.5rem}}
+      .hl{background:rgba(255,255,255,.15);border-radius:6px;margin:0 auto;animation:sh 1.6s ease-in-out infinite}
+
+      /* Content area */
+      #sc{padding:1.5rem 1rem;max-width:80rem;margin:0 auto}
+      @media(min-width:640px){#sc{padding:2rem 1.5rem}}
+      .slbl{height:1rem;width:7rem;border-radius:4px;background:#cbd5e1;animation:sh 1.6s ease-in-out infinite;margin-bottom:.75rem}
+      .sg{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+      @media(min-width:768px){.sg{grid-template-columns:repeat(4,1fr)}}
+      .sc{background:#e2e8f0;border-radius:1rem;animation:sh 1.6s ease-in-out infinite}
+
+      @keyframes sh{0%,100%{opacity:1}50%{opacity:.45}}
+    </style>
+  </head>
   <body class="bg-slate-50 text-slate-900 antialiased">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static shell — paints instantly on first HTML byte, replaced seamlessly by React -->
+      <div>
+        <!-- Header matches GuestHeader: white, sticky, h-16 mobile / h-20 desktop -->
+        <header id="sh">
+          <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" />
+          <div class="sp"></div>
+          <nav class="dn" aria-hidden="true">
+            <div class="np" style="width:2.5rem"></div>
+            <div class="np" style="width:3rem"></div>
+            <div class="np" style="width:5.5rem"></div>
+            <div class="np" style="width:2.75rem"></div>
+            <div class="np" style="width:5.25rem"></div>
+            <div class="np" style="width:4rem"></div>
+            <div class="np" style="width:5rem"></div>
+          </nav>
+          <div class="sb" aria-hidden="true"></div>
+          <div class="hb" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </div>
+        </header>
+
+        <main aria-hidden="true">
+          <!-- Hero skeleton -->
+          <div id="hro">
+            <div class="hl" style="height:.7rem;width:28%;margin-bottom:1.25rem"></div>
+            <div class="hl" style="height:2.25rem;width:72%;margin-bottom:.625rem"></div>
+            <div class="hl" style="height:2.25rem;width:52%;margin-bottom:1.5rem"></div>
+            <div class="hl" style="height:.8rem;width:58%;margin-bottom:.5rem"></div>
+            <div class="hl" style="height:.8rem;width:42%"></div>
+          </div>
+
+          <!-- Content skeleton -->
+          <div id="sc">
+            <div class="slbl"></div>
+            <div class="sg">
+              <div class="sc" style="height:80px"></div>
+              <div class="sc" style="height:80px"></div>
+              <div class="sc" style="height:80px"></div>
+              <div class="sc" style="height:80px"></div>
+            </div>
+            <div class="slbl" style="margin-top:1.5rem"></div>
+            <div class="sg">
+              <div class="sc" style="height:200px"></div>
+              <div class="sc" style="height:200px"></div>
+              <div class="sc" style="height:200px"></div>
+              <div class="sc" style="height:200px"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
