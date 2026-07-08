@@ -4,6 +4,10 @@ node_modules/
 # Service account credentials — never commit
 scripts/serviceAccount.json
 **/serviceAccount.json
+
+# Android signing — never commit
+android/jcikl-release.jks
+android/app/google-services.json
 /.pnp
 .pnp.js
 

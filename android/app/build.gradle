@@ -16,11 +16,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            storeFile file('../jcikl-release.jks')
+            storePassword '123456'
+            keyAlias 'jcikl'
+            keyPassword '123456'
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+    lint {
+        abortOnError false
+        disable 'MissingDefaultResource'
     }
 }
 

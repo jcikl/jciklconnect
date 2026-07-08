@@ -809,162 +809,162 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
           setGuestRegistrationData({ name: '', email: '', phone: '', organization: '', notes: '' });
         };
         return (
-        <Modal
-          isOpen={isRegistrationModalOpen}
-          onClose={closeModal}
-          title={null}
-          size="2xl"
-          bottomSheet={true}
-          drawerOnMobile
-          mobileHeight="h-[92vh]"
-          scrollInBody={true}
-          className="premium-registration-modal"
-          footerClassName="flex-none px-5 py-4 bg-white border-t border-slate-100 z-30 pb-safe shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.08)]"
-          footer={(
-            <div className="flex items-center gap-4 w-full">
-              <div className="shrink-0 min-w-[80px]">
-                {evPriceMin != null ? (
-                  <>
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest block leading-none mb-0.5">From</span>
-                    <span className="text-lg font-black text-slate-900 leading-none">
-                      RM {evPriceMin}{evPriceMax != null && evPriceMax !== evPriceMin ? ` – ${evPriceMax}` : ''}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-xl font-black text-green-600 leading-none">FREE</span>
-                )}
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest block leading-none mt-0.5">/ person</span>
-              </div>
-              <div className="flex-1">
-                <Button
-                  form="guest-registration-form"
-                  type="submit"
-                  className="w-full h-12 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 font-black uppercase tracking-widest text-sm shadow-lg shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                >
-                  <CheckCircle size={18} className="stroke-[3]" />
-                  <span>Confirm Registration</span>
-                </Button>
-              </div>
-            </div>
-          )}
-        >
-          <div className="-m-4 md:-m-6 relative">
-            {/* Hero Image */}
-            <div className="relative h-56 md:h-72 w-full overflow-hidden">
-              <img
-                src={selectedEvent.imageUrl || "https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?auto=format&fit=crop&q=80"}
-                alt={selectedEvent.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-                <button
-                  onClick={closeModal}
-                  className="w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-              </div>
-              {/* Title overlay */}
-              <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 md:px-6 md:pb-6">
-                <Badge variant="jci" className="bg-white/20 text-white border-white/30 backdrop-blur-sm px-2.5 py-0.5 text-[10px] font-bold mb-1.5">
-                  {selectedEvent.type || 'Event'}
-                </Badge>
-                <h2 className="text-xl md:text-2xl font-black text-white leading-tight drop-shadow-sm">
-                  {selectedEvent.title}
-                </h2>
-              </div>
-            </div>
-
-            {/* Content body */}
-            <div className="relative bg-white rounded-t-[28px] -mt-6 px-5 pt-5 pb-10 md:px-6 md:pt-6">
-              {/* Info card */}
-              <div className="divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden mb-6">
-                {/* Date */}
-                <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                    <Calendar size={14} className="text-jci-blue" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
-                    {evIsMultiDay ? (
-                      <>
-                        <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)} – {evFormatDay(evEndDate!)}</p>
-                        <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} – {evFormatWeekday(evEndDate!)}</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)}</p>
-                        {evTime && <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} · {evTime}</p>}
-                      </>
-                    )}
-                  </div>
+          <Modal
+            isOpen={isRegistrationModalOpen}
+            onClose={closeModal}
+            title={null}
+            size="2xl"
+            bottomSheet={true}
+            drawerOnMobile
+            mobileHeight="h-[92vh]"
+            scrollInBody={true}
+            className="premium-registration-modal"
+            footerClassName="flex-none px-5 py-4 bg-white border-t border-slate-100 z-30 pb-safe shadow-[0_-4px_16px_-2px_rgba(0,0,0,0.08)]"
+            footer={(
+              <div className="flex items-center gap-4 w-full">
+                <div className="shrink-0 min-w-[80px]">
+                  {evPriceMin != null ? (
+                    <>
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest block leading-none mb-0.5">From</span>
+                      <span className="text-lg font-black text-slate-900 leading-none">
+                        RM {evPriceMin}{evPriceMax != null && evPriceMax !== evPriceMin ? ` – ${evPriceMax}` : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xl font-black text-green-600 leading-none">FREE</span>
+                  )}
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest block leading-none mt-0.5">/ person</span>
                 </div>
-                {/* Location */}
-                {selectedEvent.location && (
-                  <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                      <MapPin size={14} className="text-jci-blue" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Location</p>
-                      <p className="text-sm font-semibold text-slate-800 truncate">{selectedEvent.location}</p>
-                    </div>
-                  </div>
-                )}
-                {/* Spots */}
-                {selectedEvent.maxAttendees && (
-                  <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                      <Users size={14} className="text-jci-blue" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spots</p>
-                      <p className="text-sm font-semibold text-slate-800">{selectedEvent.attendees || 0} / {selectedEvent.maxAttendees} registered</p>
-                      <div className="mt-1 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                        <div style={{ width: `${Math.min(100, Math.round(((selectedEvent.attendees || 0) / selectedEvent.maxAttendees) * 100))}%` }} className="h-full bg-jci-blue rounded-full" />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <div className="flex-1">
+                  <Button
+                    form="guest-registration-form"
+                    type="submit"
+                    className="w-full h-12 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 font-black uppercase tracking-widest text-sm shadow-lg shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle size={18} className="stroke-[3]" />
+                    <span>Confirm Registration</span>
+                  </Button>
+                </div>
               </div>
-
-              {/* Description */}
-              {selectedEvent.description && (
-                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3.5 py-3 mb-6">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">About</p>
-                  <div className={`text-sm text-slate-700 leading-relaxed space-y-2 ${descExpanded ? '' : 'line-clamp-3'}`}>
-                    {selectedEvent.description.split(/\n+/).map((para, i) => (
-                      <p key={i}>{para}</p>
-                    ))}
-                  </div>
-                  <button onClick={() => setDescExpanded(v => !v)} className="text-[11px] font-bold text-jci-blue mt-1.5">
-                    {descExpanded ? 'Show less' : 'Show more'}
+            )}
+          >
+            <div className="-m-4 md:-m-6 relative">
+              {/* Hero Image */}
+              <div className="relative h-56 md:h-72 w-full overflow-hidden">
+                <img
+                  src={selectedEvent.imageUrl || "https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?auto=format&fit=crop&q=80"}
+                  alt={selectedEvent.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
+                  <button
+                    onClick={closeModal}
+                    className="w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all"
+                  >
+                    <ArrowLeft size={18} />
                   </button>
                 </div>
-              )}
+                {/* Title overlay */}
+                <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 md:px-6 md:pb-6">
+                  <Badge variant="jci" className="bg-white/20 text-white border-white/30 backdrop-blur-sm px-2.5 py-0.5 text-[10px] font-bold mb-1.5">
+                    {selectedEvent.type || 'Event'}
+                  </Badge>
+                  <h2 className="text-xl md:text-2xl font-black text-white leading-tight drop-shadow-sm">
+                    {selectedEvent.title}
+                  </h2>
+                </div>
+              </div>
 
-              {/* Registration Form */}
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <div className="w-1 h-4 bg-jci-blue rounded-full" />
-                Your Particulars
-              </h3>
-              <form
-                id="guest-registration-form"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  try {
-                    const { EventsService } = await import('./services/eventsService');
-                    await EventsService.registerGuestForEvent(selectedEvent.id, guestRegistrationData);
-                    showToast('Registration submitted successfully! We will contact you soon.', 'success');
-                    closeModal();
-                  } catch (err) {
-                    const errorMessage = err instanceof Error ? err.message : 'Failed to register for event';
-                    showToast(errorMessage, 'error');
-                  }
-                }}
-                className="space-y-4"
-              >
+              {/* Content body */}
+              <div className="relative bg-white rounded-t-[28px] -mt-6 px-5 pt-5 pb-10 md:px-6 md:pt-6">
+                {/* Info card */}
+                <div className="divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden mb-6">
+                  {/* Date */}
+                  <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                      <Calendar size={14} className="text-jci-blue" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
+                      {evIsMultiDay ? (
+                        <>
+                          <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)} – {evFormatDay(evEndDate!)}</p>
+                          <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} – {evFormatWeekday(evEndDate!)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)}</p>
+                          {evTime && <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} · {evTime}</p>}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {/* Location */}
+                  {selectedEvent.location && (
+                    <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                        <MapPin size={14} className="text-jci-blue" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Location</p>
+                        <p className="text-sm font-semibold text-slate-800 truncate">{selectedEvent.location}</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Spots */}
+                  {selectedEvent.maxAttendees && (
+                    <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                        <Users size={14} className="text-jci-blue" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spots</p>
+                        <p className="text-sm font-semibold text-slate-800">{selectedEvent.attendees || 0} / {selectedEvent.maxAttendees} registered</p>
+                        <div className="mt-1 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div style={{ width: `${Math.min(100, Math.round(((selectedEvent.attendees || 0) / selectedEvent.maxAttendees) * 100))}%` }} className="h-full bg-jci-blue rounded-full" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                {selectedEvent.description && (
+                  <div className="rounded-xl bg-slate-50 border border-slate-100 px-3.5 py-3 mb-6">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">About</p>
+                    <div className={`text-sm text-slate-700 leading-relaxed space-y-2 ${descExpanded ? '' : 'line-clamp-3'}`}>
+                      {selectedEvent.description.split(/\n+/).map((para, i) => (
+                        <p key={i}>{para}</p>
+                      ))}
+                    </div>
+                    <button onClick={() => setDescExpanded(v => !v)} className="text-[11px] font-bold text-jci-blue mt-1.5">
+                      {descExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Registration Form */}
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2 mb-4">
+                  <div className="w-1 h-4 bg-jci-blue rounded-full" />
+                  Your Particulars
+                </h3>
+                <form
+                  id="guest-registration-form"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const { EventsService } = await import('./services/eventsService');
+                      await EventsService.registerGuestForEvent(selectedEvent.id, guestRegistrationData);
+                      showToast('Registration submitted successfully! We will contact you soon.', 'success');
+                      closeModal();
+                    } catch (err) {
+                      const errorMessage = err instanceof Error ? err.message : 'Failed to register for event';
+                      showToast(errorMessage, 'error');
+                    }
+                  }}
+                  className="space-y-4"
+                >
                   {/* Full Name */}
                   <div className="flex flex-row items-center gap-3 sm:gap-6 group">
                     <label className="w-28 sm:w-32 flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400 group-focus-within:text-jci-blue transition-colors leading-tight">
@@ -1045,10 +1045,10 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                       />
                     </div>
                   </div>
-              </form>
+                </form>
+              </div>
             </div>
-          </div>
-        </Modal>
+          </Modal>
         );
       })()}
 
@@ -3178,6 +3178,22 @@ export const JCIKLApp: React.FC = () => {
 
   const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [drawerDragY, setDrawerDragY] = useState(0);
+  const drawerDragStartY = useRef(0);
+  const drawerScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleDrawerTouchStart = (e: React.TouchEvent) => {
+    drawerDragStartY.current = e.touches[0].clientY;
+  };
+  const handleDrawerTouchMove = (e: React.TouchEvent) => {
+    const scrollTop = drawerScrollRef.current?.scrollTop ?? 0;
+    const delta = e.touches[0].clientY - drawerDragStartY.current;
+    if (delta > 0 && scrollTop === 0) setDrawerDragY(delta);
+  };
+  const handleDrawerTouchEnd = () => {
+    if (drawerDragY > 100) setShowMobileMenu(false);
+    setDrawerDragY(0);
+  };
   const [isSimulateDropdownOpen, setIsSimulateDropdownOpen] = useState(false);
   const [showBoardDashboard, setShowBoardDashboard] = useState(false);
 
@@ -3926,7 +3942,7 @@ export const JCIKLApp: React.FC = () => {
             <div className="z-[50] text-white relative shrink-0">
               {/* Background */}
               <div className="absolute inset-0 bg-gradient-to-r from-jci-navy via-[#1a3a7a] to-jci-blue overflow-hidden z-0 shadow-md">
-                <div className="absolute right-0 top-0 w-64 h-full opacity-10" style={{background: 'radial-gradient(ellipse at 100% 50%, white, transparent 70%)'}}></div>
+                <div className="absolute right-0 top-0 w-64 h-full opacity-10" style={{ background: 'radial-gradient(ellipse at 100% 50%, white, transparent 70%)' }}></div>
               </div>
 
               <div className="relative z-10 flex items-center justify-between h-14 px-4 sm:px-6 max-w-7xl mx-auto">
@@ -3938,7 +3954,7 @@ export const JCIKLApp: React.FC = () => {
                   <div className="hidden sm:flex flex-col leading-none gap-0.5 min-w-0">
                     <span className="text-[10px] font-bold text-white/55 uppercase tracking-widest">Kuala Lumpur</span>
                     <span className="text-sm font-semibold text-white truncate">
-                      {({'DASHBOARD':'Dashboard','MEMBERS':'Members','EVENTS':'Event List','PROJECTS':'Events Mgmt','FINANCE':'Finance','PAYMENT_REQUESTS':'Payments','GAMIFICATION':'Gamification','INVENTORY':'Inventory','DIRECTORY':'Biz Directory','AUTOMATION':'Automation','KNOWLEDGE':'Knowledge','COMMUNICATION':'Communication','CLUBS':'Hobby Clubs','SURVEYS':'Surveys','BENEFITS':'Benefits','DATA_IMPORT_EXPORT':'Data I/O','ADVERTISEMENTS':'Partnerships','AI_INSIGHTS':'AI Insights','TEMPLATES':'Templates','REPORTS':'Reports','DEVELOPER':'Developer'} as Record<string,string>)[view] ?? 'Dashboard'}
+                      {({ 'DASHBOARD': 'Dashboard', 'MEMBERS': 'Members', 'EVENTS': 'Event List', 'PROJECTS': 'Events Mgmt', 'FINANCE': 'Finance', 'PAYMENT_REQUESTS': 'Payments', 'GAMIFICATION': 'Gamification', 'INVENTORY': 'Inventory', 'DIRECTORY': 'Biz Directory', 'AUTOMATION': 'Automation', 'KNOWLEDGE': 'Knowledge', 'COMMUNICATION': 'Communication', 'CLUBS': 'Hobby Clubs', 'SURVEYS': 'Surveys', 'BENEFITS': 'Benefits', 'DATA_IMPORT_EXPORT': 'Data I/O', 'ADVERTISEMENTS': 'Partnerships', 'AI_INSIGHTS': 'AI Insights', 'TEMPLATES': 'Templates', 'REPORTS': 'Reports', 'DEVELOPER': 'Developer' } as Record<string, string>)[view] ?? 'Dashboard'}
                     </span>
                   </div>
                 </div>
@@ -4083,56 +4099,55 @@ export const JCIKLApp: React.FC = () => {
       {
         (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
           <>
-            <div className={`md:hidden fixed bottom-6 left-6 right-6 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200/50'} backdrop-blur-md rounded-[40px] shadow-2xl border flex items-center justify-around h-20 px-4 z-50`}>
+            <div className={`md:hidden fixed bottom-5 left-4 right-4 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/95 border-slate-700/50' : 'bg-white/95 border-slate-200/70'} backdrop-blur-xl rounded-3xl shadow-xl border flex items-center h-[66px] px-1 z-50`}>
+              {/* Dashboard */}
               <button
                 onClick={() => handleViewChange('DASHBOARD')}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
               >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DASHBOARD' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <LayoutDashboard size={20} />
+                <div className={`flex items-center justify-center transition-all duration-200 ${view === 'DASHBOARD' ? 'bg-jci-blue rounded-2xl px-3.5 py-1.5 shadow-sm shadow-jci-blue/40' : 'px-3.5 py-1.5'}`}>
+                  <LayoutDashboard size={18} className={view === 'DASHBOARD' ? 'text-white' : (isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400')} />
                 </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DASHBOARD' ? 'text-jci-blue' : 'text-slate-400'}`}>Dashboard</span>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DASHBOARD' ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Dashboard</span>
               </button>
 
+              {/* Directory */}
               <button
-                onClick={() => {
-                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                  else handleViewChange('DIRECTORY');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}
+                onClick={() => { if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true); else handleViewChange('DIRECTORY'); }}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
               >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'DIRECTORY' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <Building2 size={20} />
+                <div className={`flex items-center justify-center transition-all duration-200 ${view === 'DIRECTORY' ? 'bg-jci-blue rounded-2xl px-3.5 py-1.5 shadow-sm shadow-jci-blue/40' : 'px-3.5 py-1.5'}`}>
+                  <Building2 size={18} className={view === 'DIRECTORY' ? 'text-white' : (isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400')} />
                 </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'DIRECTORY' ? 'text-jci-blue' : 'text-slate-400'}`}>Directory</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true);
-                  else handleViewChange('BENEFITS');
-                }}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}
-              >
-                <div className={`p-2 rounded-2xl transition-all duration-300 ${view === 'BENEFITS' ? 'bg-jci-blue text-white shadow-lg shadow-jci-blue/30' : (isBoard || isAdmin || isDeveloper ? 'bg-white/5' : '')}`}>
-                  <Gift size={20} />
-                </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${view === 'BENEFITS' ? 'text-jci-blue' : 'text-slate-400'}`}>Benefits</span>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DIRECTORY' ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Directory</span>
               </button>
 
+              {/* Benefits */}
+              <button
+                onClick={() => { if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true); else handleViewChange('BENEFITS'); }}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
+              >
+                <div className={`flex items-center justify-center transition-all duration-200 ${view === 'BENEFITS' ? 'bg-jci-blue rounded-2xl px-3.5 py-1.5 shadow-sm shadow-jci-blue/40' : 'px-3.5 py-1.5'}`}>
+                  <Gift size={18} className={view === 'BENEFITS' ? 'text-white' : (isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400')} />
+                </div>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'BENEFITS' ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Benefits</span>
+              </button>
+
+              {/* Menu / Avatar */}
               <button
                 onClick={() => setShowMobileMenu(true)}
-                className={`flex flex-col items-center gap-1 transition-all duration-300 min-w-[64px] ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
               >
-                <div className={`rounded-2xl transition-all duration-300 overflow-hidden ${showMobileMenu ? 'ring-2 ring-jci-blue ring-offset-1 shadow-lg shadow-jci-blue/30' : 'ring-2 ring-transparent'}`}>
+                <div className={`rounded-xl overflow-hidden transition-all duration-200 ${showMobileMenu ? 'ring-2 ring-jci-blue ring-offset-1 ring-offset-transparent' : ''}`}>
                   {member?.avatar ? (
-                    <img src={member.avatar} alt={member?.name || 'Me'} className="w-9 h-9 rounded-2xl object-cover" />
+                    <img src={member.avatar} alt={member?.name || 'Me'} className="w-8 h-8 rounded-xl object-cover" />
                   ) : (
-                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-sm font-black ${showMobileMenu ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-600')}`}>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black ${showMobileMenu ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-600')}`}>
                       {(member?.name || 'M').charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
-                <span className={`text-[9px] font-bold tracking-widest uppercase transition-colors duration-300 ${showMobileMenu ? 'text-jci-blue' : 'text-slate-400'}`}>Menu</span>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${showMobileMenu ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Menu</span>
               </button>
             </div>
 
@@ -4141,8 +4156,13 @@ export const JCIKLApp: React.FC = () => {
               <div className="md:hidden fixed inset-0 z-[60]" onClick={() => setShowMobileMenu(false)}>
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
                 <div
-                  className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-10 pt-4 shadow-2xl max-h-[85vh] overflow-y-auto`}
+                  ref={drawerScrollRef}
+                  className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-6 pt-4 shadow-2xl max-h-[94vh] overflow-y-auto`}
+                  style={{ transform: `translateY(${drawerDragY}px)`, transition: drawerDragY === 0 ? 'transform 0.3s ease' : 'none' }}
                   onClick={e => e.stopPropagation()}
+                  onTouchStart={handleDrawerTouchStart}
+                  onTouchMove={handleDrawerTouchMove}
+                  onTouchEnd={handleDrawerTouchEnd}
                 >
                   <div className={`w-10 h-1 rounded-full mx-auto mb-4 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
 
@@ -4175,7 +4195,7 @@ export const JCIKLApp: React.FC = () => {
                   </div>
 
                   {/* Main grid */}
-                  <div className="grid grid-cols-5 gap-y-4 gap-x-1 mb-4">
+                  <div className="grid grid-cols-5 gap-y-4 gap-x-1">
                     {canAccessWorkspaceModules && (
                       <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('MEMBERS'); setShowMobileMenu(false); }}>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-purple-950/30 text-purple-400 border-purple-900/50' : 'bg-purple-50 text-purple-600 border-purple-100'}`}><Users size={22} /></div>
@@ -4206,9 +4226,12 @@ export const JCIKLApp: React.FC = () => {
 
                   {/* Workspace section */}
                   {member?.role !== UserRole.GUEST && (
-                    <div className={`pt-4 border-t ${isBoard || isAdmin || isDeveloper ? 'border-slate-700/50' : 'border-slate-100'}`}>
-                      <p className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>Workspace</p>
-                      <div className="grid grid-cols-4 gap-y-4 gap-x-1 mb-4">
+                    <div className="pt-4">
+                      <div className="flex items-center gap-2 mb-3 w-[90%]">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>Workspace</span>
+                        <div className={`flex-1 h-px ${isBoard || isAdmin || isDeveloper ? 'bg-slate-700/60' : 'bg-slate-200'}`} />
+                      </div>
+                      <div className="grid grid-cols-4 gap-y-4 gap-x-1">
                         {canViewEventsManagement && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PROJECTS'); setShowMobileMenu(false); }}>
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-blue-950/30 text-blue-400 border-blue-900/50' : 'bg-blue-50 text-blue-600 border-blue-100'}`}><FolderKanban size={22} /></div>
@@ -4261,8 +4284,11 @@ export const JCIKLApp: React.FC = () => {
 
                   {/* System section */}
                   {(isBoard || isAdmin || isDeveloper) && (
-                    <div className="pt-4 border-t border-slate-700/50">
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-3 text-slate-500">System</p>
+                    <div className="pt-4">
+                      <div className="flex items-center gap-2 mb-3 w-[90%]">
+                        <span className="text-[10px] font-bold uppercase tracking-widest shrink-0 text-slate-500">System</span>
+                        <div className="flex-1 h-px bg-slate-700/60" />
+                      </div>
                       <div className="grid grid-cols-5 gap-y-4 gap-x-1">
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('TEMPLATES'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><FileText size={22} /></div>
@@ -4309,7 +4335,7 @@ export const JCIKLApp: React.FC = () => {
                   )}
 
                   {/* Logout */}
-                  <div className={`mt-4 pt-4 border-t ${isBoard || isAdmin || isDeveloper ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                  <div className="mt-4 pt-4">
                     <button
                       onClick={() => { setShowMobileMenu(false); handleLogout(); }}
                       className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] ${isBoard || isAdmin || isDeveloper ? 'bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-950/50' : 'bg-red-50 text-red-500 border border-red-100 hover:bg-red-100'}`}

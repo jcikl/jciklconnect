@@ -340,7 +340,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   return (
     <div className="space-y-4">
 
-      {/* Homepage Advertisements Banner (Swiper) */}
+      {/* Partners Banner (Swiper) */}
+      {(adsLoading || homepageAds.length > 0) && (
+        <h2 className="text-base font-bold text-slate-800">Partners</h2>
+      )}
       {adsLoading ? (
         <div className="flex gap-3 overflow-hidden">
           {[1,2,3].map(i => <Skeleton key={i} className="flex-none w-[58%] sm:w-[30%] lg:w-[23%] h-36 sm:h-40" rounded="2xl" />)}
