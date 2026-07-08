@@ -1463,29 +1463,40 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
         )}
       </div>
 
-      {/* KPI Strip */}
-      <div className="grid grid-cols-3 gap-2 md:gap-3">
-        {[
-          { label: 'Purchase Value', value: formatCurrency(totalPurchaseValue), icon: <DollarSign size={16} />, color: 'blue' },
-          { label: 'Current Value', value: formatCurrency(totalCurrentValue), icon: <TrendingDown size={16} />, color: 'green' },
-          { label: 'Depreciated', value: formatCurrency(totalDepreciation), icon: <TrendingDown size={16} />, color: 'red' },
-        ].map(({ label, value, icon, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-2.5 md:p-3.5">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg bg-${color}-50 border border-${color}-100 flex items-center justify-center text-${color}-600 shrink-0`}>
-                {icon}
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] md:text-[10px] text-slate-500 font-semibold uppercase tracking-wide leading-none">{label}</p>
-                <p className="text-sm md:text-base font-bold text-slate-900 leading-tight mt-0.5 tabular-nums truncate">{value}</p>
+      {/* KPI Strip — only shown when data exists */}
+      {itemsWithDepreciation.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 md:gap-3">
+          {[
+            { label: 'Purchase Value',  value: formatCurrency(totalPurchaseValue),  icon: <DollarSign size={16} />,   color: 'blue' },
+            { label: 'Current Value',   value: formatCurrency(totalCurrentValue),   icon: <TrendingDown size={16} />, color: 'green' },
+            { label: 'Depreciated',     value: formatCurrency(totalDepreciation),   icon: <TrendingDown size={16} />, color: totalDepreciation > 0 ? 'red' : 'slate' },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-2.5 md:p-3.5">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg bg-${color}-50 border border-${color}-100 flex items-center justify-center text-${color}-600 shrink-0`}>
+                  {icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] md:text-[10px] text-slate-500 font-semibold uppercase tracking-wide leading-none">{label}</p>
+                  <p className="text-sm md:text-base font-bold text-slate-900 leading-tight mt-0.5 tabular-nums truncate">{value}</p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <LoadingState loading={loading} error={null} empty={itemsWithDepreciation.length === 0} emptyMessage="No items with depreciation tracking. Add a purchase price and date to an item to enable tracking.">
-        <>
+      <LoadingState loading={loading} error={null} empty={false}>
+        {itemsWithDepreciation.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-100 py-12 text-center">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+              <TrendingDown size={22} className="text-slate-400" />
+            </div>
+            <p className="text-sm font-semibold text-slate-600">No depreciation data</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">Add a purchase price and purchase date to an inventory item to start tracking its depreciation.</p>
+          </div>
+        ) : (
+          <>
           {/* Desktop table */}
           <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-100">
             <table className="w-full text-left text-sm">
@@ -1599,7 +1610,8 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
               );
             })}
           </div>
-        </>
+          </>
+        )}
       </LoadingState>
 
 
