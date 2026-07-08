@@ -2655,7 +2655,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
       {moduleTab === 'Transactions' && (
         <div className="space-y-4">
-          <Card>
+          <div>
             {(() => {
               const activeFilterCount = [
                 txTypeFilter !== 'All',
@@ -3154,7 +3154,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 </div>
               )}
             </LoadingState>
-          </Card>
+          </div>
         </div>
       )
       }
