@@ -3921,127 +3921,127 @@ export const JCIKLApp: React.FC = () => {
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 
-          {/* Global Persistent Header - Always visible, not affected by scrolling */}
+          {/* Global Persistent Header */}
           {member && (
-            <div className="z-[50] text-white relative pt-4 pb-4 px-5 sm:px-8">
-              {/* Background with rounded corners, shadow, and overflow hidden */}
-              <div className="absolute inset-0 bg-gradient-to-br from-jci-navy to-jci-blue rounded-b-[40px] overflow-hidden z-0 shadow-2xl">
-                {/* Decorative Background Pattern */}
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+            <div className="z-[50] text-white relative shrink-0">
+              {/* Background */}
+              <div className="absolute inset-0 bg-gradient-to-r from-jci-navy via-[#1a3a7a] to-jci-blue overflow-hidden z-0 shadow-md">
+                <div className="absolute right-0 top-0 w-64 h-full opacity-10" style={{background: 'radial-gradient(ellipse at 100% 50%, white, transparent 70%)'}}></div>
               </div>
 
-              <div className="relative z-10 space-y-6 max-w-7xl mx-auto">
-                {/* Top Row: Avatar & Status | Notifications */}
-                <div className="flex justify-end items-center">
-                  <div className="flex items-center">
-                    {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
-                      <div className="relative mr-2 z-30">
-                        <button
-                          onClick={() => setIsSimulateDropdownOpen(!isSimulateDropdownOpen)}
-                          className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-xl px-2.5 py-1.5 transition-all text-white text-[11px] font-bold shadow-sm"
-                          title="Simulate Role"
-                        >
-                          <Shield size={12} className="text-purple-300 shrink-0" />
-                          <span>{simulatedRole ? `${simulatedRole} Mode` : 'Dev/Admin'}</span>
-                          <ChevronDown size={11} className={`text-white/60 transition-transform duration-200 ${isSimulateDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {isSimulateDropdownOpen && (
-                          <>
-                            {/* Backdrop click outside capture */}
-                            <div
-                              className="fixed inset-0 z-40"
-                              onClick={() => setIsSimulateDropdownOpen(false)}
-                            />
-                            {/* Popover Dropdown Menu */}
-                            <div className="absolute right-0 mt-2 w-40 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                              {[
-                                { value: '', label: 'Dev/Admin', desc: 'Full privileges' },
-                                { value: UserRole.ADMIN, label: 'Admin', desc: 'Administrator' },
-                                { value: UserRole.MEMBER, label: 'Member', desc: 'Official Member' },
-                                { value: UserRole.GUEST, label: 'Guest', desc: 'Registered Guest' }
-                              ].map((opt) => {
-                                const isSelected = (simulatedRole || '') === opt.value;
-                                return (
-                                  <button
-                                    key={opt.value}
-                                    onClick={() => {
-                                      const val = opt.value;
-                                      simulateRole(val ? val as UserRole : null);
-                                      showToast(val ? `Simulating ${val} role` : 'Reset to Admin role', 'info');
-                                      setIsSimulateDropdownOpen(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 rounded-lg text-[11px] transition-all flex flex-col gap-0.5 ${isSelected
-                                      ? 'bg-blue-600 text-white font-bold'
-                                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
-                                      }`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span>{opt.label}</span>
-                                      {isSelected && <Check size={10} className="text-white" />}
-                                    </div>
-                                    <span className={`text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                                      {opt.desc}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {(isBoard || isAdmin) && (
-                      <button
-                        onClick={() => setShowBoardDashboard(v => !v)}
-                        className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 mr-1 transition-all text-[11px] font-bold border ${showBoardDashboard
-                          ? 'bg-white text-jci-navy border-white/30 shadow-sm'
-                          : 'bg-white/10 hover:bg-white/20 border-white/10 hover:border-white/20 text-white'
-                          }`}
-                        title="Toggle Board Dashboard"
-                      >
-                        <LayoutDashboard size={12} className="shrink-0" />
-                        <span>{showBoardDashboard ? 'Board' : 'Board'}</span>
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => setSearchDrawerOpen(true)}
-                      className="p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
-                      title="Search"
-                    >
-                      <Search size={20} className="group-hover:scale-110 transition-transform" />
-                    </button>
-
-                    <button
-                      onClick={() => setNotificationDrawerOpen(true)}
-                      className="relative p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
-                    >
-                      <Bell size={20} className="group-hover:rotate-12 transition-transform" />
-                      {unreadNotifications.length > 0 && (
-                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] flex items-center justify-center">
-                          {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
-                        </span>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={handleLogout}
-                      className="hidden md:flex items-center gap-1.5 p-3 rounded-full hover:bg-white/20 transition-all hover:shadow-xl"
-                      title="Sign Out"
-                    >
-                      <LogOut size={20} />
-                    </button>
-
+              <div className="relative z-10 flex items-center justify-between h-14 px-4 sm:px-6 max-w-7xl mx-auto">
+                {/* Left: Brand mark + chapter / page label */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 bg-white/15 rounded-lg border border-white/25 flex items-center justify-center shrink-0 shadow-sm">
+                    <span className="text-[10px] font-black text-white tracking-tight leading-none">JCI</span>
                   </div>
+                  <div className="hidden sm:flex flex-col leading-none gap-0.5 min-w-0">
+                    <span className="text-[10px] font-bold text-white/55 uppercase tracking-widest">Kuala Lumpur</span>
+                    <span className="text-sm font-semibold text-white truncate">
+                      {({'DASHBOARD':'Dashboard','MEMBERS':'Members','EVENTS':'Event List','PROJECTS':'Events Mgmt','FINANCE':'Finance','PAYMENT_REQUESTS':'Payments','GAMIFICATION':'Gamification','INVENTORY':'Inventory','DIRECTORY':'Biz Directory','AUTOMATION':'Automation','KNOWLEDGE':'Knowledge','COMMUNICATION':'Communication','CLUBS':'Hobby Clubs','SURVEYS':'Surveys','BENEFITS':'Benefits','DATA_IMPORT_EXPORT':'Data I/O','ADVERTISEMENTS':'Partnerships','AI_INSIGHTS':'AI Insights','TEMPLATES':'Templates','REPORTS':'Reports','DEVELOPER':'Developer'} as Record<string,string>)[view] ?? 'Dashboard'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-0.5">
+                  {/* Role simulator */}
+                  {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
+                    <div className="relative z-30">
+                      <button
+                        onClick={() => setIsSimulateDropdownOpen(!isSimulateDropdownOpen)}
+                        className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-white/25 rounded-lg px-2.5 py-1.5 transition-all text-white text-[11px] font-bold"
+                        title="Simulate Role"
+                      >
+                        <Shield size={11} className="text-purple-300 shrink-0" />
+                        <span className="hidden sm:inline">{simulatedRole ? `${simulatedRole} Mode` : 'Dev/Admin'}</span>
+                        <ChevronDown size={10} className={`text-white/60 transition-transform duration-200 ${isSimulateDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isSimulateDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsSimulateDropdownOpen(false)} />
+                          <div className="absolute right-0 mt-2 w-40 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                            {[
+                              { value: '', label: 'Dev/Admin', desc: 'Full privileges' },
+                              { value: UserRole.ADMIN, label: 'Admin', desc: 'Administrator' },
+                              { value: UserRole.MEMBER, label: 'Member', desc: 'Official Member' },
+                              { value: UserRole.GUEST, label: 'Guest', desc: 'Registered Guest' }
+                            ].map((opt) => {
+                              const isSelected = (simulatedRole || '') === opt.value;
+                              return (
+                                <button
+                                  key={opt.value}
+                                  onClick={() => {
+                                    const val = opt.value;
+                                    simulateRole(val ? val as UserRole : null);
+                                    showToast(val ? `Simulating ${val} role` : 'Reset to Admin role', 'info');
+                                    setIsSimulateDropdownOpen(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 rounded-lg text-[11px] transition-all flex flex-col gap-0.5 ${isSelected ? 'bg-blue-600 text-white font-bold' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span>{opt.label}</span>
+                                    {isSelected && <Check size={10} className="text-white" />}
+                                  </div>
+                                  <span className={`text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>{opt.desc}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Board toggle */}
+                  {(isBoard || isAdmin) && (
+                    <button
+                      onClick={() => setShowBoardDashboard(v => !v)}
+                      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all text-[11px] font-bold border ml-1 ${showBoardDashboard ? 'bg-white text-jci-navy border-white/30 shadow-sm' : 'bg-white/10 hover:bg-white/20 border-white/15 hover:border-white/25 text-white'}`}
+                      title="Toggle Board Dashboard"
+                    >
+                      <LayoutDashboard size={11} className="shrink-0" />
+                      <span className="hidden sm:inline">Board</span>
+                    </button>
+                  )}
+
+                  {/* Search */}
+                  <button
+                    onClick={() => setSearchDrawerOpen(true)}
+                    className="p-2 rounded-lg hover:bg-white/15 transition-all ml-1"
+                    title="Search"
+                  >
+                    <Search size={18} />
+                  </button>
+
+                  {/* Notifications */}
+                  <button
+                    onClick={() => setNotificationDrawerOpen(true)}
+                    className="relative p-2 rounded-lg hover:bg-white/15 transition-all"
+                  >
+                    <Bell size={18} />
+                    {unreadNotifications.length > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 rounded-full text-[9px] font-bold flex items-center justify-center px-0.5">
+                        {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Logout (desktop only) */}
+                  <button
+                    onClick={handleLogout}
+                    className="hidden md:flex p-2 rounded-lg hover:bg-white/15 transition-all"
+                    title="Sign Out"
+                  >
+                    <LogOut size={18} />
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
           {/* Scrollable Area */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-32 md:pb-4 px-5 sm:px-8 ">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pt-4 pb-32 md:pb-4 px-5 sm:px-8">
             <Suspense fallback={
               <div className="flex flex-col gap-4 animate-pulse pt-2">
                 <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />

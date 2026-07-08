@@ -1802,6 +1802,7 @@ const MemberTable: React.FC<{
 
 const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
+  const { resetPassword } = useAuth();
   // Always derive the latest member data from the live members array so the UI
   // updates automatically after every save (without a page reload).
   const member = useMemo(
@@ -1904,6 +1905,13 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       }
       return `JCI KL Member: ${shortName || fullName || 'Unnamed'}`;
     }
+    return introVal;
+  };
+
+  const resolveIntroducerShort = (introVal?: string) => {
+    if (!introVal) return 'Direct Join';
+    const foundMember = members.find(m => m.id === introVal);
+    if (foundMember) return foundMember.name || foundMember.fullName || 'Unnamed';
     return introVal;
   };
 
@@ -2340,6 +2348,25 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     }
   };
 
+  const handleSendInviteEmail = async () => {
+    const email = member.contact?.email || member.email;
+    if (!email) { showToast('No email address found for this member', 'error'); return; }
+    try {
+      const res = await fetch('/.netlify/functions/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(error);
+      }
+      showToast(`Invitation email sent to ${email}`, 'success');
+    } catch (err) {
+      showToast(`Failed to send invite: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
+    }
+  };
+
   const handleDeleteMember = async () => {
     try {
       setIsDeleting(true);
@@ -2469,7 +2496,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-white font-black text-xl leading-tight">{member.name}</h1>
-                <Badge variant={member.tier.toLowerCase() as any} className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider shrink-0">{member.tier}</Badge>
               </div>
               {(member.companyName || member.departmentAndPosition) && (
                 <p className="text-white/70 text-xs mt-0.5 truncate">
@@ -2477,8 +2503,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
-              <div className="flex items-center gap-3 mt-1 text-white/60 text-[10px] flex-wrap">
-                <span className="flex items-center gap-1"><Shield size={9} />{member.role}</span>
+              <div className="flex flex-col gap-0.5 mt-1 text-white/60 text-[10px]">
+                {member.email && <span className="flex items-center gap-1"><Mail size={9} />{member.email}</span>}
                 {member.phone && <span className="flex items-center gap-1"><Phone size={9} />{member.phone}</span>}
               </div>
             </div>
@@ -2488,22 +2514,30 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         {/* ── MOBILE contact + actions strip ── */}
         <div className="md:hidden px-4 py-3 space-y-2.5 border-b border-slate-100">
           <div className="flex flex-wrap gap-1.5">
-            <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 max-w-full truncate">
-              <Mail size={10} className="text-jci-blue shrink-0" />{member.email}
+            <span className="flex items-center gap-1 text-[11px] bg-slate-50 border border-slate-100 rounded-lg px-2 py-1">
+              <Shield size={10} className="text-jci-blue shrink-0" />
+              <span className="text-jci-blue">{member.role}</span>
+              {member.introducer && (
+                <>
+                  <span className="text-slate-300 mx-0.5">·</span>
+                  <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
+                </>
+              )}
             </span>
-            {member.introducer && (
-              <span className="flex items-center gap-1 text-[11px] text-jci-blue bg-blue-50 border border-blue-100 rounded-lg px-2 py-1">
-                <UserPlus size={10} />{resolveIntroducerDisplay(member.introducer)}
-              </span>
-            )}
-            {(member.linkedin || member.facebook || member.instagram || member.wechat) && (
-              <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg">
-                {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#0077B5]"><Linkedin size={13} /></a>}
-                {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#1877F2]"><Facebook size={13} /></a>}
-                {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#E1306C]"><Instagram size={13} /></a>}
-                {member.wechat && <span className="text-slate-400 flex items-center gap-1 text-[10px]"><MessageCircle size={13} />{member.wechat}</span>}
-              </span>
-            )}
+            <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg">
+              {member.linkedin
+                ? <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={13} /></a>
+                : <Linkedin size={13} className="text-slate-400" />}
+              {member.facebook
+                ? <a href={member.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={13} /></a>
+                : <Facebook size={13} className="text-slate-400" />}
+              {member.instagram
+                ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={13} /></a>
+                : <Instagram size={13} className="text-slate-400" />}
+              {member.wechat
+                ? <span className="text-[#07C160] flex items-center gap-1 text-[10px]"><MessageCircle size={13} />{member.wechat}</span>
+                : <MessageCircle size={13} className="text-slate-400" />}
+            </span>
           </div>
           <div className="flex gap-2">
             {isEditMode ? (
@@ -2534,6 +2568,9 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                     {member.role === UserRole.INACTIVE ? 'Activate' : 'Set Inactive'}
                   </Button>
                 )}
+                {(isAdmin || isDeveloper) && !isSelfView && (
+                  <Button variant="outline" size="sm" className="h-9 px-3 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
+                )}
                 {isDeveloper && !isSelfView && (
                   <Button variant="outline" size="sm" className="h-9 px-3 text-red-500 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
                 )}
@@ -2542,13 +2579,28 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
         </div>
 
-        {/* ── DESKTOP hero (unchanged) ── */}
-        <div className="hidden md:block h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
-        </div>
-        <div className="hidden md:block px-6 pb-6">
-          <div className="flex flex-row items-end gap-6 -mt-16 relative z-10">
+        {/* ── DESKTOP hero + strip wrapper ── */}
+        <div className="hidden md:block relative">
+          {/* 区块一: banner */}
+          <div className="h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
+            <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+            {/* Name, Tier Badge, position, company — pl-52 clears avatar */}
+            <div className="absolute bottom-4 left-0 right-0 px-6 pl-52 flex flex-col justify-end gap-1">
+              <div className="flex flex-row items-center gap-2 flex-wrap">
+                <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.name}</h1>
+              </div>
+              {(member.companyName || member.departmentAndPosition) && (
+                <p className="text-sm font-semibold text-white/70 flex items-center gap-1.5">
+                  <Briefcase size={13} className="text-white/50 shrink-0" />
+                  {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* 区块二: avatar — absolute, straddles banner/strip boundary (top-24 = 10rem - 4rem) */}
+          <div className="absolute left-6 top-24 z-20">
             <div className="relative">
               <div className="p-1 bg-white rounded-full shadow-xl">
                 <img
@@ -2559,37 +2611,48 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               </div>
               <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' : member.role === UserRole.PROBATION ? 'bg-amber-500' : 'bg-slate-500'}`} title={member.role} />
             </div>
-            <div className="flex-1 text-left space-y-2">
-              <div className="flex flex-row items-baseline gap-2">
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight break-words">{member.name}</h1>
-                <Badge variant={member.tier.toLowerCase() as any} className="px-3 py-0.5 text-xs font-bold uppercase tracking-wider">{member.tier}</Badge>
+          </div>
+
+          {/* 区块三: contact + actions strip — directly below banner, pl-52 clears avatar */}
+          <div className="px-6 pl-52 py-3 border-b border-slate-100 flex items-center gap-4">
+            {/* 左：chips */}
+            <div className="flex-1 flex flex-col gap-1.5">
+              {/* 行一：email / phone */}
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Mail size={12} className="text-jci-blue shrink-0" />{member.email}</span>
+                {member.phone && <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Phone size={12} className="text-jci-blue shrink-0" />{member.phone}</span>}
               </div>
-              {(member.companyName || member.departmentAndPosition) && (
-                <p className="text-sm font-semibold text-slate-500 flex items-center gap-1.5">
-                  <Briefcase size={13} className="text-slate-400 shrink-0" />
-                  {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-y-1.5 gap-x-2 text-sm font-medium text-slate-500">
-                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Mail size={12} className="text-jci-blue" />{member.email}</span>
-                {member.phone && <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Phone size={12} className="text-jci-blue" />{member.phone}</span>}
-                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs"><Shield size={12} className="text-jci-blue" />{member.role}</span>
-                {member.introducer && (
-                  <span className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-jci-blue rounded-lg border border-blue-100 text-xs">
-                    <UserPlus size={12} />{resolveIntroducerDisplay(member.introducer)}
-                  </span>
-                )}
-                {(member.linkedin || member.facebook || member.instagram || member.wechat) && (
-                  <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
-                    {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#0077B5] transition-colors"><Linkedin size={14} /></a>}
-                    {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#1877F2] transition-colors"><Facebook size={14} /></a>}
-                    {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-[#E1306C] transition-colors"><Instagram size={14} /></a>}
-                    {member.wechat && <span className="text-slate-400 flex items-center gap-1 text-xs"><MessageCircle size={14} />{member.wechat}</span>}
-                  </span>
-                )}
+              {/* 行二：role + introducer + 社交媒体 */}
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium">
+                  <Shield size={12} className="text-jci-blue shrink-0" />
+                  <span className="text-jci-blue">{member.role}</span>
+                  {member.introducer && (
+                    <>
+                      <span className="text-slate-300 mx-0.5">·</span>
+                      <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
+                    </>
+                  )}
+                </span>
+                <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
+                  {member.linkedin
+                    ? <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={14} /></a>
+                    : <Linkedin size={14} className="text-slate-400" />}
+                  {member.facebook
+                    ? <a href={member.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={14} /></a>
+                    : <Facebook size={14} className="text-slate-400" />}
+                  {member.instagram
+                    ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={14} /></a>
+                    : <Instagram size={14} className="text-slate-400" />}
+                  {member.wechat
+                    ? <span className="text-[#07C160] flex items-center gap-1 text-xs"><MessageCircle size={14} />{member.wechat}</span>
+                    : <MessageCircle size={14} className="text-slate-400" />}
+                </span>
               </div>
+
             </div>
-            <div className="flex gap-2 w-auto flex-wrap">
+            {/* 右：操作按钮组 */}
+            <div className="flex gap-2 shrink-0">
               {isEditMode ? (
                 <>
                   <Button variant="primary" size="sm" onClick={handleGlobalSave} className="flex-none h-10 px-6 font-bold">Save Changes</Button>
@@ -2618,14 +2681,17 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       {member.role === UserRole.INACTIVE ? 'Activate Member' : 'Set Inactive'}
                     </Button>
                   )}
+                  {(isAdmin || isDeveloper) && !isSelfView && (
+                    <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
+                  )}
                   {isDeveloper && !isSelfView && (
                     <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
                   )}
                 </>
               )}
             </div>
-          </div>
-        </div>
+          </div>{/* end 区块三 */}
+        </div>{/* end desktop hero wrapper */}
 
         <div className="grid grid-cols-4 gap-0 border-t border-slate-100 divide-x divide-slate-100 bg-slate-50/50">
           <div className="p-2 md:p-4 text-center hover:bg-white transition-colors group">
@@ -4393,7 +4459,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   })
               ) : (
                 <div className="py-10 text-center text-slate-400">
-                  <Coins size={36} className="mx-auto mb-3 text-slate-200" />
+                  <Coins size={36} className="mx-auto mb-3 text-slate-400" />
                   <p className="text-sm font-medium">No payment history found.</p>
                   <p className="text-xs mt-1">Dues records will appear here once processed.</p>
                 </div>
