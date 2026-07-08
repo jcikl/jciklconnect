@@ -522,20 +522,21 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-4">
+
+      {/* ── Header row ── */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Membership Dues</h2>
-          <p className="text-sm text-slate-500">Annual dues collection and renewal tracking</p>
+          <h2 className="text-base font-bold text-slate-900">Membership Dues</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Annual dues collection and renewal tracking</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {/* Year + refresh row */}
+          {/* Year select + refresh */}
           <div className="flex items-center gap-2">
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
             >
               {availableYears.map(y => (
                 <option key={y} value={y}>{y}</option>
@@ -544,510 +545,491 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             <button
               onClick={loadDashboardData}
               disabled={loading}
-              className="p-1.5 text-slate-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-slate-100"
+              className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors rounded-lg hover:bg-slate-100"
               title="Refresh"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          {/* Admin sync buttons */}
+          {/* Admin buttons (no Auto-match here) */}
           {hasEditPermission && (
             <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleBatchSyncMembershipTypes}
                 disabled={syncingMembershipTypes || syncingMembershipRecords || loading}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
                 title="从会费记录/角色推断并写入 membershipType"
               >
                 {syncingMembershipTypes ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
-                {syncingMembershipTypes ? '同步中...' : '同步 membershipType'}
+                {syncingMembershipTypes ? 'Syncing...' : 'Sync Types'}
               </button>
               <button
                 type="button"
                 onClick={handleBatchSyncMembershipRecords}
                 disabled={syncingMembershipTypes || syncingMembershipRecords || loading}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors disabled:opacity-50"
                 title="按 membershipType + Config 写入 membership[年份]"
               >
                 {syncingMembershipRecords ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}
-                {syncingMembershipRecords ? '同步中...' : '同步 membership'}
+                {syncingMembershipRecords ? 'Syncing...' : 'Sync Records'}
               </button>
               <button
                 type="button"
                 onClick={handleFixFirstMembershipDues}
                 disabled={fixingFirstDues || loading}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 text-violet-800 border border-violet-200 hover:bg-violet-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors disabled:opacity-50"
                 title="将每位会员 membership 中最早年份的 dues 设为 RM350"
               >
                 {fixingFirstDues ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                {fixingFirstDues ? '调整中...' : '首次会费 → RM350'}
+                {fixingFirstDues ? 'Fixing...' : 'Fix 1st Dues'}
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* ── KPI Summary Strip ── */}
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          {/* Members */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3.5">
             <div className="flex items-center gap-2 mb-2">
-              <Users className="w-4 h-4 text-blue-500 shrink-0" />
+              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                <Users className="w-3.5 h-3.5 text-blue-500" />
+              </div>
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Members</p>
             </div>
             <p className="text-2xl font-bold text-slate-900">{summary.totalMembers}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              <span className="text-green-600 font-medium">{summary.renewalMembers}</span> renewal · <span className="text-blue-600 font-medium">{summary.newMembers}</span> new
+            <p className="text-[11px] mt-0.5 font-mono text-slate-500">
+              <span className="text-green-600 font-semibold">{summary.renewalMembers}</span> renewal · <span className="text-blue-600 font-semibold">{summary.newMembers}</span> new
             </p>
           </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          {/* Collection */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3.5">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-green-500 shrink-0" />
+              <div className="w-7 h-7 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
+                <DollarSign className="w-3.5 h-3.5 text-green-500" />
+              </div>
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Collection</p>
             </div>
             <p className="text-2xl font-bold text-slate-900">{summary.overallStats.collectionRate}%</p>
-            <p className="text-xs text-slate-500 mt-1 font-mono">RM{summary.overallStats.paidAmount.toLocaleString()} / {summary.overallStats.totalAmount.toLocaleString()}</p>
+            <p className="text-[11px] mt-0.5 font-mono text-slate-500">
+              RM{summary.overallStats.paidAmount.toLocaleString()} / {summary.overallStats.totalAmount.toLocaleString()}
+            </p>
           </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          {/* Paid */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3.5">
             <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+              <div className="w-7 h-7 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+              </div>
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Paid</p>
             </div>
-            <p className="text-2xl font-bold text-green-600">{Object.values(summary.byMembershipType).reduce((sum, type) => sum + type.paid, 0)}</p>
-            <p className="text-xs text-slate-500 mt-1 font-mono">RM{summary.overallStats.paidAmount.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-green-600">
+              {Object.values(summary.byMembershipType).reduce((sum, t) => sum + t.paid, 0)}
+            </p>
+            <p className="text-[11px] mt-0.5 font-mono text-slate-500">
+              RM{summary.overallStats.paidAmount.toLocaleString()}
+            </p>
           </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          {/* Pending */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3.5">
             <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+              <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+              </div>
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pending</p>
             </div>
-            <p className="text-2xl font-bold text-amber-600">{Object.values(summary.byMembershipType).reduce((sum, type) => sum + type.pending, 0)}</p>
-            <p className="text-xs text-slate-500 mt-1 font-mono">RM{summary.overallStats.pendingAmount.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-amber-600">
+              {Object.values(summary.byMembershipType).reduce((sum, t) => sum + t.pending, 0)}
+            </p>
+            <p className="text-[11px] mt-0.5 font-mono text-slate-500">
+              RM{summary.overallStats.pendingAmount.toLocaleString()}
+            </p>
           </div>
         </div>
       )}
 
-      {/* Membership Type Breakdown */}
+      {/* ── Membership Breakdown Table ── */}
       {summary && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                <Users className="w-3.5 h-3.5 text-blue-500" />
+              </div>
+              <span className="text-sm font-bold text-slate-800">
+                Membership Breakdown · {selectedYear}
+              </span>
+            </div>
+          </div>
           <div className="p-4 overflow-x-auto">
-            <table className="w-full min-w-[700px] border-collapse">
+            <table className="w-full min-w-[600px] text-sm border-collapse">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="pb-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                    Membership Type
+                <tr className="border-b border-slate-100">
+                  <th className="pb-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider sticky left-0 bg-white pr-4 z-10">
+                    Type
                   </th>
                   {Object.entries(summary.byMembershipType).map(([type]) => (
-                    <th key={type} className="pb-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-4">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${membershipTypeColors[type as MembershipType] || 'bg-slate-100 text-slate-800'}`}>
+                    <th key={type} className="pb-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider px-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${membershipTypeColors[type as MembershipType] || 'bg-slate-100 text-slate-700'}`}>
                         {type.charAt(0).toUpperCase() + type.slice(1)}
                       </span>
                     </th>
                   ))}
-                  <th className="pb-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-4">
-                    <span
-                      className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800"
-                      title="首年会费 RM350（含注册费）"
-                    >
+                  <th className="pb-2.5 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider px-3">
+                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-800" title="首年会费 RM350（含注册费）">
                       New
                     </span>
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
+              <tbody className="divide-y divide-slate-50 text-xs">
+                {/* Standard Dues row */}
                 <tr>
-                  <td className="py-3.5 font-medium text-gray-500 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                    Standard Dues
-                  </td>
+                  <td className="py-2.5 font-medium text-slate-500 sticky left-0 bg-white pr-4 z-10">Standard Dues</td>
                   {Object.entries(summary.byMembershipType).map(([type]) => {
                     const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
                     const standardDues = rules[type as MembershipType]?.duesAmount ?? MembershipDues[type as MembershipType] ?? 0;
                     return (
-                      <td key={type} className="py-3.5 text-center text-gray-500 font-medium px-4">
-                        RM{standardDues}
-                      </td>
+                      <td key={type} className="py-2.5 text-center text-slate-500 font-medium px-3">RM{standardDues}</td>
                     );
                   })}
-                  <td className="py-3.5 text-center text-teal-700 font-semibold px-4">
-                    RM{NEW_MEMBERSHIP_DUES}
-                  </td>
+                  <td className="py-2.5 text-center text-teal-700 font-semibold px-3">RM{NEW_MEMBERSHIP_DUES}</td>
                 </tr>
-                <tr>
-                  <td className="py-3.5 font-semibold text-gray-700 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                    Total
-                  </td>
-                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
-                    <td key={type} className="py-3.5 text-center font-bold text-gray-900 px-4">
-                      {stats.total}
-                    </td>
-                  ))}
-                  <td className="py-3.5 text-center font-bold text-teal-800 px-4">
-                    {newMembershipBreakdown.total}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 font-semibold text-green-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                    Paid
-                  </td>
-                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
-                    <td key={type} className="py-3.5 text-center font-bold text-green-600 px-4">
-                      {stats.paid}
-                    </td>
-                  ))}
-                  <td className="py-3.5 text-center font-bold text-green-600 px-4">
-                    {newMembershipBreakdown.paid}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 font-semibold text-yellow-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                    Pending
-                  </td>
-                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
-                    <td key={type} className="py-3.5 text-center font-bold text-yellow-600 px-4">
-                      {stats.pending}
-                    </td>
-                  ))}
-                  <td className="py-3.5 text-center font-bold text-yellow-600 px-4">
-                    {newMembershipBreakdown.pending}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 font-semibold text-red-600 sticky left-0 bg-white pr-4 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-                    Overdue
-                  </td>
-                  {Object.entries(summary.byMembershipType).map(([type, stats]) => (
-                    <td key={type} className="py-3.5 text-center font-bold text-red-600 px-4">
-                      {stats.overdue}
-                    </td>
-                  ))}
-                  <td className="py-3.5 text-center font-bold text-red-600 px-4">
-                    {newMembershipBreakdown.overdue}
-                  </td>
-                </tr>
+                {/* Total / Paid / Pending / Overdue rows — DRY map */}
+                {[
+                  { label: 'Total',   key: 'total',   color: 'text-slate-900', newVal: newMembershipBreakdown.total },
+                  { label: 'Paid',    key: 'paid',    color: 'text-green-600', newVal: newMembershipBreakdown.paid },
+                  { label: 'Pending', key: 'pending', color: 'text-amber-600', newVal: newMembershipBreakdown.pending },
+                  { label: 'Overdue', key: 'overdue', color: 'text-red-600',   newVal: newMembershipBreakdown.overdue },
+                ].map(({ label, key, color, newVal }) => (
+                  <tr key={key}>
+                    <td className={`py-2.5 font-semibold sticky left-0 bg-white pr-4 z-10 ${color}`}>{label}</td>
+                    {Object.entries(summary.byMembershipType).map(([type, stats]) => (
+                      <td key={type} className={`py-2.5 text-center font-bold px-3 ${color}`}>{(stats as any)[key]}</td>
+                    ))}
+                    <td className={`py-2.5 text-center font-bold px-3 ${key === 'total' ? 'text-teal-800' : color}`}>{newVal}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
+      {/* ── Two-column grid: Renewal Members + Membership Payments ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-
-      {/* Renewal Transactions + 会费流水 grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          {/* Renewals List */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm h-full">
-            <div className="px-4 py-3 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-800">Renewal Transactions</h3>
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as MembershipType | 'all')}
-                  className="flex-1 sm:flex-none px-2 py-1 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Types</option>
-                  <option value="Probation">Probation</option>
-                  <option value="Full">Full</option>
-                  <option value="Honorary">Honorary</option>
-                  <option value="Senator">Senator</option>
-                  <option value="Visiting">Visiting</option>
-                </select>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as 'all' | 'paid' | 'pending' | 'overdue')}
-                  className="flex-1 sm:flex-none px-2 py-1 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="all">All Status</option>
-                  <option value="paid">Paid</option>
-                  <option value="pending">Pending</option>
-                  <option value="overdue">Overdue</option>
-                </select>
+        {/* Left: Renewal Members */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
               </div>
+              <span className="text-sm font-bold text-slate-800">Renewal Members</span>
+              <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5 shrink-0">
+                {displayRenewals.length}
+              </span>
             </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as MembershipType | 'all')}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+              >
+                <option value="all">All Types</option>
+                <option value="Probation">Probation</option>
+                <option value="Full">Full</option>
+                <option value="Honorary">Honorary</option>
+                <option value="Senator">Senator</option>
+                <option value="Visiting">Visiting</option>
+              </select>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'paid' | 'pending' | 'overdue')}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+              >
+                <option value="all">All Status</option>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+                <option value="overdue">Overdue</option>
+              </select>
+            </div>
+          </div>
 
-            {/* Desktop View */}
-            <div className="hidden md:block overflow-x-auto">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+            {displayRenewals.length === 0 ? (
+              <div className="text-center py-12">
+                <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-400 text-sm">No renewal records found for the selected filters.</p>
+              </div>
+            ) : (
               <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">#</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Membership Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dues</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reminders</th>
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-10">#</th>
+                    <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Member</th>
+                    <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                    <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Outstanding</th>
+                    <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Due Date</th>
+                    <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid Date</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-slate-50">
                   {displayRenewals.map((renewal, index) => {
+                    const m = members.find(mem => mem.id === renewal.memberId);
                     const targetDues = (renewal as any).targetDues ?? renewal.amount ?? 0;
-                    const paidAmount = renewal.amount ?? 0;
-                    const outstanding = targetDues - paidAmount;
-
+                    const paidAmt = renewal.amount ?? 0;
+                    const outstanding = targetDues - paidAmt;
+                    const statusBarColor =
+                      renewal.status === 'paid' || renewal.status === 'over paid' ? 'border-l-green-400' :
+                      renewal.status === 'overdue' ? 'border-l-red-400' :
+                      renewal.status === 'partial' ? 'border-l-orange-400' :
+                      'border-l-amber-400';
                     return (
-                      <tr key={renewal.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono w-16">
-                          {index + 1}
+                      <tr key={renewal.id} className={`border-l-2 ${statusBarColor} hover:bg-slate-50/80 transition-colors`}>
+                        <td className="py-2.5 px-3 text-xs text-slate-400 font-mono">{index + 1}</td>
+                        <td className="py-2.5 px-3 text-xs font-semibold text-slate-800">
+                          {m?.name || renewal.memberId}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {(() => {
-                            const m = members.find(mem => mem.id === renewal.memberId);
-                            return (
-                              <div className="flex flex-col">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {m?.name || renewal.memberId}
-                                </div>
-                              </div>
-                            );
-                          })()}
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : 'bg-slate-100 text-slate-600'}`}>
+                            {renewal.membershipType ? renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1) : 'Unknown'}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="mb-1">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : ''}`}>
-                              {renewal.membershipType ? renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1) : 'Unknown'}
-                            </span>
-                          </div>
-                        </td>
-                        <td 
-                          className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${outstanding < 0 ? 'text-purple-600' : 'text-gray-900'}`}
-                          title={`应缴: RM${targetDues} | 已付: RM${paidAmount}`}
+                        <td
+                          className={`py-2.5 px-3 text-xs font-bold ${outstanding < 0 ? 'text-purple-600' : outstanding === 0 ? 'text-green-600' : 'text-slate-900'}`}
+                          title={`应缴: RM${targetDues} | 已付: RM${paidAmt}`}
                         >
                           {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[renewal.status]}`}>
+                        <td className="py-2.5 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusColors[renewal.status]}`}>
                             {renewal.status.charAt(0).toUpperCase() + renewal.status.slice(1)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {fmtDate(renewal.dueDate)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="py-2.5 px-3 text-xs text-slate-600">{fmtDate(renewal.dueDate)}</td>
+                        <td className="py-2.5 px-3 text-xs text-slate-500">
                           {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {renewal.remindersSent || 0}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            )}
+          </div>
 
-              {displayRenewals.length === 0 && (
-                <div className="text-center py-12">
-                  <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No renewal transactions found for the selected filters.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Mobile View */}
-            <div className="md:hidden space-y-4 p-4">
-              {displayRenewals.map((renewal, index) => {
-                const m = members.find(mem => mem.id === renewal.memberId);
-                const targetDues = (renewal as any).targetDues ?? renewal.amount ?? 0;
-                const paidAmount = renewal.amount ?? 0;
-                const outstanding = targetDues - paidAmount;
-
-                return (
-                  <div key={renewal.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-900">
-                          #{index + 1} - {m?.name || renewal.memberId}
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2 p-3">
+            {displayRenewals.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-400 text-sm italic">No records found</p>
+              </div>
+            ) : displayRenewals.map((renewal, index) => {
+              const m = members.find(mem => mem.id === renewal.memberId);
+              const targetDues = (renewal as any).targetDues ?? renewal.amount ?? 0;
+              const paidAmt = renewal.amount ?? 0;
+              const outstanding = targetDues - paidAmt;
+              const barColor =
+                renewal.status === 'paid' || renewal.status === 'over paid' ? 'bg-green-400' :
+                renewal.status === 'overdue' ? 'bg-red-400' :
+                renewal.status === 'partial' ? 'bg-orange-400' :
+                'bg-amber-400';
+              return (
+                <div key={renewal.id} className="relative bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${barColor}`} />
+                  <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-800 block truncate">
+                          #{index + 1} {m?.name || renewal.memberId}
                         </span>
-                        <div className="mt-1">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : ''}`}>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`px-1.5 py-0 rounded-full text-[10px] font-semibold ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : 'bg-slate-100 text-slate-600'}`}>
                             {renewal.membershipType || 'Unknown'}
+                          </span>
+                          <span className={`px-1.5 py-0 rounded-full text-[10px] font-semibold ${statusColors[renewal.status]}`}>
+                            {renewal.status}
                           </span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div 
-                          className={`text-sm font-bold ${outstanding < 0 ? 'text-purple-600' : 'text-gray-900'}`}
-                          title={`应缴: RM${targetDues} | 已付: RM${paidAmount}`}
-                        >
-                          {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
-                        </div>
-                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[renewal.status]}`}>
-                          {renewal.status}
-                        </span>
+                      <div className={`text-xs font-bold shrink-0 ${outstanding < 0 ? 'text-purple-600' : outstanding === 0 ? 'text-green-600' : 'text-slate-900'}`}>
+                        {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-y-2 pt-3 border-t border-gray-50 text-[11px]">
-                      <div className="text-gray-500">Due: <span className="text-gray-900 font-medium">{fmtDate(renewal.dueDate)}</span></div>
-                      <div className="text-gray-500 text-right">Reminders: <span className="text-gray-900 font-medium">{renewal.remindersSent || 0}</span></div>
-                      {renewal.status === 'paid' && (
-                        <div className="text-gray-500 col-span-2">Paid on: <span className="text-green-600 font-medium">{renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}</span></div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+                      <span>Due: <span className="font-medium text-slate-700">{fmtDate(renewal.dueDate)}</span></span>
+                      {renewal.status === 'paid' && renewal.paidDate && (
+                        <span className="text-green-600 font-medium">Paid: {fmtDate(renewal.paidDate)}</span>
                       )}
                     </div>
                   </div>
-                );
-              })}
-
-              {displayRenewals.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-gray-400 text-sm italic">No records found</p>
                 </div>
-              )}
-            </div>
+              );
+            })}
           </div>
         </div>
-        {/* 会费流水 Card */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">会费流水</h2>
-                <p className="text-sm text-gray-500 mt-1">按年份筛选：{selectedYear}</p>
+
+        {/* Right: Membership Payments */}
+        <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          {/* Card header */}
+          <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
+                <DollarSign className="w-3.5 h-3.5 text-green-500" />
               </div>
-              {hasEditPermission && (
-                <button
-                  type="button"
-                  onClick={handleAutoMatchMembers}
-                  disabled={autoMatching}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="根据交易描述/参考号自动匹配关联会员"
-                >
-                  {autoMatching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
-                  {autoMatching ? '匹配中...' : '✨ 一键匹配会员'}
-                </button>
-              )}
+              <div className="min-w-0">
+                <span className="text-sm font-bold text-slate-800 block">Membership Payments</span>
+                <span className="text-[10px] text-slate-400">{selectedYear}</span>
+              </div>
             </div>
+            {hasEditPermission && (
+              <button
+                type="button"
+                onClick={handleAutoMatchMembers}
+                disabled={autoMatching}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50 shrink-0"
+                title="根据交易描述/参考号自动匹配关联会员"
+              >
+                {autoMatching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
+                {autoMatching ? 'Matching...' : 'Auto-match'}
+              </button>
+            )}
           </div>
-          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+
+          {/* Scrollable body */}
+          <div className="overflow-y-auto max-h-[500px]">
             {(() => {
               const filteredByYear = membershipTransactions.filter((tx) => {
                 const yearFromProjectId = tx.projectId?.match(/^(\d+)\s+membership$/)?.[1];
                 const txYear = yearFromProjectId ? parseInt(yearFromProjectId, 10) : new Date(tx.date).getFullYear();
                 return txYear === selectedYear;
               });
-              return filteredByYear.length === 0 ? (
-                <div className="text-center py-12 px-4">
-                  <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 text-sm">暂无会费流水（{selectedYear} 年）</p>
-                </div>
-              ) : (
+
+              if (filteredByYear.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                    <DollarSign className="w-10 h-10 text-slate-300 mb-3" />
+                    <p className="text-slate-400 text-sm">No payments for {selectedYear}</p>
+                  </div>
+                );
+              }
+
+              const sorted = filteredByYear.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+              return (
                 <>
-                  {/* Desktop View */}
+                  {/* Desktop table */}
                   <div className="hidden md:block">
                     <table className="w-full">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-slate-50 sticky top-0">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">日期 / 描述</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">会员 / 项目</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">金额 / 操作</th>
+                          <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                          <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Description · Member</th>
+                          <th className="py-2.5 px-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredByYear
-                          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                          .map((tx) => (
-                            <tr key={tx.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-2">
-                                <div className="text-sm text-gray-900 font-medium whitespace-nowrap">{fmtDate(tx.date)}</div>
-                                <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.description}>{tx.description}</div>
+                      <tbody className="divide-y divide-slate-50">
+                        {sorted.map((tx) => {
+                          const matchedMember = findMatchingMember(tx, members);
+                          const isIncome = tx.type === 'Income';
+                          const barColor = isIncome ? 'border-l-green-400' : 'border-l-red-400';
+                          return (
+                            <tr key={tx.id} className={`border-l-2 ${barColor} hover:bg-slate-50/80 transition-colors`}>
+                              <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-nowrap">
+                                {fmtDate(tx.date)}
                               </td>
-                              <td className="px-4 py-2">
-                                {(() => {
-                                  const matchedMember = findMatchingMember(tx, members);
-                                  if (tx.memberId) {
-                                    return (
-                                      <div className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={matchedMember?.name || tx.memberId}>
-                                        {matchedMember?.name || tx.memberId}
-                                      </div>
-                                    );
-                                  } else if (matchedMember) {
-                                    return (
-                                      <div className="flex flex-col">
-                                        <span
-                                          className="inline-flex items-center gap-1 w-fit px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60"
-                                          title="系统通过交易描述/银行参考号自动匹配"
-                                        >
-                                          ✨ {matchedMember.name}
-                                        </span>
-                                      </div>
-                                    );
-                                  } else {
-                                    return <div className="text-xs text-gray-400 italic">—</div>;
-                                  }
-                                })()}
-                                <div className="text-xs text-gray-500 truncate max-w-[150px]" title={tx.projectId || '—'}>{tx.projectId || '—'}</div>
-                              </td>
-                              <td className="px-4 py-2 text-right">
-                                <div className="flex flex-col items-end gap-1">
-                                  <span className="text-sm font-medium text-gray-900">
-                                    {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
-                                  </span>
-                                  {hasEditPermission && (
-                                    <button
-                                      type="button"
-                                      onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
-                                      className="py-0 min-h-0 min-w-0 text-gray-400 hover:text-blue-600 transition-colors flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider"
-                                    >
-                                      <Edit size={12} /> 编辑
-                                    </button>
+                              <td className="py-2.5 px-3 max-w-[160px]">
+                                <div className="text-xs text-slate-700 truncate" title={tx.description}>{tx.description}</div>
+                                <div className="text-[10px] mt-0.5">
+                                  {tx.memberId ? (
+                                    <span className="text-slate-500 font-medium">{matchedMember?.name || tx.memberId}</span>
+                                  ) : matchedMember ? (
+                                    <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-amber-700 font-semibold bg-amber-50 border border-amber-200/60" title="系统自动匹配">
+                                      ✨ {matchedMember.name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 italic">—</span>
                                   )}
                                 </div>
                               </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <div className={`text-xs font-bold ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                                  {isIncome ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
+                                </div>
+                                {hasEditPermission && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                    className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] font-bold text-slate-400 hover:text-jci-blue transition-colors uppercase tracking-wider"
+                                  >
+                                    <Edit size={10} /> Edit
+                                  </button>
+                                )}
+                              </td>
                             </tr>
-                          ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
 
-                  {/* Mobile View */}
-                  <div className="md:hidden space-y-3 p-4">
-                    {filteredByYear
-                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                      .map((tx) => (
-                        <div key={tx.id} className="bg-slate-50 border border-slate-100 rounded-lg p-3">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] text-gray-400 font-medium">{fmtDate(tx.date)}</span>
-                            <span className={`text-xs font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                              {tx.type === 'Income' ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
-                            </span>
-                          </div>
-                          <div className="text-xs font-bold text-gray-800 mb-1 truncate">{tx.description}</div>
-                          <div className="flex justify-between items-center mt-2">
-                            <div className="text-[10px] text-gray-500 truncate max-w-[180px]">
-                              {(() => {
-                                const matchedMember = findMatchingMember(tx, members);
-                                if (tx.memberId) {
-                                  return <span>👤 {matchedMember?.name || tx.memberId}</span>;
-                                } else if (matchedMember) {
-                                  return <span className="text-amber-700 font-semibold">✨ 智能匹配: {matchedMember.name}</span>;
-                                }
-                                return '—';
-                              })()}
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-2 p-3">
+                    {sorted.map((tx) => {
+                      const matchedMember = findMatchingMember(tx, members);
+                      const isIncome = tx.type === 'Income';
+                      const barColor = isIncome ? 'bg-green-400' : 'bg-red-400';
+                      return (
+                        <div key={tx.id} className="relative bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                          <div className={`absolute left-0 top-0 bottom-0 w-1 ${barColor}`} />
+                          <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] text-slate-400 font-medium">{fmtDate(tx.date)}</span>
+                              <span className={`text-xs font-bold ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                                {isIncome ? '+' : '-'}{fmtCurrency(Math.abs(tx.amount))}
+                              </span>
                             </div>
-                            {hasEditPermission && (
-                              <button
-                                type="button"
-                                onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
-                                className="text-blue-600 text-[10px] font-bold"
-                              >
-                                Edit
-                              </button>
-                            )}
+                            <div className="text-xs font-semibold text-slate-700 truncate mb-1">{tx.description}</div>
+                            <div className="flex items-center justify-between">
+                              <div className="text-[10px] text-slate-500 truncate max-w-[160px]">
+                                {tx.memberId ? (
+                                  <span>{matchedMember?.name || tx.memberId}</span>
+                                ) : matchedMember ? (
+                                  <span className="text-amber-700 font-semibold">✨ {matchedMember.name}</span>
+                                ) : (
+                                  <span className="italic">—</span>
+                                )}
+                              </div>
+                              {hasEditPermission && (
+                                <button
+                                  type="button"
+                                  onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors"
+                                >
+                                  <Edit size={10} /> Edit
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
                   </div>
                 </>
               );
             })()}
           </div>
         </div>
+
       </div>
     </div>
   );
