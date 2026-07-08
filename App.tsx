@@ -309,10 +309,10 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   }, [currentYear]);
 
   const pillars = [
-    { image: '/pillars/business-portrait.jpg', title: 'Business', description: 'Connect with entrepreneurs, grow your network, and sharpen your professional edge.', accent: 'from-jci-navy/80 to-jci-blue/60' },
-    { image: '/pillars/community-portrait.jpg', title: 'Community', description: 'Lead meaningful service projects that create lasting impact in Kuala Lumpur.', accent: 'from-rose-900/70 to-rose-600/50' },
-    { image: '/pillars/international-portrait.jpg', title: 'International', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.', accent: 'from-emerald-900/70 to-emerald-600/50' },
-    { image: '/pillars/individual-portrait.jpg', title: 'Individual', description: 'Unlock your leadership potential through training, mentorship, and real experiences.', accent: 'from-amber-900/70 to-amber-600/50' },
+    { image: '/pillars/business-portrait.webp', title: 'Business', description: 'Connect with entrepreneurs, grow your network, and sharpen your professional edge.', accent: 'from-jci-navy/80 to-jci-blue/60' },
+    { image: '/pillars/community-portrait.webp', title: 'Community', description: 'Lead meaningful service projects that create lasting impact in Kuala Lumpur.', accent: 'from-rose-900/70 to-rose-600/50' },
+    { image: '/pillars/international-portrait.webp', title: 'International', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.', accent: 'from-emerald-900/70 to-emerald-600/50' },
+    { image: '/pillars/individual-portrait.webp', title: 'Individual', description: 'Unlock your leadership potential through training, mentorship, and real experiences.', accent: 'from-amber-900/70 to-amber-600/50' },
   ];
 
   const eventTypeColor: Record<string, string> = {
