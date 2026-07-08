@@ -2680,22 +2680,6 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   <div className="space-y-2">
                     {/* Dropdowns — pill style, single row */}
                     <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                      {/* Year */}
-                      <div className="relative shrink-0">
-                        <select
-                          value={reportYear.toString()}
-                          onChange={(e) => { const v = parseInt(e.target.value, 10); setReportYear(v); setProjectAccountYearFilter(v); }}
-                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
-                            reportYear !== 0
-                              ? 'bg-jci-blue text-white border-jci-blue'
-                              : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
-                          }`}
-                        >
-                          <option value="0">All Years</option>
-                          {allTransactionYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
-                        </select>
-                        <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${reportYear !== 0 ? 'text-white' : 'text-slate-400'}`} />
-                      </div>
                       {/* Account */}
                       <div className="relative shrink-0">
                         <select
