@@ -383,7 +383,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   {/* Decorative corner accents */}
                   <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-sky-400/40 rounded-tl-xl pointer-events-none" />
                   <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-sky-400/40 rounded-br-xl pointer-events-none" />
-                  <div className="relative w-72 h-80 lg:w-80 lg:h-96 rounded-[1.75rem] overflow-hidden shadow-2xl shadow-black/40 border border-white/[0.12]">
+                  <div className="relative w-[400px] h-[260px] lg:w-[480px] lg:h-[300px] rounded-[1.75rem] overflow-hidden shadow-2xl shadow-black/40 border border-white/[0.12]">
                     {termSettings?.memberGroupPhotoUrl ? (
                       <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
                     ) : (
