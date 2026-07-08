@@ -1591,8 +1591,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
           <p className="text-slate-500 text-sm">Bookkeeping · dues collection · budgeting</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="w-28 shrink-0">
+        <div className="flex items-center gap-1.5">
+          <div className="w-20 shrink-0">
             <Select
               value={reportYear.toString()}
               onChange={(e) => {
@@ -1607,21 +1607,18 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             />
           </div>
           {/* Secondary actions: icon-only on mobile, text+icon on sm+ */}
-          <Button variant="outline" size="sm" onClick={() => setIsReportsModalOpen(true)} title="Reports" className="px-2 sm:px-3">
+          <Button variant="outline" size="sm" onClick={() => setIsReportsModalOpen(true)} title="Reports" className="shrink-0 h-[38px] px-2.5 sm:px-3">
             <FileText size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Reports</span>
           </Button>
           {hasPermission('canEditFinance') && (
             <>
-              <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)} title="Renew Dues" className="px-2 sm:px-3">
-                <Calendar size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Renew Dues</span>
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} title="Batch Import" className="px-2 sm:px-3">
+<Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} title="Batch Import" className="shrink-0 h-[38px] px-2.5 sm:px-3">
                 <Upload size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Batch Import</span>
               </Button>
             </>
           )}
-          <Button onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}>
-            <DollarSign size={16} className="mr-2" /><span className="hidden xs:inline">New </span>Transaction
+          <Button className="shrink-0 h-[38px]" onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}>
+            <DollarSign size={16} className="mr-1.5" />Transaction
           </Button>
         </div>
       </div>
@@ -2677,15 +2674,16 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   />
 
                   {/* Filter panel: always visible */}
-                  <div className="space-y-2">
-                    {/* Dropdowns — pill style, single row */}
-                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                      {/* Account */}
-                      <div className="relative shrink-0">
+                  {/* Mobile: 2 stacked rows (dropdowns full-width, chips full-width). Desktop: single row */}
+                  <div className="flex flex-col md:flex-row md:items-center gap-2">
+                    {/* Dropdowns — pill style */}
+                    <div className="flex gap-1.5">
+                      {/* Account — flex-1 on mobile so both pills share the row equally */}
+                      <div className="relative flex-1 md:flex-none md:shrink-0">
                         <select
                           value={bankAccountFilter}
                           onChange={(e) => setBankAccountFilter(e.target.value)}
-                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
+                          className={`appearance-none cursor-pointer w-full pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
                             bankAccountFilter !== 'All'
                               ? 'bg-jci-blue text-white border-jci-blue'
                               : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
@@ -2697,11 +2695,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${bankAccountFilter !== 'All' ? 'text-white' : 'text-slate-400'}`} />
                       </div>
                       {/* Category */}
-                      <div className="relative shrink-0">
+                      <div className="relative flex-1 md:flex-none md:shrink-0">
                         <select
                           value={txCategoryFilter}
                           onChange={(e) => setTxCategoryFilter(e.target.value)}
-                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
+                          className={`appearance-none cursor-pointer w-full pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${
                             txCategoryFilter !== 'All'
                               ? 'bg-jci-blue text-white border-jci-blue'
                               : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
@@ -2716,8 +2714,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${txCategoryFilter !== 'All' ? 'text-white' : 'text-slate-400'}`} />
                       </div>
                     </div>
-                    {/* Chips — Type + Status in one row */}
-                    <div className="flex items-center gap-2 flex-wrap">
+                    {/* Chips — Type + Status */}
+                    <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
                         {(['All', 'Income', 'Expense'] as const).map(t => (
                           <button key={t} onClick={() => setTxTypeFilter(t)}
