@@ -741,7 +741,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   const allPublishedEvents = events;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
       <GuestHeader currentPage="events" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">

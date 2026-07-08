@@ -58,7 +58,6 @@ export default defineConfig(({ mode }) => {
             'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
             'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/messaging'],
             'vendor-charts':   ['recharts'],
-            'vendor-pdf':      ['jspdf', 'pdf-lib'],
             'vendor-icons':    ['lucide-react'],
             'vendor-calendar': ['react-big-calendar'],
             'vendor-motion':   ['framer-motion'],
