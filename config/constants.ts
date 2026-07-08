@@ -76,6 +76,7 @@ export const COLLECTIONS = {
   PUBLICATIONS: 'publications',
   PARTNERSHIPS: 'partnerships',
   BOARD_TERM_SETTINGS: 'boardTermSettings',
+  INQUIRIES: 'inquiries',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

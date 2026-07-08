@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift, SlidersHorizontal, CheckSquare, Square, Lock } from 'lucide-react';
+import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift, SlidersHorizontal, CheckSquare, Square, Lock, Bookmark } from 'lucide-react';
 
 const BUSINESS_CATEGORIES = [
   'Service Provider',
@@ -14,6 +14,7 @@ import { useMembers } from '../../hooks/useMembers';
 import { BusinessProfile } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { Input, Textarea, Select } from '../ui/Form';
+import { submitInquiry } from '../../services/inquiryService';
 
 // Mock Sister Chapter Members
 const MOCK_SISTER_CHAPTER_MEMBERS = [
@@ -144,11 +145,47 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     requirements: ''
   });
   const [inquiryErrors, setInquiryErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { businesses, loading, error } = useBusinessDirectory();
-  const { members } = useMembers(); // Used to find owner name
+  const { members } = useMembers();
   const { showToast } = useToast();
-  const { member: currentUser } = useAuth();
+  const { member: currentUser, updateMemberProfile } = useAuth();
+
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+
+  const idealReferralsSet = useMemo(() => {
+    const raw = currentUser?.idealReferralIndustry ?? '';
+    return new Set(
+      raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    );
+  }, [currentUser?.id, currentUser?.idealReferralIndustry]);
+
+  const getBizScore = (biz: { id: string; industry?: string }): 0 | 1 | 2 => {
+    if (bookmarkedIds.has(biz.id)) return 0;
+    if (idealReferralsSet.size > 0 && biz.industry && idealReferralsSet.has(biz.industry.toLowerCase())) return 1;
+    return 2;
+  };
+
+  useEffect(() => {
+    if (currentUser?.bookmarkedBusinessIds) {
+      setBookmarkedIds(new Set(currentUser.bookmarkedBusinessIds));
+    }
+  }, [currentUser?.id]);
+
+  const toggleBookmark = async (e: React.MouseEvent, bizId: string) => {
+    e.stopPropagation();
+    if (!currentUser) return;
+    const next = new Set(bookmarkedIds);
+    if (next.has(bizId)) next.delete(bizId); else next.add(bizId);
+    setBookmarkedIds(next);
+    try {
+      await updateMemberProfile({ bookmarkedBusinessIds: Array.from(next) });
+    } catch {
+      setBookmarkedIds(bookmarkedIds);
+      showToast('Failed to update bookmark', 'error');
+    }
+  };
 
   useEffect(() => {
     if (initialSelectedBusinessId && businesses.length > 0) {
@@ -246,15 +283,21 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     }
 
     const term = (searchQuery || searchTerm).toLowerCase();
-    if (!term) return filtered;
+    const result = term
+      ? filtered.filter(biz =>
+          (biz.companyName ?? '').toLowerCase().includes(term) ||
+          (biz.ownerName ?? '').toLowerCase().includes(term) ||
+          (biz.industry ?? '').toLowerCase().includes(term) ||
+          (biz.description ?? '').toLowerCase().includes(term) ||
+          (biz.businessCategory ?? '').toLowerCase().includes(term)
+        )
+      : filtered;
 
-    return filtered.filter(biz =>
-      (biz.companyName ?? '').toLowerCase().includes(term) ||
-      (biz.ownerName ?? '').toLowerCase().includes(term) ||
-      (biz.industry ?? '').toLowerCase().includes(term) ||
-      (biz.description ?? '').toLowerCase().includes(term) ||
-      (biz.businessCategory ?? '').toLowerCase().includes(term)
-    );
+    return result.sort((a, b) => {
+      const scoreDiff = getBizScore(a) - getBizScore(b);
+      if (scoreDiff !== 0) return scoreDiff;
+      return (a.ownerName ?? '').localeCompare(b.ownerName ?? '');
+    });
   }, [
     businesses,
     searchTerm,
@@ -264,7 +307,9 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     selectedIntlBiz,
     selectedCategories,
     selectedIdealReferral,
-    showDealsOnly
+    showDealsOnly,
+    bookmarkedIds,
+    idealReferralsSet,
   ]);
 
   const handleContact = () => {
@@ -279,8 +324,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     setInquiryModalOpen(true);
   };
 
-  const handleSendInquiry = () => {
-    // Validate
+  const handleSendInquiry = async () => {
     const errors: Record<string, string> = {};
     if (!inquiryForm.name.trim()) errors.name = 'Name is required';
     if (!inquiryForm.phone.trim()) errors.phone = 'Phone number is required';
@@ -291,16 +335,51 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       return;
     }
 
-    // Submission logic (placeholder)
-    console.log('Inquiry submitted:', {
-      businessId: selectedBiz?.id,
-      businessName: selectedBiz?.companyName,
-      ...inquiryForm
-    });
+    if (!selectedBiz || !currentUser) return;
+    setIsSubmitting(true);
 
-    setInquiryModalOpen(false);
-    setSelectedBiz(null);
-    showToast('Your inquiry has been sent successfully', 'success');
+    try {
+      // Find recipient member to get phone + WhatsApp group status
+      const recipient = members.find(m => m.id === selectedBiz.memberId);
+      const recipientPhone =
+        recipient?.contact?.phone || recipient?.phone || '';
+      const recipientInGroup =
+        recipient?.whatsappGroup ?? recipient?.whatsappJoined ?? recipient?.contact?.whatsappJoined ?? false;
+      const senderInGroup =
+        currentUser.whatsappGroup ?? currentUser.whatsappJoined ?? currentUser.contact?.whatsappJoined ?? false;
+
+      const { channel, waUrl } = await submitInquiry({
+        senderId: currentUser.id,
+        senderName: inquiryForm.name,
+        senderPhone: inquiryForm.phone,
+        senderCompany: inquiryForm.company || undefined,
+        senderInGroup,
+        recipientId: selectedBiz.memberId,
+        recipientName: selectedBiz.ownerName,
+        recipientPhone,
+        recipientInGroup,
+        businessId: selectedBiz.id,
+        businessName: selectedBiz.companyName,
+        requirements: inquiryForm.requirements,
+      });
+
+      setInquiryModalOpen(false);
+      setSelectedBiz(null);
+
+      if (channel === 'whatsapp_direct' && waUrl) {
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+        showToast('Opening WhatsApp — your message is pre-filled!', 'success');
+      } else if (channel === 'whapi_bot') {
+        showToast('Inquiry sent! The member and admin will be notified via WhatsApp.', 'success');
+      } else {
+        showToast('Inquiry recorded. Admin has been notified via WhatsApp.', 'success');
+      }
+    } catch (err) {
+      console.error('Inquiry submission error:', err);
+      showToast('Failed to send inquiry. Please try again.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -370,14 +449,25 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
                 <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
                   <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
-                    {filteredBusinesses.map(biz => {
+                    {filteredBusinesses.map((biz, idx) => {
+                      const prevMobileScore = idx > 0 ? getBizScore(filteredBusinesses[idx - 1]) : -1;
+                      const thisMobileScore = getBizScore(biz);
+                      const showMobileDivider = !isGuest && idx > 0 && thisMobileScore > prevMobileScore;
+                      const mobileDividerLabel = thisMobileScore === 1 ? 'Suggested for You' : 'All Businesses';
+                      const mobileDividerStyle = thisMobileScore === 1 ? 'text-sky-500' : 'text-slate-400';
                       const ownerMember = members.find(m => m.id === biz.memberId);
                       const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
                       const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
                       const position = ownerMember?.business?.title || 'Representative';
                       const intlStatus = biz.acceptsInternationalBusiness;
                       return (
-                        <button key={biz.id} type="button"
+                        <React.Fragment key={biz.id}>
+                        {showMobileDivider && (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-t border-slate-100">
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${mobileDividerStyle}`}>{mobileDividerLabel}</span>
+                          </div>
+                        )}
+                        <button type="button"
                           className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                           onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
                           <img src={avatarUrl} alt={biz.ownerName} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
@@ -385,9 +475,10 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
                               {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
+                              {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
                             </div>
                             <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
-                            <div className="flex items-center gap-1.5 mt-1">
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{biz.industry}</span>}
                               {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
                               {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
@@ -395,9 +486,22 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                           </div>
                           {isGuest
                             ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
-                            : <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            : (
+                              <button
+                                type="button"
+                                className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                                onClick={(e) => toggleBookmark(e, biz.id)}
+                                aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
+                              >
+                                <Bookmark
+                                  size={16}
+                                  className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300'}
+                                />
+                              </button>
+                            )
                           }
                         </button>
+                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -484,25 +588,60 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
                   {/* Card grid */}
                   <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this filter">
+                    {!isGuest && filteredBusinesses.length > 0 && (() => {
+                      const firstScore = getBizScore(filteredBusinesses[0]);
+                      if (firstScore === 0) return <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Bookmark size={10} className="fill-slate-400 text-slate-400" /> Bookmarked</p>;
+                      if (firstScore === 1) return <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">✦ Suggested for You</p>;
+                      return null;
+                    })()}
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredBusinesses.map(biz => {
+                      {filteredBusinesses.map((biz, idx) => {
+                        const prevScore = idx > 0 ? getBizScore(filteredBusinesses[idx - 1]) : -1;
+                        const thisScore = getBizScore(biz);
+                        const showDivider = !isGuest && idx > 0 && thisScore > prevScore;
+                        const dividerLabel = thisScore === 1 ? 'Suggested for You' : 'All Businesses';
+                        const dividerStyle = thisScore === 1 ? 'text-sky-500' : 'text-slate-400';
                         const ownerMember = members.find(m => m.id === biz.memberId);
                         const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
                         const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
                         const position = ownerMember?.business?.title || 'Representative';
                         const intlStatus = biz.acceptsInternationalBusiness;
                         return (
-                          <div key={biz.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
+                          <React.Fragment key={biz.id}>
+                            {showDivider && (
+                              <div className="col-span-full flex items-center gap-3 pt-2">
+                                <div className="flex-1 h-px bg-slate-200" />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${dividerStyle}`}>{dividerLabel}</span>
+                                <div className="flex-1 h-px bg-slate-200" />
+                              </div>
+                            )}
+                          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
                             onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
                             {/* Card header */}
                             <div className="p-4 flex gap-3 items-start border-b border-slate-50">
                               <img src={avatarUrl} alt={biz.ownerName} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
                               <div className="min-w-0 flex-1">
-                                <p className="font-bold text-sm text-slate-900 truncate leading-tight">{biz.ownerName}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-bold text-sm text-slate-900 truncate leading-tight">{biz.ownerName}</p>
+                                  {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
+                                </div>
                                 {chineseName && <p className="text-[11px] text-slate-400 truncate">{chineseName}</p>}
                                 <p className="text-xs text-slate-500 truncate mt-0.5">{position}</p>
                                 <p className="text-xs font-semibold text-slate-700 truncate">{biz.companyName}</p>
                               </div>
+                              {!isGuest && (
+                                <button
+                                  type="button"
+                                  className="flex-shrink-0 p-1 rounded-lg hover:bg-slate-100 transition-colors -mt-0.5 -mr-0.5"
+                                  onClick={(e) => toggleBookmark(e, biz.id)}
+                                  aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
+                                >
+                                  <Bookmark
+                                    size={15}
+                                    className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300 group-hover:text-slate-400'}
+                                  />
+                                </button>
+                              )}
                             </div>
                             {/* Card body */}
                             <div className="p-4 flex-1 flex flex-col gap-3">
@@ -544,6 +683,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                               )}
                             </div>
                           </div>
+                          </React.Fragment>
                         );
                       })}
                     </div>
@@ -845,8 +985,8 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
               >
                 Cancel
               </Button>
-              <Button className="flex-1 font-bold shadow-lg shadow-jci-blue/20" onClick={handleSendInquiry}>
-                <Send size={16} className="mr-2" /> Send Inquiry
+              <Button className="flex-1 font-bold shadow-lg shadow-jci-blue/20" onClick={handleSendInquiry} disabled={isSubmitting}>
+                <Send size={16} className="mr-2" /> {isSubmitting ? 'Sending…' : 'Send Inquiry'}
               </Button>
             </div>
           </div>

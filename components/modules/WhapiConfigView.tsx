@@ -14,6 +14,7 @@ export const WhapiConfigView: React.FC = () => {
   // Member Sync states
   const { members, updateMember, loading: membersLoading } = useMembers();
   const [groupId, setGroupId] = useState('');
+  const [adminPhone, setAdminPhone] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ type: 'info' | 'success' | 'error', message: string } | null>(null);
 
@@ -32,9 +33,9 @@ export const WhapiConfigView: React.FC = () => {
       fetchQuota(savedConfig);
     }
     const savedGroupId = localStorage.getItem('whapi_sync_group_id');
-    if (savedGroupId) {
-      setGroupId(savedGroupId);
-    }
+    if (savedGroupId) setGroupId(savedGroupId);
+    const savedAdminPhone = localStorage.getItem('whapi_admin_phone');
+    if (savedAdminPhone) setAdminPhone(savedAdminPhone);
   }, []);
 
   const fetchQuota = async (token: string) => {
@@ -374,6 +375,21 @@ export const WhapiConfigView: React.FC = () => {
                   placeholder="e.g. 120363405028630543@g.us"
                   className="w-full text-xs"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase">Admin WhatsApp Number</label>
+                <Input
+                  type="text"
+                  value={adminPhone}
+                  onChange={(e) => {
+                    setAdminPhone(e.target.value);
+                    localStorage.setItem('whapi_admin_phone', e.target.value);
+                  }}
+                  placeholder="e.g. +60123456789"
+                  className="w-full text-xs"
+                />
+                <p className="text-xs text-slate-400">Receives notification when a member is not in the WhatsApp group.</p>
               </div>
 
               <Button

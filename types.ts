@@ -484,6 +484,7 @@ export interface Member {
   whatsappJoined?: boolean;
   whatsappgroup?: boolean;
   whatsappGroup?: boolean;
+  bookmarkedBusinessIds?: string[];
   emergencyContact?: string;
   emergencyContactName?: string;
   emergencyContactRelationship?: string;
@@ -602,6 +603,23 @@ export interface MemberEngagementRequirementProgress {
 export type MemberCreateInput = Omit<Member, 'id' | 'membershipType'> & {
   membershipType?: MembershipType;
 };
+
+export interface Inquiry {
+  id?: string;
+  senderId: string;
+  senderName: string;
+  senderPhone: string;
+  senderCompany?: string;
+  recipientId: string;
+  recipientName: string;
+  recipientPhone: string;
+  businessId: string;
+  businessName: string;
+  requirements: string;
+  channel: 'whatsapp_direct' | 'whapi_bot' | 'no_phone';
+  status: 'sent' | 'failed';
+  createdAt?: any;
+}
 
 export interface BusinessProfile {
   id: string;
