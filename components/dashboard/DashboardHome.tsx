@@ -6,7 +6,7 @@ import {
   CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift,
   Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, RefreshCw, ChevronRight
 } from 'lucide-react';
-import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal } from '../ui/Common';
+import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal, Skeleton } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useEvents } from '../../hooks/useEvents';
@@ -68,6 +68,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [contracts, setContracts] = useState<CommitmentContract[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
+  const [adsLoading, setAdsLoading] = useState(true);
   // Promotion Progress state (for Probation members)
   const [promotionProgress, setPromotionProgress] = useState<any>(null);
   const [promoLoading, setPromoLoading] = useState(false);
@@ -100,6 +101,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         setHomepageAds(ads);
       } catch (err) {
         console.error('Failed to load homepage ads', err);
+      } finally {
+        setAdsLoading(false);
       }
     };
     loadAds();
@@ -287,7 +290,28 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }, [birthdayMembers, currentDay]);
 
   if (!member) {
-    return <div className="text-center py-10 text-slate-400">Loading member data...</div>;
+    return (
+      <div className="space-y-4">
+        {/* Journey card skeleton */}
+        <Skeleton className="h-[72px]" rounded="2xl" />
+        {/* Stats grid skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-[80px]" rounded="xl" />)}
+        </div>
+        {/* Events section skeleton */}
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-24" rounded="md" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[1,2,3,4].map(i => <Skeleton key={i} className="h-[200px]" rounded="2xl" />)}
+          </div>
+        </div>
+        {/* Bottom cards skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Skeleton className="h-[160px]" rounded="2xl" />
+          <Skeleton className="h-[160px]" rounded="2xl" />
+        </div>
+      </div>
+    );
   }
 
   const isProbationMember = member.membershipType === 'Probation';
@@ -317,7 +341,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     <div className="space-y-4">
 
       {/* Homepage Advertisements Banner (Swiper) */}
-      {homepageAds.length > 0 && (
+      {adsLoading ? (
+        <div className="flex gap-3 overflow-hidden">
+          {[1,2,3].map(i => <Skeleton key={i} className="flex-none w-[58%] sm:w-[30%] lg:w-[23%] h-36 sm:h-40" rounded="2xl" />)}
+        </div>
+      ) : homepageAds.length > 0 && (
         <div className="w-full">
           <Swiper
             modules={[Autoplay, Pagination]}
@@ -558,7 +586,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             </button>
           </div>
           {eventsLoading ? (
-            <div className="text-center py-8 text-slate-400 text-sm">Loading events...</div>
+            <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4">
+              {[1,2,3,4].map(i => <Skeleton key={i} className="flex-none w-[60.6%] sm:w-auto h-[200px]" rounded="2xl" />)}
+            </div>
           ) : (eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length === 0 ? (
             <div className="text-center py-8 text-slate-400 font-medium">
               <Calendar size={32} className="mx-auto mb-2 text-slate-300" />

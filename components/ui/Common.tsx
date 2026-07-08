@@ -653,3 +653,13 @@ export const Drawer: React.FC<DrawerProps> = ({
 // Export Pagination component
 export { Pagination } from './Pagination';
 export type { PaginationProps } from './Pagination';
+
+// --- Skeleton ---
+interface SkeletonProps {
+  className?: string;
+  rounded?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+}
+export const Skeleton: React.FC<SkeletonProps> = ({ className = '', rounded = 'md' }) => {
+  const r = { sm: 'rounded-sm', md: 'rounded-md', lg: 'rounded-lg', xl: 'rounded-xl', '2xl': 'rounded-2xl', full: 'rounded-full' }[rounded];
+  return <div className={`animate-pulse bg-slate-100 ${r} ${className}`} />;
+};
