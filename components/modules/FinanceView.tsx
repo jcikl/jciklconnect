@@ -2666,31 +2666,18 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               ].filter(Boolean).length;
               return (
                 <div className="mb-3 space-y-2">
-                  {/* Row 1: Search + mobile filter toggle */}
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1">
-                      <Input
-                        type="text"
-                        placeholder="Search date, description, ref no…"
-                        value={txSearchTerm}
-                        onChange={(e) => setTxSearchTerm(e.target.value)}
-                        icon={<Search size={16} />}
-                        className="w-full"
-                      />
-                    </div>
-                    <button
-                      onClick={() => setTxFiltersOpen(p => !p)}
-                      className={`md:hidden shrink-0 relative flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${txFiltersOpen ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                    >
-                      <SlidersHorizontal size={15} />
-                      {activeFilterCount > 0 && (
-                        <span className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${txFiltersOpen ? 'bg-white text-jci-blue' : 'bg-jci-blue text-white'}`}>{activeFilterCount}</span>
-                      )}
-                    </button>
-                  </div>
+                  {/* Search */}
+                  <Input
+                    type="text"
+                    placeholder="Search date, description, ref no…"
+                    value={txSearchTerm}
+                    onChange={(e) => setTxSearchTerm(e.target.value)}
+                    icon={<Search size={16} />}
+                    className="w-full"
+                  />
 
-                  {/* Filter panel: always on desktop, toggle on mobile */}
-                  <div className={`space-y-2 ${txFiltersOpen ? 'block' : 'hidden'} md:block`}>
+                  {/* Filter panel: always visible */}
+                  <div className="space-y-2">
                     {/* Dropdowns — pill style, single row */}
                     <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                       {/* Year */}
