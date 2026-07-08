@@ -66,19 +66,33 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
   let html = '';
   let lastError = '';
 
-  // Try 1: corsproxy.io (extremely popular, fast and supports raw text fetch)
+  // Try 1: Netlify Function server-side proxy (avoids CORS proxy blocks)
   try {
-    const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+    const response = await fetch(`/api/jci-proxy?eventid=${eventId}`);
     if (response.ok) {
       html = await response.text();
     } else {
-      lastError = `corsproxy.io returned status ${response.status}`;
+      lastError = `Netlify proxy returned status ${response.status}`;
     }
   } catch (err: any) {
     lastError = err.message || err;
   }
 
-  // Try 2: AllOrigins JSON endpoint (most reliable CORS fallback proxy format)
+  // Try 2: corsproxy.io
+  if (!html) {
+    try {
+      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+      if (response.ok) {
+        html = await response.text();
+      } else {
+        lastError = `corsproxy.io returned status ${response.status}`;
+      }
+    } catch (err: any) {
+      lastError = err.message || err;
+    }
+  }
+
+  // Try 3: AllOrigins JSON endpoint
   if (!html) {
     try {
       const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
@@ -95,7 +109,7 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
     }
   }
 
-  // Try 3: CodeTabs Proxy (Fallback 2)
+  // Try 4: CodeTabs Proxy
   if (!html) {
     try {
       const response = await fetch(`https://api.codetabs.com/v1/proxy?target=${encodeURIComponent(targetUrl)}`);
@@ -109,7 +123,7 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
     }
   }
 
-  // Try 4: Direct fetch (Fallback 3 - in case CORS is allowed directly)
+  // Try 5: Direct fetch
   if (!html) {
     try {
       const response = await fetch(targetUrl);
