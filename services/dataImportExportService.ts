@@ -1,6 +1,6 @@
 // Data Import/Export Service
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+// xlsx is dynamically imported inside importFromFile() and exportToExcel() to avoid eager loading
 import {
   DataImportResult,
   DataImportError,
@@ -77,8 +77,9 @@ export class DataImportExportService {
         });
       } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
+            const XLSX = await import('xlsx');
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
@@ -561,6 +562,7 @@ export class DataImportExportService {
     });
 
     // Create workbook
+    const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(filteredData);
 

@@ -55,13 +55,14 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
             'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/messaging'],
-            'vendor-charts': ['recharts'],
-            'vendor-pdf': ['jspdf', 'pdf-lib'],
-            'vendor-excel': ['xlsx'],
+            'vendor-charts':   ['recharts'],
+            'vendor-pdf':      ['jspdf', 'pdf-lib'],
+            'vendor-icons':    ['lucide-react'],
             'vendor-calendar': ['react-big-calendar'],
-            'vendor-motion': ['framer-motion'],
+            'vendor-motion':   ['framer-motion'],
+            // xlsx removed: now dynamically imported, will be split automatically
           },
         },
       },
