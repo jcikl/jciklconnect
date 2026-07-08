@@ -46,3 +46,15 @@ tsc_errors_new.txt
 
 # Local Netlify folder
 .netlify
+
+# Capacitor native platforms (generated — do not commit secrets inside)
+# android/ and ios/ are committed so CI can build them,
+# but exclude generated/build artefacts inside them
+android/.gradle/
+android/app/build/
+android/build/
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+*.ipa
+*.apk
+*.aab

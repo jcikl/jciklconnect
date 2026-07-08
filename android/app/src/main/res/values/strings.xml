@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">JCI Kuala Lumpur</string>
+    <string name="title_activity_main">JCI Kuala Lumpur</string>
+    <string name="package_name">cc.jcikl.connect</string>
+    <string name="custom_url_scheme">cc.jcikl.connect</string>
+</resources>
