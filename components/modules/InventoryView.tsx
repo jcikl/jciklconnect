@@ -253,58 +253,61 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     }
   };
 
+  const handleOpenStockCard = async (item: InventoryItem) => {
+    setSelectedItem(item);
+    setStockCardModalOpen(true);
+    setIsHistoryLoading(true);
+    try {
+      const { InventoryService } = await import('../../services/inventoryService');
+      const card = await InventoryService.getStockCard(item.id);
+      setStockMovements(card);
+    } catch {
+      showToast('Failed to load stock card', 'error');
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-4 md:space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Asset & Inventory</h2>
-          <p className="text-slate-500">Track physical assets, locations, and custodians.</p>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Asset & Inventory</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Track physical assets, locations, and custodians.</p>
         </div>
-        <Button onClick={() => setAddModalOpen(true)}><Plus size={16} className="mr-2" /> Add New Item</Button>
+        <Button onClick={() => setAddModalOpen(true)} size="sm">
+          <Plus size={15} className="mr-1.5" /> Add Item
+        </Button>
       </div>
 
       <LoadingState loading={loading} error={error}>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-blue-50 border-blue-100">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white rounded-lg text-blue-600 shadow-sm"><Package size={24} /></div>
-              <div>
-                <p className="text-sm text-blue-600 font-medium">Total Assets</p>
-                <h3 className="text-2xl font-bold text-slate-900">{stats.total}</h3>
+        {/* KPI Strip — 2-col mobile, 4-col desktop */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Total Assets', value: stats.total, icon: <Package size={17} />, color: 'blue' },
+            { label: 'Available', value: stats.available, icon: <CheckCircle size={17} />, color: 'green' },
+            { label: 'Checked Out', value: stats.checkedOut, icon: <LogOut size={17} />, color: 'amber' },
+            { label: 'Action Needed', value: stats.needsAction, icon: <AlertCircle size={17} />, color: 'red' },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3.5">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg bg-${color}-50 border border-${color}-100 flex items-center justify-center text-${color}-600 shrink-0`}>
+                  {icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide leading-none">{label}</p>
+                  <p className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{value}</p>
+                </div>
               </div>
             </div>
-          </Card>
-          <Card className="bg-green-50 border-green-100">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white rounded-lg text-green-600 shadow-sm"><CheckCircle size={24} /></div>
-              <div>
-                <p className="text-sm text-green-600 font-medium">Available</p>
-                <h3 className="text-2xl font-bold text-slate-900">{stats.available}</h3>
-              </div>
-            </div>
-          </Card>
-          <Card className="bg-amber-50 border-amber-100">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white rounded-lg text-amber-600 shadow-sm"><Package size={24} /></div>
-              <div>
-                <p className="text-sm text-amber-600 font-medium">Checked Out</p>
-                <h3 className="text-2xl font-bold text-slate-900">{stats.checkedOut}</h3>
-              </div>
-            </div>
-          </Card>
-          <Card className="bg-red-50 border-red-100">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white rounded-lg text-red-600 shadow-sm"><AlertCircle size={24} /></div>
-              <div>
-                <p className="text-sm text-red-600 font-medium">Action Needed</p>
-                <h3 className="text-2xl font-bold text-slate-900">{stats.needsAction}</h3>
-              </div>
-            </div>
-          </Card>
+          ))}
         </div>
 
-        <Card noPadding>
-          <div className="px-4 md:px-6 pt-4">
+        {/* Main Content */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          {/* Tabs */}
+          <div className="px-4 md:px-6 pt-4 border-b border-slate-100">
             <Tabs
               tabs={['Items', 'Maintenance', 'Alerts', 'Depreciation', 'Financial History']}
               activeTab={
@@ -323,148 +326,183 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             />
           </div>
 
-          <div className="p-4">
+          <div className="p-4 md:p-6">
             {activeTab === 'items' && (
-              <div className="space-y-4">
-                <Card title="Asset Registry">
-                  <LoadingState loading={loading} error={error} empty={filteredItems.length === 0} emptyMessage="No inventory items found">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
-                          <tr>
-                            <th className="py-3 px-4">Item Name</th>
-                            <th className="py-3 px-4">Category</th>
-                            <th className="py-3 px-4">Location</th>
-                            <th className="py-3 px-4">Quantity</th>
-                            <th className="py-3 px-4">Status</th>
-                            <th className="py-3 px-4">Custodian</th>
-                            <th className="py-3 px-4">Value</th>
-                            <th className="py-3 px-4 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {paginatedItems.map(item => (
-                            <tr key={item.id} className="hover:bg-slate-50">
-                              <td className="py-3 px-4">
-                                <div className="font-medium text-slate-900">{item.name}</div>
+              <div className="space-y-3">
+                {/* Search bar */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, category, location…"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder:text-slate-400"
+                  />
+                </div>
+
+                <LoadingState loading={loading} error={error} empty={filteredItems.length === 0} emptyMessage="No inventory items found">
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-100">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                        <tr>
+                          <th className="py-2.5 px-3 font-semibold text-xs">Item</th>
+                          <th className="py-2.5 px-3 font-semibold text-xs whitespace-nowrap">Category</th>
+                          <th className="py-2.5 px-3 font-semibold text-xs whitespace-nowrap">Location</th>
+                          <th className="py-2.5 px-3 font-semibold text-xs text-center whitespace-nowrap">Qty</th>
+                          <th className="py-2.5 px-3 font-semibold text-xs whitespace-nowrap">Status</th>
+                          <th className="py-2.5 px-3 font-semibold text-xs whitespace-nowrap">Custodian</th>
+                          <th className="py-2.5 px-3 font-semibold text-xs whitespace-nowrap">Value</th>
+                          <th className="py-2.5 px-3 font-semibold text-xs text-right whitespace-nowrap">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {paginatedItems.map(item => {
+                          const rowColor = item.status === 'Available' ? 'border-l-green-400' : item.status === 'Checked Out' ? 'border-l-amber-400' : 'border-l-red-400';
+                          const custodianName = item.custodian ? members.find(m => m.id === item.custodian)?.name || item.custodian : '—';
+                          return (
+                            <tr key={item.id} className={`border-l-2 ${rowColor} hover:bg-slate-50/60 transition-colors`}>
+                              <td className="py-2.5 px-3 max-w-[200px]">
+                                <div className="font-semibold text-xs text-slate-900 truncate">{item.name}</div>
                                 {item.variants && item.variants.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mt-1">
                                     {item.variants.map((v, idx) => (
-                                      <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                      <span key={idx} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
                                         {v.size}: {v.quantity}
                                       </span>
                                     ))}
                                   </div>
                                 )}
                               </td>
-                              <td className="py-3 px-4 text-slate-500">{item.category}</td>
-                              <td className="py-3 px-4 text-slate-500">{item.location}</td>
-                              <td className="py-3 px-4 text-slate-500">{item.quantity ?? 1}</td>
-                              <td className="py-3 px-4">
-                                <Badge variant={item.status === 'Available' ? 'success' : item.status === 'Out of Stock' ? 'error' : 'warning'}>
+                              <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">{item.category}</td>
+                              <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap">{item.location || '—'}</td>
+                              <td className="py-2.5 px-3 text-xs font-semibold text-slate-700 text-center">{item.quantity ?? 1}</td>
+                              <td className="py-2.5 px-3">
+                                <Badge variant={item.status === 'Available' ? 'success' : item.status === 'Out of Stock' ? 'error' : 'warning'} className="text-[10px]">
                                   {item.status}
                                 </Badge>
                               </td>
-                              <td className="py-3 px-4 text-slate-500">
-                                {item.custodian ? members.find(m => m.id === item.custodian)?.name || item.custodian : '-'}
-                              </td>
-                              <td className="py-3 px-4 text-slate-500">
+                              <td className="py-2.5 px-3 text-xs text-slate-500 whitespace-nowrap max-w-[120px] truncate">{custodianName}</td>
+                              <td className="py-2.5 px-3">
                                 {item.currentValue !== undefined && item.purchasePrice !== undefined ? (
-                                  <div className="text-xs">
-                                    <div className="font-medium text-green-600">{formatCurrency(item.currentValue)}</div>
-                                    <div className="text-slate-400">of {formatCurrency(item.purchasePrice)}</div>
+                                  <div>
+                                    <div className="text-xs font-semibold text-green-600">{formatCurrency(item.currentValue)}</div>
+                                    <div className="text-[10px] text-slate-400">of {formatCurrency(item.purchasePrice)}</div>
                                   </div>
                                 ) : item.purchasePrice !== undefined ? (
                                   <span className="text-xs text-slate-500">{formatCurrency(item.purchasePrice)}</span>
                                 ) : (
-                                  <span className="text-xs text-slate-400">N/A</span>
+                                  <span className="text-xs text-slate-400">—</span>
                                 )}
                               </td>
-                              <td className="py-3 px-4 text-right">
-                                <div className="flex justify-end gap-2">
+                              <td className="py-2.5 px-3">
+                                <div className="flex justify-end items-center gap-0.5">
                                   {item.status === 'Available' ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedItem(item);
-                                        setCheckOutModalOpen(true);
-                                      }}
-                                    >
-                                      <LogOut size={14} className="mr-1" /> Check Out
-                                    </Button>
+                                    <button onClick={() => { setSelectedItem(item); setCheckOutModalOpen(true); }} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors whitespace-nowrap">
+                                      <LogOut size={11} /> Out
+                                    </button>
                                   ) : item.status === 'Checked Out' ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => checkInItem(item.id)}
-                                    >
-                                      <LogIn size={14} className="mr-1" /> Check In
-                                    </Button>
+                                    <button onClick={() => checkInItem(item.id)} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 transition-colors whitespace-nowrap">
+                                      <LogIn size={11} /> In
+                                    </button>
                                   ) : null}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Stock Card"
-                                    onClick={async () => {
-                                      setSelectedItem(item);
-                                      setStockCardModalOpen(true);
-                                      setIsHistoryLoading(true);
-                                      try {
-                                        const { InventoryService } = await import('../../services/inventoryService');
-                                        const card = await InventoryService.getStockCard(item.id);
-                                        setStockMovements(card);
-                                      } catch (err) {
-                                        showToast('Failed to load stock card', 'error');
-                                      } finally {
-                                        setIsHistoryLoading(false);
-                                      }
-                                    }}
-                                  >
-                                    <History size={14} />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Adjust Stock"
-                                    onClick={() => {
-                                      setSelectedItem(item);
-                                      setAdjustmentModalOpen(true);
-                                    }}
-                                  >
-                                    <RefreshCw size={14} />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedItem(item);
-                                      setFormVariants(item.variants || []);
-                                      setEditModalOpen(true);
-                                    }}
-                                  >
-                                    <Edit size={14} className="mr-1" /> Edit
-                                  </Button>
+                                  <button title="Stock Card" onClick={() => handleOpenStockCard(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                    <History size={13} />
+                                  </button>
+                                  <button title="Adjust Stock" onClick={() => { setSelectedItem(item); setAdjustmentModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                    <RefreshCw size={13} />
+                                  </button>
+                                  <button title="Edit" onClick={() => { setSelectedItem(item); setFormVariants(item.variants || []); setEditModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                    <Edit size={13} />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-2">
+                    {paginatedItems.map(item => {
+                      const barColor = item.status === 'Available' ? 'bg-green-400' : item.status === 'Checked Out' ? 'bg-amber-400' : 'bg-red-400';
+                      const custodianName = item.custodian ? members.find(m => m.id === item.custodian)?.name || item.custodian : null;
+                      return (
+                        <div key={item.id} className="relative bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                          <div className={`absolute left-0 top-0 bottom-0 w-1 ${barColor}`} />
+                          <div className="pl-4 pr-3 pt-3 pb-3">
+                            {/* Name + Status */}
+                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                              <span className="font-semibold text-slate-900 text-sm leading-snug">{item.name}</span>
+                              <Badge variant={item.status === 'Available' ? 'success' : item.status === 'Out of Stock' ? 'error' : 'warning'} className="text-[10px] shrink-0">
+                                {item.status}
+                              </Badge>
+                            </div>
+                            {/* Meta row */}
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500 mb-1.5">
+                              <span>{item.category}</span>
+                              {item.location && <><span className="text-slate-300">·</span><span>{item.location}</span></>}
+                              <span className="text-slate-300">·</span>
+                              <span>Qty <span className="font-semibold text-slate-700">{item.quantity ?? 1}</span></span>
+                              {item.purchasePrice !== undefined && (
+                                <><span className="text-slate-300">·</span><span className="font-medium text-slate-600">{formatCurrency(item.currentValue ?? item.purchasePrice)}</span></>
+                              )}
+                            </div>
+                            {/* Variants */}
+                            {item.variants && item.variants.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-2">
+                                {item.variants.map((v, idx) => (
+                                  <span key={idx} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                    {v.size}: {v.quantity}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {/* Footer: custodian + actions */}
+                            <div className="flex items-center justify-between gap-2 mt-2">
+                              <span className="text-[11px] text-slate-400 truncate">{custodianName || ''}</span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {item.status === 'Available' ? (
+                                  <button onClick={() => { setSelectedItem(item); setCheckOutModalOpen(true); }} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors">
+                                    <LogOut size={11} /> Out
+                                  </button>
+                                ) : item.status === 'Checked Out' ? (
+                                  <button onClick={() => checkInItem(item.id)} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 transition-colors">
+                                    <LogIn size={11} /> In
+                                  </button>
+                                ) : null}
+                                <button title="Stock Card" onClick={() => handleOpenStockCard(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                  <History size={13} />
+                                </button>
+                                <button title="Adjust" onClick={() => { setSelectedItem(item); setAdjustmentModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                  <RefreshCw size={13} />
+                                </button>
+                                <button title="Edit" onClick={() => { setSelectedItem(item); setFormVariants(item.variants || []); setEditModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                  <Edit size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="mt-4">
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filteredItems.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                      />
                     </div>
-                    {totalPages > 1 && (
-                      <div className="mt-4">
-                        <Pagination
-                          currentPage={currentPage}
-                          totalPages={totalPages}
-                          totalItems={filteredItems.length}
-                          itemsPerPage={itemsPerPage}
-                          onPageChange={setCurrentPage}
-                        />
-                      </div>
-                    )}
-                  </LoadingState>
-                </Card>
+                  )}
+                </LoadingState>
               </div>
             )}
 
@@ -516,7 +554,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
               />
             )}
           </div>
-        </Card>
+        </div>
       </LoadingState>
 
       {/* Stock Adjustment Modal */}
@@ -998,8 +1036,8 @@ const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-slate-900">Maintenance Schedules</h3>
-        <Button onClick={onOpenModal}>
-          <Plus size={16} className="mr-2" />
+        <Button onClick={onOpenModal} size="sm">
+          <Plus size={15} className="mr-1.5" />
           Schedule Maintenance
         </Button>
       </div>
@@ -1143,8 +1181,8 @@ const AlertsTab: React.FC<AlertsTabProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-slate-900">Inventory Alerts</h3>
-        <Button variant="outline" onClick={handleCheckAlerts} disabled={checkingAlerts}>
-          <Bell size={16} className="mr-2" />
+        <Button variant="outline" onClick={handleCheckAlerts} disabled={checkingAlerts} size="sm">
+          <Bell size={15} className="mr-1.5" />
           {checkingAlerts ? 'Checking...' : 'Check for Alerts'}
         </Button>
       </div>
@@ -1391,34 +1429,24 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-blue-50 border-blue-100">
-          <div className="flex items-center gap-3">
-            <DollarSign size={24} className="text-blue-600" />
-            <div>
-              <p className="text-sm text-blue-600 font-medium">Total Purchase Value</p>
-              <h3 className="text-xl font-bold text-slate-900">{formatCurrency(totalPurchaseValue)}</h3>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Total Purchase Value', value: formatCurrency(totalPurchaseValue), icon: <DollarSign size={17} />, color: 'blue' },
+          { label: 'Current Value', value: formatCurrency(totalCurrentValue), icon: <TrendingDown size={17} />, color: 'green' },
+          { label: 'Total Depreciation', value: formatCurrency(totalDepreciation), icon: <TrendingDown size={17} />, color: 'red' },
+        ].map(({ label, value, icon, color }) => (
+          <div key={label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3.5">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg bg-${color}-50 border border-${color}-100 flex items-center justify-center text-${color}-600 shrink-0`}>
+                {icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide leading-none">{label}</p>
+                <p className="text-lg font-bold text-slate-900 leading-tight mt-0.5 tabular-nums">{value}</p>
+              </div>
             </div>
           </div>
-        </Card>
-        <Card className="bg-green-50 border-green-100">
-          <div className="flex items-center gap-3">
-            <TrendingDown size={24} className="text-green-600" />
-            <div>
-              <p className="text-sm text-green-600 font-medium">Total Current Value</p>
-              <h3 className="text-xl font-bold text-slate-900">{formatCurrency(totalCurrentValue)}</h3>
-            </div>
-          </div>
-        </Card>
-        <Card className="bg-red-50 border-red-100">
-          <div className="flex items-center gap-3">
-            <TrendingDown size={24} className="text-red-600" />
-            <div>
-              <p className="text-sm text-red-600 font-medium">Total Depreciation</p>
-              <h3 className="text-xl font-bold text-slate-900">{formatCurrency(totalDepreciation)}</h3>
-            </div>
-          </div>
-        </Card>
+        ))}
       </div>
 
       <LoadingState loading={loading} error={null} empty={itemsWithDepreciation.length === 0} emptyMessage="No items with depreciation tracking">
