@@ -2691,10 +2691,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
                   {/* Filter panel: always on desktop, toggle on mobile */}
                   <div className={`space-y-2 ${txFiltersOpen ? 'block' : 'hidden'} md:block`}>
-                    {/* Dropdowns — pill style */}
-                    <div className="flex gap-1.5 flex-wrap">
+                    {/* Dropdowns — pill style, single row */}
+                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                       {/* Year */}
-                      <div className="relative">
+                      <div className="relative shrink-0">
                         <select
                           value={reportYear.toString()}
                           onChange={(e) => { const v = parseInt(e.target.value, 10); setReportYear(v); setProjectAccountYearFilter(v); }}
@@ -2710,11 +2710,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${reportYear !== 0 ? 'text-white' : 'text-slate-400'}`} />
                       </div>
                       {/* Account */}
-                      <div className="relative">
+                      <div className="relative shrink-0">
                         <select
                           value={bankAccountFilter}
                           onChange={(e) => setBankAccountFilter(e.target.value)}
-                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors max-w-[140px] truncate ${
+                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors w-[118px] ${
                             bankAccountFilter !== 'All'
                               ? 'bg-jci-blue text-white border-jci-blue'
                               : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
@@ -2726,11 +2726,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${bankAccountFilter !== 'All' ? 'text-white' : 'text-slate-400'}`} />
                       </div>
                       {/* Category */}
-                      <div className="relative">
+                      <div className="relative shrink-0">
                         <select
                           value={txCategoryFilter}
                           onChange={(e) => setTxCategoryFilter(e.target.value)}
-                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors max-w-[150px] truncate ${
+                          className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors w-[122px] ${
                             txCategoryFilter !== 'All'
                               ? 'bg-jci-blue text-white border-jci-blue'
                               : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
