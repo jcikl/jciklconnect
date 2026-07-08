@@ -1608,38 +1608,50 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       {moduleTab === 'Dashboard' && (
         <div className="space-y-6">
-          {/* Compact KPI strip — 2-col below lg, 3-col lg+ */}
+          {/* KPI strip */}
           <LoadingState loading={loading} error={error}>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              {/* Total Cash — full width on mobile/tablet, 1-col on lg+ */}
+              {/* Total Cash */}
               <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-jci-navy to-jci-blue rounded-xl p-4 text-white shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Total Cash on Hand</p>
                 <p className="text-2xl font-bold mt-1 tabular-nums">{formatCurrency(dashboardStats.totalCash, accounts[0]?.currency || 'MYR')}</p>
-                <p className="text-xs text-white/60 mt-1">Across all accounts</p>
+                <p className="text-xs text-white/60 mt-1">Across {accounts.length} account{accounts.length !== 1 ? 's' : ''}</p>
+                {summary && (
+                  <div className="mt-2 flex gap-3 border-t border-white/20 pt-2">
+                    <span className="text-[10px] text-green-300 font-mono tabular-nums">↑ {formatCurrency(summary.totalIncome)}</span>
+                    <span className="text-[10px] text-red-300 font-mono tabular-nums">↓ {formatCurrency(summary.totalExpenses)}</span>
+                  </div>
+                )}
               </div>
               {/* Net Balance */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Net Balance</p>
-                <p className={`text-base font-bold mt-1 leading-tight ${summary && summary.netBalance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
+                <p className={`text-xl font-bold mt-1 leading-tight tabular-nums ${summary && summary.netBalance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
                   {summary ? formatCurrency(summary.netBalance) : '—'}
                 </p>
-                <div className="mt-1.5 space-y-0.5">
-                  <p className="text-[10px] text-green-600 font-mono">↑ {summary ? formatCurrency(summary.totalIncome) : '—'}</p>
-                  <p className="text-[10px] text-rose-500 font-mono">↓ {summary ? formatCurrency(summary.totalExpenses) : '—'}</p>
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums truncate">{summary ? formatCurrency(summary.totalIncome) : '—'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums truncate">{summary ? formatCurrency(summary.totalExpenses) : '—'}</span>
+                  </div>
                 </div>
               </div>
               {/* Pending */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 cursor-pointer hover:border-amber-300 hover:bg-amber-50/30 transition-colors" onClick={() => setModuleTab('Transactions')}>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Pending Txs</p>
-                <p className="text-2xl font-bold text-amber-500 mt-1">{dashboardStats.pendingCount}</p>
+                <p className="text-2xl font-bold text-amber-500 mt-1 tabular-nums">{dashboardStats.pendingCount}</p>
                 <p className="text-[10px] text-slate-400 mt-1">{dashboardStats.pendingExpensesCount} exp. need review</p>
               </div>
             </div>
           </LoadingState>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6 min-w-0">
             {/* Main Content: Transactions — order-2 on mobile so Bank Accounts appears first */}
-            <div className="md:col-span-2 space-y-6 order-2 md:order-1">
+            <div className="md:col-span-2 space-y-6 order-2 md:order-1 min-w-0">
               <Card
                 title="Recent Transactions"
                 action={
@@ -1676,7 +1688,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                               <td className="py-3">
                                 <Badge variant="neutral">{tx.category}</Badge>
                               </td>
-                              <td className={`py-3 text-right pr-2 font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-slate-900'}`}>
+                              <td className={`py-3 text-right pr-2 font-mono font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
                                 {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
                               </td>
                             </tr>
@@ -1686,19 +1698,22 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     </div>
 
                     {/* Mobile View */}
-                    <div className="md:hidden space-y-3">
-                      {transactions.slice(0, 10).map(tx => (
-                        <div key={tx.id} className="p-3 border border-slate-100 rounded-lg bg-white shadow-sm">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="text-xs text-slate-500">{formatDate(tx.date)}</span>
-                            <Badge variant="neutral" className="text-[10px]">{tx.category}</Badge>
-                          </div>
-                          <div className="font-medium text-slate-900 text-sm mb-1">
-                            {tx.description}
-                            {tx.status === 'Pending' && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-amber-400"></span>}
-                          </div>
-                          <div className={`text-right font-mono font-bold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                    <div className="md:hidden space-y-2">
+                      {transactions.slice(0, 8).map(tx => (
+                        <div key={tx.id} className="bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm flex">
+                          <div className={`w-1 shrink-0 ${tx.type === 'Income' ? 'bg-green-400' : 'bg-red-400'}`} />
+                          <div className="flex-1 px-3 py-2.5">
+                            <div className="flex justify-between items-baseline gap-2">
+                              <span className="text-[11px] text-slate-400">{formatDate(tx.date)}</span>
+                              <span className={`font-mono font-bold text-sm shrink-0 ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
+                                {tx.type === 'Income' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount))}
+                              </span>
+                            </div>
+                            <p className="text-sm font-medium text-slate-900 leading-snug mt-0.5 truncate">{tx.description}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Badge variant="neutral" className="text-[10px] py-0">{tx.category}</Badge>
+                              {tx.status === 'Pending' && <span className="text-[10px] text-amber-500 font-medium">Pending</span>}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1716,118 +1731,124 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                   </Button>
                 )
               }>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="p-3 bg-blue-50 rounded-lg text-jci-blue">
-                    <RefreshCw size={24} />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-slate-900">Annual Renewal Cycle ({new Date().getFullYear()})</h4>
-                    <p className="text-sm text-slate-500">
-                      {(() => {
-                        const currentYear = new Date().getFullYear();
-                        const duesTransactions = transactions.filter(t => {
-                          const txYear = new Date(t.date).getFullYear();
-                          return txYear === currentYear && isTransactionInCategory(t, 'Membership');
-                        });
-                        const pendingCount = duesTransactions.filter(t => t.status === 'Pending').length;
-                        const clearedCount = duesTransactions.filter(t => t.status === 'Cleared').length;
-                        return `Pending: ${pendingCount} | Paid: ${clearedCount}`;
-                      })()}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {(() => {
-                    const currentYear = new Date().getFullYear();
-                    const duesTransactions = transactions.filter(t => {
-                      const txYear = new Date(t.date).getFullYear();
-                      return txYear === currentYear && isTransactionInCategory(t, 'Membership') && t.type === 'Income';
-                    });
-                    const totalDues = duesTransactions.reduce((sum, t) => sum + t.amount, 0);
-                    const clearedDues = duesTransactions.filter(t => t.status === 'Cleared').reduce((sum, t) => sum + t.amount, 0);
-                    const target = duesTransactions.length * 150; // Assuming 150 per member
-                    const progress = target > 0 ? (clearedDues / target) * 100 : 0;
-                    return (
-                      <>
-                        <ProgressBar progress={progress} label="Collection Progress" />
-                        <p className="text-xs text-slate-500 text-right">
-                          Target: {formatCurrency(target)} / Collected: {formatCurrency(clearedDues)}
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        const currentYear = new Date().getFullYear();
-                        const remindersSent = await FinanceService.sendDuesReminders(currentYear, 30);
-                        showToast(`${remindersSent} reminder notifications sent`, 'success');
-                      } catch (err) {
-                        showToast('Failed to send reminders', 'error');
-                      }
-                    }}
-                  >
-                    Send Reminders
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)}>
-                    Configure Renewal
-                  </Button>
-                </div>
+                {(() => {
+                  const currentYear = new Date().getFullYear();
+                  const duesTxs = transactions.filter(t => {
+                    const txYear = new Date(t.date).getFullYear();
+                    return txYear === currentYear && isTransactionInCategory(t, 'Membership');
+                  });
+                  const duesPendingCount = duesTxs.filter(t => t.status === 'Pending').length;
+                  const duesClearedCount = duesTxs.filter(t => t.status === 'Cleared').length;
+                  const incomeTxs = duesTxs.filter(t => t.type === 'Income');
+                  const clearedDues = incomeTxs.filter(t => t.status === 'Cleared').reduce((sum, t) => sum + t.amount, 0);
+                  const target = incomeTxs.length * 150;
+                  const progress = target > 0 ? (clearedDues / target) * 100 : 0;
+                  return (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 text-center">
+                          <p className="text-xl font-bold text-amber-600 tabular-nums">{duesPendingCount}</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Pending</p>
+                        </div>
+                        <div className="bg-green-50 border border-green-100 rounded-lg p-2.5 text-center">
+                          <p className="text-xl font-bold text-green-600 tabular-nums">{duesClearedCount}</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Paid</p>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-center">
+                          <p className="text-xl font-bold text-slate-700 tabular-nums">{Math.round(progress)}%</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Collected</p>
+                        </div>
+                      </div>
+                      <ProgressBar progress={progress} label="Collection Progress" />
+                      <p className="text-xs text-slate-400 text-right mt-1 tabular-nums">
+                        {formatCurrency(clearedDues)} / {formatCurrency(target)}
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <Button variant="outline" size="sm" onClick={async () => {
+                          try {
+                            const remindersSent = await FinanceService.sendDuesReminders(currentYear, 30);
+                            showToast(`${remindersSent} reminder notifications sent`, 'success');
+                          } catch (err) {
+                            showToast('Failed to send reminders', 'error');
+                          }
+                        }}>Send Reminders</Button>
+                        <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)}>Configure</Button>
+                      </div>
+                    </>
+                  );
+                })()}
               </Card>
             </div>
 
             {/* Sidebar: Accounts */}
-            <div className="order-1 md:order-2">
+            <div className="order-1 md:order-2 min-w-0">
               <Card title="Bank Accounts" action={
                 <Button variant="ghost" size="sm" onClick={() => setIsAddAccountModalOpen(true)}>
                   <Plus size={14} className="mr-1" /> Add
                 </Button>
               }>
-                <div className="space-y-2">
-                  {accounts.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-4">No bank accounts configured</p>
-                  ) : (
-                    accounts.map(acc => (
-                      <div
-                        key={acc.id}
-                        className="p-3 rounded-lg border border-slate-100 bg-slate-50 hover:border-jci-blue/40 hover:bg-blue-50/30 transition-all cursor-pointer"
-                        onClick={() => {
-                          setDetailAccount(acc);
-                          setDetailYear(new Date().getFullYear());
-                          setIsAccountDetailOpen(true);
-                        }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider truncate">
+                {accounts.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">No bank accounts configured</p>
+                ) : (
+                  <>
+                    {/* Mobile: horizontal scroll */}
+                    <div className="md:hidden flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
+                      {accounts.map(acc => (
+                        <div
+                          key={acc.id}
+                          className="shrink-0 w-52 p-3 rounded-xl border border-slate-200 bg-slate-50 hover:border-jci-blue/40 hover:bg-blue-50/30 transition-all cursor-pointer"
+                          onClick={() => { setDetailAccount(acc); setDetailYear(new Date().getFullYear()); setIsAccountDetailOpen(true); }}
+                        >
+                          <div className="flex items-start justify-between gap-1 mb-1">
+                            <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider truncate leading-tight">
                               {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
                             </p>
-                            <p className="text-base font-bold text-slate-900 mt-0.5 truncate">{formatCurrency(acc.balance, acc.currency)}</p>
+                            {acc.accountNumber && (
+                              <span className="text-[10px] text-slate-400 font-mono shrink-0">···{acc.accountNumber.slice(-4)}</span>
+                            )}
                           </div>
-                          {acc.accountNumber && (
-                            <span className="text-[11px] text-slate-400 font-mono shrink-0 mt-1">···{acc.accountNumber.slice(-4)}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between mt-1.5">
-                          <div className="flex items-center gap-1">
-                            <CheckCircle size={11} className="text-green-500 shrink-0" />
-                            <span className="text-[10px] text-slate-400">Reconciled {formatDate(acc.lastReconciled)}</span>
+                          <p className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(acc.balance, acc.currency)}</p>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle size={10} className="text-green-500 shrink-0" />
+                              <span className="text-[10px] text-slate-400">{formatDate(acc.lastReconciled)}</span>
+                            </div>
+                            <button className="text-[10px] text-blue-500 hover:text-blue-700 font-medium" onClick={e => { e.stopPropagation(); setMatchingAccount(acc); }}>Match</button>
                           </div>
-                          <button
-                            className="text-[10px] text-blue-500 hover:text-blue-700 font-medium"
-                            onClick={e => { e.stopPropagation(); setMatchingAccount(acc); }}
-                          >
-                            Match txs
-                          </button>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      ))}
+                    </div>
+                    {/* Desktop: stacked list */}
+                    <div className="hidden md:block space-y-2">
+                      {accounts.map(acc => (
+                        <div
+                          key={acc.id}
+                          className="p-3 rounded-lg border border-slate-100 bg-slate-50 hover:border-jci-blue/40 hover:bg-blue-50/30 transition-all cursor-pointer"
+                          onClick={() => { setDetailAccount(acc); setDetailYear(new Date().getFullYear()); setIsAccountDetailOpen(true); }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider truncate">
+                                {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
+                              </p>
+                              <p className="text-base font-bold text-slate-900 mt-0.5 tabular-nums">{formatCurrency(acc.balance, acc.currency)}</p>
+                            </div>
+                            {acc.accountNumber && (
+                              <span className="text-[11px] text-slate-400 font-mono shrink-0 mt-1">···{acc.accountNumber.slice(-4)}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <div className="flex items-center gap-1">
+                              <CheckCircle size={11} className="text-green-500 shrink-0" />
+                              <span className="text-[10px] text-slate-400">Reconciled {formatDate(acc.lastReconciled)}</span>
+                            </div>
+                            <button className="text-[10px] text-blue-500 hover:text-blue-700 font-medium" onClick={e => { e.stopPropagation(); setMatchingAccount(acc); }}>Match txs</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </Card>
             </div>
           </div>
