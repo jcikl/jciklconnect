@@ -1482,7 +1482,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
-          <p className="text-slate-500 text-sm">Automated bookkeeping, dues collection, and budgeting.</p>
+          <p className="text-slate-500 text-sm">Bookkeeping · dues collection · budgeting</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           {/* Primary row: year + new transaction CTA */}
@@ -1532,34 +1532,38 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       {moduleTab === 'Dashboard' && (
         <div className="space-y-6">
-          {/* Stat Cards */}
+          {/* Compact KPI strip — 2-col below lg, 3-col lg+ */}
           <LoadingState loading={loading} error={error}>
-            <StatCardsContainer>
-              <StatCard
-                title="Total Cash on Hand"
-                value={formatCurrency(dashboardStats.totalCash, accounts[0]?.currency || 'USD')}
-                icon={<DollarSign size={20} />}
-                subtext="Across all accounts"
-              />
-              <StatCard
-                title="Net Balance (This Year)"
-                value={summary ? formatCurrency(summary.netBalance) : '$0.00'}
-                icon={<RefreshCw size={20} />}
-                subtext={summary ? `${formatCurrency(summary.totalIncome)} income, ${formatCurrency(summary.totalExpenses)} expenses` : 'Loading...'}
-                trend={summary && summary.netBalance > 0 ? 10 : -5}
-              />
-              <StatCard
-                title="Pending Transactions"
-                value={dashboardStats.pendingCount.toString()}
-                icon={<AlertCircle size={20} />}
-                subtext={`${dashboardStats.pendingExpensesCount} expenses need approval`}
-              />
-            </StatCardsContainer>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* Total Cash — full width on mobile/tablet, 1-col on lg+ */}
+              <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-jci-navy to-jci-blue rounded-xl p-4 text-white shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Total Cash on Hand</p>
+                <p className="text-2xl font-bold mt-1 truncate">{formatCurrency(dashboardStats.totalCash, accounts[0]?.currency || 'MYR')}</p>
+                <p className="text-xs text-white/60 mt-1">Across all accounts</p>
+              </div>
+              {/* Net Balance */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Net Balance</p>
+                <p className={`text-base font-bold mt-1 leading-tight ${summary && summary.netBalance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
+                  {summary ? formatCurrency(summary.netBalance) : '—'}
+                </p>
+                <div className="mt-1.5 space-y-0.5">
+                  <p className="text-[10px] text-green-600 font-mono">↑ {summary ? formatCurrency(summary.totalIncome) : '—'}</p>
+                  <p className="text-[10px] text-rose-500 font-mono">↓ {summary ? formatCurrency(summary.totalExpenses) : '—'}</p>
+                </div>
+              </div>
+              {/* Pending */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Pending Txs</p>
+                <p className="text-2xl font-bold text-amber-500 mt-1">{dashboardStats.pendingCount}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{dashboardStats.pendingExpensesCount} exp. need review</p>
+              </div>
+            </div>
           </LoadingState>
 
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6">
             {/* Main Content: Transactions */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="md:col-span-2 space-y-6">
               <Card
                 title="Recent Transactions"
                 action={
@@ -1701,71 +1705,45 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             </div>
 
             {/* Sidebar: Accounts */}
-            <div className="space-y-6">
-              <Card title="Bank Accounts">
-                <div className="space-y-4">
+            <div>
+              <Card title="Bank Accounts" action={
+                <Button variant="ghost" size="sm" onClick={() => setIsAddAccountModalOpen(true)}>
+                  <Plus size={14} className="mr-1" /> Add
+                </Button>
+              }>
+                <div className="space-y-2">
                   {accounts.length === 0 ? (
                     <p className="text-sm text-slate-500 text-center py-4">No bank accounts configured</p>
                   ) : (
                     accounts.map(acc => (
                       <div
                         key={acc.id}
-                        className="p-4 rounded-lg border border-slate-100 bg-slate-50 hover:border-jci-blue transition-all duration-200 cursor-pointer group shadow-sm hover:shadow-md"
+                        className="p-3 rounded-lg border border-slate-100 bg-slate-50 hover:border-jci-blue/40 hover:bg-blue-50/30 transition-all cursor-pointer"
                         onClick={() => {
                           setDetailAccount(acc);
                           setDetailYear(new Date().getFullYear());
                           setIsAccountDetailOpen(true);
                         }}
                       >
-                        <div className="flex items-start justify-between mb-2">
-                          <p className="text-xs text-slate-500 uppercase font-medium">
-                            {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
-                          </p>
-
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-1">{formatCurrency(acc.balance, acc.currency)}</h3>
-                        <p className="text-xs text-slate-400 mb-2">Initial: {formatCurrency(acc.initialBalance || 0, acc.currency)}</p>
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center text-green-600">
-                            <CheckCircle size={12} className="mr-1" />
-                            <span>Reconciled: {formatDate(acc.lastReconciled)}</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider truncate">
+                              {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
+                            </p>
+                            <p className="text-base font-bold text-slate-900 mt-0.5 truncate">{formatCurrency(acc.balance, acc.currency)}</p>
                           </div>
                           {acc.accountNumber && (
-                            <span className="text-slate-500">****{acc.accountNumber.slice(-4)}</span>
+                            <span className="text-[11px] text-slate-400 font-mono shrink-0 mt-1">···{acc.accountNumber.slice(-4)}</span>
                           )}
+                        </div>
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <CheckCircle size={11} className="text-green-500 shrink-0" />
+                          <span className="text-[10px] text-slate-400">Reconciled {formatDate(acc.lastReconciled)}</span>
                         </div>
                       </div>
                     ))
                   )}
-                  <Button
-                    variant="outline"
-                    className="w-full text-sm"
-                    onClick={() => setIsAddAccountModalOpen(true)}
-                  >
-                    Add Account
-                  </Button>
                 </div>
-              </Card>
-
-              <Card title="Budget Health">
-                <div className="relative pt-1">
-                  <div className="flex mb-2 items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
-                        Operating Budget
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold inline-block text-blue-600">
-                        60% Used
-                      </span>
-                    </div>
-                  </div>
-                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
-                    <div style={{ width: "60%" }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-jci-blue"></div>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-500">Projected surplus of $2,300 by year end based on current spending.</p>
               </Card>
             </div>
           </div>
