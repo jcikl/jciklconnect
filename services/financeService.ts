@@ -2840,6 +2840,78 @@ export class FinanceService {
     }
   }
 
+  // Get unmatched transactions for reconciliation matching UI
+  // Returns bank_import and manual transactions separately for the given account
+  static async getUnmatchedForReconciliation(accountId: string): Promise<{
+    bankImports: Transaction[];
+    manualEntries: Transaction[];
+  }> {
+    const all = await this.getAllTransactions();
+    const unreconciled = all.filter(
+      t => t.bankAccountId === accountId && t.status !== 'Reconciled' && !t.isSplitChild
+    );
+    return {
+      bankImports: unreconciled.filter(t => t.source === 'bank_import'),
+      manualEntries: unreconciled.filter(t => t.source !== 'bank_import'),
+    };
+  }
+
+  // Link a bank import transaction to a manually-entered transaction
+  // Sets matchStatus:'full' on the bank import and records the manual tx id on it
+  static async matchTransactions(
+    bankTxId: string,
+    manualTxId: string,
+    reconciledBy: string
+  ): Promise<void> {
+    if (isDevMode()) {
+      localMockTransactions = localMockTransactions.map(t => {
+        if (t.id === bankTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [manualTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
+        if (t.id === manualTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [bankTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
+        return t;
+      });
+      saveMockTransactions();
+      return;
+    }
+    const now = Timestamp.now();
+    await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
+      matchStatus: 'full',
+      matchedBankTxIds: [manualTxId],
+      status: 'Reconciled',
+      reconciledBy,
+      reconciledAt: now,
+    });
+    await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, manualTxId), {
+      matchStatus: 'full',
+      matchedBankTxIds: [bankTxId],
+      status: 'Reconciled',
+      reconciledBy,
+      reconciledAt: now,
+    });
+  }
+
+  // Unmatch a previously matched pair (revert both to Cleared)
+  static async unmatchTransactions(txId1: string, txId2: string): Promise<void> {
+    if (isDevMode()) {
+      localMockTransactions = localMockTransactions.map(t => {
+        if (t.id === txId1 || t.id === txId2) {
+          return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: 'Cleared' as const, reconciledBy: undefined, reconciledAt: undefined };
+        }
+        return t;
+      });
+      saveMockTransactions();
+      return;
+    }
+    for (const id of [txId1, txId2]) {
+      await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, id), {
+        matchStatus: null,
+        matchedBankTxIds: null,
+        status: 'Cleared',
+        reconciledBy: null,
+        reconciledAt: null,
+      });
+    }
+  }
+
   // Get bank account by ID with dynamic balance
   static async getBankAccountById(accountId: string): Promise<BankAccount | null> {
     if (isDevMode()) {

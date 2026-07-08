@@ -16,6 +16,7 @@ import { TransactionSplitModal } from './Finance/TransactionSplitModal';
 import { DuesRenewalDashboard } from './Finance/DuesRenewalDashboard';
 import TransactionForm from './Finance/TransactionForm';
 import BankTransactionImportModal from './Finance/BankTransactionImportModal';
+import { BankMatchingModal } from './Finance/BankMatchingModal';
 import { BatchCategoryModal } from './Finance/BatchCategoryModal';
 import { FirstUseBanner } from '../ui/FirstUseBanner';
 import { projectFinancialService } from '../../services/projectFinancialService';
@@ -54,6 +55,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
   } | null>(null);
   const [isDuesRenewalModalOpen, setIsDuesRenewalModalOpen] = useState(false);
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
+  const [matchingAccount, setMatchingAccount] = useState<import('../../types').BankAccount | null>(null);
   const [renewalYear, setRenewalYear] = useState<number>(new Date().getFullYear());
   const [duesAmount, setDuesAmount] = useState<number>(150);
   const [isRenewing, setIsRenewing] = useState(false);
@@ -1736,9 +1738,17 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                             <span className="text-[11px] text-slate-400 font-mono shrink-0 mt-1">···{acc.accountNumber.slice(-4)}</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <CheckCircle size={11} className="text-green-500 shrink-0" />
-                          <span className="text-[10px] text-slate-400">Reconciled {formatDate(acc.lastReconciled)}</span>
+                        <div className="flex items-center justify-between mt-1.5">
+                          <div className="flex items-center gap-1">
+                            <CheckCircle size={11} className="text-green-500 shrink-0" />
+                            <span className="text-[10px] text-slate-400">Reconciled {formatDate(acc.lastReconciled)}</span>
+                          </div>
+                          <button
+                            className="text-[10px] text-blue-500 hover:text-blue-700 font-medium"
+                            onClick={e => { e.stopPropagation(); setMatchingAccount(acc); }}
+                          >
+                            Match txs
+                          </button>
                         </div>
                       </div>
                     ))
@@ -3542,6 +3552,17 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         onClose={() => setIsAddAccountModalOpen(false)}
         onAdded={loadData}
       />
+
+      {/* Bank Transaction Matching Modal */}
+      {matchingAccount && (
+        <BankMatchingModal
+          isOpen={!!matchingAccount}
+          onClose={() => setMatchingAccount(null)}
+          account={matchingAccount}
+          currentUserId={user?.uid ?? ''}
+          onComplete={() => { setMatchingAccount(null); loadData(); }}
+        />
+      )}
 
       {/* Add Administrative Project ID Modal (行政费户口) */}
       <Modal

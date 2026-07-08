@@ -217,7 +217,8 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       purpose: row.purpose,
       bankAccountId: context?.bankAccountId,
       status: 'Pending',
-      type: type as 'Income' | 'Expense'
+      type: type as 'Income' | 'Expense',
+      source: 'bank_import',
     } as any);
   },
 };

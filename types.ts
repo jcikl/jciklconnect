@@ -1130,6 +1130,8 @@ export interface Transaction {
   matchedBankTxIds?: string[];
   /** Match status for reconciliation */
   matchStatus?: 'unmatched' | 'partial' | 'full' | 'over';
+  /** Origin of this transaction record */
+  source?: 'bank_import' | 'manual';
 }
 
 export interface BankAccount {
