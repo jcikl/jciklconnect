@@ -1,8 +1,7 @@
 {
   "name": "jcikl-netlify-functions",
   "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
+"dependencies": {
     "firebase-admin": "^11.0.0"
   }
 }
