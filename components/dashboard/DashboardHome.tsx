@@ -419,7 +419,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             }}
             autoplay={{ delay: 3000, disableOnInteraction: false }}
             pagination={{ clickable: true, dynamicBullets: true }}
-            loop={homepageAds.length > 1}
+            loop={homepageAds.length >= 4}
             className="w-full"
             onSlideChange={(swiper) => {
               if (homepageAds.length > 0) {

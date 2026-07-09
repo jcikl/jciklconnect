@@ -95,6 +95,11 @@ service cloud.firestore {
       return myLo != null && (resourceData.get('loId', null) == myLo || resourceData.get('loId', null) == null);
     }
     
+    // Users collection (FCM tokens)
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
     // Members collection: 组织财政/活动财政/会员 boundary; multi-LO: read by same loId or self.
     match /members/{memberId} {
       // 1. Basic Read Access (Get and List)
