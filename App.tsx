@@ -4299,13 +4299,15 @@ export const JCIKLApp: React.FC = () => {
                     <button
                       onClick={() => setShowBoardDashboard(v => !v)}
                       title="Toggle Board Dashboard"
-                      className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 shadow-sm transition-all duration-200 ${showBoardDashboard ? 'bg-white border-white/40 shadow-white/20' : 'bg-white/15 border-white/25 hover:bg-white/25'}`}
+                      className="h-9 flex items-center justify-center shrink-0 transition-all duration-200 hover:opacity-80"
                     >
-                      <span className={`text-[10px] font-black tracking-tight leading-none ${showBoardDashboard ? 'text-jci-navy' : 'text-white'}`}>JCI</span>
+                      <img src="/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <span className={`ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap ${showBoardDashboard ? 'text-amber-300' : 'text-white'}`}>JCI KL Connect</span>
                     </button>
                   ) : (
-                    <div className="w-9 h-9 bg-white/15 rounded-lg border border-white/25 flex items-center justify-center shrink-0 shadow-sm">
-                      <span className="text-[10px] font-black text-white tracking-tight leading-none">JCI</span>
+                    <div className="h-9 flex items-center justify-center shrink-0">
+                      <img src="/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <span className="ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap text-white">JCI KL Connect</span>
                     </div>
                   )}
                   <div className="hidden sm:flex flex-col leading-none gap-0.5 min-w-0">
