@@ -35,6 +35,7 @@ import { CommunicationService } from './services/communicationService';
 import { ProjectsService } from './services/projectsService';
 import { FlagshipProjectsService } from './services/flagshipProjectsService';
 import { BoardManagementService } from './services/boardManagementService';
+import { getCurrentBoardCalendarYear } from './utils/boardMembership';
 import { trimCloudinaryImage } from './services/cloudinaryService';
 import { MembersService } from './services/membersService';
 import { registerPushNotifications, unregisterPushNotifications, onForegroundMessage } from './services/notificationService';
@@ -3447,7 +3448,7 @@ export const JCIKLApp: React.FC = () => {
     try {
       const [all, boardMembers] = await Promise.all([
         MembersService.getAllMembers(),
-        BoardManagementService.getCurrentBoardMembers().catch(() => []),
+        BoardManagementService.getBoardMembersByYear(String(getCurrentBoardCalendarYear())).catch(() => []),
       ]);
 
       // Board position map: memberId → position title
