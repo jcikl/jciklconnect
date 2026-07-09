@@ -354,7 +354,17 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                 <p className="text-base md:text-lg text-slate-300/80 max-w-lg mb-9 leading-relaxed">
                   The first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954.
                 </p>
-                <div className="flex gap-3 flex-wrap justify-center md:justify-start">
+                {/* Mobile-only group photo */}
+                {termSettings?.memberGroupPhotoUrl && (
+                  <div className="relative block md:hidden w-full rounded-2xl overflow-hidden mb-7 border border-white/[0.12] shadow-xl shadow-black/30" style={{ aspectRatio: '16/9' }}>
+                    <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-jci-navy/70 to-transparent pt-8 pb-3 px-4">
+                      <p className="text-white text-xs font-black tracking-wide">JCI Kuala Lumpur</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-row gap-3 justify-center md:justify-start">
                   <Button size="lg" onClick={onRegister} className="shadow-xl shadow-jci-blue/30 font-black px-7">
                     Become a Member
                   </Button>
@@ -483,6 +493,10 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       </div>
                     );
                   })()}
+
+                  {termSettings?.tagline && (
+                    <p className="text-amber-300/80 text-[10px] font-black uppercase tracking-widest mb-2">{termSettings.tagline}</p>
+                  )}
 
                   {/* Description — capped at 2 lines */}
                   <p className="text-white/50 text-[11px] leading-relaxed line-clamp-2">
