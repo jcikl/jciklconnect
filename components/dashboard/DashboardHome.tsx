@@ -338,8 +338,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     : (activeEngSummary?.requirements?.find(r => !r.isCompleted && !r.progress?.pendingVerification)?.title ?? null);
 
   return (
-    <div className="space-y-4 relative">
-      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'url(/background/JCI KL Logo-background.png)', backgroundSize: '60%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: 0.5 }} />
+    <div className="space-y-4" style={{ backgroundImage: 'url(/background/JCI%20KL%20Logo-background.png)', backgroundSize: '60%', backgroundPosition: 'center top', backgroundRepeat: 'no-repeat', backgroundAttachment: 'local' }}>
 
       {/* Birthday This Month — top of dashboard */}
       {birthdayMembers.length > 0 && (
@@ -382,7 +381,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     if (avatarUrl) return <img key={m.id} src={avatarUrl} alt={name} className="rounded-full object-cover border-2 border-white/60 shadow-md flex-shrink-0 group-hover:-translate-y-0.5 transition-transform" style={sharedStyle} />;
                     const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
                     let hash = 0; for (let j = 0; j < name.length; j++) hash = name.charCodeAt(j) + ((hash << 5) - hash);
-                    const gradients = ['from-pink-400 to-rose-500','from-violet-400 to-purple-500','from-sky-400 to-blue-500','from-teal-400 to-emerald-500','from-amber-400 to-orange-500'];
+                    const gradients = ['from-pink-400 to-rose-500', 'from-violet-400 to-purple-500', 'from-sky-400 to-blue-500', 'from-teal-400 to-emerald-500', 'from-amber-400 to-orange-500'];
                     return <div key={m.id} className={`rounded-full bg-gradient-to-br ${gradients[Math.abs(hash) % gradients.length]} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white/60 shadow-md flex-shrink-0 group-hover:-translate-y-0.5 transition-transform`} style={sharedStyle}>{initials}</div>;
                   })}
                   {birthdayMembers.length > 5 && <div className="rounded-full border-2 border-white/60 bg-white/25 flex items-center justify-center text-[10px] font-bold text-white shadow-md flex-shrink-0" style={{ width: '36px', height: '36px', marginLeft: '-10px', zIndex: 5 }}>+{birthdayMembers.length - 5}</div>}
@@ -390,7 +389,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <span className="text-[11px] font-semibold text-white/80">{birthdayMembers.length} celebrating</span>
               </div>
               <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
               </div>
             </div>
           </div>
