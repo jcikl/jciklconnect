@@ -3450,20 +3450,32 @@ export const JCIKLApp: React.FC = () => {
         BoardManagementService.getCurrentBoardMembers().catch(() => []),
       ]);
 
-      // Build map: memberId → board position
+      // Board position map: memberId → position title
       const boardPositionMap = new Map<string, string>();
-      boardMembers.forEach(b => boardPositionMap.set(b.memberId, b.position));
+      // Commission Director set: all member IDs listed as commission directors
+      const commissionDirectorSet = new Set<string>();
+      boardMembers.forEach(b => {
+        boardPositionMap.set(b.memberId, b.position || 'Board');
+        (b.commissionDirectorIds || []).forEach(id => commissionDirectorSet.add(id));
+      });
 
       const enriched = all.map(m => {
-        const boardPosition = boardPositionMap.get(m.id);
-        const isProbation = !!(m as any).probationTasks || (m.role || '').toUpperCase() === UserRole.PROBATION;
-        const isBoard = !!boardPosition;
-        const sortOrder = isBoard ? 0 : isProbation ? 2 : 1;
+        const isBoard = boardPositionMap.has(m.id);
+        const isCommDir = !isBoard && commissionDirectorSet.has(m.id);
+        const isProbation = !isBoard && !isCommDir && (
+          !!(m as any).probationTasks || (m.role || '').toUpperCase() === UserRole.PROBATION
+        );
+        // sortOrder: Board=0, CommDir=1, Member=2, Probation=3
+        const sortOrder = isBoard ? 0 : isCommDir ? 1 : isProbation ? 3 : 2;
         return {
           id: m.id,
           name: m.fullName || m.name || m.id,
-          label: isBoard ? (boardPosition || 'Board') : isProbation ? 'Probation' : 'Member',
-          labelColor: isBoard ? 'purple' : isProbation ? 'amber' : 'blue',
+          label: isBoard
+            ? (boardPositionMap.get(m.id) || 'Board')
+            : isCommDir ? 'Comm. Director'
+            : isProbation ? 'Probation'
+            : 'Member',
+          labelColor: isBoard ? 'purple' : isCommDir ? 'teal' : isProbation ? 'amber' : 'blue',
           avatar: m.avatarUrl || m.general?.avatarUrl || undefined,
           sortOrder,
           sortName: m.fullName || m.name || '',
@@ -4718,7 +4730,7 @@ export const JCIKLApp: React.FC = () => {
                     key={m.id}
                     onClick={async () => {
                       setMemberPickerOpen(false);
-                      const role = m.labelColor === 'purple' ? UserRole.BOARD : m.labelColor === 'amber' ? UserRole.PROBATION : UserRole.MEMBER;
+                      const role = m.labelColor === 'purple' ? UserRole.BOARD : m.labelColor === 'teal' ? UserRole.BOARD : m.labelColor === 'amber' ? UserRole.PROBATION : UserRole.MEMBER;
                       await simulateAsMember(m.id, role);
                       showToast(`Viewing as ${m.name} (${m.label})`, 'info');
                     }}
@@ -4732,7 +4744,8 @@ export const JCIKLApp: React.FC = () => {
                     </div>
                     <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full max-w-[90px] truncate ${
                       m.labelColor === 'purple' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300' :
-                      m.labelColor === 'amber' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
+                      m.labelColor === 'teal'   ? 'bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-300' :
+                      m.labelColor === 'amber'  ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
                       'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
                     }`}>{m.label || 'Member'}</span>
                   </button>
