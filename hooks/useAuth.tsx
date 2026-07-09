@@ -507,8 +507,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setOriginalRole(null);
     } else {
       setSimulatedRole(role);
-      // If not already simulating a different member, just change role on current member
-      if (!simulatedMemberId) {
+      // If simulating as a specific member, restore original member first then apply new role
+      if (simulatedMemberId) {
+        setSimulatedMemberId(null);
+        const base = originalMember || member;
+        setMember({ ...base, role });
+        setOriginalMember(null);
+      } else {
         setMember({ ...member, role });
       }
     }

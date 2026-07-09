@@ -3547,19 +3547,20 @@ export const JCIKLApp: React.FC = () => {
     isPlainMember,
     isGuest,
     canAccessWorkspaceModules,
+    canAccessEventsAndPayments,
     effectiveRole,
     hasPermission,
   } = usePermissions();
   const { projects } = useProjects();
   const canViewEventsManagement = React.useMemo(() => {
     if (!member) return false;
-    if (isAdmin || isBoard || isDeveloper) return true;
+    if (isAdmin || isBoard || isDeveloper || isMember) return true;
     return projects.some(p => {
       const isCreator = p.organizerId === member.id || p.submittedBy === member.id;
       const isCommittee = p.committee?.some(c => c.memberId === member.id) ?? false;
       return isCreator || isCommittee;
     });
-  }, [member, isAdmin, isBoard, isDeveloper, projects]);
+  }, [member, isAdmin, isBoard, isDeveloper, isMember, projects]);
 
 
   // useCommunication hook is safe to call even without authentication
@@ -4130,7 +4131,7 @@ export const JCIKLApp: React.FC = () => {
                     onClick={() => { handleViewChange('SURVEYS'); setIsSidebarOpen(false); }}
                     isCollapsed={isSidebarCollapsed}
                   />
-                  {canAccessWorkspaceModules && (
+                  {canAccessEventsAndPayments && (
                     <SidebarItem
                       icon={<FileText size={18} />}
                       label="Payment Requests"
@@ -4301,12 +4302,12 @@ export const JCIKLApp: React.FC = () => {
                       title="Toggle Board Dashboard"
                       className="h-9 flex items-center justify-center shrink-0 transition-all duration-200 hover:opacity-80"
                     >
-                      <img src="/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
                       <span className={`ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap ${showBoardDashboard ? 'text-amber-300' : 'text-white'}`}>JCI KL Connect</span>
                     </button>
                   ) : (
                     <div className="h-9 flex items-center justify-center shrink-0">
-                      <img src="/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
                       <span className="ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap text-white">JCI KL Connect</span>
                     </div>
                   )}
@@ -4490,38 +4491,38 @@ export const JCIKLApp: React.FC = () => {
       {
         (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
           <>
-            <div className={`md:hidden fixed bottom-5 left-4 right-4 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900/95 border-slate-700/50' : 'bg-white/95 border-slate-200/70'} backdrop-blur-xl rounded-3xl shadow-xl border flex items-center h-[66px] px-1 z-50`}>
+            <div className={`md:hidden fixed bottom-5 left-4 right-4 ${'bg-slate-900/95 border-slate-700/50'} backdrop-blur-xl rounded-3xl shadow-xl border flex items-center h-[66px] px-1 z-50`}>
               {/* Dashboard */}
               <button
                 onClick={() => handleViewChange('DASHBOARD')}
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
               >
                 <div className={`flex items-center justify-center transition-all duration-200 ${view === 'DASHBOARD' ? 'bg-jci-blue rounded-2xl px-3.5 py-1.5 shadow-sm shadow-jci-blue/40' : 'px-3.5 py-1.5'}`}>
-                  <LayoutDashboard size={18} className={view === 'DASHBOARD' ? 'text-white' : (isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400')} />
+                  <LayoutDashboard size={18} className={view === 'DASHBOARD' ? 'text-white' : ('text-slate-400')} />
                 </div>
-                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DASHBOARD' ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Dashboard</span>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DASHBOARD' ? 'text-jci-blue' : ('text-slate-500')}`}>Dashboard</span>
               </button>
 
               {/* Directory */}
               <button
-                onClick={() => { if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true); else handleViewChange('DIRECTORY'); }}
+                onClick={() => handleViewChange('DIRECTORY')}
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
               >
                 <div className={`flex items-center justify-center transition-all duration-200 ${view === 'DIRECTORY' ? 'bg-jci-blue rounded-2xl px-3.5 py-1.5 shadow-sm shadow-jci-blue/40' : 'px-3.5 py-1.5'}`}>
-                  <Building2 size={18} className={view === 'DIRECTORY' ? 'text-white' : (isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400')} />
+                  <Building2 size={18} className={view === 'DIRECTORY' ? 'text-white' : ('text-slate-400')} />
                 </div>
-                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DIRECTORY' ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Directory</span>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DIRECTORY' ? 'text-jci-blue' : ('text-slate-500')}`}>Directory</span>
               </button>
 
               {/* Benefits */}
               <button
-                onClick={() => { if (member?.role === UserRole.GUEST) setUpgradeModalOpen(true); else handleViewChange('BENEFITS'); }}
+                onClick={() => handleViewChange('BENEFITS')}
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
               >
                 <div className={`flex items-center justify-center transition-all duration-200 ${view === 'BENEFITS' ? 'bg-jci-blue rounded-2xl px-3.5 py-1.5 shadow-sm shadow-jci-blue/40' : 'px-3.5 py-1.5'}`}>
-                  <Gift size={18} className={view === 'BENEFITS' ? 'text-white' : (isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-400')} />
+                  <Gift size={18} className={view === 'BENEFITS' ? 'text-white' : ('text-slate-400')} />
                 </div>
-                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'BENEFITS' ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Benefits</span>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'BENEFITS' ? 'text-jci-blue' : ('text-slate-500')}`}>Benefits</span>
               </button>
 
               {/* Menu / Avatar */}
@@ -4533,12 +4534,12 @@ export const JCIKLApp: React.FC = () => {
                   {member?.avatar ? (
                     <img src={member.avatar} alt={member?.name || 'Me'} className="w-8 h-8 rounded-xl object-cover" />
                   ) : (
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black ${showMobileMenu ? 'bg-jci-blue text-white' : (isBoard || isAdmin || isDeveloper ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-600')}`}>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black ${showMobileMenu ? 'bg-jci-blue text-white' : ('bg-white/10 text-slate-300')}`}>
                       {(member?.name || 'M').charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
-                <span className={`text-[10px] font-semibold transition-colors duration-200 ${showMobileMenu ? 'text-jci-blue' : (isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400')}`}>Menu</span>
+                <span className={`text-[10px] font-semibold transition-colors duration-200 ${showMobileMenu ? 'text-jci-blue' : ('text-slate-500')}`}>Menu</span>
               </button>
             </div>
 
@@ -4548,39 +4549,39 @@ export const JCIKLApp: React.FC = () => {
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
                 <div
                   ref={drawerScrollRef}
-                  className={`absolute bottom-0 left-0 right-0 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} border-t rounded-t-3xl px-6 pb-6 pt-4 shadow-2xl max-h-[94vh] overflow-y-auto`}
+                  className={`absolute bottom-0 left-0 right-0 ${'bg-slate-900 border-slate-700'} border-t rounded-t-3xl px-6 pb-6 pt-4 shadow-2xl max-h-[94vh] overflow-y-auto`}
                   style={{ transform: `translateY(${drawerDragY}px)`, transition: drawerDragY === 0 ? 'transform 0.3s ease' : 'none' }}
                   onClick={e => e.stopPropagation()}
                   onTouchStart={handleDrawerTouchStart}
                   onTouchMove={handleDrawerTouchMove}
                   onTouchEnd={handleDrawerTouchEnd}
                 >
-                  <div className={`w-10 h-1 rounded-full mx-auto mb-4 ${isBoard || isAdmin || isDeveloper ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                  <div className={`w-10 h-1 rounded-full mx-auto mb-4 ${'bg-slate-600'}`} />
 
                   {/* Profile Card */}
                   <div
-                    className={`flex items-center gap-3 p-3 rounded-2xl mb-4 cursor-pointer active:scale-[0.98] transition-all ${isBoard || isAdmin || isDeveloper ? 'bg-slate-800/60 border border-slate-700/50 hover:bg-slate-800' : 'bg-slate-50 border border-slate-100 hover:bg-slate-100'}`}
+                    className={`flex items-center gap-3 p-3 rounded-2xl mb-4 cursor-pointer active:scale-[0.98] transition-all ${'bg-slate-800/60 border border-slate-700/50 hover:bg-slate-800'}`}
                     onClick={() => { handleViewChange('MEMBERS', member?.id); setShowMobileMenu(false); }}
                   >
                     <div className="relative shrink-0">
                       {member?.avatar ? (
                         <img src={member.avatar} alt={member?.name || ''} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
                       ) : (
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-black ${isBoard || isAdmin || isDeveloper ? 'bg-jci-blue text-white' : 'bg-slate-200 text-slate-600'}`}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-black ${'bg-jci-blue text-white'}`}>
                           {(member?.name || 'M').charAt(0).toUpperCase()}
                         </div>
                       )}
                       <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-black text-sm leading-tight truncate ${isBoard || isAdmin || isDeveloper ? 'text-white' : 'text-slate-900'}`}>{member?.name || 'Member'}</p>
-                      <p className={`text-xs truncate mt-0.5 ${isBoard || isAdmin || isDeveloper ? 'text-slate-400' : 'text-slate-500'}`}>{member?.email || ''}</p>
+                      <p className={`font-black text-sm leading-tight truncate ${'text-white'}`}>{member?.name || 'Member'}</p>
+                      <p className={`text-xs truncate mt-0.5 ${'text-slate-400'}`}>{member?.email || ''}</p>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isBoard || isAdmin || isDeveloper ? 'bg-jci-blue/20 text-jci-blue' : 'bg-slate-200 text-slate-600'}`}>{member?.tier || 'Member'}</span>
-                        <span className={`text-[10px] font-bold ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>{member?.points ?? 0} pts</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${'bg-jci-blue/20 text-jci-blue'}`}>{member?.tier || 'Member'}</span>
+                        <span className={`text-[10px] font-bold ${'text-slate-500'}`}>{member?.points ?? 0} pts</span>
                       </div>
                     </div>
-                    <div className={`text-xs font-bold shrink-0 ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <div className={`text-xs font-bold shrink-0 ${'text-slate-500'}`}>
                       View Profile →
                     </div>
                   </div>
@@ -4589,29 +4590,28 @@ export const JCIKLApp: React.FC = () => {
                   <div className="grid grid-cols-5 gap-y-4 gap-x-1">
                     {canAccessWorkspaceModules && (
                       <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('MEMBERS'); setShowMobileMenu(false); }}>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-purple-950/30 text-purple-400 border-purple-900/50' : 'bg-purple-50 text-purple-600 border-purple-100'}`}><Users size={22} /></div>
-                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Members</span>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-purple-950/30 text-purple-400 border-purple-900/50'}`}><Users size={22} /></div>
+                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Members</span>
                       </div>
                     )}
-                    {canAccessWorkspaceModules && (
-                      <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('EVENTS'); setShowMobileMenu(false); }}>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-green-950/30 text-green-400 border-green-900/50' : 'bg-green-50 text-green-600 border-green-100'}`}><Calendar size={22} /></div>
-                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Event List</span>
-                      </div>
-                    )}
+                    {/* Event List — visible to all roles including GUEST */}
+                    <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('EVENTS'); setShowMobileMenu(false); }}>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-green-950/30 text-green-400 border-green-900/50'}`}><Calendar size={22} /></div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Event List</span>
+                    </div>
                     {canAccessWorkspaceModules && (
                       <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('COMMUNICATION'); setShowMobileMenu(false); }}>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-sky-950/30 text-sky-400 border-sky-900/50' : 'bg-sky-50 text-sky-600 border-sky-100'}`}><MessageSquare size={22} /></div>
-                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Comm</span>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-sky-950/30 text-sky-400 border-sky-900/50'}`}><MessageSquare size={22} /></div>
+                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Comm</span>
                       </div>
                     )}
                     <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('KNOWLEDGE'); setShowMobileMenu(false); }}>
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-indigo-950/30 text-indigo-400 border-indigo-900/50' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}><BookOpen size={22} /></div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Knowledge</span>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><BookOpen size={22} /></div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Knowledge</span>
                     </div>
                     <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('CLUBS'); setShowMobileMenu(false); }}>
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-pink-950/30 text-pink-400 border-pink-900/50' : 'bg-pink-50 text-pink-600 border-pink-100'}`}><Heart size={22} /></div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Hobbies</span>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-pink-950/30 text-pink-400 border-pink-900/50'}`}><Heart size={22} /></div>
+                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Hobbies</span>
                     </div>
                   </div>
 
@@ -4619,54 +4619,54 @@ export const JCIKLApp: React.FC = () => {
                   {member?.role !== UserRole.GUEST && (
                     <div className="pt-4">
                       <div className="flex items-center gap-2 mb-3 w-[90%]">
-                        <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${isBoard || isAdmin || isDeveloper ? 'text-slate-500' : 'text-slate-400'}`}>Workspace</span>
-                        <div className={`flex-1 h-px ${isBoard || isAdmin || isDeveloper ? 'bg-slate-700/60' : 'bg-slate-200'}`} />
+                        <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${'text-slate-500'}`}>Workspace</span>
+                        <div className={`flex-1 h-px ${'bg-slate-700/60'}`} />
                       </div>
                       <div className="grid grid-cols-4 gap-y-4 gap-x-1">
                         {canViewEventsManagement && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PROJECTS'); setShowMobileMenu(false); }}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-blue-950/30 text-blue-400 border-blue-900/50' : 'bg-blue-50 text-blue-600 border-blue-100'}`}><FolderKanban size={22} /></div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Evts Mgt</span>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-blue-950/30 text-blue-400 border-blue-900/50'}`}><FolderKanban size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Evts Mgt</span>
                           </div>
                         )}
                         {canViewEventsManagement && !isPlainMember && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setShowMobileMenu(false); }}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-violet-950/30 text-violet-400 border-violet-900/50' : 'bg-violet-50 text-violet-600 border-violet-100'}`}><Briefcase size={22} /></div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Flagship</span>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-violet-950/30 text-violet-400 border-violet-900/50'}`}><Briefcase size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Flagship</span>
                           </div>
                         )}
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SURVEYS'); setShowMobileMenu(false); }}>
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-rose-950/30 text-rose-400 border-rose-900/50' : 'bg-rose-50 text-rose-600 border-rose-100'}`}><CheckSquare size={22} /></div>
-                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Surveys</span>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-rose-950/30 text-rose-400 border-rose-900/50'}`}><CheckSquare size={22} /></div>
+                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Surveys</span>
                         </div>
-                        {canAccessWorkspaceModules && (
+                        {canAccessEventsAndPayments && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PAYMENT_REQUESTS'); setShowMobileMenu(false); }}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-amber-950/30 text-amber-400 border-amber-900/50' : 'bg-amber-50 text-amber-600 border-amber-100'}`}><FileText size={22} /></div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Payment Req</span>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-amber-950/30 text-amber-400 border-amber-900/50'}`}><FileText size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Payment Req</span>
                           </div>
                         )}
                         {hasPermission('canViewFinance') && (
                           <>
                             <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FINANCE'); setShowMobileMenu(false); }}>
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-emerald-950/30 text-emerald-400 border-emerald-900/50' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}><TrendingUp size={22} /></div>
-                              <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Finances</span>
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-emerald-950/30 text-emerald-400 border-emerald-900/50'}`}><TrendingUp size={22} /></div>
+                              <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Finances</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('INVENTORY'); setShowMobileMenu(false); }}>
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-amber-950/30 text-amber-400 border-amber-900/50' : 'bg-amber-50 text-amber-600 border-amber-100'}`}><Package size={22} /></div>
-                              <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Inventory</span>
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-amber-950/30 text-amber-400 border-amber-900/50'}`}><Package size={22} /></div>
+                              <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Inventory</span>
                             </div>
                           </>
                         )}
                         {(isBoard || isAdmin) && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ADVERTISEMENTS'); setShowMobileMenu(false); }}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-orange-950/30 text-orange-400 border-orange-900/50' : 'bg-orange-50 text-orange-600 border-orange-100'}`}><Megaphone size={22} /></div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Partners</span>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-orange-950/30 text-orange-400 border-orange-900/50'}`}><Megaphone size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Partners</span>
                           </div>
                         )}
                         {canAccessWorkspaceModules && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GAMIFICATION'); setShowMobileMenu(false); }}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${isBoard || isAdmin || isDeveloper ? 'bg-yellow-950/30 text-yellow-400 border-yellow-900/50' : 'bg-yellow-50 text-yellow-600 border-yellow-100'}`}><Award size={22} /></div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${isBoard || isAdmin || isDeveloper ? 'text-slate-300' : 'text-slate-600'}`}>Gamify</span>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-yellow-950/30 text-yellow-400 border-yellow-900/50'}`}><Award size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Gamify</span>
                           </div>
                         )}
                       </div>
@@ -4725,7 +4725,7 @@ export const JCIKLApp: React.FC = () => {
                   <div className="mt-4 pt-4">
                     <button
                       onClick={() => { setShowMobileMenu(false); handleLogout(); }}
-                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] ${isBoard || isAdmin || isDeveloper ? 'bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-950/50' : 'bg-red-50 text-red-500 border border-red-100 hover:bg-red-100'}`}
+                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] ${'bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-950/50'}`}
                     >
                       <LogOut size={16} />
                       Sign Out
@@ -4779,7 +4779,7 @@ export const JCIKLApp: React.FC = () => {
                     key={m.id}
                     onClick={async () => {
                       setMemberPickerOpen(false);
-                      const role = m.labelColor === 'purple' ? UserRole.BOARD : m.labelColor === 'teal' ? UserRole.BOARD : m.labelColor === 'amber' ? UserRole.PROBATION : UserRole.MEMBER;
+                      const role = m.labelColor === 'purple' ? UserRole.BOARD : m.labelColor === 'teal' ? UserRole.MEMBER : m.labelColor === 'amber' ? UserRole.PROBATION : UserRole.MEMBER;
                       await simulateAsMember(m.id, role);
                       showToast(`Viewing as ${m.name} (${m.label})`, 'info');
                     }}

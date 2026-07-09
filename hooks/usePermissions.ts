@@ -219,12 +219,17 @@ export const usePermissions = () => {
   const isPlainMember =
     (effectiveRole === UserRole.MEMBER || effectiveRole === UserRole.PROBATION) && !isBoardUser;
 
-  /** Workspace modules (Events Mgmt, Finance, etc.) — board, admin, finance roles; not plain members/guests */
+  /** Workspace modules (Members, Communication, Gamification etc.) — board, admin only; not plain members/guests */
   const canAccessWorkspaceModules =
     effectiveRole !== UserRole.GUEST &&
     (isBoardUser ||
       effectiveRole === UserRole.ADMIN ||
       effectiveRole === UserRole.SUPER_ADMIN);
+
+  /** Events management + Payment Requests — open to all active members */
+  const canAccessEventsAndPayments =
+    effectiveRole !== UserRole.GUEST &&
+    effectiveRole !== UserRole.INACTIVE;
 
   return {
     permissions,
@@ -238,6 +243,7 @@ export const usePermissions = () => {
     isCurrentBoardMember: isBoardUser,
     isBoard: isBoardUser,
     canAccessWorkspaceModules,
+    canAccessEventsAndPayments,
     isAdmin: effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN,
     isOrganizationSecretary: false, // Deprecated - use dynamic assignment
     isOrganizationFinance: false, // Deprecated - use dynamic assignment
