@@ -3,7 +3,7 @@ const { getAuth } = require('firebase-admin/auth');
 
 const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
 const clientEmail = process.env.VITE_FIREBASE_CLIENT_EMAIL;
-const privateKey = process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\n/g, '\n');
+const privateKey = process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 console.log('[send-invite] init check:', {
   hasProjectId: !!projectId,
