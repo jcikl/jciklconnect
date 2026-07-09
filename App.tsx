@@ -3473,7 +3473,7 @@ export const JCIKLApp: React.FC = () => {
           name: m.fullName || m.name || m.id,
           label: isBoard
             ? 'Board'
-            : isCommDir ? 'Board'
+            : isCommDir ? 'Comm. Director'
             : isProbation ? 'Probation'
             : 'Member',
           labelColor: isBoard ? 'purple' : isCommDir ? 'teal' : isProbation ? 'amber' : 'blue',
