@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
+import { errorLoggingService } from '../../services/errorLoggingService';
 
 interface Props {
   children: ReactNode;
@@ -76,8 +77,11 @@ export class ErrorBoundary extends Component<Props, State> {
       console.groupEnd();
     }
 
-    // TODO: Send to error tracking service
-    // Example: Sentry.captureException(error, { extra: errorData });
+    // Upload to Firestore errorLogs (works on web + APK)
+    errorLoggingService.logError(error, {
+      component: 'ErrorBoundary',
+      additionalData: { errorId: this.state.errorId },
+    }, errorInfo);
   };
 
   private handleRetry = () => {
@@ -177,7 +181,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 </div>
               </div>
 
-                {(this.props.showDetails || process.env.NODE_ENV === 'development') && (
+                {(this.props.showDetails !== false) && (
                   <details className="mt-6 text-left">
                     <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
                       显示错误详情

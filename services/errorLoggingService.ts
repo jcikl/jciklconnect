@@ -1,4 +1,5 @@
 import { ErrorInfo } from 'react';
+import { isDevMode } from '../utils/devMode';
 
 export interface ErrorLogEntry {
   id: string;
@@ -186,34 +187,24 @@ class ErrorLoggingService {
     }
   }
 
+  // Upload crash reports to Firestore `errorLogs` so APK/web errors are visible remotely
   private async reportToExternalService(logEntry: ErrorLogEntry): Promise<void> {
-    // In a real application, you would send this to an error tracking service
-    // like Sentry, LogRocket, Bugsnag, or your own logging endpoint
-    
+    if (isDevMode()) return;
     try {
-      // Example: Send to your own logging endpoint
-      // await fetch('/api/errors', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(logEntry)
-      // });
-
-      // Example: Send to Sentry
-      // if (window.Sentry) {
-      //   window.Sentry.captureException(new Error(logEntry.message), {
-      //     extra: logEntry.context,
-      //     tags: {
-      //       errorId: logEntry.id,
-      //       component: logEntry.context?.component
-      //     }
-      //   });
-      // }
-
-      console.log('Error reported to external service:', logEntry.id);
+      // Dynamic import avoids a circular dependency at module-load time
+      const [{ collection, addDoc }, { db }] = await Promise.all([
+        import('firebase/firestore'),
+        import('../config/firebase'),
+      ]);
+      const isNative = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
+      // Firestore rejects undefined values — strip them
+      const payload = JSON.parse(JSON.stringify({
+        ...logEntry,
+        platform: isNative ? 'apk' : 'web',
+      }));
+      await addDoc(collection(db, 'errorLogs'), payload);
     } catch (error) {
-      console.warn('Failed to report error to external service:', error);
+      console.warn('Failed to report error to Firestore:', error);
     }
   }
 

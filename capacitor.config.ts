@@ -20,6 +20,8 @@ const config: CapacitorConfig = {
     },
   },
   android: {
+    // 调试用：允许 Chrome chrome://inspect 检查 WebView；正式发布前建议改回 false
+    webContentsDebuggingEnabled: true,
     buildOptions: {
       releaseType: 'AAB',
     },
