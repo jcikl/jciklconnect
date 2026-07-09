@@ -68,6 +68,7 @@ const DashboardHome = lazy(() => import('./components/dashboard/DashboardHome').
 const DeveloperInterface = lazy(() => import('./components/modules/DeveloperInterface').then(m => ({ default: m.DeveloperInterface })));
 const ToyyibView = lazy(() => import('./components/modules/ToyyibView').then(m => ({ default: m.ToyyibView })));
 const WhapiConfigView = lazy(() => import('./components/modules/WhapiConfigView').then(m => ({ default: m.WhapiConfigView })));
+const ApiConfigView = lazy(() => import('./components/modules/ApiConfigView').then(m => ({ default: m.ApiConfigView })));
 const MembershipConfigView = lazy(() => import('./components/modules/MembershipConfigView').then(m => ({ default: m.MembershipConfigView })));
 const AccessConfigView = lazy(() => import('./components/modules/AccessConfigView').then(m => ({ default: m.AccessConfigView })));
 const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
@@ -81,7 +82,7 @@ import { AdvertisementService } from './services/advertisementService';
 
 // --- View Definitions ---
 
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'WHAPI_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'WHAPI_CONFIG' | 'API_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
 
 // --- Helper Components ---
 
@@ -3597,6 +3598,7 @@ export const JCIKLApp: React.FC = () => {
       REPORTS: 'Reports',
       DEVELOPER: 'Developer Interface',
       WHAPI_CONFIG: 'Whapi Configuration',
+      API_CONFIG: 'API Settings',
     };
     const pageTitle = titles[view] ?? 'JCI LO Management';
     document.title = `${pageTitle} | JCI Kuala Lumpur`;
@@ -3848,8 +3850,9 @@ export const JCIKLApp: React.FC = () => {
       case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
       case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
-      case 'TOYYIB': return <ToyyibView />;
-      case 'WHAPI_CONFIG': return <WhapiConfigView />;
+      case 'TOYYIB': return <ApiConfigView />;
+      case 'WHAPI_CONFIG': return <ApiConfigView />;
+      case 'API_CONFIG': return <ApiConfigView />;
       case 'MEMBERSHIP_CONFIG': return <MembershipConfigView />;
       case 'ACCESS_CONFIG': return <AccessConfigView />;
       case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
@@ -4106,16 +4109,9 @@ export const JCIKLApp: React.FC = () => {
                       />
                       <SidebarItem
                         icon={<CreditCard size={18} />}
-                        label="ToyyibPay"
-                        isActive={view === 'TOYYIB'}
-                        onClick={() => { handleViewChange('TOYYIB'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<MessageSquare size={18} />}
-                        label="Whapi API"
-                        isActive={view === 'WHAPI_CONFIG'}
-                        onClick={() => { handleViewChange('WHAPI_CONFIG'); setIsSidebarOpen(false); }}
+                        label="API Settings"
+                        isActive={view === 'API_CONFIG' || view === 'TOYYIB' || view === 'WHAPI_CONFIG'}
+                        onClick={() => { handleViewChange('API_CONFIG'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem
@@ -4581,13 +4577,9 @@ export const JCIKLApp: React.FC = () => {
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Zap size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Radar</span>
                         </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('TOYYIB'); setShowMobileMenu(false); }}>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('API_CONFIG'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><CreditCard size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">ToyyibPay</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('WHAPI_CONFIG'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><MessageSquare size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Whapi API</span>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">API Settings</span>
                         </div>
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('MEMBERSHIP_CONFIG'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Users size={22} /></div>

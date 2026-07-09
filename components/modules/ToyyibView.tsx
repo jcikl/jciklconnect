@@ -4,7 +4,7 @@ import { Card, Button, Badge, Modal, useToast, Tabs, StatCard } from '../ui/Comm
 import { Input, Select } from '../ui/Form';
 import { ToyyibService } from '../../services/toyyibService';
 
-export const ToyyibView: React.FC = () => {
+export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('Bill Management');
   const [amount, setAmount] = useState('10.00');
@@ -431,12 +431,19 @@ export const ToyyibView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto py-6 px-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">ToyyibPay Integration Center</h1>
-          <p className="text-slate-500 text-sm">Official payment gateway management and testing dashboard.</p>
-        </div>
+    <div className={embedded ? 'space-y-5' : 'space-y-6 max-w-6xl mx-auto py-6 px-4'}>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {embedded ? (
+          <div>
+            <h2 className="text-base font-black text-slate-900">ToyyibPay Integration</h2>
+            <p className="text-slate-400 text-xs">Payment gateway management and testing.</p>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">ToyyibPay Integration Center</h1>
+            <p className="text-slate-500 text-sm">Official payment gateway management and testing dashboard.</p>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Badge variant="info" className="px-3 py-1 bg-blue-50 text-blue-600 border-blue-100">Sandbox Mode</Badge>
           <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full border border-slate-200" onClick={loadData} isLoading={isRefreshing}>
@@ -445,11 +452,11 @@ export const ToyyibView: React.FC = () => {
         </div>
       </div>
 
-      <div className="border-b border-slate-200">
-        <Tabs 
-          tabs={['Category Management', 'Bill Management', 'Settlement Management']} 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
+      <div className="border-b border-slate-200 overflow-x-auto">
+        <Tabs
+          tabs={['Category Management', 'Bill Management', 'Settlement Management']}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
       </div>
 

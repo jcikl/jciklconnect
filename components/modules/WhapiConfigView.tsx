@@ -5,7 +5,7 @@ import { Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
 import { Combobox } from '../ui/Combobox';
 
-export const WhapiConfigView: React.FC = () => {
+export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const { showToast } = useToast();
   const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
@@ -308,12 +308,19 @@ export const WhapiConfigView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto py-6 px-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Whapi API Configuration</h1>
-          <p className="text-slate-500 text-sm">Manage your WhatsApp API connection via Whapi.</p>
-        </div>
+    <div className={embedded ? 'space-y-5' : 'space-y-6 max-w-5xl mx-auto py-6 px-4'}>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {embedded ? (
+          <div>
+            <h2 className="text-base font-black text-slate-900">Whapi WhatsApp API</h2>
+            <p className="text-slate-400 text-xs">Manage your WhatsApp API connection via Whapi.</p>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Whapi API Configuration</h1>
+            <p className="text-slate-500 text-sm">Manage your WhatsApp API connection via Whapi.</p>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {status === 'connected' ? (
             <Badge variant="success" className="px-3 py-1 bg-green-50 text-green-600 border-green-100 flex items-center gap-1">

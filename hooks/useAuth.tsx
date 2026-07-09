@@ -8,9 +8,12 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCredential,
   sendPasswordResetEmail,
   updateProfile,
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -111,10 +114,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
 
-        setUser(firebaseUser);
-
         if (firebaseUser && !checkDevMode()) {
-          // Load member data from Firestore — must exist or user is not allowed to stay logged in
+          // Load member data from Firestore — must exist or user is not allowed to stay logged in.
+          // NOTE: setUser is deferred until member data resolves — setting user with member still
+          // null lets authenticated views render against a null member and crash (ErrorBoundary
+          // on first Google login in the APK).
           try {
             // 1. Try UID lookup first
             const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid));
@@ -157,6 +161,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               } catch (boardSyncErr) {
                 console.warn('Board membership sync skipped:', boardSyncErr);
               }
+              // Atomic: user + member land in the same commit so no render sees user without member
+              setUser(firebaseUser);
               setMember(memberData);
             } else if (!memberData && isMounted && !checkDevMode()) {
               // Still no member record for this account — sign out so they cannot use the app
@@ -168,6 +174,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Only log error if not in dev mode
             if (!checkDevMode() && isMounted) {
               console.error('Error loading member data:', error);
+              // Keep the UI logged-out rather than half-authenticated; session persists for retry
+              setUser(null);
+              setMember(null);
             } else if (checkDevMode()) {
               // In dev mode, silently ignore Firebase errors
               console.log('[DEV MODE] Skipping member data load from Firebase');
@@ -175,6 +184,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } else {
           if (isMounted && !checkDevMode()) {
+            setUser(null);
             setMember(null);
           }
         }
@@ -378,8 +388,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    const userCredential = await signInWithPopup(auth, provider);
+    let userCredential;
+    if (Capacitor.isNativePlatform()) {
+      // WebView 内 Google 禁止 OAuth 弹窗（disallowed_useragent），改走原生登录换取 idToken
+      const result = await FirebaseAuthentication.signInWithGoogle();
+      const idToken = result.credential?.idToken;
+      if (!idToken) {
+        throw new Error('Google 登入失敗：未取得憑證，請重試。');
+      }
+      const credential = GoogleAuthProvider.credential(idToken, result.credential?.accessToken);
+      userCredential = await signInWithCredential(auth, credential);
+    } else {
+      const provider = new GoogleAuthProvider();
+      userCredential = await signInWithPopup(auth, provider);
+    }
     const email = userCredential.user.email;
 
     if (!email) {
