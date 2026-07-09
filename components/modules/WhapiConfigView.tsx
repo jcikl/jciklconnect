@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, MessageSquare, CheckCircle, ExternalLink, Save, Activity, BarChart2, Users, RefreshCw } from 'lucide-react';
+import { Settings, Shield, MessageSquare, CheckCircle, ExternalLink, Save, Activity, BarChart2, Users, RefreshCw, Bell, Send } from 'lucide-react';
 import { Card, Button, Badge, useToast, ProgressBar } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
+import { Combobox } from '../ui/Combobox';
 
 export const WhapiConfigView: React.FC = () => {
   const { showToast } = useToast();
@@ -17,6 +18,13 @@ export const WhapiConfigView: React.FC = () => {
   const [adminPhone, setAdminPhone] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ type: 'info' | 'success' | 'error', message: string } | null>(null);
+
+  // Push notification test states
+  const [pushMemberName, setPushMemberName] = useState('');
+  const [pushTitle, setPushTitle] = useState('JCI KL Test Notification');
+  const [pushMessage, setPushMessage] = useState('This is a test push notification from JCI KL Connect.');
+  const [pushSending, setPushSending] = useState(false);
+  const [pushResult, setPushResult] = useState<{ type: 'success' | 'error' | 'warn', message: string } | null>(null);
 
   const [quotaData, setQuotaData] = useState<{
     messages: { used: number, total: number | string },
@@ -234,6 +242,38 @@ export const WhapiConfigView: React.FC = () => {
     }
   };
 
+  const handleSendTestPush = async () => {
+    const pushMember = members.find(m => m.name === pushMemberName);
+    if (!pushMember) {
+      showToast('Please select a member', 'warning');
+      return;
+    }
+    setPushSending(true);
+    setPushResult(null);
+    try {
+      const response = await fetch('/.netlify/functions/send-push-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: pushMember.id, title: pushTitle, message: pushMessage }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Request failed');
+      if (data.pushed) {
+        setPushResult({ type: 'success', message: 'Push notification sent successfully!' });
+        showToast('Push notification sent!', 'success');
+      } else {
+        setPushResult({ type: 'warn', message: `In-app notification saved, but no FCM token found: ${data.reason || ''}` });
+        showToast('No FCM token for this member', 'warning');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      setPushResult({ type: 'error', message: msg });
+      showToast(msg, 'error');
+    } finally {
+      setPushSending(false);
+    }
+  };
+
   const renderQuotaItem = (label: string, used: number, total: number | string) => {
     let percentage = 0;
     if (typeof total === 'number' && total > 0) {
@@ -415,6 +455,60 @@ export const WhapiConfigView: React.FC = () => {
             </div>
           </Card>
         </div>
+
+        {/* Push Notification Test */}
+        <Card className="md:col-span-3">
+          <div className="p-6 space-y-5">
+            <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800">
+              <Bell size={20} className="text-jci-blue" />
+              Push Notification Test
+            </h3>
+            <p className="text-xs text-slate-500">Send a test push notification to a specific member to verify their device is registered and receiving notifications.</p>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase">Member</label>
+                <Combobox
+                  options={members.map(m => m.name || m.id)}
+                  value={pushMemberName}
+                  onChange={setPushMemberName}
+                  placeholder="Search member..."
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase">Title</label>
+                <Input
+                  value={pushTitle}
+                  onChange={e => setPushTitle(e.target.value)}
+                  placeholder="Notification title"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase">Message</label>
+                <Input
+                  value={pushMessage}
+                  onChange={e => setPushMessage(e.target.value)}
+                  placeholder="Notification body"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={handleSendTestPush}
+                isLoading={pushSending}
+                disabled={!pushMemberName || membersLoading}
+                variant="primary"
+                className="flex items-center gap-2"
+              >
+                <Send size={15} /> Send Test Notification
+              </Button>
+              {pushResult && (
+                <p className={`text-sm font-medium ${pushResult.type === 'success' ? 'text-green-600' : pushResult.type === 'warn' ? 'text-amber-600' : 'text-red-600'}`}>
+                  {pushResult.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>
 
         {/* Quota Section - Spans across below settings if connected */}
         {status === 'connected' && (
