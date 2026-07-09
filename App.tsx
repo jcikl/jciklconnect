@@ -3446,7 +3446,8 @@ export const JCIKLApp: React.FC = () => {
     setMemberPickerLoading(true);
     try {
       const all = await MembersService.getAllMembers();
-      setMemberPickerList(all.map(m => ({
+      const filtered = role ? all.filter(m => m.role === role) : all;
+      setMemberPickerList(filtered.map(m => ({
         id: m.id,
         name: m.fullName || m.name || m.id,
         role: m.role || '',
