@@ -140,6 +140,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   const [isInquiryModalOpen, setInquiryModalOpen] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
     name: '',
+    jobTitle: '',
     company: '',
     phone: '',
     requirements: ''
@@ -194,6 +195,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         setSelectedBiz(bizToSelect);
         setInquiryForm({
           name: currentUser?.name || '',
+          jobTitle: currentUser?.business?.title || '',
           company: currentUser?.companyName || '',
           phone: currentUser?.phone || '',
           requirements: ''
@@ -316,6 +318,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     // Auto-fill form from current user info
     setInquiryForm({
       name: currentUser?.name || '',
+      jobTitle: currentUser?.business?.title || '',
       company: currentUser?.companyName || '',
       phone: currentUser?.phone || '',
       requirements: ''
@@ -352,6 +355,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         senderId: currentUser.id,
         senderName: inquiryForm.name,
         senderPhone: inquiryForm.phone,
+        senderJobTitle: inquiryForm.jobTitle || undefined,
         senderCompany: inquiryForm.company || undefined,
         senderInGroup,
         recipientId: selectedBiz.memberId,
@@ -938,6 +942,17 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       value={inquiryForm.name}
                       error={inquiryErrors.name}
                       onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <label className="w-20 sm:w-28 pt-2.5 text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Job Title</label>
+                  <div className="flex-1">
+                    <Input
+                      placeholder="E.g. Managing Director (optional)"
+                      value={inquiryForm.jobTitle}
+                      onChange={(e) => setInquiryForm({ ...inquiryForm, jobTitle: e.target.value })}
                     />
                   </div>
                 </div>

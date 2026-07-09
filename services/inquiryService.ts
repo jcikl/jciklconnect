@@ -15,13 +15,13 @@ function waPhone(phone: string): string {
 
 function buildDirectMessage(
   senderName: string,
+  senderJobTitle: string | undefined,
   senderCompany: string | undefined,
   requirements: string
 ): string {
-  const intro = senderCompany
-    ? `I am ${senderName} from ${senderCompany}, a JCI Kuala Lumpur member.`
-    : `I am ${senderName}, a JCI Kuala Lumpur member.`;
-  const companyLine = senderCompany
+  const companyLine = senderJobTitle && senderCompany
+    ? `I am also the ${senderJobTitle} of ${senderCompany}, I would like to ask about:\n${requirements}`
+    : senderCompany
     ? `I am also from ${senderCompany}, I would like to ask about:\n${requirements}`
     : `I would like to ask about:\n${requirements}`;
   return (
@@ -96,6 +96,7 @@ export interface SubmitInquiryParams {
   senderId: string;
   senderName: string;
   senderPhone: string;
+  senderJobTitle?: string;
   senderCompany?: string;
   senderInGroup: boolean;
   recipientId: string;
@@ -119,7 +120,7 @@ export async function submitInquiry(params: SubmitInquiryParams): Promise<{
   waUrl?: string;
 }> {
   const {
-    senderId, senderName, senderPhone, senderCompany, senderInGroup,
+    senderId, senderName, senderPhone, senderJobTitle, senderCompany, senderInGroup,
     recipientId, recipientName, recipientPhone, recipientInGroup,
     businessId, businessName, requirements,
   } = params;
@@ -133,7 +134,7 @@ export async function submitInquiry(params: SubmitInquiryParams): Promise<{
   if (bothInGroup && hasPhone) {
     // Case A: both in group — direct WhatsApp redirect
     channel = 'whatsapp_direct';
-    const msg = buildDirectMessage(senderName, senderCompany, requirements);
+    const msg = buildDirectMessage(senderName, senderJobTitle, senderCompany, requirements);
     waUrl = `https://api.whatsapp.com/send?phone=${waPhone(recipientPhone)}&text=${encodeURIComponent(msg)}`;
   } else {
     // Case B: at least one party not in group, OR recipient has no phone
