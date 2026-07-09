@@ -4734,7 +4734,7 @@ export const JCIKLApp: React.FC = () => {
                       m.labelColor === 'purple' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300' :
                       m.labelColor === 'amber' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
                       'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
-                    }`}>{m.label}</span>
+                    }`}>{m.label || 'Member'}</span>
                   </button>
                 ));
               })()}
