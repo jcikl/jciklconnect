@@ -345,7 +345,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full py-16 md:py-20">
             <div className="flex flex-col md:flex-row items-center gap-10 md:gap-20 lg:gap-24">
               {/* Left: text */}
-              <div className="flex-1 text-center md:text-left">
+              <div className="flex-1 text-center md:text-left relative z-10">
                 <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/70 mb-7">
                   <span>JCI Kuala Lumpur</span>
                   <span className="w-1 h-1 rounded-full bg-white/40" />
@@ -359,15 +359,25 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                 </p>
                 {/* Mobile-only group photo */}
                 {termSettings?.memberGroupPhotoUrl && (
-                  <div className="relative block md:hidden w-full rounded-2xl overflow-hidden mb-7 border border-white/[0.12] shadow-xl shadow-black/30" style={{ aspectRatio: '16/9' }}>
-                    <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
-                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-jci-navy/70 to-transparent pt-8 pb-3 px-4">
-                      <p className="text-white text-xs font-black tracking-wide">JCI Kuala Lumpur</p>
+                  <div className="relative block md:hidden mb-7" style={{ zIndex: 0 }}>
+                    {[0, 1, 2, 3].map(i => (
+                      <div key={i} className="absolute rounded-2xl pointer-events-none"
+                        style={{
+                          inset: '-8px',
+                          border: '1px solid rgba(255,255,255,0.5)',
+                          animation: `ring-ripple-out 4s ease-out ${i}s infinite backwards`,
+                        }} />
+                    ))}
+                    <div className="relative w-full rounded-2xl overflow-hidden border border-white/[0.12] shadow-xl shadow-black/30" style={{ aspectRatio: '16/9' }}>
+                      <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-jci-navy/70 to-transparent pt-8 pb-3 px-4">
+                        <p className="text-white text-xs font-black tracking-wide">JCI Kuala Lumpur</p>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="flex flex-row gap-3 justify-center md:justify-start">
+                <div className="flex flex-row gap-3 justify-center md:justify-start relative z-10">
                   <Button size="lg" onClick={onRegister} className="shadow-xl shadow-jci-blue/30 font-black px-7">
                     Become a Member
                   </Button>
@@ -391,6 +401,22 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
               {/* Right: photo */}
               <div className="shrink-0 hidden md:flex items-center justify-center">
                 <div className="relative">
+                  {/* Ripple rings — 1 per second sonar */}
+                  <style>{`
+                    @keyframes ring-ripple-out {
+                      0%   { transform: scale(1);   opacity: 0;    }
+                      5%   { transform: scale(1);   opacity: 0.45; }
+                      100% { transform: scale(1.6); opacity: 0;    }
+                    }
+                  `}</style>
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} className="absolute rounded-[2.5rem] pointer-events-none"
+                      style={{
+                        inset: '-20px',
+                        border: '1px solid rgba(255,255,255,0.5)',
+                        animation: `ring-ripple-out 4s ease-out ${i}s infinite backwards`,
+                      }} />
+                  ))}
                   {/* Outer glow ring */}
                   <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-sky-400/20 to-jci-blue/10 blur-xl" />
                   {/* Decorative corner accents */}
@@ -421,12 +447,31 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
           <section className="relative bg-jci-navy overflow-hidden">
 
             {/* ── Background layer ── */}
-            <div className="absolute inset-0 pointer-events-none select-none">
+            <div className="absolute inset-0 pointer-events-none select-none z-0">
               <div className="absolute bottom-0 right-0 leading-none font-black text-white/[0.04] text-[140px] lg:text-[200px]">
                 {currentYear}
               </div>
+              <style>{`
+                @keyframes stripe-wipe {
+                  0%   { -webkit-mask-position: -100% 0; mask-position: -100% 0; }
+                  100% { -webkit-mask-position: 200% 0;  mask-position: 200% 0; }
+                }
+              `}</style>
+              {/* Base stripes — always visible */}
               <div className="absolute inset-0 opacity-[0.025]"
                 style={{ backgroundImage: 'repeating-linear-gradient(135deg, white 0px, white 1px, transparent 1px, transparent 40px)' }} />
+              {/* Bright stripes — revealed left to right via mask */}
+              <div className="absolute inset-0 opacity-[0.13]"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(135deg, white 0px, white 1px, transparent 1px, transparent 40px)',
+                  WebkitMaskImage: 'linear-gradient(to right, transparent 0%, white 25%, white 75%, transparent 100%)',
+                  maskImage: 'linear-gradient(to right, transparent 0%, white 25%, white 75%, transparent 100%)',
+                  WebkitMaskSize: '60% 100%',
+                  maskSize: '60% 100%',
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskRepeat: 'no-repeat',
+                  animation: 'stripe-wipe 4s ease-in-out infinite',
+                }} />
               <div className="absolute top-0 left-1/2 w-96 h-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-jci-blue/15 blur-3xl" />
               <div className="absolute bottom-0 right-1/4 w-64 h-64 rounded-full bg-sky-600/10 blur-3xl" />
             </div>
@@ -528,7 +573,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                     <span className="text-8xl font-black text-white/20">{president.name.charAt(0)}</span>
                   </div>
                 )}
-                <div className="absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-jci-navy/100 to-transparent" />
+                <div className="absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-jci-navy to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-jci-navy/100 to-transparent" />
                 <div className="absolute bottom-8 inset-x-0 flex flex-col items-center gap-1 z-10">
                   <p className="text-white font-black text-xl drop-shadow-lg leading-snug">{president.name}</p>
@@ -537,12 +582,13 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                     President {currentYear}
                   </div>
                 </div>
-                {/* Vertical amber divider */}
-                <div className="absolute right-0 inset-y-0 flex flex-col items-center py-10">
-                  <div className="flex-1 w-px bg-gradient-to-b from-transparent via-amber-400/35 to-transparent" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 my-1 animate-pulse" />
-                  <div className="flex-1 w-px bg-gradient-to-b from-transparent via-amber-400/35 to-transparent" />
-                </div>
+              </div>
+
+              {/* Vertical amber divider — between panels */}
+              <div className="absolute inset-y-0 flex flex-col items-center py-10 pointer-events-none z-10" style={{ left: 'calc(5 / 13 * 100%)', transform: 'translateX(-50%)' }}>
+                <div className="flex-1 w-px bg-gradient-to-b from-transparent via-amber-400/35 to-transparent" />
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 my-1 animate-pulse" />
+                <div className="flex-1 w-px bg-gradient-to-b from-transparent via-amber-400/35 to-transparent" />
               </div>
 
               {/* Right: content panel */}
@@ -3474,8 +3520,8 @@ export const JCIKLApp: React.FC = () => {
           label: isBoard
             ? 'Board'
             : isCommDir ? 'Comm. Director'
-            : isProbation ? 'Probation'
-            : 'Member',
+              : isProbation ? 'Probation'
+                : 'Member',
           labelColor: isBoard ? 'purple' : isCommDir ? 'teal' : isProbation ? 'amber' : 'blue',
           avatar: m.avatarUrl || m.general?.avatarUrl || undefined,
           sortOrder,
@@ -4743,12 +4789,11 @@ export const JCIKLApp: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-slate-800 dark:text-white truncate">{m.name}</p>
                     </div>
-                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full max-w-[90px] truncate ${
-                      m.labelColor === 'purple' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300' :
-                      m.labelColor === 'teal'   ? 'bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-300' :
-                      m.labelColor === 'amber'  ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
-                      'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
-                    }`}>{m.label || 'Member'}</span>
+                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full max-w-[90px] truncate ${m.labelColor === 'purple' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300' :
+                      m.labelColor === 'teal' ? 'bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-300' :
+                        m.labelColor === 'amber' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
+                          'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
+                      }`}>{m.label || 'Member'}</span>
                   </button>
                 ));
               })()}
