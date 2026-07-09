@@ -458,7 +458,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {showJourneyCard && (
         <div
           className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all"
-          onClick={openJourneyModal}
+          onClick={isProbationMember || isFullMember ? openJourneyModal : undefined}
         >
           <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
             <TrendingUp size={20} className="text-amber-600" />
@@ -466,30 +466,39 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
               <h3 className="font-semibold text-sm text-slate-900">Membership journey</h3>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${journeyIsComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                }`}>
-                {isProbationMember ? 'Probation' : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
-              </span>
-              <ChevronRight size={14} className="text-slate-400 ml-auto flex-shrink-0" />
+              {(isProbationMember || isFullMember) && (
+                <>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${journeyIsComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {isProbationMember ? 'Probation' : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
+                  </span>
+                  <ChevronRight size={14} className="text-slate-400 ml-auto flex-shrink-0" />
+                </>
+              )}
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${journeyProgress}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                  className={`h-full rounded-full ${journeyIsComplete ? 'bg-green-500' : 'bg-amber-500'}`}
-                />
-              </div>
-              <span className="text-[11px] text-slate-500 flex-shrink-0">
-                {(isProbationMember ? promoLoading : engagementLoading) ? '...' : journeyLabel.split(' · ')[0]}
-              </span>
-            </div>
-            {nextStepHint && !journeyIsComplete && (
-              <p className="text-[11px] text-slate-400 truncate">
-                <ArrowUpRight size={10} className="inline -mt-0.5 mr-0.5" />
-                Next: {nextStepHint}
-              </p>
+            {(isProbationMember || isFullMember) ? (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${journeyProgress}%` }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                      className={`h-full rounded-full ${journeyIsComplete ? 'bg-green-500' : 'bg-amber-500'}`}
+                    />
+                  </div>
+                  <span className="text-[11px] text-slate-500 flex-shrink-0">
+                    {(isProbationMember ? promoLoading : engagementLoading) ? '...' : journeyLabel.split(' · ')[0]}
+                  </span>
+                </div>
+                {nextStepHint && !journeyIsComplete && (
+                  <p className="text-[11px] text-slate-400 truncate">
+                    <ArrowUpRight size={10} className="inline -mt-0.5 mr-0.5" />
+                    Next: {nextStepHint}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-[11px] text-slate-400">Join us to unlock more benefits</p>
             )}
           </div>
         </div>
