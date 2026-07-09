@@ -316,7 +316,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const isProbationMember = member.membershipType === 'Probation';
   const isFullMember = member.membershipType === 'Full';
-  const showJourneyCard = isProbationMember || isFullMember;
+  const showJourneyCard = isProbationMember || isFullMember || isBoard || isAdmin;
   const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
   const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
   const yearsInMembership = joinYear ? new Date().getFullYear() - joinYear : 0;
