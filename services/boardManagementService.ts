@@ -361,7 +361,10 @@ export class BoardManagementService {
       'Vice President (Business)',
       'Vice President (Community)',
       'Vice President (International Affairs)',
-      'Vice President (LOM)'
+      'Vice President (LOM)',
+      'Area Officer',
+      'National Officer',
+      'JCI Officer'
     ];
   }
 

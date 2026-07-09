@@ -302,7 +302,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             <p className="text-sm text-slate-500 mb-4">
               Let's get to know you better. Fill in your details below.
             </p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 name="fullName"
                 label="Full Name (NRIC)"
@@ -320,7 +320,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 onChange={handleChange}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 name="email"
                 label="Email Address"
@@ -384,7 +384,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </div>
         );
 
-      case 2:
+      case 2: {
+        const pwd = formData.password;
+        const confirmMismatch = formData.confirmPassword.length > 0 && formData.confirmPassword !== pwd;
         return (
           <div className="space-y-4 animate-fade-in">
             <p className="text-sm text-slate-500 mb-4">
@@ -401,33 +403,53 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               icon={<Lock size={18} />}
               helperText="Mix letters, numbers, and symbols for better security"
             />
-            <Input
-              name="confirmPassword"
-              label="Confirm Password"
-              type="password"
-              placeholder="Re-enter your password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              icon={<Lock size={18} />}
-            />
+            <div>
+              <Input
+                name="confirmPassword"
+                label="Confirm Password"
+                type="password"
+                placeholder="Re-enter your password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                icon={<Lock size={18} />}
+              />
+              {confirmMismatch && (
+                <p className="text-[11px] text-red-500 font-medium mt-1">Passwords do not match yet</p>
+              )}
+              {formData.confirmPassword.length > 0 && !confirmMismatch && (
+                <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                  <CheckCircle size={11} /> Passwords match
+                </p>
+              )}
+            </div>
           </div>
         );
+      }
 
       case 3: {
         const answeredQCount = Object.keys(formData.surveyAnswers).filter(
           k => formData.surveyAnswers[k]?.length > 0
         ).length;
         return (
-          <div className="space-y-2 animate-fade-in pr-1">
-            {/* Header row with toggle */}
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="font-bold text-slate-500 text-sm leading-tight">Personalized Assessment</h4>
+          <div className="space-y-3 animate-fade-in pr-1">
+            {/* Header row with progress + toggle */}
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="font-bold text-slate-600 text-sm leading-tight truncate">Personalized Assessment</h4>
+                <span className={`flex-none text-[10px] font-black px-2 py-0.5 rounded-full ${
+                  answeredQCount === JOIN_US_SURVEY_QUESTIONS.length
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {answeredQCount}/{JOIN_US_SURVEY_QUESTIONS.length}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowZh(v => !v)}
                 title={showZh ? 'Switch to English' : '切换到中文'}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                className={`flex-none flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
                   showZh
                     ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
                     : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
@@ -437,7 +459,14 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 {showZh ? 'EN' : '中文'}
               </button>
             </div>
-            <p className="text-sm text-slate-500 mb-4">
+            {/* Mini progress bar */}
+            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${answeredQCount === JOIN_US_SURVEY_QUESTIONS.length ? 'bg-emerald-500' : 'bg-jci-blue'}`}
+                style={{ width: `${(answeredQCount / JOIN_US_SURVEY_QUESTIONS.length) * 100}%` }}
+              />
+            </div>
+            <p className="text-sm text-slate-500 mb-2">
               Select all that apply — we'll match you with the best opportunities.
             </p>
             {JOIN_US_SURVEY_QUESTIONS.map((q, idx) => {
@@ -483,9 +512,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                             if (error) setError(null);
                           }}
                           className={`
-                            w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all duration-150 group
+                            w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all duration-150 group
                             ${isSelected
-                              ? 'bg-blue-50'
+                              ? 'bg-blue-50 ring-1 ring-blue-100'
                               : 'hover:bg-slate-50'
                             }
                           `}
@@ -512,93 +541,158 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 </div>
               );
             })}
+
+            {/* Hobbies (optional) */}
+            <div className="rounded-2xl border-2 border-slate-100 overflow-hidden">
+              <div className="px-4 py-3 flex items-center gap-3 bg-slate-50/80">
+                <span className="flex-none flex items-center justify-center w-7 h-7 rounded-full bg-white text-slate-400 border-2 border-slate-200">
+                  <Sparkles size={13} />
+                </span>
+                <h4 className="text-[13px] font-semibold leading-snug flex-1 text-slate-600">
+                  Your Hobbies & Interests
+                </h4>
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                  Optional
+                </span>
+              </div>
+              <div className="p-3 flex flex-wrap gap-1.5">
+                {HOBBY_OPTIONS.map(hobby => {
+                  const isSelected = formData.selectedHobbies.includes(hobby);
+                  return (
+                    <button
+                      key={hobby}
+                      type="button"
+                      onClick={() => setFormData(prev => ({
+                        ...prev,
+                        selectedHobbies: isSelected
+                          ? prev.selectedHobbies.filter(h => h !== hobby)
+                          : [...prev.selectedHobbies, hobby],
+                      }))}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+                        isSelected
+                          ? 'bg-jci-blue text-white border-jci-blue shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-jci-blue/40 hover:text-jci-blue'
+                      }`}
+                    >
+                      {hobby}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         );
       }
 
-      case 4:
+      case 4: {
+        const AgreementCard = ({
+          checked,
+          onToggle,
+          icon,
+          title,
+          points,
+          accent,
+        }: {
+          checked: boolean;
+          onToggle: () => void;
+          icon: React.ReactNode;
+          title: string;
+          points: string[];
+          accent: 'blue' | 'green';
+        }) => (
+          <button
+            type="button"
+            onClick={onToggle}
+            className={`w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 ${checked
+              ? accent === 'blue'
+                ? 'border-jci-blue bg-blue-50/60 shadow-sm'
+                : 'border-emerald-400 bg-emerald-50/60 shadow-sm'
+              : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`flex-none p-2 rounded-xl ${checked
+                ? accent === 'blue' ? 'bg-jci-blue text-white' : 'bg-emerald-500 text-white'
+                : 'bg-slate-100 text-slate-400'
+                } transition-colors`}>
+                {icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className={`text-sm font-bold mb-1 ${checked ? 'text-slate-900' : 'text-slate-700'}`}>{title}</h4>
+                <ul className="space-y-0.5">
+                  {points.map((p, i) => (
+                    <li key={i} className="text-[11px] text-slate-500 leading-relaxed flex items-start gap-1.5">
+                      <span className={`mt-1.5 w-1 h-1 rounded-full flex-none ${checked ? (accent === 'blue' ? 'bg-jci-blue' : 'bg-emerald-500') : 'bg-slate-300'}`} />
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {/* Check indicator */}
+              <div className={`flex-none w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${checked
+                ? accent === 'blue' ? 'bg-jci-blue border-jci-blue' : 'bg-emerald-500 border-emerald-500'
+                : 'border-slate-300'
+                }`}>
+                {checked && (
+                  <svg width="12" height="10" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+            </div>
+          </button>
+        );
+        const allAgreed = formData.agreeToTerms && formData.agreeToPrivacy;
         return (
-          <div className="space-y-4 animate-fade-in">
-            <p className="text-sm text-slate-500 mb-4">
-              Please review and accept our agreements to complete your registration.
+          <div className="space-y-3 animate-fade-in">
+            <p className="text-sm text-slate-500 mb-1">
+              Tap each agreement to accept and complete your registration.
             </p>
-            <div className="space-y-4">
-              <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
-                <h4 className="font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
-                  <Shield size={16} className="text-jci-blue" />
-                  Code of Ethics
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  I commit to upholding integrity, respect, and service to the community.
-                </p>
-              </div>
-              <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
-                <h4 className="font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
-                  <Shield size={16} className="text-green-600" />
-                  Privacy Policy
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  My data will be used only for JCI Kuala Lumpur operations.
-                </p>
-              </div>
-              <div className="bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm">
-                <h4 className="font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
-                  <Users size={16} className="text-amber-600" />
-                  Membership Agreement
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  I will actively participate and contribute to JCI's goals.
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className={`relative p-3 rounded-lg border-2 transition-all cursor-pointer ${formData.agreeToTerms
-                ? 'border-jci-blue bg-blue-50/50'
-                : 'border-slate-200 hover:border-slate-300'
-                }`}>
-                <Checkbox
-                  checked={formData.agreeToTerms}
-                  onChange={(e) => {
-                    setFormData({ ...formData, agreeToTerms: e.target.checked });
-                    if (error?.includes('Code of Ethics')) setError(null);
-                  }}
-                  label={
-                    <span className="text-xs text-slate-700 leading-tight">
-                      I agree to the <span className="text-jci-blue font-semibold">Code of Ethics</span> and <span className="text-jci-blue font-semibold">Membership Agreement</span>
-                    </span>
-                  }
-                />
-              </div>
-              <div className={`relative p-3 rounded-lg border-2 transition-all cursor-pointer ${formData.agreeToPrivacy
-                ? 'border-green-400 bg-green-50/50'
-                : 'border-slate-200 hover:border-slate-300'
-                }`}>
-                <Checkbox
-                  checked={formData.agreeToPrivacy}
-                  onChange={(e) => {
-                    setFormData({ ...formData, agreeToPrivacy: e.target.checked });
-                    if (error?.includes('Privacy')) setError(null);
-                  }}
-                  label={
-                    <span className="text-xs text-slate-700 leading-tight">
-                      I agree to the <span className="text-green-600 font-semibold">Privacy Policy</span>
-                    </span>
-                  }
-                />
-              </div>
-            </div>
-            {formData.agreeToTerms && formData.agreeToPrivacy && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 flex items-center gap-3 animate-fade-in">
-                <div className="bg-green-100 p-1.5 rounded-full">
+            <AgreementCard
+              checked={formData.agreeToTerms}
+              onToggle={() => {
+                setFormData(prev => ({ ...prev, agreeToTerms: !prev.agreeToTerms }));
+                if (error?.includes('Code of Ethics')) setError(null);
+              }}
+              icon={<Shield size={18} />}
+              title="Code of Ethics & Membership Agreement"
+              points={[
+                'I commit to upholding integrity, respect, and service to the community.',
+                "I will actively participate and contribute to JCI's goals.",
+              ]}
+              accent="blue"
+            />
+            <AgreementCard
+              checked={formData.agreeToPrivacy}
+              onToggle={() => {
+                setFormData(prev => ({ ...prev, agreeToPrivacy: !prev.agreeToPrivacy }));
+                if (error?.includes('Privacy')) setError(null);
+              }}
+              icon={<Lock size={18} />}
+              title="Privacy Policy"
+              points={['My data will be used only for JCI Kuala Lumpur operations.']}
+              accent="green"
+            />
+            {allAgreed ? (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-3.5 flex items-center gap-3 animate-fade-in">
+                <div className="bg-green-100 p-1.5 rounded-full flex-none">
                   <CheckCircle className="text-green-600" size={16} />
                 </div>
-                <p className="text-sm text-green-800">
-                  <strong>Ready to join!</strong> Your digital signature will be recorded.
-                </p>
+                <div className="min-w-0">
+                  <p className="text-sm text-green-800 font-bold">Ready to join!</p>
+                  <p className="text-[11px] text-green-700 truncate">
+                    Signing digitally as <strong>{formData.fullName || formData.name}</strong> ({formData.email})
+                  </p>
+                </div>
               </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 text-center pt-1">
+                Your digital signature (name, email, timestamp) will be recorded with your acceptance.
+              </p>
             )}
           </div>
         );
+      }
 
       default:
         return null;
@@ -624,7 +718,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         </div>
       }
     >
-      <div className="flex flex-col h-[650px] -mx-4 md:-mx-6 -mt-4 md:-mt-6 -mb-4 md:-mb-6 overflow-hidden">
+      <div className="flex flex-col h-[min(650px,78vh)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 -mb-4 md:-mb-6 overflow-hidden">
         <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col min-h-0">
           {/* Fixed Progress & Highlight Section */}
           <div className="flex-none px-6 py-4 space-y-4 bg-white border-b border-slate-50">
@@ -692,17 +786,27 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           {/* Fixed Footer (Navigation) */}
           <div className="flex-none px-6 py-4 border-t border-slate-100 bg-slate-50/50">
             <div className="flex justify-between items-center">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handlePrevious}
-                disabled={currentStep === 1 || loading}
-                size="sm"
-                className={currentStep === 1 ? 'invisible' : 'text-slate-500'}
-              >
-                <ChevronLeft size={16} className="mr-1" />
-                Back
-              </Button>
+              {currentStep === 1 && onSwitchToLogin ? (
+                <button
+                  type="button"
+                  onClick={onSwitchToLogin}
+                  className="text-xs text-slate-400 hover:text-jci-blue font-semibold transition-colors"
+                >
+                  Already a member? <span className="text-jci-blue">Log in</span>
+                </button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handlePrevious}
+                  disabled={currentStep === 1 || loading}
+                  size="sm"
+                  className={currentStep === 1 ? 'invisible' : 'text-slate-500'}
+                >
+                  <ChevronLeft size={16} className="mr-1" />
+                  Back
+                </Button>
+              )}
 
               <div className="flex gap-2">
                 <Button

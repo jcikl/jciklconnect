@@ -50,9 +50,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       if (isCredentialError) {
         try {
           const methods = await fetchSignInMethodsForEmail(auth, email);
-          if (methods.includes('google.com')) {
-            await resetPassword(email);
-            errorMessage = '检测到您曾使用 Google 登入。我们已发送密码重置邮件到您的邮箱，请检查。';
+          if (methods.includes('password')) {
+            // Account has a password (may also have Google) — this is simply a wrong password
+            errorMessage = '密码错误，请重试。您也可以点击下方「Forgot password?」重置密码，或使用 Google 登入。';
+          } else if (methods.includes('google.com')) {
+            // Google-only account, no password set — direct them to the Google button
+            errorMessage = '此帳號使用 Google 註冊，尚未設置密碼。請點擊下方「Sign in with Google」登入。';
           } else if (methods.length > 0) {
             errorMessage = '密码错误，请重试。';
           } else {

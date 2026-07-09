@@ -316,7 +316,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const isProbationMember = member.membershipType === 'Probation';
   const isFullMember = member.membershipType === 'Full';
-  const showJourneyCard = isProbationMember || isFullMember || isBoard || isAdmin;
+  // Everyone sees the journey card — guests get the "Join us" upsell version
+  const showJourneyCard = true;
   const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
   const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
   const yearsInMembership = joinYear ? new Date().getFullYear() - joinYear : 0;
@@ -458,7 +459,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {showJourneyCard && (
         <div
           className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
-          onClick={isProbationMember || isFullMember ? openJourneyModal : undefined}
+          onClick={isProbationMember || isFullMember ? openJourneyModal : () => setShowUpgradeModal(true)}
         >
           <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%)' }} />

@@ -5,22 +5,27 @@ To curate exclusive lifestyle experiences that build high-trust relationships an
 
 ## Rules & Regulation
 ### Members
-- Not against tobacco, golf, liqour & wine
+- Not against tobacco, golf, liqour & wine,
 - Top & Medium Management of the company
-- Members benefits
-- Membership Fees activated after membership size reached X
+- Members benefits (cigar, accessories, wine,)
+- Membership Fees activated after membership size reached 100
 ### Program
 - Lifestyle as main program combined business as sub program
 - Guest host
 - Exclusive events invitation to members who not continues missed 3 events within 6 months
+- 1 Bring 3 booth
+- 1 bring 1 for free
 
 ### Membership Size
 #### 0 - 50 Members
 - Membership Fee: FOC
-- Events Type: 
+- Events Type (w topic sharing): 
 	- Cigar Lounge Gathering, Monthly
 	- Golf Swing Gathering, Monthly
-	- Wine Taste Gathering, Monthly
+	- Wine Taste Gathering, Monthly 
+	- Bottle exchange
+	- JDM Club
+	- Watches 
 	- Founder Dinner, Quarterly
 - Half year active rate target: 24 / 50
 - Active Member: 3 events/ Half

@@ -37,6 +37,14 @@ import {
   computeMembershipTypeFromMember,
 } from '../../services/membershipConfigService';
 import { MembersService } from '../../services/membersService';
+
+/** 出席对比：当年签到次数 vs 已过月份（入会年份从入会月起算），每年重算 */
+const getAttendanceDisplay = (m: Member) => {
+  const year = new Date().getFullYear();
+  const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate || m.joinDate);
+  const checkins = m.attendanceYear === year ? (m.attendanceCheckins || 0) : 0;
+  return { checkins, months, text: `${checkins} / ${months}`, ratio: Math.min(100, (checkins / months) * 100) };
+};
 import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS, JOIN_US_SURVEY_QUESTIONS } from '../../config/constants';
 import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../config/constants';
@@ -1679,10 +1687,15 @@ const MemberTable: React.FC<{
                     </div>
                   </td>
                   <td className="px-6 py-4 w-48">
-                    <div className="flex items-center space-x-2">
-                      <ProgressBar progress={member.attendanceRate} color={member.attendanceRate < 50 ? 'bg-red-500' : 'bg-green-500'} />
-                      <span className="text-xs font-medium text-slate-600">{member.attendanceRate}%</span>
-                    </div>
+                    {(() => {
+                      const att = getAttendanceDisplay(member);
+                      return (
+                        <div className="flex items-center space-x-2">
+                          <ProgressBar progress={att.ratio} color={att.checkins < att.months ? 'bg-amber-500' : 'bg-green-500'} />
+                          <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{att.text}</span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     {member.churnRisk === 'High' && (
@@ -1779,13 +1792,18 @@ const MemberTable: React.FC<{
                         {member.tier}
                       </span>
                       <span className="text-[10px] text-slate-400">{member.points} pts</span>
-                      <div className="flex items-center gap-1 flex-1">
-                        <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden max-w-[48px]">
-                          <div className={`h-full rounded-full ${member.attendanceRate < 50 ? 'bg-red-400' : 'bg-green-400'}`}
-                            style={{ width: `${member.attendanceRate}%` }} />
-                        </div>
-                        <span className="text-[10px] text-slate-400">{member.attendanceRate}%</span>
-                      </div>
+                      {(() => {
+                        const att = getAttendanceDisplay(member);
+                        return (
+                          <div className="flex items-center gap-1 flex-1">
+                            <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden max-w-[48px]">
+                              <div className={`h-full rounded-full ${att.checkins < att.months ? 'bg-amber-400' : 'bg-green-400'}`}
+                                style={{ width: `${att.ratio}%` }} />
+                            </div>
+                            <span className="text-[10px] text-slate-400 whitespace-nowrap">{att.text}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1802,7 +1820,9 @@ const MemberTable: React.FC<{
 
 const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
-  const { resetPassword } = useAuth();
+  const { resetPassword, member: currentAuthMember } = useAuth();
+  // Points columns in the Activities Log are visible to the President only
+  const isPresident = (currentAuthMember?.jciCareer?.currentBoardPosition || currentAuthMember?.currentBoardPosition) === 'President';
   // Always derive the latest member data from the live members array so the UI
   // updates automatically after every save (without a page reload).
   const member = useMemo(
@@ -2362,8 +2382,41 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         throw new Error(error);
       }
       showToast(`Invitation email sent to ${email}`, 'success');
+      setAuthEmailExists(true);
     } catch (err) {
       showToast(`Failed to send invite: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
+    }
+  };
+
+  // Whether this member's email already has a Firebase Auth account (Google/password) —
+  // if so, the CTA becomes "Reset Password" instead of "Send Invite"
+  const [authEmailExists, setAuthEmailExists] = useState<boolean | null>(null);
+  useEffect(() => {
+    const email = member.contact?.email || member.email;
+    if (!email) { setAuthEmailExists(false); return; }
+    let cancelled = false;
+    setAuthEmailExists(null);
+    fetch('/.netlify/functions/check-auth-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled && data) setAuthEmailExists(!!data.exists); })
+      .catch(() => { /* keep null — fall back to Send Invite */ });
+    return () => { cancelled = true; };
+  }, [member.id]);
+
+  const handleResetPassword = async () => {
+    const email = member.contact?.email || member.email;
+    if (!email) { showToast('No email address found for this member', 'error'); return; }
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      const { auth } = await import('../../config/firebase');
+      await sendPasswordResetEmail(auth, email);
+      showToast(`Password reset email sent to ${email}`, 'success');
+    } catch (err) {
+      showToast(`Failed to send reset email: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -2468,18 +2521,21 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20 md:pb-0">
-      {!isSelfView && (
-        <Button variant="ghost" onClick={onBack} className="text-slate-500">
-          <ArrowLeft size={16} className="mr-2" /> Back to Directory
-        </Button>
-      )}
-
       {/* Header Card */}
       <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md group">
 
         {/* ── MOBILE hero ── */}
         <div className="md:hidden bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy px-4 pt-4 pb-3 relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+          {!isSelfView && (
+            <button
+              onClick={onBack}
+              aria-label="Close member detail"
+              className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-white/80 hover:bg-white/30 hover:text-white active:scale-95 transition-all"
+            >
+              <X size={16} />
+            </button>
+          )}
           <div className="relative flex items-center gap-3">
             {/* Avatar */}
             <div className="relative shrink-0">
@@ -2535,7 +2591,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={13} /></a>
                 : <Instagram size={13} className="text-slate-400" />}
               {member.wechat
-                ? <span className="text-[#07C160] flex items-center gap-1 text-[10px]"><MessageCircle size={13} />{member.wechat}</span>
+                ? <span className="text-[#07C160] flex items-center gap-1 text-[10px]"><MessageCircle size={13} /></span>
                 : <MessageCircle size={13} className="text-slate-400" />}
             </span>
           </div>
@@ -2569,7 +2625,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   </Button>
                 )}
                 {(isAdmin || isDeveloper) && !isSelfView && (
-                  <Button variant="outline" size="sm" className="h-9 px-3 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
+                  authEmailExists ? (
+                    <Button variant="outline" size="sm" className="h-9 px-3 text-amber-600 border-amber-200 hover:bg-amber-50 font-bold" onClick={handleResetPassword}>Reset Password</Button>
+                  ) : (
+                    <Button variant="outline" size="sm" className="h-9 px-3 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
+                  )
                 )}
                 {isDeveloper && !isSelfView && (
                   <Button variant="outline" size="sm" className="h-9 px-3 text-red-500 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
@@ -2585,6 +2645,15 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           <div className="h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
             <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+            {!isSelfView && (
+              <button
+                onClick={onBack}
+                aria-label="Close member detail"
+                className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-white/80 hover:bg-white/30 hover:text-white active:scale-95 transition-all"
+              >
+                <X size={17} />
+              </button>
+            )}
             {/* Name, Tier Badge, position, company — pl-52 clears avatar */}
             <div className="absolute bottom-4 left-0 right-0 px-6 pl-52 flex flex-col justify-end gap-1">
               <div className="flex flex-row items-center gap-2 flex-wrap">
@@ -2645,7 +2714,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                     ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={14} /></a>
                     : <Instagram size={14} className="text-slate-400" />}
                   {member.wechat
-                    ? <span className="text-[#07C160] flex items-center gap-1 text-xs"><MessageCircle size={14} />{member.wechat}</span>
+                    ? <span className="text-[#07C160] flex items-center gap-1 text-xs"><MessageCircle size={14} /></span>
                     : <MessageCircle size={14} className="text-slate-400" />}
                 </span>
               </div>
@@ -2682,7 +2751,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                     </Button>
                   )}
                   {(isAdmin || isDeveloper) && !isSelfView && (
-                    <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
+                    authEmailExists ? (
+                      <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-amber-600 border-amber-200 hover:bg-amber-50 font-bold" onClick={handleResetPassword}>Reset Password</Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
+                    )
                   )}
                   {isDeveloper && !isSelfView && (
                     <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
@@ -2713,7 +2786,15 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <CalendarCheck size={12} className="text-slate-400" />
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Attendance</p>
             </div>
-            <p className="text-lg md:text-2xl font-black text-slate-900">{member.attendanceRate}%</p>
+            {(() => {
+              const att = getAttendanceDisplay(member);
+              return (
+                <>
+                  <p className="text-lg md:text-2xl font-black text-slate-900 whitespace-nowrap">{att.text}</p>
+                  <p className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">check-ins / months</p>
+                </>
+              );
+            })()}
           </div>
           <div className="p-2 md:p-4 text-center flex flex-col items-center justify-center hover:bg-white transition-colors">
             <div className="flex items-center justify-center gap-1.5 mb-2">
@@ -3987,7 +4068,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       {[
                         {
                           label: 'Level 1',
-                          title: 'JCI Certified Trainer',
+                          title: 'JCI Trainer',
                           description: 'Pre-requisites: Graduate from JCI Discover',
                           status: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'Completed' : 'Upcoming',
                           tone: (member.skills?.includes('JCI Discover') || member.points >= 150) ? 'green' : 'slate',
@@ -4074,7 +4155,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                       <tr>
                         <th className="px-4 py-2 text-slate-600 font-bold">Date</th>
                         <th className="px-4 py-2 text-slate-600 font-bold">Category / Description</th>
-                        <th className="px-4 py-2 text-right text-slate-600 font-bold w-[100px]">Points</th>
+                        {isPresident && <th className="px-4 py-2 text-right text-slate-600 font-bold w-[100px]">Points</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -4082,7 +4163,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         <React.Fragment key={year}>
                           {/* Year Segment Header */}
                           <tr className="bg-slate-100/60 border-y border-slate-200">
-                            <td colSpan={3} className="px-4 py-2 text-xs font-black text-slate-700 tracking-wider bg-slate-50/80 select-none">
+                            <td colSpan={isPresident ? 3 : 2} className="px-4 py-2 text-xs font-black text-slate-700 tracking-wider bg-slate-50/80 select-none">
                               {year}
                             </td>
                           </tr>
@@ -4095,9 +4176,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                                 <span className="font-bold text-slate-900 block">{log.description}</span>
                                 <span className="text-[10px] text-slate-400 uppercase tracking-wider">{log.type}</span>
                               </td>
-                              <td className="px-4 py-3 text-right font-black text-green-600 w-[100px]">
-                                +{log.points} pts
-                              </td>
+                              {isPresident && (
+                                <td className="px-4 py-3 text-right font-black text-green-600 w-[100px]">
+                                  +{log.points} pts
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </React.Fragment>
@@ -4122,7 +4205,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         <th className="px-4 py-2 text-slate-600 font-bold">Date</th>
                         <th className="px-4 py-2 text-slate-600 font-bold">Project Name</th>
                         <th className="px-4 py-2 text-slate-600 font-bold">Sponsorship Amount</th>
-                        <th className="px-4 py-2 text-right text-slate-600 font-bold">Points</th>
+                        {isPresident && <th className="px-4 py-2 text-right text-slate-600 font-bold">Points</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -4137,9 +4220,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                           <td className="px-4 py-3 font-bold text-slate-700">
                             RM {s.amount.toLocaleString()}
                           </td>
-                          <td className="px-4 py-3 text-right font-black text-green-600">
-                            +{s.points} pts
-                          </td>
+                          {isPresident && (
+                            <td className="px-4 py-3 text-right font-black text-green-600">
+                              +{s.points} pts
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -4202,7 +4287,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               )}
             </Card>
 
-            {/* Config Overview Card */}
+            {/* Config Overview Card — points info is President-only */}
+            {isPresident && (
             <Card title="Points Standard Reference" className="bg-slate-50/50">
               <div className="text-xs space-y-3 text-slate-600">
                 <p className="font-semibold text-slate-800 border-b pb-1.5 mb-2">How points are credited:</p>
@@ -4232,6 +4318,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 </div>
               </div>
             </Card>
+            )}
           </div>
         </div>
       )}

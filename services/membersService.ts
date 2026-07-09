@@ -459,6 +459,35 @@ export class MembersService {
         }
       }
 
+      // Email change → keep the Firebase Auth login email in sync (before writing Firestore,
+      // so an email conflict blocks the whole update instead of leaving the two out of sync)
+      const newEmail = (updates as any).email ?? (updates.contact as any)?.email;
+      const currentEmail = currentData?.contact?.email || currentData?.email;
+      if (
+        newEmail &&
+        currentEmail &&
+        newEmail.toLowerCase() !== currentEmail.toLowerCase() &&
+        !isDevMode()
+      ) {
+        try {
+          const res = await fetch('/.netlify/functions/update-auth-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: memberId, newEmail }),
+          });
+          if (res.status === 409) {
+            throw new Error('This email is already used by another account. Email not updated.');
+          }
+          if (!res.ok) {
+            console.warn('update-auth-email failed with status', res.status, '— profile email updated without Auth sync');
+          }
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('already used')) throw err;
+          // Function unreachable (e.g. local dev) — proceed; Auth email stays unchanged
+          console.warn('update-auth-email unreachable, skipping Auth sync:', err);
+        }
+      }
+
       const cleanUpdates: Record<string, any> = {
         updatedAt: Timestamp.now(),
         ...(updatedBy != null && updatedBy !== '' && { updatedBy }),
@@ -739,6 +768,51 @@ export class MembersService {
   }
 
   // Update member role (for Board transitions)
+  /** 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 */
+  static computeAttendanceMonths(joinDate?: string | null, now: Date = new Date()): number {
+    const year = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-based
+    let startMonth = 1;
+    if (joinDate) {
+      const jd = new Date(joinDate);
+      if (!isNaN(jd.getTime()) && jd.getFullYear() === year) {
+        startMonth = jd.getMonth() + 1;
+      }
+    }
+    return Math.max(1, currentMonth - startMonth + 1);
+  }
+
+  /** 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 */
+  static async recalculateAttendance(memberId: string): Promise<void> {
+    if (isDevMode()) return;
+    try {
+      const member = await this.getMemberById(memberId);
+      if (!member) return;
+      const now = new Date();
+      const year = now.getFullYear();
+      const joinDate = member.jciCareer?.joinDate || member.joinDate;
+      const months = this.computeAttendanceMonths(joinDate, now);
+
+      const { EventRegistrationService } = await import('./eventRegistrationService');
+      const regs = await EventRegistrationService.listByMember(memberId);
+      const checkins = regs.filter(r =>
+        r.status === 'checked_in' &&
+        r.checkedInAt &&
+        new Date(r.checkedInAt).getFullYear() === year
+      ).length;
+
+      await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), {
+        attendanceCheckins: checkins,
+        attendanceMonths: months,
+        attendanceYear: year,
+        updatedAt: Timestamp.now(),
+      });
+      this.invalidateMembersCache();
+    } catch (error) {
+      console.error('Error recalculating attendance:', error);
+    }
+  }
+
   static async updateMemberRole(memberId: string, newRole: UserRole): Promise<void> {
     try {
       await this.updateMember(memberId, { role: newRole });

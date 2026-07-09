@@ -19,7 +19,27 @@ const POSITION_ORDER: Record<string, number> = {
   'Vice President (Community)': 9,
   'Vice President (International Affairs)': 10,
   'Vice President (LOM)': 11,
+  'Area Officer': 12,
+  'National Officer': 13,
+  'JCI Officer': 14,
 };
+
+/** Board 设定弹窗的职位分组标签 */
+const POSITION_GROUPS: { key: string; label: string; positions: string[] }[] = [
+  {
+    key: 'exco',
+    label: 'EXCO',
+    positions: ['President', 'Immediate Past President', 'Secretary', 'Honorary Treasurer', 'General Legal Council', 'Executive Vice President'],
+  },
+  {
+    key: 'vp',
+    label: 'VP',
+    positions: ['Vice President (Individual)', 'Vice President (Business)', 'Vice President (Community)', 'Vice President (International Affairs)', 'Vice President (LOM)'],
+  },
+  { key: 'area', label: 'Area Officer', positions: ['Area Officer'] },
+  { key: 'national', label: 'National Officer', positions: ['National Officer'] },
+  { key: 'jci', label: 'JCI Officer', positions: ['JCI Officer'] },
+];
 
 interface BoardOfDirectorsSectionProps {
   members: Member[];
@@ -59,6 +79,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const { showToast } = useToast();
 
   const positions = BoardManagementService.getDefaultBoardPositions();
+  const [activePositionGroup, setActivePositionGroup] = useState<string>('exco');
 
   const handleBodAvatarUpload = async (
     member: Member,
@@ -420,6 +441,18 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       onChange={e => setTermSettings(prev => ({ ...prev, tagline: e.target.value }))}
                     />
                   </div>
+                  <div className="sm:col-span-3">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                      <AlignLeft size={11} /> Short Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 resize-none"
+                      placeholder="A brief message from the president about this year's direction..."
+                      value={termSettings.shortDescription || ''}
+                      onChange={e => setTermSettings(prev => ({ ...prev, shortDescription: e.target.value }))}
+                    />
+                  </div>
                   {/* Theme Logo card */}
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
@@ -576,22 +609,32 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       )}
                     </div>
                   ))}
-                  <div className="sm:col-span-2">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                      <AlignLeft size={11} /> Short Description
-                    </label>
-                    <textarea
-                      rows={3}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 resize-none"
-                      placeholder="A brief message from the president about this year's direction..."
-                      value={termSettings.shortDescription || ''}
-                      onChange={e => setTermSettings(prev => ({ ...prev, shortDescription: e.target.value }))}
-                    />
-                  </div>
                 </div>
               </div>
 
-              {positions.map(position => (
+              {/* Position group tabs */}
+              <div className="flex gap-1.5 flex-wrap sticky top-0 z-10 bg-white py-2 -my-2">
+                {POSITION_GROUPS.map(group => {
+                  const assignedCount = group.positions.filter(p => assignments[p]?.memberId).length;
+                  const isActive = activePositionGroup === group.key;
+                  return (
+                    <button
+                      key={group.key}
+                      onClick={() => setActivePositionGroup(group.key)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                        isActive ? 'bg-jci-blue text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {group.label}
+                      <span className={`text-[10px] font-black ${isActive ? 'text-white/70' : assignedCount === group.positions.length ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        {assignedCount}/{group.positions.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {positions.filter(p => (POSITION_GROUPS.find(g => g.key === activePositionGroup)?.positions || []).includes(p)).map(position => (
                 <div key={position} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">

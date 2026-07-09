@@ -449,7 +449,14 @@ export interface Member {
 
     // Career summaries (historic logging split into subcollections /trainings, /projects)
     points: number;
+    /** @deprecated legacy hand-filled percentage — see attendanceCheckins/attendanceMonths */
     attendanceRate: number;
+    /** 当年签到活动总次数（每年按 checked_in 重算） */
+    attendanceCheckins?: number;
+    /** 当年应计月份数（入会年份从入会月起算） */
+    attendanceMonths?: number;
+    /** attendanceCheckins/attendanceMonths 所属年份 */
+    attendanceYear?: number;
     badgesCount: number;
     projectsCount: number;
     trainingsCount: number;
@@ -543,6 +550,9 @@ export interface Member {
   promotionProgress?: MemberPromotionProgress;
   points?: number;
   attendanceRate?: number;
+  attendanceCheckins?: number;
+  attendanceMonths?: number;
+  attendanceYear?: number;
   badgesCount?: number;
   projectsCount?: number;
   trainingsCount?: number;

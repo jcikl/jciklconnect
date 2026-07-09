@@ -309,6 +309,10 @@ export class EventsService {
         event.type,
         undefined // Duration can be calculated later
       );
+
+      // 按当年签到记录重算出席对比（签到次数 vs 已过月份）
+      const { MembersService } = await import('./membersService');
+      MembersService.recalculateAttendance(memberId).catch(console.error);
     } catch (error) {
       console.error('Error marking attendance:', error);
       throw error;
