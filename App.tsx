@@ -3455,15 +3455,15 @@ export const JCIKLApp: React.FC = () => {
     try {
       const all = await MembersService.getAllMembers();
       const sorted = [...all].sort((a, b) => {
-        const aOrder = ROLE_SORT_ORDER[(a.role || '').toUpperCase()] ?? 99;
-        const bOrder = ROLE_SORT_ORDER[(b.role || '').toUpperCase()] ?? 99;
+        const aOrder = ROLE_SORT_ORDER[a.role || ''] ?? 99;
+        const bOrder = ROLE_SORT_ORDER[b.role || ''] ?? 99;
         if (aOrder !== bOrder) return aOrder - bOrder;
         return (a.fullName || a.name || '').localeCompare(b.fullName || b.name || '');
       });
       setMemberPickerList(sorted.map(m => ({
         id: m.id,
         name: m.fullName || m.name || m.id,
-        role: (m.role || '').toUpperCase(),
+        role: m.role || '',
         avatar: m.avatarUrl || m.general?.avatarUrl || undefined,
       })));
     } catch {
