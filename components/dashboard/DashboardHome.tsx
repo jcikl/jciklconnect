@@ -460,7 +460,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
           onClick={isProbationMember || isFullMember ? openJourneyModal : undefined}
         >
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.92) 0%, rgba(180,83,9,0.88) 50%, rgba(120,53,15,0.85) 100%)' }} />
+          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%)' }} />
           <div className="relative z-10 p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
