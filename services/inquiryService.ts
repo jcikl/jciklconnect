@@ -132,7 +132,7 @@ export async function submitInquiry(params: SubmitInquiryParams): Promise<{
     // Case A: both in group — direct WhatsApp redirect
     channel = 'whatsapp_direct';
     const msg = buildDirectMessage(senderName, senderCompany, requirements);
-    waUrl = `https://wa.me/${waPhone(recipientPhone)}?text=${encodeURIComponent(msg)}`;
+    waUrl = `https://api.whatsapp.com/send?phone=${waPhone(recipientPhone)}&text=${encodeURIComponent(msg)}`;
   } else {
     // Case B: at least one party not in group, OR recipient has no phone
     // → send via Whapi to admin + recipient
