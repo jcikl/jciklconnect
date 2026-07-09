@@ -4268,7 +4268,7 @@ export const JCIKLApp: React.FC = () => {
           )}
 
           {/* Scrollable Area */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pt-4 pb-32 md:pb-4 px-5 sm:px-8">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pt-4 pb-32 md:pb-4 px-5 sm:px-8" style={view === 'HOME' ? { backgroundImage: 'url(/background/JCI%20KL%20Logo-background.png)', backgroundSize: '55%', backgroundPosition: 'center 40%', backgroundRepeat: 'no-repeat', backgroundAttachment: 'local' } : undefined}>
             <Suspense fallback={
               <div className="flex flex-col gap-4 animate-pulse pt-2">
                 <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />
