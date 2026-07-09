@@ -22,11 +22,11 @@ function buildDirectMessage(
     ? `I am ${senderName} from ${senderCompany}, a JCI Kuala Lumpur member.`
     : `I am ${senderName}, a JCI Kuala Lumpur member.`;
   return (
-    `Hi! \u{1F44B}\n\n` +
+    `Hi! 👋\n\n` +
     `${intro}\n\n` +
     `I found your business profile on JCI KL Connect and would love to connect.\n\n` +
-    `\u{1F4CB} My inquiry:\n${requirements}\n\n` +
-    `Looking forward to hearing from you! \u{1F91D}`
+    `📋 My inquiry:\n${requirements}\n\n` +
+    `Looking forward to hearing from you! 🤝`
   );
 }
 
@@ -37,14 +37,14 @@ function buildRecipientBotMessage(
   senderCompany: string | undefined,
   requirements: string
 ): string {
-  const companyLine = senderCompany ? `\u{1F3E2} Company: ${senderCompany}\n` : '';
+  const companyLine = senderCompany ? `🏢 Company: ${senderCompany}\n` : '';
   return (
-    `Hi ${recipientName}! \u{1F44B}\n\n` +
+    `Hi ${recipientName}! 👋\n\n` +
     `A JCI KL member has reached out to you via *JCI KL Connect*:\n\n` +
-    `\u{1F464} Name: ${senderName}\n` +
+    `👤 Name: ${senderName}\n` +
     `${companyLine}` +
-    `\u{1F4DE} Contact: ${senderPhone}\n\n` +
-    `\u{1F4AC} Inquiry:\n${requirements}\n\n` +
+    `📞 Contact: ${senderPhone}\n\n` +
+    `💬 Inquiry:\n${requirements}\n\n` +
     `Feel free to contact them directly, or log in to JCI KL Connect to reply.\n\n` +
     `_This message was sent by JCI KL Connect_`
   );
@@ -59,15 +59,15 @@ function buildAdminBotMessage(
   requirements: string,
   note: string
 ): string {
-  const companyLine = senderCompany ? `\u{1F3E2} ${senderCompany}\n` : '';
+  const companyLine = senderCompany ? `🏢 ${senderCompany}\n` : '';
   return (
-    `\u{1F4CB} *New Business Inquiry — JCI KL Connect*\n\n` +
+    `📋 *New Business Inquiry — JCI KL Connect*\n\n` +
     `*From (Sender):*\n` +
-    `\u{1F464} ${senderName}\n` +
+    `👤 ${senderName}\n` +
     `${companyLine}` +
-    `\u{1F4DE} ${senderPhone}\n\n` +
+    `📞 ${senderPhone}\n\n` +
     `*To (Recipient):*\n` +
-    `\u{1F464} ${recipientName} — ${businessName}\n\n` +
+    `👤 ${recipientName} — ${businessName}\n\n` +
     `*Inquiry:*\n${requirements}\n\n` +
     `⚠️ Note: ${note}\n\n` +
     `_Please follow up if needed._`
