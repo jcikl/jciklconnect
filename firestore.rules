@@ -799,7 +799,7 @@ service cloud.firestore {
     match /guestPageStats/{docId} {
       allow read: if isBoard();
       allow create, update: if request.resource.data.keys().hasOnly(
-        ['page', 'date', 'views', 'dwellSeconds', 'signupClicks', 'updatedAt']
+        ['page', 'date', 'views', 'dwellSeconds', 'potentials', 'signupClicks', 'updatedAt']
       );
       allow delete: if isAdmin();
     }

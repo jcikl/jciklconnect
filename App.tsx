@@ -3740,8 +3740,10 @@ export const JCIKLApp: React.FC = () => {
 
   // Handle guest page navigation
   const handleGuestRegister = () => {
+    // Opening the Join JCI KL modal counts as a potential member; the actual
+    // sign-up is only counted after a successful registration (RegisterModal).
     const page = pathToGuestPage(window.location.pathname);
-    if (page) GuestAnalyticsService.trackSignupClick(page);
+    if (page) GuestAnalyticsService.trackPotential(page);
     openRegistration();
   };
 
@@ -4621,27 +4623,50 @@ export const JCIKLApp: React.FC = () => {
       <Modal
         isOpen={isUpgradeModalOpen}
         onClose={() => setUpgradeModalOpen(false)}
-        title="Join Member to Unlock More"
+        title=""
         size="md"
-        footer={(
-          <div className="flex flex-col gap-3 w-full">
-            <Button className="w-full" onClick={() => { setUpgradeModalOpen(false); /* Route to Join Us or open registration */ }}>
-              Join Us Now
-            </Button>
-            <Button variant="ghost" className="w-full" onClick={() => setUpgradeModalOpen(false)}>
-              Maybe Later
-            </Button>
-          </div>
-        )}
       >
-        <div className="text-center p-4">
-          <div className="w-16 h-16 bg-blue-50 text-jci-blue rounded-full flex items-center justify-center mx-auto mb-4">
-            <Award size={32} />
+        {/* Hero */}
+        <div className="relative overflow-hidden rounded-xl mx-1 mb-5" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #0ea5e9 100%)' }}>
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 70% 30%, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+          <div className="relative z-10 px-6 py-7 text-center">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/30">
+              <Award size={32} className="text-white" />
+            </div>
+            <h3 className="text-xl font-extrabold text-white mb-1">Join JCI Kuala Lumpur</h3>
+            <p className="text-sm text-blue-100/90">Be part of Malaysia's premier young leaders network</p>
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">Unlock More Features</h3>
-          <p className="text-sm text-slate-500 mb-4">
-            Upgrade your account to access Claims, Business Directory, Projects, Mentorship, and more exclusive member benefits!
-          </p>
+        </div>
+
+        {/* Feature list */}
+        <div className="px-2 mb-5 space-y-2.5">
+          {[
+            { icon: '🏆', label: 'Points & Achievements', desc: 'Earn badges and track your leadership journey' },
+            { icon: '💼', label: 'Business Directory', desc: 'Connect with 200+ member businesses' },
+            { icon: '📋', label: 'Projects & Events', desc: 'Join committees and flagship projects' },
+            { icon: '🤝', label: 'Mentorship', desc: 'Get paired with experienced JCI leaders' },
+          ].map(({ icon, label, desc }) => (
+            <div key={label} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-xl leading-none flex-shrink-0">{icon}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-800 leading-tight">{label}</p>
+                <p className="text-[11px] text-slate-400 leading-tight mt-0.5">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTAs */}
+        <div className="flex flex-col gap-2.5 px-2 pb-1">
+          <Button
+            className="w-full font-bold py-3 text-base"
+            onClick={() => { setUpgradeModalOpen(false); handleViewChange('GUEST'); }}
+          >
+            Join Us Now →
+          </Button>
+          <Button variant="ghost" className="w-full text-slate-400" onClick={() => setUpgradeModalOpen(false)}>
+            Maybe Later
+          </Button>
         </div>
       </Modal>
     </>
