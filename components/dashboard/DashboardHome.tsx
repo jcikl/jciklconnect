@@ -338,7 +338,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     : (activeEngSummary?.requirements?.find(r => !r.isCompleted && !r.progress?.pendingVerification)?.title ?? null);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative" style={{ backgroundImage: 'url(/background/JCI KL Logo-background.png)', backgroundSize: '60%', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundAttachment: 'local' }}>
 
       {/* Birthday This Month — top of dashboard */}
       {birthdayMembers.length > 0 && (
