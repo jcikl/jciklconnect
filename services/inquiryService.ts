@@ -21,11 +21,13 @@ function buildDirectMessage(
   const intro = senderCompany
     ? `I am ${senderName} from ${senderCompany}, a JCI Kuala Lumpur member.`
     : `I am ${senderName}, a JCI Kuala Lumpur member.`;
+  const companyLine = senderCompany
+    ? `I am also from ${senderCompany}, I would like to ask about:\n${requirements}`
+    : `I would like to ask about:\n${requirements}`;
   return (
-    `Hi! 👋\n\n` +
-    `${intro}\n\n` +
+    `Hellooo! 👋This is ${senderName} from JCI Kuala Lumpur.\n` +
     `I found your business profile on JCI KL Connect and would love to connect.\n\n` +
-    `📋 My inquiry:\n${requirements}\n\n` +
+    `${companyLine}\n\n` +
     `Looking forward to hearing from you! 🤝`
   );
 }
