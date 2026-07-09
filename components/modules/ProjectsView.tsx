@@ -66,65 +66,11 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
   let html = '';
   let lastError = '';
 
-  // Try 1: Netlify Function server-side proxy (avoids CORS proxy blocks)
-  try {
-    const response = await fetch(`/api/jci-proxy?eventid=${eventId}`);
-    if (response.ok) {
-      html = await response.text();
-    } else {
-      lastError = `Netlify proxy returned status ${response.status}`;
-    }
-  } catch (err: any) {
-    lastError = err.message || err;
-  }
+  // Detect Capacitor native platform — no CORS restriction, direct fetch works
+  const isNative = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
 
-  // Try 2: corsproxy.io
-  if (!html) {
-    try {
-      const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-      if (response.ok) {
-        html = await response.text();
-      } else {
-        lastError = `corsproxy.io returned status ${response.status}`;
-      }
-    } catch (err: any) {
-      lastError = err.message || err;
-    }
-  }
-
-  // Try 3: AllOrigins JSON endpoint
-  if (!html) {
-    try {
-      const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.contents) {
-          html = data.contents;
-        }
-      } else {
-        lastError = `AllOrigins returned status ${response.status}`;
-      }
-    } catch (err: any) {
-      lastError = err.message || err;
-    }
-  }
-
-  // Try 4: CodeTabs Proxy
-  if (!html) {
-    try {
-      const response = await fetch(`https://api.codetabs.com/v1/proxy?target=${encodeURIComponent(targetUrl)}`);
-      if (response.ok) {
-        html = await response.text();
-      } else {
-        lastError = `CodeTabs returned status ${response.status}`;
-      }
-    } catch (err: any) {
-      lastError = err.message || err;
-    }
-  }
-
-  // Try 5: Direct fetch
-  if (!html) {
+  if (isNative) {
+    // On native (APK), skip proxies and fetch directly — CORS does not apply
     try {
       const response = await fetch(targetUrl);
       if (response.ok) {
@@ -134,6 +80,77 @@ const fetchRoadmapEventDetails = async (input: string): Promise<RoadmapEventDeta
       }
     } catch (err: any) {
       lastError = err.message || err;
+    }
+  } else {
+    // Try 1: Netlify Function server-side proxy (avoids CORS proxy blocks)
+    try {
+      const response = await fetch(`/api/jci-proxy?eventid=${eventId}`);
+      if (response.ok) {
+        html = await response.text();
+      } else {
+        lastError = `Netlify proxy returned status ${response.status}`;
+      }
+    } catch (err: any) {
+      lastError = err.message || err;
+    }
+
+    // Try 2: corsproxy.io
+    if (!html) {
+      try {
+        const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+        if (response.ok) {
+          html = await response.text();
+        } else {
+          lastError = `corsproxy.io returned status ${response.status}`;
+        }
+      } catch (err: any) {
+        lastError = err.message || err;
+      }
+    }
+
+    // Try 3: AllOrigins JSON endpoint
+    if (!html) {
+      try {
+        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.contents) {
+            html = data.contents;
+          }
+        } else {
+          lastError = `AllOrigins returned status ${response.status}`;
+        }
+      } catch (err: any) {
+        lastError = err.message || err;
+      }
+    }
+
+    // Try 4: CodeTabs Proxy
+    if (!html) {
+      try {
+        const response = await fetch(`https://api.codetabs.com/v1/proxy?target=${encodeURIComponent(targetUrl)}`);
+        if (response.ok) {
+          html = await response.text();
+        } else {
+          lastError = `CodeTabs returned status ${response.status}`;
+        }
+      } catch (err: any) {
+        lastError = err.message || err;
+      }
+    }
+
+    // Try 5: Direct fetch (fallback)
+    if (!html) {
+      try {
+        const response = await fetch(targetUrl);
+        if (response.ok) {
+          html = await response.text();
+        } else {
+          lastError = `Direct fetch returned status ${response.status}`;
+        }
+      } catch (err: any) {
+        lastError = err.message || err;
+      }
     }
   }
 
