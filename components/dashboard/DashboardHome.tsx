@@ -814,10 +814,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   </span>
                 </button>
 
+                {showEngagementSteps && (<>
                 {/* Connector */}
                 <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-green-300' : 'bg-slate-200'}`} />
 
-                {showEngagementSteps && (<>
                 {/* 1st Year step */}
                 <button
                   className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -868,8 +868,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 </button>
                 </>)}
 
-                {/* Connector */}
-                <div className="flex-1 h-0.5 mt-4 bg-slate-200" />
+                {/* Connector — reflects the preceding step (2nd Year, or Probation for pre-2025 members) */}
+                <div className={`flex-1 h-0.5 mt-4 transition-colors ${showEngagementSteps
+                  ? (engagementSecond?.isCompleted ? 'bg-green-300' : 'bg-slate-200')
+                  : (isFullMember ? 'bg-green-300' : 'bg-slate-200')}`} />
 
                 {/* Leadership step */}
                 <button
