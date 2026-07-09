@@ -3439,15 +3439,28 @@ export const JCIKLApp: React.FC = () => {
   const { user, member, loading: authLoading, signOut, simulatedRole, simulatedMemberId, simulateRole, simulateAsMember, isDevMode } = useAuth();
   const { showToast } = useToast();
 
-  const openMemberPicker = async (role: UserRole) => {
+  const ROLE_SORT_ORDER: Record<string, number> = {
+    [UserRole.BOARD]: 0,
+    [UserRole.ADMIN]: 1,
+    [UserRole.MEMBER]: 2,
+    [UserRole.PROBATION]: 3,
+    [UserRole.GUEST]: 4,
+  };
+
+  const openMemberPicker = async (role: UserRole | null) => {
     setMemberPickerRole(role);
     setMemberPickerSearch('');
     setMemberPickerOpen(true);
     setMemberPickerLoading(true);
     try {
       const all = await MembersService.getAllMembers();
-      const filtered = role ? all.filter(m => m.role === role) : all;
-      setMemberPickerList(filtered.map(m => ({
+      const sorted = [...all].sort((a, b) => {
+        const aOrder = ROLE_SORT_ORDER[a.role || ''] ?? 99;
+        const bOrder = ROLE_SORT_ORDER[b.role || ''] ?? 99;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return (a.fullName || a.name || '').localeCompare(b.fullName || b.name || '');
+      });
+      setMemberPickerList(sorted.map(m => ({
         id: m.id,
         name: m.fullName || m.name || m.id,
         role: m.role || '',
@@ -4262,12 +4275,12 @@ export const JCIKLApp: React.FC = () => {
                             {[
                               { value: '', label: 'Dev/Admin', desc: 'Full privileges', needsPicker: false },
                               { value: UserRole.ADMIN, label: 'Admin', desc: 'Administrator', needsPicker: false },
-                              { value: UserRole.BOARD, label: 'Board', desc: 'Pick a member', needsPicker: true },
-                              { value: UserRole.MEMBER, label: 'Member', desc: 'Pick a member', needsPicker: true },
-                              { value: UserRole.PROBATION, label: 'Probation', desc: 'Pick a member', needsPicker: true },
-                              { value: UserRole.GUEST, label: 'Guest', desc: 'Pick a member', needsPicker: true },
+                              { value: 'MEMBER_PICK', label: 'Member', desc: 'Pick any member', needsPicker: true },
+                              { value: UserRole.GUEST, label: 'Guest', desc: 'No account', needsPicker: false },
                             ].map((opt) => {
-                              const isSelected = simulatedRole ? simulatedRole === opt.value : opt.value === '';
+                              const isSelected = opt.value === 'MEMBER_PICK'
+                                ? !!simulatedMemberId
+                                : (simulatedRole ? simulatedRole === opt.value : opt.value === '');
                               return (
                                 <button
                                   key={opt.value}
@@ -4277,7 +4290,7 @@ export const JCIKLApp: React.FC = () => {
                                       simulateRole(null);
                                       showToast('Reset to Admin role', 'info');
                                     } else if (opt.needsPicker) {
-                                      openMemberPicker(opt.value as UserRole);
+                                      openMemberPicker(null);
                                     } else {
                                       simulateRole(opt.value as UserRole);
                                       showToast(`Simulating ${opt.value} role`, 'info');
@@ -4667,7 +4680,7 @@ export const JCIKLApp: React.FC = () => {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-800 dark:text-white">View as Member</h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Simulating <span className="font-semibold text-blue-500">{memberPickerRole}</span> role</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Select a member to simulate their view</p>
                 </div>
                 <button onClick={() => setMemberPickerOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
                   <X size={14} />
@@ -4698,8 +4711,8 @@ export const JCIKLApp: React.FC = () => {
                     key={m.id}
                     onClick={async () => {
                       setMemberPickerOpen(false);
-                      await simulateAsMember(m.id, memberPickerRole!);
-                      showToast(`Viewing as ${m.name} (${memberPickerRole})`, 'info');
+                      await simulateAsMember(m.id, m.role as UserRole || UserRole.MEMBER);
+                      showToast(`Viewing as ${m.name} (${m.role})`, 'info');
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
                   >
@@ -4708,8 +4721,13 @@ export const JCIKLApp: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-slate-800 dark:text-white truncate">{m.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{m.role}</p>
                     </div>
+                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                      m.role === UserRole.BOARD ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300' :
+                      m.role === UserRole.MEMBER ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300' :
+                      m.role === UserRole.PROBATION ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
+                      'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}>{m.role}</span>
                   </button>
                 ));
               })()}
