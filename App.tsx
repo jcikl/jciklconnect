@@ -1513,7 +1513,7 @@ const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   useEffect(() => {
     BoardManagementService.getBoardTermSettings(String(new Date().getFullYear()))
       .then(s => { if (s?.groupPhotoUrl) setCurrentTermGroupPhoto(s.groupPhotoUrl); })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Available years: from JCI KL's founding year to the current calendar year.
@@ -2962,7 +2962,7 @@ const NotificationDrawer: React.FC<{
         markedRef.current = true;
         notifications
           .filter(n => !n.read && !n.id.startsWith('birthday-'))
-          .forEach(n => onMarkAsRead(n.id).catch(() => {}));
+          .forEach(n => onMarkAsRead(n.id).catch(() => { }));
       }
     } else {
       markedRef.current = false;
@@ -4268,7 +4268,7 @@ export const JCIKLApp: React.FC = () => {
           )}
 
           {/* Scrollable Area */}
-          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pt-4 pb-32 md:pb-4 px-5 sm:px-8" style={view === 'HOME' ? { backgroundImage: 'url(/background/JCI%20KL%20Logo-background.png)', backgroundSize: '55%', backgroundPosition: 'center 40%', backgroundRepeat: 'no-repeat', backgroundAttachment: 'local' } : undefined}>
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pt-4 pb-32 md:pb-4 px-5 sm:px-8">
             <Suspense fallback={
               <div className="flex flex-col gap-4 animate-pulse pt-2">
                 <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />
