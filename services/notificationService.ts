@@ -7,8 +7,16 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
 let messaging: Messaging | null = null;
 
+// Web Push API is unavailable inside the Capacitor WebView — Firebase Messaging (web SDK)
+// throws messaging/unsupported-browser there. Native push would use a Capacitor plugin instead.
+function isNativePlatform(): boolean {
+  return typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
+}
+
 function getMessagingInstance(): Messaging | null {
   if (typeof window === 'undefined') return null;
+  if (isNativePlatform()) return null;
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return null;
   if (!messaging) {
     try {
       messaging = getMessaging(app);
@@ -63,9 +71,14 @@ export async function unregisterPushNotifications(userId: string): Promise<void>
 export function onForegroundMessage(handler: (payload: { title: string; body: string }) => void) {
   const m = getMessagingInstance();
   if (!m) return () => {};
-  return onMessage(m, (payload) => {
-    const title = payload.notification?.title || 'JCI KL';
-    const body = payload.notification?.body || '';
-    handler({ title, body });
-  });
+  try {
+    return onMessage(m, (payload) => {
+      const title = payload.notification?.title || 'JCI KL';
+      const body = payload.notification?.body || '';
+      handler({ title, body });
+    });
+  } catch (err) {
+    console.warn('Foreground message listener unavailable:', err);
+    return () => {};
+  }
 }
