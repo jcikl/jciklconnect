@@ -454,51 +454,65 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       )}
 
 
-      {/* Membership Journey Card — Probation & Full Members */}
+      {/* Membership Journey Card */}
       {showJourneyCard && (
         <div
-          className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all"
+          className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
           onClick={isProbationMember || isFullMember ? openJourneyModal : undefined}
         >
-          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-            <TrendingUp size={20} className="text-amber-600" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <h3 className="font-semibold text-sm text-slate-900">Membership journey</h3>
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.92) 0%, rgba(180,83,9,0.88) 50%, rgba(120,53,15,0.85) 100%)' }} />
+          <div className="relative z-10 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-3xl leading-none select-none drop-shadow-md">🏅</span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-200/80 leading-none mb-0.5">Your Progress</p>
+                  <h3 className="font-extrabold text-white text-lg leading-tight drop-shadow-sm">Membership Journey</h3>
+                </div>
+              </div>
               {(isProbationMember || isFullMember) && (
-                <>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${journeyIsComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {isProbationMember ? 'Probation' : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
-                  </span>
-                  <ChevronRight size={14} className="text-slate-400 ml-auto flex-shrink-0" />
-                </>
+                <span className="text-[10px] font-black uppercase tracking-widest text-white bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
+                  {isProbationMember ? 'Probation' : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
+                </span>
               )}
             </div>
             {(isProbationMember || isFullMember) ? (
               <>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="mb-3 flex items-center gap-3 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
+                  <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${journeyProgress}%` }}
                       transition={{ duration: 1, ease: 'easeOut' }}
-                      className={`h-full rounded-full ${journeyIsComplete ? 'bg-green-500' : 'bg-amber-500'}`}
+                      className={`h-full rounded-full ${journeyIsComplete ? 'bg-green-300' : 'bg-amber-200'}`}
                     />
                   </div>
-                  <span className="text-[11px] text-slate-500 flex-shrink-0">
+                  <span className="text-[11px] font-bold text-white/90 flex-shrink-0">
                     {(isProbationMember ? promoLoading : engagementLoading) ? '...' : journeyLabel.split(' · ')[0]}
                   </span>
                 </div>
-                {nextStepHint && !journeyIsComplete && (
-                  <p className="text-[11px] text-slate-400 truncate">
-                    <ArrowUpRight size={10} className="inline -mt-0.5 mr-0.5" />
-                    Next: {nextStepHint}
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold text-white/70 truncate">
+                    {nextStepHint && !journeyIsComplete ? (
+                      <><ArrowUpRight size={10} className="inline -mt-0.5 mr-0.5" />Next: {nextStepHint}</>
+                    ) : journeyIsComplete ? (
+                      '✓ All requirements completed'
+                    ) : (
+                      'Keep going — you\'re making progress!'
+                    )}
                   </p>
-                )}
+                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200 flex-shrink-0 ml-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
+                  </div>
+                </div>
               </>
             ) : (
-              <p className="text-[11px] text-slate-400">Join us to unlock more benefits</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-semibold text-white/80">Join us to unlock more benefits</p>
+                <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="m9 18 6-6-6-6" /></svg>
+                </div>
+              </div>
             )}
           </div>
         </div>
