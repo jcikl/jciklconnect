@@ -701,6 +701,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 setSelectedBiz(biz);
                 setInquiryForm({
                   name: currentUser?.name || '',
+                  jobTitle: currentUser?.business?.title || '',
                   company: currentUser?.companyName || '',
                   phone: currentUser?.phone || '',
                   requirements: ''
@@ -740,7 +741,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 onClick={() => {
                   setIsDetailOpen(false);
                   setSelectedBiz(detailBiz);
-                  setInquiryForm({ name: currentUser?.name || '', company: currentUser?.companyName || '', phone: currentUser?.phone || '', requirements: '' });
+                  setInquiryForm({ name: currentUser?.name || '', jobTitle: currentUser?.business?.title || '', company: currentUser?.companyName || '', phone: currentUser?.phone || '', requirements: '' });
                   setInquiryErrors({});
                   setInquiryModalOpen(true);
                 }}

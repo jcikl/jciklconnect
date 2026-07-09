@@ -502,7 +502,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
 
                   {/* Description — capped at 2 lines */}
                   <p className="text-white/50 text-[11px] leading-relaxed line-clamp-2">
-                    {termSettings?.shortDescription || 'This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose.'}
+                    {termSettings?.shortDescription || 'JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose.'}
                   </p>
 
                   {/* CTA full-width */}
@@ -620,7 +620,7 @@ const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   {/* Pull quote description */}
                   <div className="border-l-2 border-amber-400/40 pl-4 bg-white/[0.03] rounded-r-lg py-3 pr-3 mb-7">
                     <p className="text-white/55 text-sm leading-relaxed">
-                      {termSettings?.shortDescription || 'This year, JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose and transforms Kuala Lumpur for generations to come.'}
+                      {termSettings?.shortDescription || 'JCI Kuala Lumpur commits to igniting the spark of leadership in every young active citizen — building a community that leads with purpose and transforms Kuala Lumpur for generations to come.'}
                     </p>
                   </div>
 
@@ -3430,9 +3430,35 @@ export const JCIKLApp: React.FC = () => {
   };
   const [isSimulateDropdownOpen, setIsSimulateDropdownOpen] = useState(false);
   const [showBoardDashboard, setShowBoardDashboard] = useState(false);
+  const [memberPickerOpen, setMemberPickerOpen] = useState(false);
+  const [memberPickerRole, setMemberPickerRole] = useState<UserRole | null>(null);
+  const [memberPickerSearch, setMemberPickerSearch] = useState('');
+  const [memberPickerList, setMemberPickerList] = useState<{ id: string; name: string; role: string; avatar?: string }[]>([]);
+  const [memberPickerLoading, setMemberPickerLoading] = useState(false);
 
-  const { user, member, loading: authLoading, signOut, simulatedRole, simulateRole, isDevMode } = useAuth();
+  const { user, member, loading: authLoading, signOut, simulatedRole, simulatedMemberId, simulateRole, simulateAsMember, isDevMode } = useAuth();
   const { showToast } = useToast();
+
+  const openMemberPicker = async (role: UserRole) => {
+    setMemberPickerRole(role);
+    setMemberPickerSearch('');
+    setMemberPickerOpen(true);
+    setMemberPickerLoading(true);
+    try {
+      const all = await MembersService.getAllMembers();
+      setMemberPickerList(all.map(m => ({
+        id: m.id,
+        name: m.fullName || m.name || m.id,
+        role: m.role || '',
+        avatar: m.avatarUrl || m.general?.avatarUrl || undefined,
+      })));
+    } catch {
+      setMemberPickerList([]);
+    } finally {
+      setMemberPickerLoading(false);
+    }
+  };
+
   const {
     isBoard,
     isAdmin,
@@ -4221,28 +4247,40 @@ export const JCIKLApp: React.FC = () => {
                         title="Simulate Role"
                       >
                         <Shield size={11} className="text-purple-300 shrink-0" />
-                        <span className="hidden sm:inline">{simulatedRole ? `${simulatedRole} Mode` : 'Dev/Admin'}</span>
+                        <span className="hidden sm:inline">
+                          {simulatedMemberId && member
+                            ? `${(member.fullName || member.name || 'Member').split(' ')[0]} (${simulatedRole})`
+                            : simulatedRole ? `${simulatedRole} Mode` : 'Dev/Admin'}
+                        </span>
                         <ChevronDown size={10} className={`text-white/60 transition-transform duration-200 ${isSimulateDropdownOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {isSimulateDropdownOpen && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setIsSimulateDropdownOpen(false)} />
-                          <div className="absolute right-0 mt-2 w-40 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                          <div className="absolute right-0 mt-2 w-44 bg-slate-900/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                             {[
-                              { value: '', label: 'Dev/Admin', desc: 'Full privileges' },
-                              { value: UserRole.ADMIN, label: 'Admin', desc: 'Administrator' },
-                              { value: UserRole.MEMBER, label: 'Member', desc: 'Official Member' },
-                              { value: UserRole.GUEST, label: 'Guest', desc: 'Registered Guest' }
+                              { value: '', label: 'Dev/Admin', desc: 'Full privileges', needsPicker: false },
+                              { value: UserRole.ADMIN, label: 'Admin', desc: 'Administrator', needsPicker: false },
+                              { value: UserRole.BOARD, label: 'Board', desc: 'Pick a member', needsPicker: true },
+                              { value: UserRole.MEMBER, label: 'Member', desc: 'Pick a member', needsPicker: true },
+                              { value: UserRole.PROBATION, label: 'Probation', desc: 'Pick a member', needsPicker: true },
+                              { value: UserRole.GUEST, label: 'Guest', desc: 'Pick a member', needsPicker: true },
                             ].map((opt) => {
-                              const isSelected = (simulatedRole || '') === opt.value;
+                              const isSelected = simulatedRole ? simulatedRole === opt.value : opt.value === '';
                               return (
                                 <button
                                   key={opt.value}
                                   onClick={() => {
-                                    const val = opt.value;
-                                    simulateRole(val ? val as UserRole : null);
-                                    showToast(val ? `Simulating ${val} role` : 'Reset to Admin role', 'info');
                                     setIsSimulateDropdownOpen(false);
+                                    if (!opt.value) {
+                                      simulateRole(null);
+                                      showToast('Reset to Admin role', 'info');
+                                    } else if (opt.needsPicker) {
+                                      openMemberPicker(opt.value as UserRole);
+                                    } else {
+                                      simulateRole(opt.value as UserRole);
+                                      showToast(`Simulating ${opt.value} role`, 'info');
+                                    }
                                   }}
                                   className={`w-full text-left px-3 py-2 rounded-lg text-[11px] transition-all flex flex-col gap-0.5 ${isSelected ? 'bg-blue-600 text-white font-bold' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
                                 >
@@ -4617,6 +4655,67 @@ export const JCIKLApp: React.FC = () => {
           </>
         )
       }
+
+      {/* Member Picker Modal — for role simulation */}
+      {memberPickerOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMemberPickerOpen(false)} />
+          <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            {/* Header */}
+            <div className="px-4 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">View as Member</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Simulating <span className="font-semibold text-blue-500">{memberPickerRole}</span> role</p>
+                </div>
+                <button onClick={() => setMemberPickerOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Search by name..."
+                  value={memberPickerSearch}
+                  onChange={e => setMemberPickerSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </div>
+            </div>
+            {/* List */}
+            <div className="flex-1 overflow-y-auto py-1">
+              {memberPickerLoading ? (
+                <div className="flex items-center justify-center py-10 text-xs text-slate-400">Loading members…</div>
+              ) : (() => {
+                const q = memberPickerSearch.toLowerCase();
+                const filtered = memberPickerList.filter(m => !q || m.name.toLowerCase().includes(q));
+                if (!filtered.length) return <div className="flex items-center justify-center py-10 text-xs text-slate-400">No members found</div>;
+                return filtered.map(m => (
+                  <button
+                    key={m.id}
+                    onClick={async () => {
+                      setMemberPickerOpen(false);
+                      await simulateAsMember(m.id, memberPickerRole!);
+                      showToast(`Viewing as ${m.name} (${memberPickerRole})`, 'info');
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-[11px] font-bold text-blue-600 dark:text-blue-300 shrink-0 overflow-hidden">
+                      {m.avatar ? <img src={m.avatar} alt="" className="w-full h-full object-cover" /> : m.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-white truncate">{m.name}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{m.role}</p>
+                    </div>
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Modal
         isOpen={isUpgradeModalOpen}

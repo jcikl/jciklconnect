@@ -29,14 +29,16 @@ interface AuthContextType {
   member: Member | null;
   loading: boolean;
   isDevMode: boolean;
-  simulatedRole: UserRole | null; // Role being simulated in dev mode
+  simulatedRole: UserRole | null;
+  simulatedMemberId: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, additionalData?: Record<string, any>) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateMemberProfile: (updates: Partial<Member>) => Promise<void>;
-  simulateRole: (role: UserRole | null) => void; // Role simulator function
+  simulateRole: (role: UserRole | null) => void;
+  simulateAsMember: (memberId: string, role: UserRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +49,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [isDevMode, setIsDevMode] = useState(false);
   const [simulatedRole, setSimulatedRole] = useState<UserRole | null>(null);
+  const [simulatedMemberId, setSimulatedMemberId] = useState<string | null>(null);
+  const [originalMember, setOriginalMember] = useState<Member | null>(null);
   const [originalRole, setOriginalRole] = useState<UserRole | null>(null);
 
   // Load persisted auth state on mount (runs first, before Firebase listener)
@@ -481,7 +485,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     let currentOriginal = originalRole;
     if (!currentOriginal) {
-      currentOriginal = (member.role as UserRole) || UserRole.MEMBER;
+      currentOriginal = (member.role as UserRole) || UserRole.ADMIN;
       setOriginalRole(currentOriginal);
     }
 
@@ -490,13 +494,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    setSimulatedRole(role);
+    if (role === null) {
+      // Reset — restore original member if we were simulating as someone else
+      setSimulatedRole(null);
+      setSimulatedMemberId(null);
+      if (originalMember) {
+        setMember(originalMember);
+        setOriginalMember(null);
+      } else {
+        setMember({ ...member, role: currentOriginal });
+      }
+      setOriginalRole(null);
+    } else {
+      setSimulatedRole(role);
+      // If not already simulating a different member, just change role on current member
+      if (!simulatedMemberId) {
+        setMember({ ...member, role });
+      }
+    }
+  };
 
-    // Update member with simulated role
-    setMember({
-      ...member,
-      role: role || UserRole.ADMIN,
-    });
+  const simulateAsMember = async (memberId: string, role: UserRole) => {
+    if (!member) return;
+
+    // Only allow if in dev mode OR current role is ADMIN
+    const currentRole = originalRole || (member.role as UserRole);
+    if (!isDevMode && currentRole !== UserRole.ADMIN) return;
+
+    // Save original member before first impersonation
+    if (!originalMember) {
+      setOriginalMember(member);
+      setOriginalRole(currentRole);
+    }
+
+    const targetMember = await MembersService.getMemberById(memberId);
+    if (!targetMember) return;
+
+    setSimulatedMemberId(memberId);
+    setSimulatedRole(role);
+    setMember({ ...targetMember, role });
   };
 
   return (
@@ -506,6 +542,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       loading,
       isDevMode,
       simulatedRole,
+      simulatedMemberId,
       signIn,
       signUp,
       signInWithGoogle,
@@ -513,6 +550,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       resetPassword,
       updateMemberProfile,
       simulateRole,
+      simulateAsMember,
     }}>
       {children}
     </AuthContext.Provider>
