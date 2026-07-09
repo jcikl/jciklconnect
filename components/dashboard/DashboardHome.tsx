@@ -102,7 +102,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
 
   const handleRestrictedAction = (viewType: string) => {
-    if (member?.role === UserRole.GUEST) {
+    // Benefits is reachable by guests — the page itself masks its content
+    if (member?.role === UserRole.GUEST && viewType !== 'BENEFITS') {
       setShowUpgradeModal(true);
     } else {
       onNavigate?.(viewType);
@@ -451,7 +452,17 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           {[1, 2, 3].map(i => <Skeleton key={i} className="flex-none w-[58%] sm:w-[30%] lg:w-[23%] h-36 sm:h-40" rounded="2xl" />)}
         </div>
       ) : homepageAds.length > 0 && (
-        <div className="w-full">
+        <div className="w-full relative rounded-2xl overflow-hidden">
+          {/* Guest mask — partner benefits are members only */}
+          {member?.role === UserRole.GUEST && (
+            <div className="absolute inset-0 z-20 backdrop-blur-md bg-white/60 rounded-2xl flex flex-col items-center justify-center px-6 text-center">
+              <div className="w-10 h-10 rounded-xl bg-jci-blue/10 flex items-center justify-center mb-2">
+                <Gift size={20} className="text-jci-blue" />
+              </div>
+              <p className="text-sm font-black text-slate-900">Members Only</p>
+              <p className="text-xs text-slate-500 mt-0.5">Join JCI KL to unlock partner privileges.</p>
+            </div>
+          )}
           <Swiper
             modules={[Autoplay, Pagination]}
             spaceBetween={16}

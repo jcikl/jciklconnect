@@ -386,8 +386,24 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     }
   };
 
+  // Logged-in GUEST role: mask the directory like the Benefits page (public guest landing page uses isGuest prop instead)
+  const isGuestRole = !isGuest && (currentUser?.role || '') === 'GUEST';
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 relative">
+      {isGuestRole && (
+        <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/60 rounded-2xl flex flex-col items-center justify-start pt-24 md:pt-32 px-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-jci-blue/10 flex items-center justify-center mb-4">
+            <Lock size={28} className="text-jci-blue" />
+          </div>
+          <h3 className="text-lg font-black text-slate-900 mb-2">Members Only</h3>
+          <p className="text-sm text-slate-500 leading-relaxed max-w-sm">
+            The member business directory is exclusive to JCI Kuala Lumpur members.
+            Join us to connect with local businesses and the global JCI network.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Member Business Directory</h2>
