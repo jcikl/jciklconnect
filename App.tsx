@@ -3433,19 +3433,11 @@ export const JCIKLApp: React.FC = () => {
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [memberPickerRole, setMemberPickerRole] = useState<UserRole | null>(null);
   const [memberPickerSearch, setMemberPickerSearch] = useState('');
-  const [memberPickerList, setMemberPickerList] = useState<{ id: string; name: string; role: string; avatar?: string }[]>([]);
+  const [memberPickerList, setMemberPickerList] = useState<{ id: string; name: string; label: string; labelColor: string; avatar?: string }[]>([]);
   const [memberPickerLoading, setMemberPickerLoading] = useState(false);
 
   const { user, member, loading: authLoading, signOut, simulatedRole, simulatedMemberId, simulateRole, simulateAsMember, isDevMode } = useAuth();
   const { showToast } = useToast();
-
-  const ROLE_SORT_ORDER: Record<string, number> = {
-    [UserRole.BOARD]: 0,
-    [UserRole.ADMIN]: 1,
-    [UserRole.MEMBER]: 2,
-    [UserRole.PROBATION]: 3,
-    [UserRole.GUEST]: 4,
-  };
 
   const openMemberPicker = async (role: UserRole | null) => {
     setMemberPickerRole(role);
@@ -3453,19 +3445,34 @@ export const JCIKLApp: React.FC = () => {
     setMemberPickerOpen(true);
     setMemberPickerLoading(true);
     try {
-      const all = await MembersService.getAllMembers();
-      const sorted = [...all].sort((a, b) => {
-        const aOrder = ROLE_SORT_ORDER[a.role || ''] ?? 99;
-        const bOrder = ROLE_SORT_ORDER[b.role || ''] ?? 99;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return (a.fullName || a.name || '').localeCompare(b.fullName || b.name || '');
+      const [all, boardMembers] = await Promise.all([
+        MembersService.getAllMembers(),
+        BoardManagementService.getCurrentBoardMembers().catch(() => []),
+      ]);
+
+      // Build map: memberId → board position
+      const boardPositionMap = new Map<string, string>();
+      boardMembers.forEach(b => boardPositionMap.set(b.memberId, b.position));
+
+      const enriched = all.map(m => {
+        const boardPosition = boardPositionMap.get(m.id);
+        const isProbation = !!(m as any).probationTasks || (m.role || '').toUpperCase() === UserRole.PROBATION;
+        const isBoard = !!boardPosition;
+        const sortOrder = isBoard ? 0 : isProbation ? 2 : 1;
+        return {
+          id: m.id,
+          name: m.fullName || m.name || m.id,
+          label: isBoard ? (boardPosition || 'Board') : isProbation ? 'Probation' : 'Member',
+          labelColor: isBoard ? 'purple' : isProbation ? 'amber' : 'blue',
+          avatar: m.avatarUrl || m.general?.avatarUrl || undefined,
+          sortOrder,
+          sortName: m.fullName || m.name || '',
+        };
       });
-      setMemberPickerList(sorted.map(m => ({
-        id: m.id,
-        name: m.fullName || m.name || m.id,
-        role: m.role || '',
-        avatar: m.avatarUrl || m.general?.avatarUrl || undefined,
-      })));
+
+      enriched.sort((a, b) => a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.sortName.localeCompare(b.sortName));
+
+      setMemberPickerList(enriched.map(({ sortOrder: _s, sortName: _n, ...rest }) => rest));
     } catch {
       setMemberPickerList([]);
     } finally {
@@ -4711,8 +4718,9 @@ export const JCIKLApp: React.FC = () => {
                     key={m.id}
                     onClick={async () => {
                       setMemberPickerOpen(false);
-                      await simulateAsMember(m.id, m.role as UserRole || UserRole.MEMBER);
-                      showToast(`Viewing as ${m.name} (${m.role})`, 'info');
+                      const role = m.labelColor === 'purple' ? UserRole.BOARD : m.labelColor === 'amber' ? UserRole.PROBATION : UserRole.MEMBER;
+                      await simulateAsMember(m.id, role);
+                      showToast(`Viewing as ${m.name} (${m.label})`, 'info');
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
                   >
@@ -4722,12 +4730,11 @@ export const JCIKLApp: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-slate-800 dark:text-white truncate">{m.name}</p>
                     </div>
-                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                      m.role === UserRole.BOARD ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300' :
-                      m.role === UserRole.MEMBER ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300' :
-                      m.role === UserRole.PROBATION ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
-                      'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                    }`}>{m.role}</span>
+                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full max-w-[90px] truncate ${
+                      m.labelColor === 'purple' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300' :
+                      m.labelColor === 'amber' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300' :
+                      'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
+                    }`}>{m.label}</span>
                   </button>
                 ));
               })()}
