@@ -3472,8 +3472,8 @@ export const JCIKLApp: React.FC = () => {
           id: m.id,
           name: m.fullName || m.name || m.id,
           label: isBoard
-            ? (boardPositionMap.get(m.id) || 'Board')
-            : isCommDir ? 'Comm. Director'
+            ? 'Board'
+            : isCommDir ? 'Board'
             : isProbation ? 'Probation'
             : 'Member',
           labelColor: isBoard ? 'purple' : isCommDir ? 'teal' : isProbation ? 'amber' : 'blue',
