@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Megaphone, Plus, Edit, Trash2, Eye, MousePointerClick, TrendingUp, Calendar, Image as ImageIcon, Link as LinkIcon, BarChart3, Download, Filter, Upload } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Megaphone, Plus, Edit, Trash2, Eye, MousePointerClick, TrendingUp, Calendar, Image as ImageIcon, Link as LinkIcon, BarChart3, Download, Filter, Upload, Globe, Clock, UserPlus } from 'lucide-react';
 import { Button, Card, Badge, Modal, useToast, Tabs, StatCardsContainer, ProgressBar } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
@@ -11,6 +11,7 @@ import { formatNumber } from '../../utils/formatUtils';
 import { Timestamp } from 'firebase/firestore';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
 import imageCompression from 'browser-image-compression';
+import { GuestAnalyticsService, GuestPageSummary, GUEST_PAGE_LABELS } from '../../services/guestAnalyticsService';
 
 // AdImage component extracted outside to avoid React Hooks rule violation
 interface AdImageProps {
@@ -38,7 +39,7 @@ const AdImage: React.FC<AdImageProps> = ({ imageUrl, title }) => {
 export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAd, setSelectedAd] = useState<Advertisement | null>(null);
-  const [activeTab, setActiveTab] = useState<'ads' | 'packages' | 'analytics'>('ads');
+  const [activeTab, setActiveTab] = useState<'ads' | 'packages' | 'analytics' | 'guest'>('ads');
   const [analyticsFilter, setAnalyticsFilter] = useState<'all' | 'active' | 'scheduled' | 'completed'>('all');
   const [selectedAdForAnalytics, setSelectedAdForAnalytics] = useState<Advertisement | null>(null);
   const { advertisements, packages, loading, error, createAdvertisement, updateAdvertisement, deleteAdvertisement } = useAdvertisements();
@@ -205,29 +206,22 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           <h2 className="text-2xl font-bold text-slate-900">Partnership & Promotions</h2>
           <p className="text-slate-500">Manage promotional content and partnership campaigns.</p>
         </div>
-        {(isBoard || isAdmin) && (
-          <Button onClick={() => {
-            setSelectedAd(null);
-            setIsModalOpen(true);
-          }}>
-            <Plus size={16} className="mr-2" />
-            Create Advertisement
-          </Button>
-        )}
       </div>
 
       <Card noPadding>
         <div className="px-4 md:px-6 pt-4">
           <Tabs
-            tabs={['Partnerships', 'Promotion Packages', 'Analytics']}
+            tabs={['Partnerships', 'Promotion Packages', 'Analytics', 'Guest Analytics']}
             activeTab={
               activeTab === 'ads' ? 'Partnerships' :
                 activeTab === 'packages' ? 'Promotion Packages' :
-                  'Analytics'
+                  activeTab === 'guest' ? 'Guest Analytics' :
+                    'Analytics'
             }
             onTabChange={(tab) => {
               if (tab === 'Partnerships') setActiveTab('ads');
               else if (tab === 'Promotion Packages') setActiveTab('packages');
+              else if (tab === 'Guest Analytics') setActiveTab('guest');
               else setActiveTab('analytics');
             }}
           />
@@ -251,6 +245,22 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
+                      {/* Create partnership row */}
+                      {(isBoard || isAdmin) && (
+                        <tr
+                          className="cursor-pointer hover:bg-blue-50/40 transition-colors group"
+                          onClick={() => { setSelectedAd(null); setIsModalOpen(true); }}
+                        >
+                          <td colSpan={7} className="py-3 px-3">
+                            <div className="flex items-center gap-3 text-slate-400 group-hover:text-jci-blue transition-colors">
+                              <div className="w-10 h-10 rounded-lg border-2 border-dashed border-slate-200 group-hover:border-jci-blue/40 flex items-center justify-center shrink-0 transition-colors">
+                                <Plus size={16} />
+                              </div>
+                              <span className="font-semibold text-sm">Create Partnership</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       {filteredAds.map(ad => (
                         <tr key={ad.id} className="hover:bg-slate-50/60 transition-colors">
                           {/* Partner identity */}
@@ -314,6 +324,18 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
                 {/* Mobile list */}
                 <div className="md:hidden divide-y divide-slate-100">
+                  {/* Create partnership row (mobile) */}
+                  {(isBoard || isAdmin) && (
+                    <button
+                      className="w-full flex items-center gap-3 py-3 px-1 text-slate-400 hover:text-jci-blue transition-colors"
+                      onClick={() => { setSelectedAd(null); setIsModalOpen(true); }}
+                    >
+                      <div className="w-11 h-11 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center shrink-0">
+                        <Plus size={16} />
+                      </div>
+                      <span className="font-semibold text-sm">Create Partnership</span>
+                    </button>
+                  )}
                   {filteredAds.map(ad => (
                     <div key={ad.id} className="flex items-center gap-3 py-3 px-1">
                       {/* Thumbnail */}
@@ -389,6 +411,8 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                 ))}
               </div>
             </LoadingState>
+          ) : activeTab === 'guest' ? (
+            <GuestPageAnalyticsSection />
           ) : (
             <AdvertisementAnalyticsTab
               advertisements={filteredAdsForAnalytics}
@@ -807,6 +831,131 @@ const AdvertisementAnalyticsTab: React.FC<AdvertisementAnalyticsTabProps> = ({
                   </React.Fragment>
                 );
               })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Guest Page Analytics — public site page views, dwell time, and Sign Up clicks
+const formatDwell = (seconds: number): string => {
+  if (seconds <= 0) return '—';
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+};
+
+const GuestPageAnalyticsSection: React.FC = () => {
+  const [range, setRange] = useState<7 | 30 | 90>(30);
+  const [rows, setRows] = useState<GuestPageSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    GuestAnalyticsService.getSummary(range)
+      .then(data => { if (!cancelled) setRows(data); })
+      .catch(err => { if (!cancelled) setError(err?.message || 'Failed to load guest analytics'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [range]);
+
+  const totals = useMemo(() => rows.reduce(
+    (acc, r) => ({
+      views: acc.views + r.views,
+      signupClicks: acc.signupClicks + r.signupClicks,
+      dwellSeconds: acc.dwellSeconds + r.dwellSeconds,
+    }),
+    { views: 0, signupClicks: 0, dwellSeconds: 0 }
+  ), [rows]);
+  const maxViews = Math.max(...rows.map(r => r.views), 1);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Globe size={15} className="text-jci-blue" />
+          <h3 className="text-sm font-black text-slate-900">Guest Page Analytics</h3>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {([7, 30, 90] as const).map(d => (
+            <button
+              key={d}
+              onClick={() => setRange(d)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${range === d ? 'bg-jci-blue text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <Eye size={12} />
+            <p className="text-[10px] font-black uppercase tracking-widest">Page Views</p>
+          </div>
+          <p className="text-2xl font-black text-slate-900 tabular-nums">{formatNumber(totals.views)}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <Clock size={12} />
+            <p className="text-[10px] font-black uppercase tracking-widest">Avg Dwell</p>
+          </div>
+          <p className="text-2xl font-black text-slate-900 tabular-nums">
+            {formatDwell(totals.views > 0 ? Math.round(totals.dwellSeconds / totals.views) : 0)}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <UserPlus size={12} />
+            <p className="text-[10px] font-black uppercase tracking-widest">Sign Up Clicks</p>
+          </div>
+          <p className="text-2xl font-black text-slate-900 tabular-nums">{formatNumber(totals.signupClicks)}</p>
+        </div>
+      </div>
+
+      {/* Per-page table */}
+      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+        {loading ? (
+          <p className="text-center text-slate-400 text-sm py-10">Loading…</p>
+        ) : error ? (
+          <p className="text-center text-red-400 text-sm py-10">{error}</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="py-3 px-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Page</th>
+                <th className="py-3 px-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Views</th>
+                <th className="py-3 px-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Avg Dwell</th>
+                <th className="py-3 px-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Sign Ups</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {rows.map(row => (
+                <tr key={row.page} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="py-3 px-4">
+                    <p className="font-semibold text-slate-900">{GUEST_PAGE_LABELS[row.page]}</p>
+                    <div className="w-24 bg-slate-100 rounded-full h-1 mt-1.5">
+                      <div className="bg-jci-blue/50 h-1 rounded-full" style={{ width: `${(row.views / maxViews) * 100}%` }} />
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-right font-semibold text-slate-700 tabular-nums text-xs">{formatNumber(row.views)}</td>
+                  <td className="py-3 px-4 text-right font-semibold text-slate-700 tabular-nums text-xs">{formatDwell(row.avgDwellSeconds)}</td>
+                  <td className="py-3 px-4 text-right">
+                    <span className={`text-xs font-bold tabular-nums ${row.signupClicks > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      {formatNumber(row.signupClicks)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}

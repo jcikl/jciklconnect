@@ -1297,12 +1297,21 @@ export interface WorkflowNodeExecution {
   duration?: number;
 }
 
+export interface ClubActivity {
+  id: string;
+  /** datetime-local string, e.g. 2026-08-22T14:22 */
+  date: string;
+  description: string;
+}
+
 export interface HobbyClub {
   id: string;
   name: string;
   category?: string;
   membersCount: number;
+  /** Derived from earliest upcoming entry in `activities`; kept for card display */
   nextActivity?: string;
+  activities?: ClubActivity[];
   lead: string;
   image: string;
   memberIds?: string[];

@@ -787,6 +787,15 @@ service cloud.firestore {
       );
     }
     
+    // Guest page analytics — unauthenticated visitors increment counters; Board reads
+    match /guestPageStats/{docId} {
+      allow read: if isBoard();
+      allow create, update: if request.resource.data.keys().hasOnly(
+        ['page', 'date', 'views', 'dwellSeconds', 'signupClicks', 'updatedAt']
+      );
+      allow delete: if isAdmin();
+    }
+
 		// Partnership : public read for guest page; Board/Admin can manage
 		match /partnerships/{docId} {
       allow read: if true;

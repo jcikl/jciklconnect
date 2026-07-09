@@ -75,6 +75,7 @@ const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporte
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 import { PartnershipsService } from './services/partnershipsService';
+import { GuestAnalyticsService, pathToGuestPage, GuestPage } from './services/guestAnalyticsService';
 import { Partnership, FlagshipProject } from './types';
 import { AdvertisementService } from './services/advertisementService';
 
@@ -782,7 +783,7 @@ const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   const allPublishedEvents = events;
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50">
       <GuestHeader currentPage="events" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
@@ -2801,40 +2802,49 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                   return (
                     <div
                       key={partner.id}
-                      className="group flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
+                      className="group flex flex-col bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer overflow-hidden border border-slate-100/80"
                       onClick={() => handleCardClick(partner)}
                     >
                       {/* Logo area */}
-                      <div className="relative w-full h-36 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
+                      <div className="relative w-full h-36 overflow-hidden bg-slate-100 flex items-center justify-center">
                         {partner.logo ? (
-                          <img
-                            src={partner.logo}
-                            alt={partner.name}
-                            className="max-w-full max-h-full object-contain drop-shadow-sm"
-                            onError={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              img.onerror = null; img.style.display = 'none';
-                            }}
-                          />
+                          <>
+                            <img src={partner.logo} aria-hidden="true"
+                              className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-50 pointer-events-none select-none" />
+                            <div className="absolute inset-0 bg-white/10" />
+                            <img src={partner.logo} alt={partner.name}
+                              className="relative z-10 max-h-[4.5rem] max-w-[75%] object-contain drop-shadow-lg transition-transform duration-300 group-hover:scale-105"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          </>
                         ) : (
-                          <div className="flex flex-col items-center justify-center text-slate-300">
-                            <Gift size={36} />
-                          </div>
+                          <>
+                            <div className="absolute inset-0 bg-gradient-to-br from-jci-blue/15 via-slate-100 to-jci-navy/10" />
+                            <span className="relative z-10 w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center text-xl font-black text-jci-blue">
+                              {partner.name?.charAt(0)?.toUpperCase() || '?'}
+                            </span>
+                          </>
                         )}
+                        {/* Members-only badge */}
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/30 backdrop-blur-md rounded-full px-2 py-1">
+                          <Lock size={9} className="text-white/80" />
+                          <span className="text-[9px] font-black text-white/80 uppercase tracking-wide">Members</span>
+                        </div>
                       </div>
 
                       {/* Body */}
-                      <div className="flex flex-col flex-1 p-4 gap-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-black text-slate-900 text-sm leading-tight">{partner.name}</h3>
-                          <Lock size={13} className="shrink-0 text-slate-300 mt-0.5 group-hover:text-jci-blue transition-colors" />
-                        </div>
+                      <div className="flex flex-col flex-1 p-3.5 gap-1.5">
+                        <h3 className="font-black text-slate-900 text-sm leading-tight line-clamp-1">{partner.name}</h3>
                         {partner.memberBenefits && (
-                          <p className="text-sm text-jci-blue font-semibold line-clamp-2 leading-snug">{partner.memberBenefits}</p>
+                          <div className="flex">
+                            <span className="inline-flex items-center gap-1 bg-jci-blue/10 text-jci-blue text-[11px] font-bold rounded-lg px-2 py-1 leading-snug line-clamp-2">
+                              <Gift size={11} className="shrink-0" />
+                              <span className="line-clamp-2">{partner.memberBenefits}</span>
+                            </span>
+                          </div>
                         )}
-                        <div className="mt-auto pt-3 border-t border-slate-50 flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Tap to unlock details</span>
-                          <ChevronRight size={13} className="text-slate-300 group-hover:text-jci-blue transition-colors" />
+                        <div className="mt-auto pt-2.5 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">View Details</span>
+                          <ChevronRight size={13} className="text-slate-300 group-hover:text-jci-blue group-hover:translate-x-0.5 transition-all" />
                         </div>
                       </div>
                     </div>
@@ -2951,6 +2961,41 @@ const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
       )}
     </div>
   );
+};
+
+// Tracks guest page views + dwell time; mounted only while the guest shell is shown
+const GuestAnalyticsTracker: React.FC = () => {
+  const location = useLocation();
+  const pageRef = useRef<GuestPage | null>(null);
+  const startRef = useRef<number>(0);
+
+  useEffect(() => {
+    const page = pathToGuestPage(location.pathname);
+    if (pageRef.current) {
+      GuestAnalyticsService.trackDwell(pageRef.current, (performance.now() - startRef.current) / 1000);
+    }
+    pageRef.current = page;
+    startRef.current = performance.now();
+    if (page) GuestAnalyticsService.trackPageView(page);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === 'hidden' && pageRef.current) {
+        GuestAnalyticsService.trackDwell(pageRef.current, (performance.now() - startRef.current) / 1000);
+        startRef.current = performance.now();
+      }
+    };
+    document.addEventListener('visibilitychange', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', flush);
+      if (pageRef.current) {
+        GuestAnalyticsService.trackDwell(pageRef.current, (performance.now() - startRef.current) / 1000);
+      }
+    };
+  }, []);
+
+  return null;
 };
 
 // --- Authenticated Dashboard Views ---
@@ -3692,7 +3737,14 @@ export const JCIKLApp: React.FC = () => {
   }
 
   // Handle guest page navigation
+  const handleGuestRegister = () => {
+    const page = pathToGuestPage(window.location.pathname);
+    if (page) GuestAnalyticsService.trackSignupClick(page);
+    openRegistration();
+  };
+
   const handleGuestPageChange = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
     setSearchQuery('');
     if (page === 'home') {
       setView('GUEST');
@@ -3722,12 +3774,13 @@ export const JCIKLApp: React.FC = () => {
   if (view === 'GUEST' || view === 'GUEST_EVENTS' || view === 'FLAGSHIP_PROJECTS' || view === 'GUEST_ABOUT' || view === 'GUEST_ENEWSLETTERS' || view === 'GUEST_DIRECTORY' || view === 'GUEST_PARTNERSHIPS') {
     const guestPageProps = {
       onLogin: handleLogin,
-      onRegister: openRegistration,
+      onRegister: handleGuestRegister,
       onPageChange: handleGuestPageChange,
     };
 
     return (
       <>
+        <GuestAnalyticsTracker />
         <Routes>
           <Route path="/" element={<GuestLandingPage {...guestPageProps} />} />
           <Route path="/events" element={<GuestEventsPage {...guestPageProps} />} />

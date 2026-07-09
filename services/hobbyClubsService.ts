@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { HobbyClub } from '../types';
+import { HobbyClub, ClubActivity } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { MOCK_CLUBS } from './mockData';
 
@@ -170,18 +170,75 @@ export class HobbyClubsService {
     }
   }
 
-  // Schedule club activity
-  static async scheduleActivity(clubId: string, activityDate: string, description: string): Promise<void> {
+  // Derive the card-display string from the earliest upcoming activity
+  private static computeNextActivity(activities: ClubActivity[]): string {
+    const now = new Date();
+    const upcoming = activities
+      .filter(a => a.date && new Date(a.date) >= now)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const next = upcoming[0] || [...activities].sort((a, b) => b.date.localeCompare(a.date))[0];
+    return next ? `${next.date.replace('T', ' ')} — ${next.description}` : '';
+  }
+
+  private static async writeActivities(clubId: string, activities: ClubActivity[]): Promise<void> {
+    const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+    await updateDoc(clubRef, {
+      activities,
+      nextActivity: this.computeNextActivity(activities),
+      updatedAt: Timestamp.now(),
+    });
+  }
+
+  // Read a club's activities (migrates a legacy `nextActivity` string on the fly for display)
+  static async getActivities(clubId: string): Promise<ClubActivity[]> {
+    const club = await this.getClubById(clubId);
+    return club?.activities || [];
+  }
+
+  // Add a club activity
+  static async addActivity(clubId: string, date: string, description: string): Promise<void> {
     try {
-      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-      await updateDoc(clubRef, {
-        nextActivity: `${activityDate}: ${description}`,
-        updatedAt: Timestamp.now(),
+      const activities = await this.getActivities(clubId);
+      activities.push({
+        id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        date,
+        description,
       });
+      await this.writeActivities(clubId, activities);
     } catch (error) {
-      console.error('Error scheduling activity:', error);
+      console.error('Error adding activity:', error);
       throw error;
     }
+  }
+
+  // Update a club activity
+  static async updateActivity(clubId: string, activityId: string, updates: Partial<Omit<ClubActivity, 'id'>>): Promise<void> {
+    try {
+      const activities = await this.getActivities(clubId);
+      const idx = activities.findIndex(a => a.id === activityId);
+      if (idx === -1) throw new Error('Activity not found');
+      activities[idx] = { ...activities[idx], ...updates };
+      await this.writeActivities(clubId, activities);
+    } catch (error) {
+      console.error('Error updating activity:', error);
+      throw error;
+    }
+  }
+
+  // Delete a club activity
+  static async deleteActivity(clubId: string, activityId: string): Promise<void> {
+    try {
+      const activities = await this.getActivities(clubId);
+      await this.writeActivities(clubId, activities.filter(a => a.id !== activityId));
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      throw error;
+    }
+  }
+
+  /** @deprecated kept for backward compatibility — adds an activity */
+  static async scheduleActivity(clubId: string, activityDate: string, description: string): Promise<void> {
+    return this.addActivity(clubId, activityDate, description);
   }
 
   // Get club members

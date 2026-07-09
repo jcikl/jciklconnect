@@ -6,7 +6,7 @@ import { LoadingState } from '../ui/Loading';
 import { useHobbyClubs } from '../../hooks/useHobbyClubs';
 import { useAuth } from '../../hooks/useAuth';
 import { useMembers } from '../../hooks/useMembers';
-import { HobbyClub } from '../../types';
+import { HobbyClub, ClubActivity } from '../../types';
 import { Tabs } from '../ui/Common';
 
 export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
@@ -16,7 +16,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
     const [selectedClub, setSelectedClub] = useState<HobbyClub | null>(null);
     const [activeTab, setActiveTab] = useState<'clubs' | 'activities'>('clubs');
-    const { clubs, loading, error, createClub, updateClub, deleteClub, joinClub, leaveClub, scheduleActivity, getClubMembers } = useHobbyClubs();
+    const { clubs, loading, error, createClub, updateClub, deleteClub, joinClub, leaveClub, scheduleActivity, updateActivity, deleteActivity, getClubMembers } = useHobbyClubs();
     const { member } = useAuth();
     const { members } = useMembers();
     const { showToast } = useToast();
@@ -85,14 +85,18 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
         return member && club.lead === member.name;
     };
 
+    const CATEGORY_STYLES: Record<string, string> = {
+        Sports: 'bg-emerald-500 text-white',
+        Social: 'bg-amber-500 text-white',
+        Professional: 'bg-jci-blue text-white',
+        Arts: 'bg-purple-500 text-white',
+    };
+
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Hobby Clubs</h2>
-                    <p className="text-slate-500">Connect with members beyond formal projects.</p>
-                </div>
-                <Button onClick={() => setCreateModalOpen(true)}><Plus size={16} className="mr-2" /> Start New Club</Button>
+            <div>
+                <h2 className="text-2xl font-bold text-slate-900">Hobby Clubs</h2>
+                <p className="text-slate-500">Connect with members beyond formal projects.</p>
             </div>
 
             <Card noPadding>
@@ -105,75 +109,91 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 </div>
                 <div className="p-4">
                     {activeTab === 'clubs' ? (
-                        <LoadingState loading={loading} error={error} empty={filteredClubs.length === 0} emptyMessage="No hobby clubs found">
-                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <LoadingState loading={loading} error={error} empty={false} emptyMessage="No hobby clubs found">
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                {/* Start new club card */}
+                                <button
+                                    className="group flex flex-col items-center justify-center gap-3 min-h-[220px] rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-jci-blue/40 hover:text-jci-blue hover:bg-blue-50/30 transition-all"
+                                    onClick={() => setCreateModalOpen(true)}
+                                >
+                                    <div className="w-12 h-12 rounded-2xl border-2 border-dashed border-current flex items-center justify-center">
+                                        <Plus size={20} />
+                                    </div>
+                                    <span className="font-bold text-sm">Start New Club</span>
+                                </button>
                                 {filteredClubs.map(club => (
-                                    <Card key={club.id} noPadding className="hover:shadow-lg transition-shadow">
-                                        <div className="h-32 bg-slate-200 relative">
-                                            <img src={club.image} alt={club.name} className="w-full h-full object-cover" />
-                                            <div className="absolute top-4 right-4">
-                                                <Badge variant="neutral">{club.category}</Badge>
-                                            </div>
+                                    <div key={club.id} className="group flex flex-col bg-white rounded-2xl border border-slate-100/80 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 overflow-hidden">
+                                        {/* Cover */}
+                                        <div className="relative h-36 bg-slate-100 overflow-hidden">
+                                            <img src={club.image} alt={club.name}
+                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                                            {/* Category badge */}
+                                            <span className={`absolute top-2.5 right-2.5 text-[10px] font-black uppercase tracking-wide px-2 py-1 rounded-full backdrop-blur-sm ${CATEGORY_STYLES[club.category] || 'bg-slate-500/90 text-white'}`}>
+                                                {club.category}
+                                            </span>
+                                            {/* Owner actions */}
+                                            {isOwner(club) && (
+                                                <div className="absolute top-2.5 left-2.5 flex gap-1">
+                                                    <button
+                                                        className="p-1.5 rounded-lg bg-black/30 backdrop-blur-md text-white/90 hover:bg-black/50 transition-colors"
+                                                        onClick={() => { setSelectedClub(club); setEditModalOpen(true); }}
+                                                    >
+                                                        <Edit size={13} />
+                                                    </button>
+                                                    <button
+                                                        className="p-1.5 rounded-lg bg-black/30 backdrop-blur-md text-white/90 hover:bg-red-500/80 transition-colors"
+                                                        onClick={() => handleDeleteClub(club.id)}
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {/* Name on cover */}
+                                            <h3 className="absolute bottom-2.5 left-3.5 right-3.5 text-white font-black text-lg leading-tight drop-shadow line-clamp-1">
+                                                {club.name}
+                                            </h3>
                                         </div>
-                                        <div className="p-4">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <h3 className="text-lg font-bold text-slate-900">{club.name}</h3>
-                                                {isOwner(club) && (
-                                                    <div className="flex gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setSelectedClub(club);
-                                                                setEditModalOpen(true);
-                                                            }}
-                                                        >
-                                                            <Edit size={14} />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDeleteClub(club.id)}
-                                                        >
-                                                            <Trash2 size={14} className="text-red-600" />
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
 
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="text-sm text-slate-500">
-                                                    <span className="block text-xs uppercase tracking-wide">Members</span>
-                                                    <div className="mt-1">
-                                                        <AvatarGroup count={club.membersCount} />
-                                                    </div>
+                                        {/* Body */}
+                                        <div className="flex flex-col flex-1 p-3.5 gap-3">
+                                            {/* Members + Lead */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <AvatarGroup count={club.membersCount} />
+                                                    <span className="text-xs text-slate-400 font-medium">{club.membersCount || 0} member{(club.membersCount || 0) !== 1 ? 's' : ''}</span>
                                                 </div>
-                                                <div className="text-right text-sm text-slate-500">
-                                                    <span className="block text-xs uppercase tracking-wide">Lead</span>
-                                                    <span className="font-medium text-slate-800">{club.lead}</span>
+                                                <div className="text-right min-w-0">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Lead</p>
+                                                    <p className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{club.lead}</p>
                                                 </div>
                                             </div>
 
-                                            {club.nextActivity && (
-                                                <div className="bg-blue-50 p-3 rounded-lg flex items-start gap-3 mb-4">
-                                                    <Calendar size={16} className="text-jci-blue mt-0.5" />
-                                                    <div>
-                                                        <span className="block text-xs text-blue-600 font-bold uppercase">Next Activity</span>
-                                                        <span className="text-sm font-medium text-slate-900">{club.nextActivity}</span>
+                                            {/* Next activity */}
+                                            {club.nextActivity ? (
+                                                <div className="flex items-start gap-2 bg-jci-blue/5 border border-jci-blue/10 rounded-xl px-3 py-2">
+                                                    <Calendar size={13} className="text-jci-blue mt-0.5 shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-jci-blue">Next Activity</p>
+                                                        <p className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug">{club.nextActivity}</p>
                                                     </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 text-slate-400">
+                                                    <Calendar size={13} className="shrink-0" />
+                                                    <p className="text-xs font-medium">No upcoming activity</p>
                                                 </div>
                                             )}
 
-                                            <div className="flex gap-2">
+                                            {/* Actions */}
+                                            <div className="mt-auto flex gap-2">
                                                 {isOwner(club) ? (
                                                     <>
                                                         <Button
                                                             variant="outline"
                                                             className="flex-1"
-                                                            onClick={() => {
-                                                                setSelectedClub(club);
-                                                                setIsMembersModalOpen(true);
-                                                            }}
+                                                            onClick={() => { setSelectedClub(club); setIsMembersModalOpen(true); }}
                                                         >
                                                             <Users size={14} className="mr-2" />
                                                             Members
@@ -181,10 +201,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => {
-                                                                setSelectedClub(club);
-                                                                setIsActivityModalOpen(true);
-                                                            }}
+                                                            onClick={() => { setSelectedClub(club); setIsActivityModalOpen(true); }}
                                                         >
                                                             <Calendar size={14} />
                                                         </Button>
@@ -196,15 +213,13 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                                                             onClick={() => joinClub(club.id)}
                                                             disabled={!member}
                                                         >
+                                                            <Heart size={14} className="mr-2" />
                                                             Join Club
                                                         </Button>
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => {
-                                                                setSelectedClub(club);
-                                                                setIsMembersModalOpen(true);
-                                                            }}
+                                                            onClick={() => { setSelectedClub(club); setIsMembersModalOpen(true); }}
                                                         >
                                                             <Users size={14} />
                                                         </Button>
@@ -212,12 +227,16 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                                                 )}
                                             </div>
                                         </div>
-                                    </Card>
+                                    </div>
                                 ))}
                             </div>
                         </LoadingState>
                     ) : (
-                        <ClubActivitiesTab clubs={filteredClubs} />
+                        <ClubActivitiesTab
+                            clubs={filteredClubs}
+                            canManage={(club) => !!isOwner(club)}
+                            onManage={(club) => { setSelectedClub(club); setIsActivityModalOpen(true); }}
+                        />
                     )}
                 </div>
             </Card>
@@ -271,39 +290,19 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 </Modal>
             )}
 
-            {/* Activity Modal */}
+            {/* Activities Management Modal */}
             {selectedClub && (
-                <Modal
+                <ClubActivitiesModal
                     isOpen={isActivityModalOpen}
                     onClose={() => {
                         setIsActivityModalOpen(false);
                         setSelectedClub(null);
                     }}
-                    title="Schedule Activity"
-                    size="lg"
-                    drawerOnMobile
-                >
-                    <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        if (!selectedClub) return;
-                        const formData = new FormData(e.currentTarget);
-                        const activityDate = formData.get('activityDate') as string;
-                        const activityDescription = formData.get('activityDescription') as string;
-                        try {
-                            await scheduleActivity(selectedClub.id, activityDate, activityDescription);
-                            setIsActivityModalOpen(false);
-                            setSelectedClub(null);
-                        } catch (err) {
-                            // Error handled by hook
-                        }
-                    }} className="space-y-4">
-                        <Input name="activityDate" label="Activity Date" type="datetime-local" required />
-                        <Textarea name="activityDescription" label="Description" placeholder="Activity description..." required />
-                        <div className="pt-4">
-                            <Button className="w-full" type="submit">Schedule Activity</Button>
-                        </div>
-                    </form>
-                </Modal>
+                    club={clubs.find(c => c.id === selectedClub.id) || selectedClub}
+                    onAdd={scheduleActivity}
+                    onUpdate={updateActivity}
+                    onDelete={deleteActivity}
+                />
             )}
 
             {/* Members Modal */}
@@ -332,35 +331,219 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
 // Club Activities Tab Component
 interface ClubActivitiesTabProps {
     clubs: HobbyClub[];
+    canManage: (club: HobbyClub) => boolean;
+    onManage: (club: HobbyClub) => void;
 }
 
-const ClubActivitiesTab: React.FC<ClubActivitiesTabProps> = ({ clubs }) => {
-    const { showToast } = useToast();
+const formatActivityDate = (date: string) => date ? date.replace('T', ' · ') : '';
+
+const ClubActivitiesTab: React.FC<ClubActivitiesTabProps> = ({ clubs, canManage, onManage }) => {
+    // Flatten all activities across clubs, sorted by date ascending
+    const allActivities = clubs
+        .flatMap(club => (club.activities || []).map(activity => ({ club, activity })))
+        .sort((a, b) => a.activity.date.localeCompare(b.activity.date));
+    const now = new Date();
+    const upcoming = allActivities.filter(x => new Date(x.activity.date) >= now);
+    const past = allActivities.filter(x => new Date(x.activity.date) < now);
+    const withoutActivity = clubs.filter(c => !(c.activities || []).length);
 
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-900">Club Activities</h3>
             <LoadingState loading={false} error={null} empty={clubs.length === 0} emptyMessage="No clubs available">
-                <div className="space-y-3">
-                    {clubs.map(club => (
-                        <Card key={club.id} className="hover:shadow-md transition-shadow">
-                            <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                    <h4 className="font-semibold text-slate-900">{club.name}</h4>
-                                    {club.nextActivity && (
-                                        <p className="text-sm text-slate-600 mt-1">
-                                            <Calendar size={14} className="inline mr-1" />
-                                            Next: {club.nextActivity}
-                                        </p>
-                                    )}
-                                </div>
-                                <Badge variant="info">{club.category}</Badge>
+                <div className="space-y-5">
+                    {/* Upcoming */}
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Upcoming Activities</p>
+                        {upcoming.length === 0 ? (
+                            <div className="text-center py-8 bg-slate-50 rounded-xl">
+                                <Calendar size={28} className="text-slate-300 mx-auto mb-2" />
+                                <p className="text-sm text-slate-400">No upcoming club activities</p>
                             </div>
-                        </Card>
-                    ))}
+                        ) : (
+                            <div className="divide-y divide-slate-50 bg-white rounded-xl border border-slate-100">
+                                {upcoming.map(({ club, activity }) => (
+                                    <div key={activity.id} className="flex items-center gap-3 p-3.5">
+                                        <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                                            <img src={club.image} alt="" className="w-full h-full object-cover"
+                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-bold text-slate-900 text-sm truncate">{club.name}</p>
+                                                <Badge variant="info">{club.category}</Badge>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                                <Calendar size={11} className="text-jci-blue shrink-0" />
+                                                <span className="font-semibold text-slate-700 shrink-0">{formatActivityDate(activity.date)}</span>
+                                                <span className="truncate">— {activity.description}</span>
+                                            </p>
+                                        </div>
+                                        {canManage(club) && (
+                                            <Button variant="outline" size="sm" onClick={() => onManage(club)}>
+                                                <Edit size={13} />
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Past */}
+                    {past.length > 0 && (
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Past Activities</p>
+                            <div className="divide-y divide-slate-50 bg-white rounded-xl border border-slate-100 opacity-70">
+                                {past.map(({ club, activity }) => (
+                                    <div key={activity.id} className="flex items-center gap-3 p-3">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                                                <span className="font-bold text-slate-600 shrink-0">{club.name}</span>
+                                                <span className="shrink-0">· {formatActivityDate(activity.date)}</span>
+                                                <span className="truncate">— {activity.description}</span>
+                                            </p>
+                                        </div>
+                                        {canManage(club) && (
+                                            <Button variant="outline" size="sm" onClick={() => onManage(club)}>
+                                                <Edit size={13} />
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* No activity scheduled */}
+                    {withoutActivity.length > 0 && (
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">No Activity Scheduled</p>
+                            <div className="flex flex-wrap gap-2">
+                                {withoutActivity.map(club => (
+                                    <button
+                                        key={club.id}
+                                        disabled={!canManage(club)}
+                                        onClick={() => onManage(club)}
+                                        className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 enabled:hover:border-jci-blue/30 enabled:hover:text-jci-blue transition-colors disabled:cursor-default"
+                                    >
+                                        {club.name}
+                                        {canManage(club) && <Plus size={11} />}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </LoadingState>
         </div>
+    );
+};
+
+// Club Activities Management Modal (CRUD)
+interface ClubActivitiesModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    club: HobbyClub;
+    onAdd: (clubId: string, date: string, description: string) => Promise<void>;
+    onUpdate: (clubId: string, activityId: string, updates: { date?: string; description?: string }) => Promise<void>;
+    onDelete: (clubId: string, activityId: string) => Promise<void>;
+}
+
+const ClubActivitiesModal: React.FC<ClubActivitiesModalProps> = ({ isOpen, onClose, club, onAdd, onUpdate, onDelete }) => {
+    const [editing, setEditing] = useState<ClubActivity | null>(null);
+    const [saving, setSaving] = useState(false);
+    const activities = [...(club.activities || [])].sort((a, b) => a.date.localeCompare(b.date));
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const formData = new FormData(form);
+        const date = formData.get('activityDate') as string;
+        const description = formData.get('activityDescription') as string;
+        setSaving(true);
+        try {
+            if (editing) {
+                await onUpdate(club.id, editing.id, { date, description });
+                setEditing(null);
+            } else {
+                await onAdd(club.id, date, description);
+            }
+            form.reset();
+        } catch {
+            // Error handled by hook
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Activities - ${club.name}`} size="lg" drawerOnMobile>
+            <div className="space-y-5">
+                {/* Existing activities */}
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Scheduled Activities</p>
+                    {activities.length === 0 ? (
+                        <div className="text-center py-6 bg-slate-50 rounded-xl">
+                            <Calendar size={24} className="text-slate-300 mx-auto mb-1.5" />
+                            <p className="text-xs text-slate-400">No activities yet — add one below</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-slate-50 bg-white rounded-xl border border-slate-100 max-h-56 overflow-y-auto">
+                            {activities.map(activity => {
+                                const isPast = new Date(activity.date) < new Date();
+                                return (
+                                    <div key={activity.id} className={`flex items-center gap-3 p-3 ${editing?.id === activity.id ? 'bg-blue-50/50' : ''} ${isPast ? 'opacity-60' : ''}`}>
+                                        <Calendar size={14} className={isPast ? 'text-slate-300 shrink-0' : 'text-jci-blue shrink-0'} />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-slate-800">{formatActivityDate(activity.date)}{isPast && <span className="ml-2 text-[9px] font-black uppercase text-slate-400">Past</span>}</p>
+                                            <p className="text-xs text-slate-500 truncate">{activity.description}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-blue-50 transition-colors"
+                                                onClick={() => setEditing(activity)}
+                                            >
+                                                <Edit size={13} />
+                                            </button>
+                                            <button
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                onClick={async () => {
+                                                    if (window.confirm('Delete this activity?')) {
+                                                        if (editing?.id === activity.id) setEditing(null);
+                                                        await onDelete(club.id, activity.id);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Add / Edit form */}
+                <form key={editing?.id || 'new'} onSubmit={handleSubmit} className="space-y-3 bg-slate-50/70 rounded-xl p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        {editing ? 'Edit Activity' : 'Add New Activity'}
+                    </p>
+                    <Input name="activityDate" label="Activity Date" type="datetime-local" defaultValue={editing?.date} required />
+                    <Textarea name="activityDescription" label="Description" placeholder="Activity description..." defaultValue={editing?.description} required />
+                    <div className="flex gap-2 pt-1">
+                        {editing && (
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => setEditing(null)}>
+                                Cancel
+                            </Button>
+                        )}
+                        <Button className="flex-1" type="submit" disabled={saving}>
+                            {editing ? 'Update Activity' : 'Add Activity'}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </Modal>
     );
 };
 
