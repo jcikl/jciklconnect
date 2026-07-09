@@ -21,6 +21,7 @@ import { MEMBER_TIERS, MEMBER_PRIVILEGES, BOUNTY_STATUS } from '../../config/con
 import { ContractService, CommitmentContract } from '../../services/contractService';
 import { PromotionService, type MemberEngagementProgressSummary, type EngagementYear } from '../../services/promotionService';
 import { MembersService } from '../../services/membersService';
+import { MemberJourneyService, MemberJourney } from '../../services/memberJourneyService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 import type { Event } from '../../types';
 import { UserRole } from '../../types';
@@ -33,6 +34,19 @@ import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
 
+
+/** membershipType 归一化：兼容旧版小写值（'probation member' / 'official member'…）与缺失值（按角色兜底） */
+const normalizeMembership = (m: { membershipType?: string; role?: UserRole | string } | null): 'probation' | 'full' | 'other' => {
+  if (!m) return 'other';
+  const mt = (m.membershipType || '').toLowerCase();
+  if (mt.includes('probation')) return 'probation';
+  if (mt && !mt.includes('guest')) return 'full';
+  if (!mt) {
+    if (m.role === UserRole.PROBATION) return 'probation';
+    if (m.role && [UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(m.role as UserRole)) return 'full';
+  }
+  return 'other';
+};
 
 interface DashboardHomeProps {
   userRole: import('../../types').UserRole;
@@ -75,11 +89,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [showPromoModal, setShowPromoModal] = useState(false);
   // Membership Journey modal state
   const [showJourneyModal, setShowJourneyModal] = useState(false);
-  const [journeyActiveTab, setJourneyActiveTab] = useState<'probation' | 'firstYear' | 'secondYear'>('probation');
+  const [journeyActiveTab, setJourneyActiveTab] = useState<'probation' | 'firstYear' | 'secondYear' | 'leadership' | 'trainer'>('probation');
   const [journeyGroupTab, setJourneyGroupTab] = useState<'Leadership Experience' | 'Skills Development' | 'JCI Experience'>('Leadership Experience');
   const [engagementFirst, setEngagementFirst] = useState<MemberEngagementProgressSummary | null>(null);
   const [engagementSecond, setEngagementSecond] = useState<MemberEngagementProgressSummary | null>(null);
   const [engagementLoading, setEngagementLoading] = useState(false);
+  // Leadership Journey + Trainer Pathway (shown to all members)
+  const [pathwayJourney, setPathwayJourney] = useState<MemberJourney | null>(null);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
   const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
@@ -92,6 +108,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       onNavigate?.(viewType);
     }
   };
+
+  // Load Leadership/Trainer journey (shown to all members in the journey modal)
+  useEffect(() => {
+    if (!member || normalizeMembership(member) === 'other') return;
+    let cancelled = false;
+    MemberJourneyService.getJourney(member)
+      .then(j => { if (!cancelled) setPathwayJourney(j); })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, [member?.id]);
 
   // Load Homepage Advertisements
   useEffect(() => {
@@ -131,7 +157,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load Promotion Progress for Probation and Full members (Journey modal shows it for both)
   useEffect(() => {
-    if (!member || (member.membershipType !== 'Probation' && member.membershipType !== 'Full')) return;
+    if (!member || normalizeMembership(member) === 'other') return;
     const loadPromotion = async () => {
       setPromoLoading(true);
       try {
@@ -148,7 +174,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load Engagement Progress for Full members
   useEffect(() => {
-    if (!member || member.membershipType !== 'Full') return;
+    if (!member || normalizeMembership(member) !== 'full') return;
     const loadEngagement = async () => {
       setEngagementLoading(true);
       try {
@@ -186,11 +212,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const openJourneyModal = () => {
     if (!member) return;
-    if (member.membershipType === 'Probation') {
+    const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
+    const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
+    if (normalizeMembership(member) === 'probation') {
       setJourneyActiveTab('probation');
+    } else if (joinYear !== null && joinYear < 2025) {
+      // Veterans skip 1st/2nd year tracking — land on Leadership
+      setJourneyActiveTab('leadership');
     } else {
-      const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
-      const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
       const yearsIn = joinYear ? new Date().getFullYear() - joinYear : 0;
       setJourneyActiveTab(yearsIn >= 1 ? 'secondYear' : 'firstYear');
     }
@@ -314,11 +343,27 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     );
   }
 
-  const isProbationMember = member.membershipType === 'Probation';
-  const isFullMember = member.membershipType === 'Full';
-  const showJourneyCard = isProbationMember || isFullMember || isBoard || isAdmin;
+  // membershipType has legacy lowercase variants ('probation member', 'official member', ...)
+  // and may be missing entirely on imported members — normalize, then fall back to role.
+  const membershipKind = normalizeMembership(member);
+  const isProbationMember = membershipKind === 'probation';
+  const isFullMember = membershipKind === 'full';
+  // Membership status: Probation Member / Voting Member (Pending dues) / Voting Member
+  const currentYearDuesStatus = member.membership?.[String(new Date().getFullYear())]?.status;
+  const isDuesPaid = currentYearDuesStatus === 'paid' || currentYearDuesStatus === 'over paid';
+  const membershipStatusLabel = isProbationMember
+    ? 'Probation Member'
+    : isFullMember
+      ? (isDuesPaid ? 'Voting Member' : 'Voting Member (Pending dues)')
+      : '';
   const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
   const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
+  // 1st/2nd-year engagement tracking only applies to members who joined in 2025 or later;
+  // veterans (joined before 2025) still see the journey card, but without the tracking content
+  const isVeteranMember = isFullMember && joinYear !== null && joinYear < 2025;
+  // 1st/2nd Year engagement steps only apply to members who joined in 2025 or later
+  const showEngagementSteps = joinYear === null || joinYear >= 2025;
+  const showJourneyCard = isProbationMember || isFullMember || isBoard || isAdmin;
   const yearsInMembership = joinYear ? new Date().getFullYear() - joinYear : 0;
   const activeEngSummary = yearsInMembership >= 1 ? engagementSecond : engagementFirst;
   const journeyProgress = isProbationMember
@@ -458,7 +503,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {showJourneyCard && (
         <div
           className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
-          onClick={isProbationMember || isFullMember ? openJourneyModal : undefined}
+          onClick={(isProbationMember || isFullMember) ? openJourneyModal : undefined}
         >
           <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%)' }} />
@@ -473,11 +518,37 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </div>
               {(isProbationMember || isFullMember) && (
                 <span className="text-[10px] font-black uppercase tracking-widest text-white bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
-                  {isProbationMember ? 'Probation' : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
+                  {isProbationMember ? 'Probation' : isVeteranMember ? `Member since ${joinYear}` : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
                 </span>
               )}
             </div>
-            {(isProbationMember || isFullMember) ? (
+            {isVeteranMember ? (
+              <>
+                <div className="mb-3 flex items-center gap-3 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
+                  <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pathwayJourney ? ((pathwayJourney.leadership.currentIndex + 1) / pathwayJourney.leadership.steps.length) * 100 : 0}%` }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                      className="h-full rounded-full bg-amber-200"
+                    />
+                  </div>
+                  <span className="text-[11px] font-bold text-white/90 flex-shrink-0">
+                    {pathwayJourney ? `${pathwayJourney.leadership.currentIndex + 1}/${pathwayJourney.leadership.steps.length}` : '...'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold text-white/70 truncate">
+                    {pathwayJourney
+                      ? `${membershipStatusLabel} · ${pathwayJourney.leadership.steps[pathwayJourney.leadership.currentIndex]?.title} · Trainer: ${pathwayJourney.trainer.currentIndex >= 0 ? pathwayJourney.trainer.steps[pathwayJourney.trainer.currentIndex]?.title : 'Not started'}`
+                      : membershipStatusLabel || 'Loading your journey...'}
+                  </p>
+                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200 flex-shrink-0 ml-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
+                  </div>
+                </div>
+              </>
+            ) : (isProbationMember || isFullMember) ? (
               <>
                 <div className="mb-3 flex items-center gap-3 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
                   <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -729,6 +800,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 {/* Connector */}
                 <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-green-300' : 'bg-slate-200'}`} />
 
+                {showEngagementSteps && (<>
                 {/* 1st Year step */}
                 <button
                   className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -776,6 +848,41 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       {engagementSecond.overallProgress.toFixed(0)}%
                     </span>
                   )}
+                </button>
+                </>)}
+
+                {/* Connector */}
+                <div className="flex-1 h-0.5 mt-4 bg-slate-200" />
+
+                {/* Leadership step */}
+                <button
+                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                  onClick={() => setJourneyActiveTab('leadership')}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'leadership' ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                    <Crown size={14} />
+                  </div>
+                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'leadership' ? 'text-amber-700' : 'text-slate-400'}`}>Leadership</span>
+                  <span className="text-[10px] text-amber-600">
+                    {pathwayJourney ? `${pathwayJourney.leadership.currentIndex + 1}/${pathwayJourney.leadership.steps.length}` : '...'}
+                  </span>
+                </button>
+
+                {/* Connector */}
+                <div className="flex-1 h-0.5 mt-4 bg-slate-200" />
+
+                {/* Trainer step */}
+                <button
+                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                  onClick={() => setJourneyActiveTab('trainer')}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'trainer' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                    <BookOpen size={14} />
+                  </div>
+                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'trainer' ? 'text-blue-700' : 'text-slate-400'}`}>Trainer</span>
+                  <span className="text-[10px] text-blue-600">
+                    {pathwayJourney ? `${pathwayJourney.trainer.currentIndex + 1}/${pathwayJourney.trainer.steps.length}` : '...'}
+                  </span>
                 </button>
 
               </div>
@@ -859,6 +966,60 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   )}
                 </>
               )}
+
+              {/* ── Leadership / Trainer Pathway Tab (read-only ladder) ── */}
+              {(journeyActiveTab === 'leadership' || journeyActiveTab === 'trainer') && (() => {
+                if (!pathwayJourney) return (
+                  <div className="flex items-center justify-center py-10">
+                    <RefreshCw className="animate-spin text-amber-500" size={24} />
+                  </div>
+                );
+                const data = pathwayJourney[journeyActiveTab];
+                return (
+                  <>
+                    {/* Segmented dots progress */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-500">
+                          {data.steps.filter(s => s.achieved).length}/{data.steps.length} achieved
+                        </span>
+                        <span className="text-xs font-bold text-slate-700">
+                          {Math.round(((data.currentIndex + 1) / data.steps.length) * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        {data.steps.map((s, i) => (
+                          <div key={i} className={`flex-1 h-2 rounded-full transition-all duration-500 ${s.achieved ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-slate-200'}`} />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Step rows */}
+                    {data.steps.map((step, i) => {
+                      const isCurrent = i === data.currentIndex && step.achieved;
+                      return (
+                        <div key={step.title} className={`flex items-center gap-3 p-3 rounded-xl border ${step.achieved ? 'border-green-100 bg-green-50/50' : 'border-slate-100 bg-white'}`}>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${step.achieved
+                            ? isCurrent ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'
+                            : 'bg-slate-100 text-slate-400'
+                            }`}>
+                            {step.achieved ? <CheckCircle size={13} /> : i + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm leading-tight ${step.achieved ? 'font-bold text-slate-900' : 'font-medium text-slate-400'}`}>{step.title}</p>
+                              {isCurrent && (
+                                <span className="text-[9px] font-black uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
+                              )}
+                            </div>
+                            {step.detail && <p className="text-[11px] text-slate-400 mt-0.5 truncate">{step.detail}</p>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
 
               {/* ── 1st / 2nd Year Engagement Tab (shared renderer, read-only) ── */}
               {(journeyActiveTab === 'firstYear' || journeyActiveTab === 'secondYear') && (() => {
