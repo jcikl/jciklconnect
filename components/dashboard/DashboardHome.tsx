@@ -1053,7 +1053,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                   <span className="text-[9px] font-black uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
                                 )}
                               </div>
-                              {visibleEntries.length > 0 && (
+                              {(!hasMore || isExpanded) && visibleEntries.length > 0 && (
                                 <div className="mt-0.5 space-y-0.5">
                                   {visibleEntries.map((e, ei) => (
                                     <p key={ei} className="text-[11px] text-white/30 truncate">{e}</p>
