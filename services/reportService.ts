@@ -1,4 +1,4 @@
-// Report Service - Generate and export reports
+﻿// Report Service - Generate and export reports
 import {
   collection,
   query,
@@ -387,7 +387,7 @@ export class ReportService {
         ethnicity: race,
         birthDate: dob,
         birthPlace: (m.general as any)?.birthPlace || m.birthPlace || '',
-        occupation: m.business?.title || m.profession || m.business?.companyName || '',
+        occupation: m.business?.title || m.business?.companyName || '',
         homeAddress: m.contact?.address || m.address || '',
         contactNumber: m.contact?.phone || m.phone || '',
         email: m.contact?.email || m.email || '',

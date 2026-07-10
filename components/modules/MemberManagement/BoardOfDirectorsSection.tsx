@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Save, Users, Plus, Trash2, ChevronRight, Award, Shield, RefreshCw, Camera, Quote, Tag, AlignLeft, ImageIcon } from 'lucide-react';
 import { Card, Button, useToast, Badge, Modal } from '../../ui/Common';
 import { Select, Input } from '../../ui/Form';
@@ -24,7 +24,7 @@ const POSITION_ORDER: Record<string, number> = {
   'JCI Officer': 14,
 };
 
-/** Board 设定弹窗的职位分组标签 */
+/** Board è®¾å®šå¼¹çª—çš„èŒä½åˆ†ç»„æ ‡ç­¾ */
 const POSITION_GROUPS: { key: string; label: string; positions: string[] }[] = [
   {
     key: 'exco',
@@ -490,7 +490,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       </div>
                       {logoUploading && (
                         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-4">
-                          <p className="text-xs text-white font-bold">Uploading…</p>
+                          <p className="text-xs text-white font-bold">Uploadingâ€¦</p>
                           <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden"><div className="h-full bg-white transition-all rounded-full" style={{ width: `${logoUploadProgress}%` }} /></div>
                         </div>
                       )}
@@ -513,7 +513,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       </label>
                     )}
                   </div>
-                  {/* Group Photos — side by side cards */}
+                  {/* Group Photos â€” side by side cards */}
                   {([
                     {
                       key: 'groupPhotoUrl' as const,
@@ -591,7 +591,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                         {/* Upload progress overlay */}
                         {item.uploading && (
                           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-6">
-                            <p className="text-xs text-white font-bold">Uploading…</p>
+                            <p className="text-xs text-white font-bold">Uploadingâ€¦</p>
                             <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden">
                               <div className="h-full bg-white transition-all rounded-full" style={{ width: `${item.progress}%` }} />
                             </div>
@@ -852,7 +852,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                             <h4 className={`font-black text-slate-900 truncate ${isPresident ? 'text-lg' : 'text-sm'}`}>
                               {bm.fullName || bm.name}
                             </h4>
-                            <p className="text-xs text-slate-500 truncate">{bm.companyName || bm.profession || 'JCI Member'}</p>
+                            <p className="text-xs text-slate-500 truncate">{bm.companyName || (bm.business?.title ?? bm.profession) || 'JCI Member'}</p>
                           </div>
                         </div>
 

@@ -603,6 +603,7 @@ export interface Member {
   dietaryPreference?: 'vegetarian' | 'halal' | 'normal' | null;
   /** @deprecated use business.interestedIndustries */
   interestedIndustries?: string[];
+  /** @deprecated use business.title */
   profession?: string;
   /** @deprecated use jciCareer.senatorshipValidatedAt */
   senatorshipValidatedAt?: string;

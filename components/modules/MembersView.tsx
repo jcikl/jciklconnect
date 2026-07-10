@@ -1,4 +1,4 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Trash2, Settings, X, ChevronDown, Sparkles, ArrowLeft, Phone, Mail,
@@ -38,7 +38,7 @@ import {
 } from '../../services/membershipConfigService';
 import { MembersService } from '../../services/membersService';
 
-/** 出席对比：当年签到次数 vs 已过月份（入会年份从入会月起算），每年重算 */
+/** å‡ºå¸­å¯¹æ¯”ï¼šå½“å¹´ç­¾åˆ°æ¬¡æ•° vs å·²è¿‡æœˆä»½ï¼ˆå…¥ä¼šå¹´ä»½ä»Žå…¥ä¼šæœˆèµ·ç®—ï¼‰ï¼Œæ¯å¹´é‡ç®— */
 const getAttendanceDisplay = (m: Member) => {
   const year = new Date().getFullYear();
   const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate || m.joinDate);
@@ -185,7 +185,7 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
         </form>
       </Card>
 
-      {/* Story 8.1：会费状态与活动参与、筹委经历 */}
+      {/* Story 8.1ï¼šä¼šè´¹çŠ¶æ€ä¸Žæ´»åŠ¨å‚ä¸Žã€ç­¹å§”ç»åŽ† */}
       <Card className="p-4">
         <h3 className="font-semibold text-slate-800 mb-4">Dues Status & Participation History</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -229,7 +229,7 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
               ) : (
                 <ul className="divide-y divide-slate-100 text-sm">
                   {organizerEvents.slice(0, 10).map((e) => (
-                    <li key={e.id} className="py-2 text-slate-700">{e.title}（{e.date?.slice(0, 10)}）</li>
+                    <li key={e.id} className="py-2 text-slate-700">{e.title}ï¼ˆ{e.date?.slice(0, 10)}ï¼‰</li>
                   ))}
                   {organizerEvents.length > 10 && <li className="py-2 text-slate-500">Total {organizerEvents.length}, showing latest 10</li>}
                 </ul>
@@ -680,7 +680,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     <div className="space-y-0 pb-24 md:pb-0">
       {!selectedMember ? (
         <>
-          {/* ── PAGE HEADER ── */}
+          {/* â”€â”€ PAGE HEADER â”€â”€ */}
           <div className="flex items-center justify-between gap-3 mb-4">
             {/* Left: title */}
             <div>
@@ -738,7 +738,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             )}
           </div>
 
-          {/* ── TAB NAVIGATION ── */}
+          {/* â”€â”€ TAB NAVIGATION â”€â”€ */}
           {/* Desktop: scrollable icon+label tabs */}
           <div className="hidden md:flex items-center gap-1 overflow-x-auto pb-1 mb-4 scrollbar-none border-b border-slate-100">
             {TAB_CONFIG.map(tab => {
@@ -765,7 +765,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             })}
           </div>
 
-          {/* Mobile: current tab pill → tap → bottom sheet */}
+          {/* Mobile: current tab pill â†’ tap â†’ bottom sheet */}
           <div className="md:hidden mb-4">
             <button
               onClick={() => setShowTabSheet(true)}
@@ -1169,7 +1169,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         }}
       />
 
-      {/* Export Modal – Export Data (migrated from Import/Export tab) */}
+      {/* Export Modal â€“ Export Data (migrated from Import/Export tab) */}
       <Modal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
@@ -1429,7 +1429,7 @@ const MemberStatisticsView: React.FC<{
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards — 2×2 on mobile, 4-col on desktop */}
+      {/* KPI Cards â€” 2Ã—2 on mobile, 4-col on desktop */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Total Members', value: statistics.totalMembers, color: 'text-slate-900', bg: 'bg-slate-100', icon: Users },
@@ -1451,7 +1451,7 @@ const MemberStatisticsView: React.FC<{
         ))}
       </div>
 
-      {/* Engagement Overview — segmented bar */}
+      {/* Engagement Overview â€” segmented bar */}
       <Card title="Member Engagement Overview">
         {(() => {
           const high = statistics.engagementMetrics.highlyEngaged;
@@ -1471,7 +1471,7 @@ const MemberStatisticsView: React.FC<{
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { label: 'Highly Engaged', value: high, pct: highPct, color: 'text-green-600', dot: 'bg-green-500', sub: '>80%' },
-                  { label: 'Moderately Engaged', value: mod, pct: modPct, color: 'text-amber-500', dot: 'bg-amber-400', sub: '50–80%' },
+                  { label: 'Moderately Engaged', value: mod, pct: modPct, color: 'text-amber-500', dot: 'bg-amber-400', sub: '50â€“80%' },
                   { label: 'Low Engaged', value: low, pct: lowPct, color: 'text-red-500', dot: 'bg-red-400', sub: '<50%' },
                 ].map(({ label, value, pct, color, dot, sub }) => (
                   <div key={label} className="text-center">
@@ -1480,7 +1480,7 @@ const MemberStatisticsView: React.FC<{
                       <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{sub}</span>
                     </div>
-                    <div className="text-[9px] text-slate-400 mt-0.5">{pct}% · {label.split(' ')[0]}</div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">{pct}% Â· {label.split(' ')[0]}</div>
                   </div>
                 ))}
               </div>
@@ -1489,7 +1489,7 @@ const MemberStatisticsView: React.FC<{
         })()}
       </Card>
 
-      {/* 2×2 donut chart grid */}
+      {/* 2Ã—2 donut chart grid */}
       <div className="grid md:grid-cols-4 gap-4">
         <Card title="Age Demographics">
           <DonutChart
@@ -1584,7 +1584,7 @@ const MemberStatisticsView: React.FC<{
                 <h3 className="text-lg font-black text-slate-900">{drawerSegment.label}</h3>
               </div>
               <div className="flex items-center gap-3">
-                <span className="bg-jci-blue/10 text-jci-blue text-sm font-black px-3 py-1 rounded-full">{drawerSegment.members.length} 人</span>
+                <span className="bg-jci-blue/10 text-jci-blue text-sm font-black px-3 py-1 rounded-full">{drawerSegment.members.length} äºº</span>
                 <button onClick={() => setDrawerSegment(null)} className="p-2 rounded-full hover:bg-slate-100 text-slate-400">
                   <X size={18} />
                 </button>
@@ -2259,10 +2259,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     });
 
     const personas: Record<string, string> = {
-      A: 'Learning-oriented (学习型)',
-      B: 'Practical-oriented (务实型)',
-      C: 'Backbone-oriented (骨干型)',
-      D: 'Explorer-oriented (探索型)'
+      A: 'Learning-oriented (å­¦ä¹ åž‹)',
+      B: 'Practical-oriented (åŠ¡å®žåž‹)',
+      C: 'Backbone-oriented (éª¨å¹²åž‹)',
+      D: 'Explorer-oriented (æŽ¢ç´¢åž‹)'
     };
 
     return {
@@ -2525,7 +2525,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     }
   };
 
-  // Whether this member's email already has a Firebase Auth account (Google/password) —
+  // Whether this member's email already has a Firebase Auth account (Google/password) â€”
   // if so, the CTA becomes "Reset Password" instead of "Send Invite"
   const [authEmailExists, setAuthEmailExists] = useState<boolean | null>(null);
   useEffect(() => {
@@ -2540,7 +2540,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     })
       .then(res => (res.ok ? res.json() : null))
       .then(data => { if (!cancelled && data) setAuthEmailExists(!!data.exists); })
-      .catch(() => { /* keep null — fall back to Send Invite */ });
+      .catch(() => { /* keep null â€” fall back to Send Invite */ });
     return () => { cancelled = true; };
   }, [member.id]);
 
@@ -2589,7 +2589,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     bizTagsScore += tags.filter(t => bizTagItems.includes(t)).length * 5;
     const bizBase = 40;
     const bizWillingness = member.acceptInternationalBusiness === 'Yes' ? 25 : member.acceptInternationalBusiness === 'Willing to Explore' ? 12 : 0;
-    const bizProfile = (member.companyName || member.profession) ? 5 : 0;
+    const bizProfile = ((member.companyName || member.business?.title)) ? 5 : 0;
     const bizPersona = member.personaType?.includes('Practical') ? 10 : 0;
     const business = Math.min(99, Math.max(15, bizBase + Math.min(25, bizTagsScore) + bizWillingness + bizProfile + bizPersona));
 
@@ -2661,7 +2661,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       {/* Header Card */}
       <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md group">
 
-        {/* ── MOBILE hero ── */}
+        {/* â”€â”€ MOBILE hero â”€â”€ */}
         <div className="md:hidden bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy px-4 pt-4 pb-3 relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
           {!isSelfView && (
@@ -2693,7 +2693,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
                 <p className="text-white/70 text-xs mt-0.5 truncate">
                   <Briefcase size={10} className="inline mr-1 opacity-70" />
-                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
+                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' Â· ')}
                 </p>
               )}
               <div className="flex flex-col gap-0.5 mt-1 text-white/60 text-[10px]">
@@ -2704,7 +2704,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
         </div>
 
-        {/* ── MOBILE contact + actions strip ── */}
+        {/* â”€â”€ MOBILE contact + actions strip â”€â”€ */}
         <div className="md:hidden px-4 py-3 space-y-2.5 border-b border-slate-100">
           <div className="flex flex-wrap gap-1.5">
             <span className="flex items-center gap-1 text-[11px] bg-slate-50 border border-slate-100 rounded-lg px-2 py-1">
@@ -2712,7 +2712,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <span className="text-jci-blue">{member.role}</span>
               {member.introducer && (
                 <>
-                  <span className="text-slate-300 mx-0.5">·</span>
+                  <span className="text-slate-300 mx-0.5">Â·</span>
                   <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
                 </>
               )}
@@ -2776,9 +2776,9 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
           </div>
         </div>
 
-        {/* ── DESKTOP hero + strip wrapper ── */}
+        {/* â”€â”€ DESKTOP hero + strip wrapper â”€â”€ */}
         <div className="hidden md:block relative">
-          {/* 区块一: banner */}
+          {/* åŒºå—ä¸€: banner */}
           <div className="h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
             <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
@@ -2791,7 +2791,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 <X size={17} />
               </button>
             )}
-            {/* Name, Tier Badge, position, company — pl-52 clears avatar */}
+            {/* Name, Tier Badge, position, company â€” pl-52 clears avatar */}
             <div className="absolute bottom-4 left-0 right-0 px-6 pl-52 flex flex-col justify-end gap-1">
               <div className="flex flex-row items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.name}</h1>
@@ -2799,13 +2799,13 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
                 <p className="text-sm font-semibold text-white/70 flex items-center gap-1.5">
                   <Briefcase size={13} className="text-white/50 shrink-0" />
-                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
+                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' Â· ')}
                 </p>
               )}
             </div>
           </div>
 
-          {/* 区块二: avatar — absolute, straddles banner/strip boundary (top-24 = 10rem - 4rem) */}
+          {/* åŒºå—äºŒ: avatar â€” absolute, straddles banner/strip boundary (top-24 = 10rem - 4rem) */}
           <div className="absolute left-6 top-24 z-20">
             <div className="relative">
               <div className="p-1 bg-white rounded-full shadow-xl">
@@ -2819,23 +2819,23 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             </div>
           </div>
 
-          {/* 区块三: contact + actions strip — directly below banner, pl-52 clears avatar */}
+          {/* åŒºå—ä¸‰: contact + actions strip â€” directly below banner, pl-52 clears avatar */}
           <div className="px-6 pl-52 py-3 border-b border-slate-100 flex items-center gap-4">
-            {/* 左：chips */}
+            {/* å·¦ï¼šchips */}
             <div className="flex-1 flex flex-col gap-1.5">
-              {/* 行一：email / phone */}
+              {/* è¡Œä¸€ï¼šemail / phone */}
               <div className="flex flex-wrap gap-1.5 items-center">
                 <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Mail size={12} className="text-jci-blue shrink-0" />{member.email}</span>
                 {member.phone && <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Phone size={12} className="text-jci-blue shrink-0" />{member.phone}</span>}
               </div>
-              {/* 行二：role + introducer + 社交媒体 */}
+              {/* è¡ŒäºŒï¼šrole + introducer + ç¤¾äº¤åª’ä½“ */}
               <div className="flex flex-wrap gap-1.5 items-center">
                 <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium">
                   <Shield size={12} className="text-jci-blue shrink-0" />
                   <span className="text-jci-blue">{member.role}</span>
                   {member.introducer && (
                     <>
-                      <span className="text-slate-300 mx-0.5">·</span>
+                      <span className="text-slate-300 mx-0.5">Â·</span>
                       <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
                     </>
                   )}
@@ -2857,7 +2857,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               </div>
 
             </div>
-            {/* 右：操作按钮组 */}
+            {/* å³ï¼šæ“ä½œæŒ‰é’®ç»„ */}
             <div className="flex gap-2 shrink-0">
               {isEditMode ? (
                 <>
@@ -2900,7 +2900,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                 </>
               )}
             </div>
-          </div>{/* end 区块三 */}
+          </div>{/* end åŒºå—ä¸‰ */}
         </div>{/* end desktop hero wrapper */}
 
         <div className="grid grid-cols-4 gap-0 border-t border-slate-100 divide-x divide-slate-100 bg-slate-50/50">
@@ -3570,15 +3570,15 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
             {activeDetailTab === 'professional' && (member.companyName || member.industry) && activeInlineEditCard !== 'professional' && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
-                  <p className="text-sm text-slate-500 mt-0.5">{[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.industry].filter(Boolean).join(' · ')}</p>
+                  <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || 'â€”'}</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">{[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.industry].filter(Boolean).join(' Â· ')}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
                   {member.industry && (
                     <span className="px-3 py-1 rounded-full bg-blue-50 text-jci-blue text-xs font-bold border border-blue-100">{member.industry}</span>
                   )}
                   {member.acceptInternationalBusiness && member.acceptInternationalBusiness !== 'No' && (
-                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
+                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">ðŸŒ Intl Business</span>
                   )}
                   {member.companyWebsite && (
                     <a href={member.companyWebsite} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
@@ -3983,7 +3983,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1">Emergency Contact</h4>
                         <div>
                           <p className="text-sm font-bold text-slate-900">{member.emergencyContactName || 'None Listed'}</p>
-                          <p className="text-xs text-slate-500">{member.emergencyContactRelationship} • {member.emergencyContactPhone}</p>
+                          <p className="text-xs text-slate-500">{member.emergencyContactRelationship} â€¢ {member.emergencyContactPhone}</p>
                         </div>
 
                         <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
@@ -4168,7 +4168,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             type: 'board',
                             year: bp.term,
                             title: bp.position,
-                            subtitle: `Board of Directors – ${bp.term}`,
+                            subtitle: `Board of Directors â€“ ${bp.term}`,
                             bodStatus: getBodStatus(bp),
                           });
                         });
@@ -4481,7 +4481,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               )}
             </Card>
 
-            {/* Config Overview Card — points info is President-only */}
+            {/* Config Overview Card â€” points info is President-only */}
             {isPresident && (
               <Card title="Points Standard Reference" className="bg-slate-50/50">
                 <div className="text-xs space-y-3 text-slate-600">
@@ -4538,8 +4538,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                   : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
                   }`}
               >
-                <span className="text-[11px]">🌐</span>
-                {assessmentShowZh ? 'EN' : '中文'}
+                <span className="text-[11px]">ðŸŒ</span>
+                {assessmentShowZh ? 'EN' : 'ä¸­æ–‡'}
               </button>
             </div>
 
@@ -4663,7 +4663,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         <Modal
           isOpen={showPaymentHistoryModal}
           onClose={() => setShowPaymentHistoryModal(false)}
-          title={`Membership Dues History — ${member.name}`}
+          title={`Membership Dues History â€” ${member.name}`}
           size="md"
           bottomSheet
         >
@@ -4732,7 +4732,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             Target: RM {record.dues || 0}
                           </p>
                           {record.dues > 0 && record.amount >= record.dues && (
-                            <p className="text-[10px] text-green-600 font-bold">✓ Fulfilled</p>
+                            <p className="text-[10px] text-green-600 font-bold">âœ“ Fulfilled</p>
                           )}
                         </div>
                       </div>
@@ -4837,7 +4837,7 @@ const MentorMatchingModal: React.FC<MentorMatchingModalProps> = ({ mentee, poten
                           <Zap size={10} fill="currentColor" /> {match.matchScore}%
                         </div>
                       </div>
-                      <p className="text-xs text-slate-500 mb-2">{match.mentor.role} • {match.mentor.tier}</p>
+                      <p className="text-xs text-slate-500 mb-2">{match.mentor.role} â€¢ {match.mentor.tier}</p>
 
                       <div className="flex flex-wrap gap-1 mb-3">
                         {Array.isArray(match.mentor.skills) && match.mentor.skills.slice(0, 3).map(skill => (
@@ -5391,9 +5391,9 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h4 className="font-semibold text-blue-900 mb-2">Default Probation Tasks:</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Attend Orientation Session</li>
-                <li>• Complete Member Profile</li>
-                <li>• Attend First Event</li>
+                <li>â€¢ Attend Orientation Session</li>
+                <li>â€¢ Complete Member Profile</li>
+                <li>â€¢ Attend First Event</li>
               </ul>
             </div>
 
@@ -5445,9 +5445,9 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h4 className="font-semibold text-blue-900 mb-2">Default Probation Tasks:</h4>
               <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Attend Orientation Session</li>
-                <li>• Complete Member Profile</li>
-                <li>• Attend First Event</li>
+                <li>â€¢ Attend Orientation Session</li>
+                <li>â€¢ Complete Member Profile</li>
+                <li>â€¢ Attend First Event</li>
               </ul>
             </div>
 

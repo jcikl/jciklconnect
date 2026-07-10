@@ -125,9 +125,11 @@ export class MentorshipService {
     }
 
     // Professional background alignment
-    if (mentor.profession && mentee.profession) {
-      if (mentor.profession.toLowerCase().includes(mentee.profession.toLowerCase()) ||
-          mentee.profession.toLowerCase().includes(mentor.profession.toLowerCase())) {
+    const mentorTitle = mentor.business?.title ?? mentor.profession;
+    const menteeTitle = mentee.business?.title ?? mentee.profession;
+    if (mentorTitle && menteeTitle) {
+      if (mentorTitle.toLowerCase().includes(menteeTitle.toLowerCase()) ||
+          menteeTitle.toLowerCase().includes(mentorTitle.toLowerCase())) {
         score += 15;
         factors.push('Similar professional background');
       }

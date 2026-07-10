@@ -1,4 +1,4 @@
-// Data Import/Export Service
+﻿// Data Import/Export Service
 import Papa from 'papaparse';
 // xlsx is dynamically imported inside importFromFile() and exportToExcel() to avoid eager loading
 import {
@@ -544,7 +544,7 @@ export class DataImportExportService {
   }
 
   /**
-   * Export data to JSON (Story 6.1 – 主档导出约定格式)
+   * Export data to JSON (Story 6.1 â€“ ä¸»æ¡£å¯¼å‡ºçº¦å®šæ ¼å¼)
    */
   static async exportToJSON(
     entityType: string,
@@ -724,7 +724,7 @@ export class DataImportExportService {
         // Basic Info
         'name', 'fullName', 'idNumber', 'email', 'dateOfBirth', 'gender', 'ethnicity', 'nationality', 'role', 'status', 'tier', 'points', 'joinDate', 'introducer', 'membershipType', 'duesYear', 'duesPaidDate', 'senatorCertified', 'bio', 'avatar',
         // 2. Professional & Business Information
-        'profession', 'companyName', 'companyWebsite', 'companyDescription', 'departmentAndPosition', 'industry', 'businessCategory', 'interestedIndustries', 'acceptInternationalBusiness', 'specialOffer', 'companyLogoUrl',
+        'companyName', 'companyWebsite', 'companyDescription', 'departmentAndPosition', 'industry', 'businessCategory', 'interestedIndustries', 'acceptInternationalBusiness', 'specialOffer', 'companyLogoUrl',
         // 3. Contact Information (Personal & Emergency)
         'phone', 'alternatePhone', 'whatsappGroup', 'address', 'linkedin', 'facebook', 'instagram', 'wechat', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship',
         // 4. Apparel & Items

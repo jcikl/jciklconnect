@@ -46,6 +46,13 @@ const MIGRATIONS = [
   },
 
   // business.*
+  // profession → business.title (only when business.title is absent)
+  {
+    flatField: 'profession',
+    subObject: 'business',
+    nestedField: 'title',
+    conditionFn: (data) => data.business != null && (data.business.title == null || data.business.title === ''),
+  },
   { flatField: 'levelOfManagement',     subObject: 'business', nestedField: 'levelOfManagement' },
   { flatField: 'departmentAndPosition', subObject: 'business', nestedField: 'departmentAndPosition' },
   { flatField: 'companyDescription',    subObject: 'business', nestedField: 'companyDescription' },
