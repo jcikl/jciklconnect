@@ -4531,13 +4531,19 @@ export const JCIKLApp: React.FC = () => {
         <Modal
           isOpen={isSignOutConfirmOpen}
           onClose={() => setSignOutConfirmOpen(false)}
-          title="Sign Out"
+          title=""
           size="sm"
         >
-          <div className="px-4 pb-4 space-y-4">
-            <p className="text-sm text-slate-500">Are you sure you want to sign out?</p>
-            <div className="flex gap-3">
-              <Button variant="ghost" className="flex-1" onClick={() => setSignOutConfirmOpen(false)}>Cancel</Button>
+          <div className="flex flex-col items-center text-center px-6 pb-6 pt-2 gap-5">
+            <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+              <LogOut size={24} className="text-red-500" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-semibold text-slate-800 text-base">Sign out?</p>
+              <p className="text-sm text-slate-400">You'll need to log in again to access your account.</p>
+            </div>
+            <div className="flex gap-3 w-full">
+              <Button variant="outline" className="flex-1" onClick={() => setSignOutConfirmOpen(false)}>Cancel</Button>
               <Button variant="danger" className="flex-1" onClick={() => { setSignOutConfirmOpen(false); handleLogout(); }}>Sign Out</Button>
             </div>
           </div>
