@@ -4703,12 +4703,6 @@ export const JCIKLApp: React.FC = () => {
                             <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Evts Mgt</span>
                           </div>
                         )}
-                        {canViewEventsManagement && !isPlainMember && (
-                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setShowMobileMenu(false); }}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-violet-950/30 text-violet-400 border-violet-900/50'}`}><Briefcase size={22} /></div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Flagship</span>
-                          </div>
-                        )}
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SURVEYS'); setShowMobileMenu(false); }}>
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-rose-950/30 text-rose-400 border-rose-900/50'}`}><CheckSquare size={22} /></div>
                           <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Surveys</span>
@@ -4731,12 +4725,6 @@ export const JCIKLApp: React.FC = () => {
                             </div>
                           </>
                         )}
-                        {(isBoard || isAdmin) && (
-                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ADVERTISEMENTS'); setShowMobileMenu(false); }}>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-orange-950/30 text-orange-400 border-orange-900/50'}`}><Megaphone size={22} /></div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Partners</span>
-                          </div>
-                        )}
                         {canAccessWorkspaceModules && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GAMIFICATION'); setShowMobileMenu(false); }}>
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-yellow-950/30 text-yellow-400 border-yellow-900/50'}`}><Award size={22} /></div>
@@ -4755,6 +4743,22 @@ export const JCIKLApp: React.FC = () => {
                         <div className="flex-1 h-px bg-slate-700/60" />
                       </div>
                       <div className="grid grid-cols-4 gap-y-4 gap-x-1">
+                        {canViewEventsManagement && !isPlainMember && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setShowMobileMenu(false); }}>
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Briefcase size={22} /></div>
+                            <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Flagship</span>
+                          </div>
+                        )}
+                        {(isBoard || isAdmin) && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ADVERTISEMENTS'); setShowMobileMenu(false); }}>
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Megaphone size={22} /></div>
+                            <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Partners</span>
+                          </div>
+                        )}
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PUBLICATIONS'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><BookOpen size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Publications</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -4794,10 +4798,6 @@ export const JCIKLApp: React.FC = () => {
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ACCESS_CONFIG'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Shield size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Access Cfg</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PUBLICATIONS'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><BookOpen size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Publications</span>
                         </div>
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('AUTOMATION'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Activity size={22} /></div>
