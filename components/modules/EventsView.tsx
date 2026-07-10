@@ -294,14 +294,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   member,
   members,
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'participants' | 'feedback'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'participants' | 'stats' | 'feedback'>('details');
   const [eventFeedback, setEventFeedback] = useState<EventFeedbackSummary | null>(null);
   const [participations, setParticipations] = useState<EventRegistration[]>([]);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [updatingRegId, setUpdatingRegId] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [participantSubTab, setParticipantSubTab] = useState<'all' | 'board' | 'director' | 'member' | 'guest' | 'stats'>('all');
+  const [participantSubTab, setParticipantSubTab] = useState<'all' | 'board' | 'director' | 'member' | 'guest'>('all');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
@@ -379,6 +379,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     const tabs = ['Event Details'];
     if (isCommitteeMember) {
       tabs.push('Participants');
+      tabs.push('Stats');
     }
     tabs.push('Feedback');
     return tabs;
@@ -387,7 +388,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   useEffect(() => {
     if (activeTab === 'feedback') {
       loadEventFeedback();
-    } else if (activeTab === 'participants') {
+    } else if (activeTab === 'participants' || activeTab === 'stats') {
       loadParticipations();
     }
   }, [activeTab, event.id]);
@@ -679,6 +680,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   onTabChange={(tab) => {
                     if (tab === 'Event Details') setActiveTab('details');
                     else if (tab === 'Participants') setActiveTab('participants');
+                    else if (tab === 'Stats') setActiveTab('stats');
                     else setActiveTab('feedback');
                   }}
                   className="mb-4"
@@ -765,7 +767,6 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       { key: 'director', label: 'Comm. Dir.', count: directorRegs.length },
                       { key: 'member', label: 'Member', count: memberRegs.length },
                       { key: 'guest', label: 'Guest', count: guestRegs.length },
-                      { key: 'stats', label: 'Stats' },
                     ];
                     return (
                       <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1 scrollbar-none">
@@ -814,69 +815,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     <div className="flex items-center justify-center py-10">
                       <RefreshCw className="animate-spin text-jci-blue" size={22} />
                     </div>
-                  ) : participantSubTab === 'stats' ? (() => {
-                    const activeRegs = participations.filter(r => r.status !== 'cancelled');
-                    const vegCount = activeRegs.filter(r => r.isVegetarian === true).length;
-                    const nonVegCount = activeRegs.filter(r => r.isVegetarian === false).length;
-                    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
-                    const sizeCounts = activeRegs.reduce<Record<string, number>>((acc, r) => {
-                      if (r.tshirtSize) acc[r.tshirtSize] = (acc[r.tshirtSize] ?? 0) + 1;
-                      return acc;
-                    }, {});
-                    const sizes = Object.entries(sizeCounts).sort(([a], [b]) => {
-                      const ai = sizeOrder.indexOf(a), bi = sizeOrder.indexOf(b);
-                      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-                    });
-                    return (
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-slate-100 overflow-hidden">
-                          <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dietary</p>
-                          </div>
-                          <div className="divide-y divide-slate-100">
-                            <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                              <span className="text-sm text-slate-700">Vegetarian</span>
-                              <span className="text-sm font-bold text-jci-blue">{vegCount}</span>
-                            </div>
-                            <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                              <span className="text-sm text-slate-700">Non-vegetarian</span>
-                              <span className="text-sm font-bold text-slate-700">{nonVegCount}</span>
-                            </div>
-                            <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                              <span className="text-sm text-slate-400">Not specified</span>
-                              <span className="text-sm font-bold text-slate-400">{activeRegs.length - vegCount - nonVegCount}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="rounded-xl border border-slate-100 overflow-hidden">
-                          <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">T-Shirt Sizes</p>
-                          </div>
-                          {sizes.length === 0 ? (
-                            <div className="px-3.5 py-4 text-center text-sm text-slate-400">No size data collected</div>
-                          ) : (
-                            <div className="divide-y divide-slate-100">
-                              {sizes.map(([size, count]) => (
-                                <div key={size} className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                                  <span className="text-sm text-slate-700">{size}</span>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                      <div className="h-full bg-jci-blue rounded-full" style={{ width: `${Math.round((count / activeRegs.length) * 100)}%` }} />
-                                    </div>
-                                    <span className="text-sm font-bold text-slate-700 w-4 text-right">{count}</span>
-                                  </div>
-                                </div>
-                              ))}
-                              <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                                <span className="text-sm text-slate-400">Not specified</span>
-                                <span className="text-sm font-bold text-slate-400">{activeRegs.length - sizes.reduce((s, [, c]) => s + c, 0)}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })() : (participantSubTab === 'board' || participantSubTab === 'director') ? (() => {
+                  ) : (participantSubTab === 'board' || participantSubTab === 'director') ? (() => {
                     const targetMembers = participantSubTab === 'board'
                       ? members.filter(m => isBoardMember(m))
                       : members.filter(m => isDirector(m) && !isBoardMember(m));
@@ -1104,6 +1043,70 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   })()}
                 </div>
               )}
+
+              {activeTab === 'stats' && (() => {
+                const activeRegs = participations.filter(r => r.status !== 'cancelled');
+                const vegCount = activeRegs.filter(r => r.isVegetarian === true).length;
+                const nonVegCount = activeRegs.filter(r => r.isVegetarian === false).length;
+                const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+                const sizeCounts = activeRegs.reduce<Record<string, number>>((acc, r) => {
+                  if (r.tshirtSize) acc[r.tshirtSize] = (acc[r.tshirtSize] ?? 0) + 1;
+                  return acc;
+                }, {});
+                const sizes = Object.entries(sizeCounts).sort(([a], [b]) => {
+                  const ai = sizeOrder.indexOf(a), bi = sizeOrder.indexOf(b);
+                  return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                });
+                return (
+                  <div className="animate-fade-in space-y-4">
+                    <div className="rounded-xl border border-slate-100 overflow-hidden">
+                      <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dietary</p>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                          <span className="text-sm text-slate-700">Vegetarian</span>
+                          <span className="text-sm font-bold text-jci-blue">{vegCount}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                          <span className="text-sm text-slate-700">Non-vegetarian</span>
+                          <span className="text-sm font-bold text-slate-700">{nonVegCount}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                          <span className="text-sm text-slate-400">Not specified</span>
+                          <span className="text-sm font-bold text-slate-400">{activeRegs.length - vegCount - nonVegCount}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 overflow-hidden">
+                      <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">T-Shirt Sizes</p>
+                      </div>
+                      {sizes.length === 0 ? (
+                        <div className="px-3.5 py-4 text-center text-sm text-slate-400">No size data collected</div>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {sizes.map(([size, count]) => (
+                            <div key={size} className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                              <span className="text-sm text-slate-700">{size}</span>
+                              <div className="flex items-center gap-3">
+                                <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-jci-blue rounded-full" style={{ width: `${Math.round((count / activeRegs.length) * 100)}%` }} />
+                                </div>
+                                <span className="text-sm font-bold text-slate-700 w-4 text-right">{count}</span>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                            <span className="text-sm text-slate-400">Not specified</span>
+                            <span className="text-sm font-bold text-slate-400">{activeRegs.length - sizes.reduce((s, [, c]) => s + c, 0)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {activeTab === 'feedback' && (
                 <div className="animate-fade-in">
