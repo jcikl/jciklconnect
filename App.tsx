@@ -4747,6 +4747,34 @@ export const JCIKLApp: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Portal section */}
+                  {(isBoard || isAdmin || isDeveloper) && (
+                    <div className="pt-4">
+                      <div className="flex items-center gap-2 mb-3 w-[90%]">
+                        <span className="text-[10px] font-bold uppercase tracking-widest shrink-0 text-slate-500">Portal</span>
+                        <div className="flex-1 h-px bg-slate-700/60" />
+                      </div>
+                      <div className="grid grid-cols-4 gap-y-4 gap-x-1">
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GUEST'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Eye size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Home</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GUEST_EVENTS'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Calendar size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Events</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GUEST_ENEWSLETTERS'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Mail size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">E-News</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GUEST_PARTNERSHIPS'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Megaphone size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Partners</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* System section */}
                   {(isBoard || isAdmin || isDeveloper) && (
                     <div className="pt-4">
