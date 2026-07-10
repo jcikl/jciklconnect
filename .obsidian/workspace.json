@@ -1,20 +1,20 @@
 {
   "main": {
-    "id": "46e472e875569a88",
+    "id": "8a579ab72db53996",
     "type": "split",
     "children": [
       {
-        "id": "d542e14740087874",
+        "id": "c741eec6633c3259",
         "type": "tabs",
         "children": [
           {
-            "id": "215c89ce9b6097cb",
+            "id": "48f637b5618be61f",
             "type": "leaf",
             "state": {
-              "type": "empty",
+              "type": "graph",
               "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -23,15 +23,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "c053880984d8c940",
+    "id": "3caaf568d71ddd09",
     "type": "split",
     "children": [
       {
-        "id": "88e22f6d467fd057",
+        "id": "3b5f8034a9c555b0",
         "type": "tabs",
         "children": [
           {
-            "id": "0944d4d1f77ea3d0",
+            "id": "aa4ca96318bb4529",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -44,7 +44,7 @@
             }
           },
           {
-            "id": "da258e12558857fa",
+            "id": "85afbcc3af64f3b3",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "7a3bbec003b09112",
+            "id": "c1ab7eb3b854fe8f",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -77,20 +77,19 @@
     "width": 300
   },
   "right": {
-    "id": "5559bace34f232b2",
+    "id": "781bedb7746f33ce",
     "type": "split",
     "children": [
       {
-        "id": "e0a726fb04bcd338",
+        "id": "91c491a6f9438312",
         "type": "tabs",
         "children": [
           {
-            "id": "49ec63ce41771468",
+            "id": "73f92848d2ab72f7",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
-                "file": "雪茄文化与生意.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -100,25 +99,24 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for 雪茄文化与生意"
+              "title": "Backlinks"
             }
           },
           {
-            "id": "dc64b0fb3adbb62e",
+            "id": "9723f51d14eb8c75",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Untitled.base",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from Untitled"
+              "title": "Outgoing links"
             }
           },
           {
-            "id": "d527a56ea63efd3f",
+            "id": "a6d4f6928c8a89a0",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -133,7 +131,7 @@
             }
           },
           {
-            "id": "66f2c0558c3d512a",
+            "id": "7877e885cbacc2be",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -147,7 +145,7 @@
             }
           },
           {
-            "id": "2d66dcb1bfd3d14e",
+            "id": "821c045a2d2e91d9",
             "type": "leaf",
             "state": {
               "type": "outline",
@@ -160,8 +158,7 @@
               "title": "Outline"
             }
           }
-        ],
-        "currentTab": 4
+        ]
       }
     ],
     "direction": "horizontal",
@@ -178,20 +175,18 @@
       "bases:Create new base": false
     }
   },
-  "active": "215c89ce9b6097cb",
+  "active": "48f637b5618be61f",
   "lastOpenFiles": [
-    "APC/APC.md",
-    "Untitled.base",
-    "Welcome.md",
-    "Untitled.md",
-    "create a link.md",
-    "2026-06-25.md",
-    "2025-07-14.md",
-    "Untitled.canvas",
-    "Untitled",
-    "雪茄文化与生意.md",
-    "2025-04-15.md",
-    "Untitled/Untitled.base",
-    "APC"
+    "trash/components/accessibility/AccessibilityRunner.tsx",
+    "trash/components/modules/CanvaView.tsx",
+    "trash/services/memberBenefitsService.ts",
+    "trash/extractFirestoreSchema.js",
+    "trash/components/accessibility",
+    "App.tsx.tmp.14128.3283bc20fcf7",
+    "node_modules/jose/README.md",
+    "node_modules/common-tags/readme.md",
+    "FIREBASE_SETUP.md",
+    "CLAUDE.md",
+    "JCI KL(Eric/Untitled.base"
   ]
 }
