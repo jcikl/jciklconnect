@@ -18,6 +18,7 @@ import { db } from '../../config/firebase';
 import { EventFeedbackService, EventFeedback, EventFeedbackSummary } from '../../services/eventFeedbackService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { EventsService } from '../../services/eventsService';
+import { MembersService } from '../../services/membersService';
 import type { EventRegistration } from '../../types';
 import { formatCurrency } from '../../utils/formatUtils';
 import { formatDate } from '../../utils/dateUtils';
@@ -525,6 +526,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         dietary: addForm.dietary,
         tshirtSize: addForm.tshirtSize || undefined,
       });
+      const profileUpdate: Record<string, unknown> = { dietaryPreference: addForm.dietary };
+      if (addForm.tshirtSize) profileUpdate.tshirtSize = addForm.tshirtSize;
+      MembersService.updateMember(addMemberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(() => {});
       await loadParticipations();
       showToast(`${added?.name ?? 'Member'} added`, 'success');
       setAddMemberId('');
@@ -721,7 +725,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               {availableTabs.length > 1 && (
                 <Tabs
                   tabs={availableTabs}
-                  activeTab={activeTab === 'details' ? 'Event Details' : activeTab === 'participants' ? 'Participants' : 'Feedback'}
+                  activeTab={activeTab === 'details' ? 'Event Details' : activeTab === 'participants' ? 'Participants' : activeTab === 'stats' ? 'Stats' : 'Feedback'}
                   onTabChange={(tab) => {
                     if (tab === 'Event Details') setActiveTab('details');
                     else if (tab === 'Participants') setActiveTab('participants');
@@ -982,7 +986,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                               !isDirector(m)
                             )}
                             value={addMemberId}
-                            onChange={setAddMemberId}
+                            onChange={(id) => {
+                              setAddMemberId(id);
+                              const m = members.find(x => x.id === id);
+                              if (m) setAddForm({
+                                dietary: (m.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
+                                tshirtSize: m.tshirtSize ?? '',
+                              });
+                            }}
                             placeholder="Search members..."
                           />
                           <div className="flex gap-1.5">
@@ -1164,16 +1175,18 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 const activeRegs = participations.filter(r => r.status !== 'cancelled');
                 const dietaryCounts = { normal: 0, vegetarian: 0, halal: 0, unspecified: 0 };
                 activeRegs.forEach(r => {
-                  if (r.dietary === 'vegetarian') dietaryCounts.vegetarian++;
-                  else if (r.dietary === 'halal') dietaryCounts.halal++;
-                  else if (r.dietary === 'normal') dietaryCounts.normal++;
-                  else if (r.isVegetarian === true) dietaryCounts.vegetarian++; // legacy veg
-                  else if (r.isVegetarian === false) dietaryCounts.normal++; // legacy normal
+                  const mem = members.find(m => m.id === r.memberId);
+                  const dietary = r.dietary ?? (mem?.dietaryPreference as 'normal' | 'vegetarian' | 'halal' | null | undefined) ?? null;
+                  if (dietary === 'vegetarian') dietaryCounts.vegetarian++;
+                  else if (dietary === 'halal') dietaryCounts.halal++;
+                  else if (dietary === 'normal') dietaryCounts.normal++;
                   else dietaryCounts.unspecified++;
                 });
                 const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
                 const sizeCounts = activeRegs.reduce<Record<string, number>>((acc, r) => {
-                  if (r.tshirtSize) acc[r.tshirtSize] = (acc[r.tshirtSize] ?? 0) + 1;
+                  const mem = members.find(m => m.id === r.memberId);
+                  const size = r.tshirtSize ?? mem?.tshirtSize ?? null;
+                  if (size) acc[size] = (acc[size] ?? 0) + 1;
                   return acc;
                 }, {});
                 const sizes = Object.entries(sizeCounts).sort(([a], [b]) => {
