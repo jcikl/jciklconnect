@@ -68,7 +68,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const { showToast } = useToast();
   const { member, isDevMode, simulatedRole, simulateRole } = useAuth();
   const { isBoard, isAdmin, isDeveloper, hasPermission, isOrganizationFinance, isActivityFinance, isOrganizationSecretary } = usePermissions();
-  const { events, loading: eventsLoading, registerForEvent, markAttendance } = useEvents();
+  const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents();
   const { projects, loading: projectsLoading } = useProjects();
   const { members, loading: membersLoading } = useMembers();
   const { nudges, dismissNudge } = useBehavioralNudging();
@@ -1188,6 +1188,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           }}
           onCheckIn={() => {
             if (member) markAttendance(selectedEventForDetail.id!, member.id);
+          }}
+          onCancelRegistration={async (memberId, cancelledBy, cancelledByName, cancelledByRole) => {
+            await cancelRegistration(selectedEventForDetail.id!, memberId, cancelledBy, cancelledByName, cancelledByRole);
           }}
           member={member}
           members={members}
