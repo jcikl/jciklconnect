@@ -1,5 +1,4 @@
 ﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
-import { App as CapApp } from '@capacitor/app';
 import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
@@ -3828,37 +3827,42 @@ export const JCIKLApp: React.FC = () => {
     if (newView === 'DIRECTORY' && selectedId) setInitialSelectedBusinessId(selectedId);
   };
 
-  // Android hardware back button
+  // Android hardware back button (Capacitor only — skip on web/Netlify)
   useEffect(() => {
     let listener: { remove: () => void } | null = null;
-    CapApp.addListener('backButton', () => {
-      // Close any open drawer/modal first
-      if (isMenuDrawerOpen) { setIsMenuDrawerOpen(false); return; }
-      if (isNotificationDrawerOpen) { setNotificationDrawerOpen(false); return; }
-      if (isSearchDrawerOpen) { setSearchDrawerOpen(false); return; }
-      if (isLoginModalOpen) { setLoginModalOpen(false); return; }
+    let cancelled = false;
+    import('@capacitor/app').then(({ App: CapApp }) => {
+      if (cancelled) return;
+      CapApp.addListener('backButton', () => {
+        // Close any open drawer/modal first
+        if (isMenuDrawerOpen) { setIsMenuDrawerOpen(false); return; }
+        if (isNotificationDrawerOpen) { setNotificationDrawerOpen(false); return; }
+        if (isSearchDrawerOpen) { setSearchDrawerOpen(false); return; }
+        if (isLoginModalOpen) { setLoginModalOpen(false); return; }
 
-      // Navigate back through view history
-      if (viewHistory.length > 0) {
-        const prev = viewHistory[viewHistory.length - 1];
-        setViewHistory(h => h.slice(0, -1));
-        setView(prev);
-        return;
-      }
+        // Navigate back through view history
+        if (viewHistory.length > 0) {
+          const prev = viewHistory[viewHistory.length - 1];
+          setViewHistory(h => h.slice(0, -1));
+          setView(prev);
+          return;
+        }
 
-      // On root view (DASHBOARD or GUEST) — double-press to exit
-      if (backPressedOnceRef.current) {
-        CapApp.exitApp();
-      } else {
-        backPressedOnceRef.current = true;
-        showToast('再按一次退出应用', 'info');
-        backPressTimerRef.current = setTimeout(() => {
-          backPressedOnceRef.current = false;
-        }, 2000);
-      }
-    }).then(l => { listener = l; });
+        // On root view (DASHBOARD or GUEST) — double-press to exit
+        if (backPressedOnceRef.current) {
+          CapApp.exitApp();
+        } else {
+          backPressedOnceRef.current = true;
+          showToast('再按一次退出应用', 'info');
+          backPressTimerRef.current = setTimeout(() => {
+            backPressedOnceRef.current = false;
+          }, 2000);
+        }
+      }).then(l => { listener = l; });
+    }).catch(() => { /* not in Capacitor environment */ });
 
     return () => {
+      cancelled = true;
       listener?.remove();
       if (backPressTimerRef.current) clearTimeout(backPressTimerRef.current);
     };
