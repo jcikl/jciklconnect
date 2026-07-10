@@ -1225,7 +1225,20 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     {/* Registration status bar */}
                     {totalActive > 0 && (
                       <div className="rounded-xl border border-slate-100 bg-white p-3.5">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Registration Status</p>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registration Status</p>
+                          <button
+                            onClick={() => {
+                              const text = `Registration Status (${totalActive} active):\nChecked In: ${totalCheckedIn} (${pct(totalCheckedIn, totalActive)}%)\nPaid: ${totalPaid} (${pct(totalPaid, totalActive)}%)\nPending Payment: ${totalRegistered} (${pct(totalRegistered, totalActive)}%)${totalCancelled > 0 ? `\nCancelled: ${totalCancelled}` : ''}`;
+                              navigator.clipboard.writeText(text);
+                              showToast('Registration status copied', 'success');
+                            }}
+                            className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded"
+                            title="Copy registration status"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        </div>
                         <div className="flex h-3 rounded-full overflow-hidden gap-px">
                           {totalCheckedIn > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${pct(totalCheckedIn, totalActive)}%` }} title={`Checked In: ${totalCheckedIn}`} />}
                           {totalPaid > 0 && <div className="bg-jci-blue transition-all" style={{ width: `${pct(totalPaid, totalActive)}%` }} title={`Paid: ${totalPaid}`} />}
