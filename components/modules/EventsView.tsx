@@ -1172,7 +1172,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               )}
 
               {activeTab === 'stats' && (() => {
-                const activeRegs = participations.filter(r => r.status !== 'cancelled');
+                const allRegs = participations;
+                const activeRegs = allRegs.filter(r => r.status !== 'cancelled');
+                const totalRegistered = allRegs.filter(r => r.status === 'registered').length;
+                const totalPaid = allRegs.filter(r => r.status === 'paid').length;
+                const totalCheckedIn = allRegs.filter(r => r.status === 'checked_in').length;
+                const totalCancelled = allRegs.filter(r => r.status === 'cancelled').length;
+                const totalActive = activeRegs.length;
+
                 const dietaryCounts = { normal: 0, vegetarian: 0, halal: 0, unspecified: 0 };
                 activeRegs.forEach(r => {
                   const mem = members.find(m => m.id === r.memberId);
@@ -1182,6 +1189,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   else if (dietary === 'normal') dietaryCounts.normal++;
                   else dietaryCounts.unspecified++;
                 });
+
                 const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
                 const sizeCounts = activeRegs.reduce<Record<string, number>>((acc, r) => {
                   const mem = members.find(m => m.id === r.memberId);
@@ -1193,58 +1201,110 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   const ai = sizeOrder.indexOf(a), bi = sizeOrder.indexOf(b);
                   return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
                 });
+                const sizeUnspecified = totalActive - sizes.reduce((s, [, c]) => s + c, 0);
+
+                const pct = (n: number, total: number) => total === 0 ? 0 : Math.round((n / total) * 100);
+
                 return (
                   <div className="animate-fade-in space-y-4">
-                    <div className="rounded-xl border border-slate-100 overflow-hidden">
-                      <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dietary</p>
-                      </div>
-                      <div className="divide-y divide-slate-100">
-                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                          <span className="text-sm text-slate-700">Normal</span>
-                          <span className="text-sm font-bold text-slate-700">{dietaryCounts.normal}</span>
+                    {/* Summary tiles */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { label: 'Registered', value: totalActive, color: 'text-slate-800' },
+                        { label: 'Pending Pay', value: totalRegistered, color: 'text-amber-600' },
+                        { label: 'Paid', value: totalPaid, color: 'text-blue-600' },
+                        { label: 'Checked In', value: totalCheckedIn, color: 'text-emerald-600' },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="rounded-xl border border-slate-100 bg-white p-2.5 text-center">
+                          <p className={`text-xl font-black ${color} leading-none`}>{value}</p>
+                          <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mt-1 leading-tight">{label}</p>
                         </div>
-                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                          <span className="text-sm text-slate-700">🌿 Vegetarian</span>
-                          <span className="text-sm font-bold text-emerald-600">{dietaryCounts.vegetarian}</span>
-                        </div>
-                        <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                          <span className="text-sm text-slate-700">☪️ Halal</span>
-                          <span className="text-sm font-bold text-teal-600">{dietaryCounts.halal}</span>
-                        </div>
-                        {dietaryCounts.unspecified > 0 && (
-                          <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                            <span className="text-sm text-slate-400">Not specified</span>
-                            <span className="text-sm font-bold text-slate-400">{dietaryCounts.unspecified}</span>
-                          </div>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                    <div className="rounded-xl border border-slate-100 overflow-hidden">
-                      <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">T-Shirt Sizes</p>
+
+                    {/* Registration status bar */}
+                    {totalActive > 0 && (
+                      <div className="rounded-xl border border-slate-100 bg-white p-3.5">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Registration Status</p>
+                        <div className="flex h-3 rounded-full overflow-hidden gap-px">
+                          {totalCheckedIn > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${pct(totalCheckedIn, totalActive)}%` }} title={`Checked In: ${totalCheckedIn}`} />}
+                          {totalPaid > 0 && <div className="bg-jci-blue transition-all" style={{ width: `${pct(totalPaid, totalActive)}%` }} title={`Paid: ${totalPaid}`} />}
+                          {totalRegistered > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${pct(totalRegistered, totalActive)}%` }} title={`Pending: ${totalRegistered}`} />}
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
+                          {[
+                            { label: 'Checked In', count: totalCheckedIn, cls: 'bg-emerald-500' },
+                            { label: 'Paid', count: totalPaid, cls: 'bg-jci-blue' },
+                            { label: 'Pending', count: totalRegistered, cls: 'bg-amber-400' },
+                            ...(totalCancelled > 0 ? [{ label: 'Cancelled', count: totalCancelled, cls: 'bg-slate-300' }] : []),
+                          ].map(({ label, count, cls }) => (
+                            <div key={label} className="flex items-center gap-1.5">
+                              <div className={`w-2 h-2 rounded-full ${cls}`} />
+                              <span className="text-[11px] text-slate-500">{label} <span className="font-bold text-slate-700">{count}</span></span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      {sizes.length === 0 ? (
-                        <div className="px-3.5 py-4 text-center text-sm text-slate-400">No size data collected</div>
-                      ) : (
+                    )}
+
+                    {/* Dietary + T-Shirt: 2-col on desktop, stacked on mobile */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Dietary */}
+                      <div className="rounded-xl border border-slate-100 overflow-hidden">
+                        <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dietary</p>
+                          <span className="text-[10px] text-slate-400">{totalActive} total</span>
+                        </div>
                         <div className="divide-y divide-slate-100">
-                          {sizes.map(([size, count]) => (
-                            <div key={size} className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                              <span className="text-sm text-slate-700">{size}</span>
-                              <div className="flex items-center gap-3">
-                                <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-jci-blue rounded-full" style={{ width: `${Math.round((count / activeRegs.length) * 100)}%` }} />
-                                </div>
-                                <span className="text-sm font-bold text-slate-700 w-4 text-right">{count}</span>
+                          {[
+                            { label: 'Normal', count: dietaryCounts.normal, bar: 'bg-slate-400', text: 'text-slate-700' },
+                            { label: '🌿 Vegetarian', count: dietaryCounts.vegetarian, bar: 'bg-emerald-500', text: 'text-emerald-700' },
+                            { label: '☪️ Halal', count: dietaryCounts.halal, bar: 'bg-teal-500', text: 'text-teal-700' },
+                            ...(dietaryCounts.unspecified > 0 ? [{ label: 'Not specified', count: dietaryCounts.unspecified, bar: 'bg-slate-200', text: 'text-slate-400' }] : []),
+                          ].map(({ label, count, bar, text }) => (
+                            <div key={label} className="px-3.5 py-2.5 bg-white">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs text-slate-600">{label}</span>
+                                <span className={`text-xs font-bold tabular-nums ${text}`}>{count} <span className="font-normal text-slate-400">({pct(count, totalActive)}%)</span></span>
+                              </div>
+                              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div className={`h-full ${bar} rounded-full transition-all`} style={{ width: `${pct(count, totalActive)}%` }} />
                               </div>
                             </div>
                           ))}
-                          <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                            <span className="text-sm text-slate-400">Not specified</span>
-                            <span className="text-sm font-bold text-slate-400">{activeRegs.length - sizes.reduce((s, [, c]) => s + c, 0)}</span>
-                          </div>
                         </div>
-                      )}
+                      </div>
+
+                      {/* T-Shirt Sizes */}
+                      <div className="rounded-xl border border-slate-100 overflow-hidden">
+                        <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">T-Shirt Sizes</p>
+                          <span className="text-[10px] text-slate-400">{sizes.reduce((s, [, c]) => s + c, 0)} specified</span>
+                        </div>
+                        {sizes.length === 0 ? (
+                          <div className="px-3.5 py-6 text-center text-sm text-slate-400">No size data collected</div>
+                        ) : (
+                          <div className="divide-y divide-slate-100">
+                            {sizes.map(([size, count]) => (
+                              <div key={size} className="px-3.5 py-2.5 bg-white">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-xs font-semibold text-slate-700 w-8">{size}</span>
+                                  <span className="text-xs font-bold tabular-nums text-jci-blue">{count} <span className="font-normal text-slate-400">({pct(count, totalActive)}%)</span></span>
+                                </div>
+                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-jci-blue rounded-full transition-all" style={{ width: `${pct(count, totalActive)}%` }} />
+                                </div>
+                              </div>
+                            ))}
+                            {sizeUnspecified > 0 && (
+                              <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                                <span className="text-xs text-slate-400">Not specified</span>
+                                <span className="text-xs font-bold text-slate-400 tabular-nums">{sizeUnspecified}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
