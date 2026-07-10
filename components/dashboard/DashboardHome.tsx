@@ -294,11 +294,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         return d.getMonth() === currentMonth;
       })
       .sort((a, b) => {
-        const da = new Date(getDob(a)!);
-        const db = new Date(getDob(b)!);
-        return da.getDate() - db.getDate();
+        const dayA = new Date(getDob(a)!).getDate();
+        const dayB = new Date(getDob(b)!).getDate();
+        // Passed birthdays sink to the bottom; upcoming/today stay on top (both ascending)
+        const passedA = dayA < currentDay ? 1 : 0;
+        const passedB = dayB < currentDay ? 1 : 0;
+        if (passedA !== passedB) return passedA - passedB;
+        return dayA - dayB;
       });
-  }, [members, currentMonth]);
+  }, [members, currentMonth, currentDay]);
 
   const todayBirthdays = React.useMemo(() => {
     return birthdayMembers.filter(m => {
@@ -775,32 +779,36 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
       {/* Membership Journey Modal — 3-tab: Probation / 1st Year / 2nd Year */}
       {showJourneyModal && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center md:justify-center" onClick={() => setShowJourneyModal(false)}>
-          <div className="bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up md:animate-fade-in" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-end md:items-center md:justify-center" onClick={() => setShowJourneyModal(false)}>
+          <div className="rounded-t-[32px] md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up md:animate-fade-in" style={{ background: '#0f172a' }} onClick={(e) => e.stopPropagation()}>
 
-            {/* Drag Handle */}
-            <div className="flex justify-center pt-3 pb-1 md:hidden">
-              <div className="w-10 h-1 rounded-full bg-slate-300" />
-            </div>
-
-            {/* Header */}
-            <div className="px-5 pt-2 pb-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+            {/* Header — matches journey card background (drag handle integrated) */}
+            <div className="px-5 pt-3 pb-4 flex-shrink-0" style={{
+              backgroundImage: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%), url(/background/birthday-background.jpg)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}>
+              <div className="flex justify-center pb-2 md:hidden">
+                <div className="w-10 h-1 rounded-full bg-white/30" />
+              </div>
+              <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-md">
+                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border border-white/25">
                   <TrendingUp size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Membership Journey</h3>
-                  <p className="text-xs text-slate-500">Track your progress at each stage</p>
+                  <h3 className="font-bold text-white">Membership Journey</h3>
+                  <p className="text-xs text-amber-200/80">Track your progress at each stage</p>
                 </div>
               </div>
-              <button onClick={() => setShowJourneyModal(false)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowJourneyModal(false)} className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
+              </div>
             </div>
 
             {/* Journey Stepper */}
-            <div className="px-5 py-4 border-b border-slate-100 flex-shrink-0">
+            <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-start">
 
                 {/* Probation step */}
@@ -808,17 +816,17 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
                   onClick={() => setJourneyActiveTab('probation')}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isFullMember ? 'bg-green-500 text-white'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isFullMember ? 'bg-emerald-500 text-white'
                     : journeyActiveTab === 'probation' ? 'bg-amber-500 text-white'
-                      : 'bg-slate-200 text-slate-500'
+                      : 'bg-white/10 text-white/40'
                     }`}>
                     {isFullMember ? <CheckCircle size={14} /> : 'P'}
                   </div>
-                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'probation' ? 'text-amber-700'
-                    : isFullMember ? 'text-green-700'
-                      : 'text-slate-400'
+                  <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'probation' ? 'text-amber-400'
+                    : isFullMember ? 'text-emerald-400'
+                      : 'text-white/40'
                     }`}>Probation</span>
-                  <span className={`text-[10px] ${isFullMember ? 'text-green-600' : 'text-amber-600'}`}>
+                  <span className={`text-[10px] ${isFullMember ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {isProbationMember
                       ? `${promotionProgress?.overallProgress?.toFixed(0) ?? 0}%`
                       : '100%'}
@@ -827,90 +835,90 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                 {showEngagementSteps && (<>
                 {/* Connector */}
-                <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-green-300' : 'bg-slate-200'}`} />
+                <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
 
                 {/* 1st Year step */}
                 <button
-                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-30 cursor-not-allowed' : ''}`}
                   onClick={() => !isProbationMember && setJourneyActiveTab('firstYear')}
                   disabled={isProbationMember}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementFirst?.isCompleted ? 'bg-green-500 text-white'
-                    : journeyActiveTab === 'firstYear' ? 'bg-blue-500 text-white'
-                      : 'bg-slate-200 text-slate-500'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementFirst?.isCompleted ? 'bg-emerald-500 text-white'
+                    : journeyActiveTab === 'firstYear' ? 'bg-sky-500 text-white'
+                      : 'bg-white/10 text-white/40'
                     }`}>
                     {engagementFirst?.isCompleted ? <CheckCircle size={14} /> : '1'}
                   </div>
-                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'firstYear' ? 'text-blue-700'
-                    : engagementFirst?.isCompleted ? 'text-green-700'
-                      : 'text-slate-400'
+                  <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'firstYear' ? 'text-sky-400'
+                    : engagementFirst?.isCompleted ? 'text-emerald-400'
+                      : 'text-white/40'
                     }`}>1st Year</span>
                   {!isProbationMember && engagementFirst && (
-                    <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-green-600' : 'text-blue-600'}`}>
+                    <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-emerald-400' : 'text-sky-400'}`}>
                       {engagementFirst.overallProgress.toFixed(0)}%
                     </span>
                   )}
                 </button>
 
                 {/* Connector */}
-                <div className={`flex-1 h-0.5 mt-4 transition-colors ${engagementFirst?.isCompleted ? 'bg-green-300' : 'bg-slate-200'}`} />
+                <div className={`flex-1 h-0.5 mt-4 transition-colors ${engagementFirst?.isCompleted ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
 
                 {/* 2nd Year step */}
                 <button
-                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-30 cursor-not-allowed' : ''}`}
                   onClick={() => !isProbationMember && setJourneyActiveTab('secondYear')}
                   disabled={isProbationMember}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementSecond?.isCompleted ? 'bg-green-500 text-white'
-                    : journeyActiveTab === 'secondYear' ? 'bg-indigo-500 text-white'
-                      : 'bg-slate-200 text-slate-500'
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementSecond?.isCompleted ? 'bg-emerald-500 text-white'
+                    : journeyActiveTab === 'secondYear' ? 'bg-violet-500 text-white'
+                      : 'bg-white/10 text-white/40'
                     }`}>
                     {engagementSecond?.isCompleted ? <CheckCircle size={14} /> : '2'}
                   </div>
-                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'secondYear' ? 'text-indigo-700'
-                    : engagementSecond?.isCompleted ? 'text-green-700'
-                      : 'text-slate-400'
+                  <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'secondYear' ? 'text-violet-400'
+                    : engagementSecond?.isCompleted ? 'text-emerald-400'
+                      : 'text-white/40'
                     }`}>2nd Year</span>
                   {!isProbationMember && engagementSecond && (
-                    <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-green-600' : 'text-indigo-600'}`}>
+                    <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-emerald-400' : 'text-violet-400'}`}>
                       {engagementSecond.overallProgress.toFixed(0)}%
                     </span>
                   )}
                 </button>
                 </>)}
 
-                {/* Connector — reflects the preceding step (2nd Year, or Probation for pre-2025 members) */}
+                {/* Connector */}
                 <div className={`flex-1 h-0.5 mt-4 transition-colors ${showEngagementSteps
-                  ? (engagementSecond?.isCompleted ? 'bg-green-300' : 'bg-slate-200')
-                  : (isFullMember ? 'bg-green-300' : 'bg-slate-200')}`} />
+                  ? (engagementSecond?.isCompleted ? 'bg-emerald-500/60' : 'bg-white/15')
+                  : (isFullMember ? 'bg-emerald-500/60' : 'bg-white/15')}`} />
 
                 {/* Leadership step */}
                 <button
                   className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
                   onClick={() => setJourneyActiveTab('leadership')}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'leadership' ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'leadership' ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/40'}`}>
                     <Crown size={14} />
                   </div>
-                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'leadership' ? 'text-amber-700' : 'text-slate-400'}`}>Leadership</span>
-                  <span className="text-[10px] text-amber-600">
+                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'leadership' ? 'text-amber-400' : 'text-white/40'}`}>Leadership</span>
+                  <span className="text-[10px] text-amber-400">
                     {pathwayJourney ? `${pathwayJourney.leadership.currentIndex + 1}/${pathwayJourney.leadership.steps.length}` : '...'}
                   </span>
                 </button>
 
                 {/* Connector */}
-                <div className="flex-1 h-0.5 mt-4 bg-slate-200" />
+                <div className="flex-1 h-0.5 mt-4 bg-white/15" />
 
                 {/* Trainer step */}
                 <button
                   className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
                   onClick={() => setJourneyActiveTab('trainer')}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'trainer' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'trainer' ? 'bg-sky-500 text-white' : 'bg-white/10 text-white/40'}`}>
                     <BookOpen size={14} />
                   </div>
-                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'trainer' ? 'text-blue-700' : 'text-slate-400'}`}>Trainer</span>
-                  <span className="text-[10px] text-blue-600">
+                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'trainer' ? 'text-sky-400' : 'text-white/40'}`}>Trainer</span>
+                  <span className="text-[10px] text-sky-400">
                     {pathwayJourney ? `${pathwayJourney.trainer.currentIndex + 1}/${pathwayJourney.trainer.steps.length}` : '...'}
                   </span>
                 </button>
@@ -918,32 +926,27 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </div>
             </div>
 
-            {/* Tab Body — read-only */}
-            <div className="p-4 overflow-y-auto flex-1 space-y-3">
+            {/* Tab Body */}
+            <div className="p-4 overflow-y-auto no-scrollbar flex-1 space-y-3">
 
               {/* ── Probation Tab ── */}
               {journeyActiveTab === 'probation' && (
                 <>
-                  {/* Segmented dots progress */}
                   {promotionProgress && (
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-slate-500">
+                        <span className="text-xs font-medium text-white/50">
                           {promotionProgress.requirements?.filter((r: any) => r.isCompleted).length || 0}/{promotionProgress.requirements?.length || 4} completed
                         </span>
-                        <span className="text-xs font-bold text-slate-700">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
+                        <span className="text-xs font-bold text-white/80">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
                       </div>
                       <div className="flex gap-1">
                         {(promotionProgress.requirements || []).map((req: any, i: number) => (
-                          <div
-                            key={i}
-                            className={`flex-1 h-2 rounded-full transition-all duration-500 ${req.isCompleted ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-slate-200'
-                              }`}
-                          />
+                          <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-500 ${req.isCompleted ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-white/10'}`} />
                         ))}
                       </div>
                       {promotionProgress.isEligibleForPromotion && (
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-green-700">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
                           <CheckCircle size={12} /> All requirements met
                         </div>
                       )}
@@ -952,44 +955,47 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                   {promoLoading ? (
                     <div className="flex items-center justify-center py-10">
-                      <RefreshCw className="animate-spin text-amber-500" size={24} />
+                      <RefreshCw className="animate-spin text-amber-400" size={24} />
                     </div>
                   ) : promotionProgress?.requirements ? (
                     <div className="space-y-2">
                       {promotionProgress.requirements.map((req: any) => (
-                        <div key={req.id} className={`p-3 rounded-xl border ${req.isCompleted ? 'border-green-200 bg-green-50/60' : 'border-slate-200 bg-white'}`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-green-500' : 'bg-slate-200'}`}>
-                                {req.isCompleted
-                                  ? <CheckCircle size={11} className="text-white" />
-                                  : <Clock size={11} className="text-slate-400" />}
-                              </div>
-                              <span className="font-semibold text-xs text-slate-900 truncate">{req.name}</span>
+                        <div key={req.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl" style={{ background: req.isCompleted ? 'rgba(52,211,153,0.10)' : 'rgba(255,255,255,0.05)', border: req.isCompleted ? '1px solid rgba(52,211,153,0.25)' : '1px solid rgba(255,255,255,0.08)' }}>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-emerald-500' : 'bg-white/10'}`}>
+                              {req.isCompleted
+                                ? <CheckCircle size={11} className="text-white" />
+                                : <Clock size={11} className="text-white/30" />}
                             </div>
-                            {req.isCompleted && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] flex-shrink-0">Done</Badge>}
+                            <div className="min-w-0">
+                              <span className={`font-semibold text-xs truncate block ${req.isCompleted ? 'text-white' : 'text-white/60'}`}>{req.name}</span>
+                              {req.isCompleted && req.completionDetails && (() => {
+                                const rawVal = Object.values(req.completionDetails)[0];
+                                const raw = typeof rawVal === 'string' ? rawVal : Array.isArray(rawVal) ? (rawVal as string[]).join(' ') : String(rawVal ?? '');
+                                const lines = raw ? raw.split(/\s+(?=\d{4}-\d{2}-\d{2})/) : [];
+                                return lines.length > 1
+                                  ? <div className="space-y-0.5 mt-0.5">{lines.map((l, i) => <p key={i} className="text-[10px] text-emerald-400 font-medium truncate">{l}</p>)}</div>
+                                  : <p className="text-[10px] text-emerald-400 font-medium truncate">{raw}</p>;
+                              })()}
+                              {!req.isCompleted && req.description && (
+                                <p className="text-[10px] text-white/30 truncate">{req.description}</p>
+                              )}
+                            </div>
                           </div>
-                          {req.isCompleted && req.completionDetails && (
-                            <p className="text-xs text-green-700 font-medium mt-1 pl-7 truncate">
-                              {Object.values(req.completionDetails)[0] as string}
-                            </p>
-                          )}
-                          {!req.isCompleted && (
-                            <p className="text-[11px] text-slate-400 mt-0.5 pl-7 line-clamp-1">{req.description}</p>
-                          )}
+                          {req.isCompleted && <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full flex-shrink-0 bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">Done</span>}
                         </div>
                       ))}
                     </div>
                   ) : isFullMember ? (
                     <div className="flex flex-col items-center justify-center py-8 gap-2">
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
                         <CheckCircle size={22} />
                       </div>
-                      <p className="text-sm font-semibold text-green-700">Probation completed</p>
-                      <p className="text-xs text-slate-400">You have been promoted to Full Member.</p>
+                      <p className="text-sm font-semibold text-emerald-400">Probation completed</p>
+                      <p className="text-xs text-white/40">You have been promoted to Full Member.</p>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-slate-400 text-sm">
+                    <div className="text-center py-8 text-white/30 text-sm">
                       <AlertTriangle size={24} className="mx-auto mb-2" />
                       Unable to load promotion requirements.
                     </div>
@@ -997,52 +1003,51 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 </>
               )}
 
-              {/* ── Leadership / Trainer Pathway Tab (read-only ladder) ── */}
+              {/* ── Leadership / Trainer Pathway Tab ── */}
               {(journeyActiveTab === 'leadership' || journeyActiveTab === 'trainer') && (() => {
                 if (!pathwayJourney) return (
                   <div className="flex items-center justify-center py-10">
-                    <RefreshCw className="animate-spin text-amber-500" size={24} />
+                    <RefreshCw className="animate-spin text-amber-400" size={24} />
                   </div>
                 );
                 const data = pathwayJourney[journeyActiveTab];
+                const accentColor = journeyActiveTab === 'leadership' ? 'text-amber-400' : 'text-sky-400';
                 return (
                   <>
-                    {/* Segmented dots progress */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-slate-500">
+                        <span className="text-xs font-medium text-white/50">
                           {data.steps.filter(s => s.achieved).length}/{data.steps.length} achieved
                         </span>
-                        <span className="text-xs font-bold text-slate-700">
+                        <span className={`text-xs font-bold ${accentColor}`}>
                           {Math.round(((data.currentIndex + 1) / data.steps.length) * 100)}%
                         </span>
                       </div>
                       <div className="flex gap-1">
                         {data.steps.map((s, i) => (
-                          <div key={i} className={`flex-1 h-2 rounded-full transition-all duration-500 ${s.achieved ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-slate-200'}`} />
+                          <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-500 ${s.achieved ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-white/10'}`} />
                         ))}
                       </div>
                     </div>
 
-                    {/* Step rows */}
                     {data.steps.map((step, i) => {
                       const isCurrent = i === data.currentIndex && step.achieved;
                       return (
-                        <div key={step.title} className={`flex items-center gap-3 p-3 rounded-xl border ${step.achieved ? 'border-green-100 bg-green-50/50' : 'border-slate-100 bg-white'}`}>
+                        <div key={step.title} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: step.achieved ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)', border: step.achieved ? '1px solid rgba(52,211,153,0.20)' : '1px solid rgba(255,255,255,0.07)' }}>
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${step.achieved
-                            ? isCurrent ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'
-                            : 'bg-slate-100 text-slate-400'
+                            ? isCurrent ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
+                            : 'bg-white/10 text-white/25'
                             }`}>
                             {step.achieved ? <CheckCircle size={13} /> : i + 1}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className={`text-sm leading-tight ${step.achieved ? 'font-bold text-slate-900' : 'font-medium text-slate-400'}`}>{step.title}</p>
+                              <p className={`text-sm leading-tight ${step.achieved ? 'font-bold text-white' : 'font-medium text-white/35'}`}>{step.title}</p>
                               {isCurrent && (
-                                <span className="text-[9px] font-black uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
+                                <span className="text-[9px] font-black uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
                               )}
                             </div>
-                            {step.detail && <p className="text-[11px] text-slate-400 mt-0.5 truncate">{step.detail}</p>}
+                            {step.detail && <p className="text-[11px] text-white/30 mt-0.5 truncate">{step.detail}</p>}
                           </div>
                         </div>
                       );
@@ -1051,19 +1056,19 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 );
               })()}
 
-              {/* ── 1st / 2nd Year Engagement Tab (shared renderer, read-only) ── */}
+              {/* ── 1st / 2nd Year Engagement Tab ── */}
               {(journeyActiveTab === 'firstYear' || journeyActiveTab === 'secondYear') && (() => {
                 const summary = journeyActiveTab === 'firstYear' ? engagementFirst : engagementSecond;
-                const accentDot = journeyActiveTab === 'firstYear' ? 'from-blue-400 to-blue-600' : 'from-indigo-400 to-indigo-600';
-                const accentPct = journeyActiveTab === 'firstYear' ? 'text-blue-600' : 'text-indigo-600';
+                const accentPct = journeyActiveTab === 'firstYear' ? 'text-sky-400' : 'text-violet-400';
+                const accentDot = journeyActiveTab === 'firstYear' ? 'from-sky-400 to-sky-600' : 'from-violet-400 to-violet-600';
 
                 if (engagementLoading) return (
                   <div className="flex items-center justify-center py-10">
-                    <RefreshCw className={`animate-spin ${journeyActiveTab === 'firstYear' ? 'text-blue-500' : 'text-indigo-500'}`} size={24} />
+                    <RefreshCw className={`animate-spin ${journeyActiveTab === 'firstYear' ? 'text-sky-400' : 'text-violet-400'}`} size={24} />
                   </div>
                 );
                 if (!summary) return (
-                  <div className="text-center py-8 text-slate-400 text-sm">
+                  <div className="text-center py-8 text-white/30 text-sm">
                     <AlertTriangle size={24} className="mx-auto mb-2" />
                     Unable to load engagement progress.
                   </div>
@@ -1073,34 +1078,23 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                 return (
                   <>
-                    {/* Segmented dots */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-slate-500">{summary.completedCount}/{summary.totalCount} completed</span>
+                        <span className="text-xs font-medium text-white/50">{summary.completedCount}/{summary.totalCount} completed</span>
                         <span className={`text-xs font-bold ${accentPct}`}>{summary.overallProgress.toFixed(0)}%</span>
                       </div>
                       <div className="flex gap-1">
                         {summary.requirements.map((req, i) => {
                           const isPending = !!req.progress.pendingVerification;
                           return (
-                            <div
-                              key={i}
-                              className={`flex-1 h-2 rounded-full transition-all duration-500 ${req.isCompleted
-                                ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                                : isPending
-                                  ? 'bg-amber-300'
-                                  : summary.isCompleted
-                                    ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                                    : `bg-gradient-to-r ${accentDot} opacity-20`
-                                }`}
-                            />
+                            <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-500 ${req.isCompleted ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : isPending ? 'bg-amber-400' : summary.isCompleted ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : `bg-gradient-to-r ${accentDot} opacity-20`}`} />
                           );
                         })}
                       </div>
                     </div>
 
                     {/* Group tabs */}
-                    <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                    <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.07)' }}>
                       {(['Leadership Experience', 'Skills Development', 'JCI Experience'] as const).map(g => {
                         const gReqs = summary.requirements.filter(r => r.group === g);
                         if (gReqs.length === 0) return null;
@@ -1111,11 +1105,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <button
                             key={g}
                             onClick={() => setJourneyGroupTab(g)}
-                            className={`flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold transition-all flex flex-col items-center gap-0.5 ${isActive ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
-                              }`}
+                            className={`flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold transition-all flex flex-col items-center gap-0.5 ${isActive ? 'bg-white/15 text-white' : 'text-white/35 hover:text-white/60'}`}
                           >
                             <span>{label}</span>
-                            <span className={`text-[9px] font-black ${doneCount === gReqs.length ? 'text-green-600' : isActive ? accentPct : 'text-slate-400'}`}>
+                            <span className={`text-[9px] font-black ${doneCount === gReqs.length ? 'text-emerald-400' : isActive ? accentPct : 'text-white/25'}`}>
                               {doneCount}/{gReqs.length}
                             </span>
                           </button>
@@ -1123,40 +1116,32 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       })}
                     </div>
 
-                    {/* Requirements for active group */}
                     <div className="space-y-2">
                       {groupReqs.map(req => {
                         const isPending = !!req.progress.pendingVerification;
-                        const cardClass = req.isCompleted
-                          ? 'border-green-200 bg-green-50/60'
-                          : isPending
-                            ? 'border-amber-200 bg-amber-50/60'
-                            : 'border-slate-200 bg-white';
-                        const iconClass = req.isCompleted ? 'text-green-500' : isPending ? 'text-amber-400' : 'text-slate-300';
                         return (
-                          <div key={req.key} className={`p-3 rounded-xl border ${cardClass}`}>
+                          <div key={req.key} className="px-3 py-2.5 rounded-xl" style={{ background: req.isCompleted ? 'rgba(52,211,153,0.08)' : isPending ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: req.isCompleted ? '1px solid rgba(52,211,153,0.20)' : isPending ? '1px solid rgba(251,191,36,0.25)' : '1px solid rgba(255,255,255,0.07)' }}>
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-green-500' : isPending ? 'bg-amber-400' : 'bg-slate-200'
-                                  }`}>
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-emerald-500' : isPending ? 'bg-amber-400' : 'bg-white/10'}`}>
                                   {req.isCompleted
                                     ? <CheckCircle size={11} className="text-white" />
-                                    : <Clock size={11} className={isPending ? 'text-white' : 'text-slate-400'} />}
+                                    : <Clock size={11} className={isPending ? 'text-white' : 'text-white/30'} />}
                                 </div>
-                                <span className="font-semibold text-xs text-slate-900 truncate">{req.title}</span>
+                                <span className={`font-semibold text-xs truncate ${req.isCompleted || isPending ? 'text-white' : 'text-white/50'}`}>{req.title}</span>
                               </div>
                               <div className="flex-shrink-0">
-                                {req.isCompleted && !isPending && <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">Done</Badge>}
-                                {isPending && <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px]">Pending BOD</Badge>}
+                                {req.isCompleted && !isPending && <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">Done</span>}
+                                {isPending && <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">Pending</span>}
                               </div>
                             </div>
                             {(isPending || req.isCompleted) && (req.progress.detail || req.progress.date) ? (
                               <div className="mt-1 pl-7 flex items-center gap-2 text-[11px]">
-                                {req.progress.detail && <span className={isPending ? 'text-amber-700 font-medium' : 'text-green-700 font-medium'}>{req.progress.detail}</span>}
-                                {req.progress.date && <span className="text-slate-400">{req.progress.date}</span>}
+                                {req.progress.detail && <span className={isPending ? 'text-amber-300 font-medium' : 'text-emerald-400 font-medium'}>{req.progress.detail}</span>}
+                                {req.progress.date && <span className="text-white/30">{req.progress.date}</span>}
                               </div>
                             ) : !req.isCompleted ? (
-                              <p className="text-[11px] text-slate-400 mt-0.5 pl-7 line-clamp-1">{req.description}</p>
+                              <p className="text-[11px] text-white/25 mt-0.5 pl-7 line-clamp-1">{req.description}</p>
                             ) : null}
                           </div>
                         );
@@ -1201,72 +1186,138 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         onClose={() => setShowBirthdayDrawer(false)}
         title={
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-900">Birthdays This Month</span>
-            <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            <span className="text-xl leading-none">🎂</span>
+            <span className="font-bold text-white">Birthdays This Month</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-rose-200/80 bg-white/15 px-2 py-0.5 rounded-full border border-white/20">
               {now.toLocaleString('default', { month: 'long' })}
             </span>
           </div>
         }
+        headerStyle={{
+          backgroundImage: 'linear-gradient(135deg, rgba(190,18,60,0.82) 0%, rgba(134,25,143,0.78) 50%, rgba(79,70,229,0.75) 100%), url(/background/birthday-background.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
         size="md"
         drawerOnMobile={true}
         bottomSheet={true}
+        dragHandleInHeader
+        className="!bg-slate-900"
+        scrollInBody={false}
       >
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-          {birthdayMembers.map(m => {
-            const dob = new Date(getDob(m)!);
-            const day = dob.getDate();
-            const isToday = day === currentDay;
+        {(() => {
+          const membershipBadge = (type: string) => {
+            const t = (type || '').toLowerCase();
+            if (t.includes('probation')) return { label: 'Probation', cls: 'bg-amber-400/20 text-amber-300 border-amber-400/30' };
+            if (t.includes('associate')) return { label: 'Associate', cls: 'bg-sky-400/20 text-sky-300 border-sky-400/30' };
+            if (t.includes('full') || t.includes('voting') || t.includes('member')) return { label: 'Member', cls: 'bg-violet-400/20 text-violet-300 border-violet-400/30' };
+            return { label: type || 'Member', cls: 'bg-white/10 text-white/50 border-white/15' };
+          };
+          return (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar -mx-4 px-4 md:-mx-6 md:px-6 pb-2">
+              {birthdayMembers.map(m => {
+                const dob = new Date(getDob(m)!);
+                const day = dob.getDate();
+                const isToday = day === currentDay;
+                const name = m.general?.name || m.name || '';
+                const avatarUrl = m.general?.avatarUrl || m.avatar;
+                const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
+                let hash = 0; for (let j = 0; j < name.length; j++) hash = name.charCodeAt(j) + ((hash << 5) - hash);
+                const gradients = ['from-pink-400 to-rose-500', 'from-violet-400 to-purple-500', 'from-sky-400 to-blue-500', 'from-teal-400 to-emerald-500', 'from-amber-400 to-orange-500'];
+                const avatarGradient = gradients[Math.abs(hash) % gradients.length];
+                const badge = membershipBadge(m.membershipType || '');
+                const duesPaid = m.isDuesPaidCurrentYear ?? (m.duesStatus === 'paid');
+                const duesLabel = duesPaid ? 'Dues Paid' : 'Dues Pending';
+                const duesCls = duesPaid
+                  ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30'
+                  : 'bg-red-400/15 text-red-300 border-red-400/30';
 
-            return (
-              <div
-                key={m.id}
-                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${isToday
-                  ? 'bg-gradient-to-r from-orange-50 to-amber-50/50 border-orange-200 shadow-sm animate-pulse'
-                  : 'bg-white border-slate-100 hover:border-slate-200'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img
-                      src={m.general?.avatarUrl || m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.general?.name || m.name || '')}&background=e0f2fe&color=0097D7`}
-                      alt={m.general?.name || m.name}
-                      className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm"
-                    />
-                    {isToday && (
-                      <span className="absolute -top-1.5 -right-1.5 text-base">🎉</span>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{m.general?.name || m.name}</h4>
-                    <p className="text-[11px] text-slate-500 font-medium">{m.membershipType || 'Member'} • FY {m.duesYear || 'N/A'}</p>
-                  </div>
-                </div>
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all"
+                    style={{
+                      background: isToday
+                        ? 'linear-gradient(135deg, rgba(190,18,60,0.25) 0%, rgba(134,25,143,0.20) 100%)'
+                        : 'rgba(255,255,255,0.06)',
+                      border: isToday ? '1px solid rgba(251,113,133,0.35)' : '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0">
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={name}
+                          className={`w-11 h-11 rounded-full object-cover shadow-md ${isToday ? 'ring-2 ring-rose-400/70 ring-offset-1 ring-offset-slate-900' : 'ring-1 ring-white/20'}`}
+                        />
+                      ) : (
+                        <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-sm font-bold text-white shadow-md ${isToday ? 'ring-2 ring-rose-400/70 ring-offset-1 ring-offset-slate-900' : 'ring-1 ring-white/20'}`}>
+                          {initials}
+                        </div>
+                      )}
+                      {/* WhatsApp group status */}
+                      <span
+                        className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-md"
+                        style={m.whatsappGroup || m.whatsappgroup
+                          ? { background: '#25d366', border: '1.5px solid rgba(255,255,255,0.25)' }
+                          : { background: '#475569', border: '1.5px solid rgba(255,255,255,0.10)' }}
+                        title={m.whatsappGroup || m.whatsappgroup ? 'In WhatsApp group' : 'Not in WhatsApp group'}
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className={`w-2.5 h-2.5 ${m.whatsappGroup || m.whatsappgroup ? 'text-slate-900' : 'text-white'}`}>
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.85L.057 23.25a.75.75 0 0 0 .918.919l5.4-1.47A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.88 0-3.638-.502-5.153-1.378l-.37-.213-3.833 1.043 1.044-3.832-.214-.372A9.944 9.944 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                        </svg>
+                      </span>
+                      {isToday && (
+                        <span className="absolute -top-0.5 -left-0.5 text-xs leading-none">🎉</span>
+                      )}
+                    </div>
 
-                <div className="text-right flex flex-col items-end gap-1">
-                  <span className={`text-xs font-bold px-2 py-1 rounded-xl border ${isToday
-                    ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                    : 'bg-slate-50 text-slate-600 border-slate-150'
-                    }`}>
-                    {isToday ? 'Today! 🎂' : `${dob.toLocaleString('default', { month: 'short' })} ${day}`}
-                  </span>
-                  {isToday && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      className="text-[10px] h-6 py-0 px-2.5 bg-orange-500 hover:bg-orange-650 text-white font-bold border-none"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`Happy Birthday ${m.general?.name || m.name}! 🎂 Wishing you a wonderful day!`);
-                        showToast(`Copied wishes to clipboard!`, 'success');
-                      }}
-                    >
-                      Copy Wishes
-                    </Button>
-                  )}
+                    {/* Name + badges */}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-white text-sm leading-snug truncate">{name}</h4>
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${badge.cls}`}>
+                          {badge.label}
+                        </span>
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${duesCls}`}>
+                          {duesLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Date / today */}
+                    <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
+                      {isToday ? (
+                        <>
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full text-white shadow-sm" style={{ background: 'rgba(225,29,72,0.7)', border: '1px solid rgba(251,113,133,0.5)' }}>
+                            Today 🎂
+                          </span>
+                          <button
+                            className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white/80 border border-white/20 hover:bg-white/15 transition-colors"
+                            style={{ background: 'rgba(255,255,255,0.10)' }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(`Happy Birthday ${name}! 🎂 Wishing you a wonderful day!`);
+                              showToast(`Copied wishes to clipboard!`, 'success');
+                            }}
+                          >
+                            Copy Wishes
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center px-2.5 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                          <span className="text-[9px] font-black uppercase tracking-wider text-white/40 leading-none">{dob.toLocaleString('default', { month: 'short' })}</span>
+                          <span className="text-base font-extrabold text-white leading-tight">{day}</span>
+                        </div>
+                      )}
                 </div>
               </div>
             );
           })}
-        </div>
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

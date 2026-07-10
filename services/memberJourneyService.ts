@@ -77,7 +77,10 @@ export class MemberJourneyService {
 
       // Board of Directors records
       hasCommissionDirector = commissionPositions.length > 0;
-      if (hasCommissionDirector) details['Commission Director'] = commissionPositions[0].term;
+      if (hasCommissionDirector) {
+        const cp = commissionPositions[0];
+        details['Commission Director'] = cp.position ? `${cp.position} · ${cp.term}` : cp.term;
+      }
       for (const bp of boardPositions) {
         if (bp.position === 'President') { hasPresident = true; details['President'] = bp.term; }
         else if (bp.position === 'Area Officer') { hasAreaOfficer = true; details['Area Officer'] = bp.term; }

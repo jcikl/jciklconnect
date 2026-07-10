@@ -432,6 +432,12 @@ interface ModalProps {
   className?: string;
   /** Custom class name for the footer wrapper */
   footerClassName?: string;
+  /** Custom inline style for the modal header bar */
+  headerStyle?: React.CSSProperties;
+  /** Hide the built-in drag handle (use when embedding handle inside title) */
+  noDragHandle?: boolean;
+  /** Render drag handle inside the header (above title row), matching journey modal layout */
+  dragHandleInHeader?: boolean;
   /** Initial height on mobile for drawer/bottomSheet */
   mobileHeight?: string;
   /** Scroll event handler */
@@ -452,6 +458,9 @@ export const Modal: React.FC<ModalProps> = ({
   header,
   className,
   footerClassName,
+  headerStyle,
+  noDragHandle,
+  dragHandleInHeader,
   mobileHeight,
   onScroll,
 }) => {
@@ -510,18 +519,28 @@ export const Modal: React.FC<ModalProps> = ({
         `}
         style={!drawerOnMobile ? { maxWidth: size === 'sm' ? '448px' : size === 'md' ? '512px' : undefined } : {}}
       >
-        {(bottomSheet || drawerOnMobile) && (
+        {(bottomSheet || drawerOnMobile) && !noDragHandle && !dragHandleInHeader && (
           <div className="absolute top-0 left-0 right-0 h-10 flex items-center justify-center z-50 pointer-events-none md:hidden">
-            <div className="w-12 h-1.5 bg-black/10 rounded-full" />
+            <div className="w-12 h-1.5 bg-white/30 rounded-full" />
           </div>
         )}
         {title !== null && (
-          <div className={`
-            flex justify-between items-center sticky top-0 z-10 
-            ${variant === 'jci'
-              ? 'flex-none bg-gradient-to-r from-jci-blue via-sky-600 to-blue-700 px-6 py-5 text-white shadow-md'
-              : 'p-4 border-b border-slate-100 bg-slate-50'}
-          `}>
+          <div
+            className={`
+              flex sticky top-0 z-10
+              ${dragHandleInHeader ? 'flex-col' : 'justify-between items-center'}
+              ${variant === 'jci'
+                ? 'flex-none bg-gradient-to-r from-jci-blue via-sky-600 to-blue-700 px-6 py-5 text-white shadow-md'
+                : 'p-4 border-b border-slate-100 bg-slate-50'}
+            `}
+            style={headerStyle}
+          >
+            {dragHandleInHeader && (
+              <div className="flex justify-center pb-2 md:hidden">
+                <div className="w-10 h-1 rounded-full bg-white/30" />
+              </div>
+            )}
+            <div className={dragHandleInHeader ? 'flex justify-between items-center w-full' : 'contents'}>
             <div id="modal-title" className={variant === 'jci' ? 'flex-1' : 'font-bold text-slate-800'}>
               {typeof title === 'string' ? (
                 <h3 className={variant === 'jci' ? 'text-xl font-bold uppercase tracking-tight' : ''}>{title}</h3>
@@ -541,6 +560,7 @@ export const Modal: React.FC<ModalProps> = ({
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>
             </button>
+            </div>
           </div>
         )}
         <div
