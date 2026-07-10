@@ -1944,6 +1944,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       dateOfBirth: member.dateOfBirth || '',
       gender: member.gender || '',
       ethnicity: member.ethnicity || '',
+      dietaryPreference: member.dietaryPreference || '',
       nationality: member.nationality || 'Malaysia',
       introducer: member.introducer || '',
       bio: member.bio || '',
@@ -2036,6 +2037,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         avatar: inlineValues.avatar || '', avatarUrl: inlineValues.avatar || '',
         name: inlineValues.name, fullName: inlineValues.fullName, idNumber: inlineValues.idNumber,
         dateOfBirth: inlineValues.dateOfBirth, gender: inlineValues.gender, ethnicity: inlineValues.ethnicity,
+        dietaryPreference: (inlineValues.dietaryPreference as Member['dietaryPreference']) || undefined,
         nationality: inlineValues.nationality, introducer: inlineValues.introducer, bio: inlineValues.bio,
         hobbies: inlineValues.hobbies, skills: skillsArr,
         companyName: inlineValues.companyName, companyWebsite: inlineValues.companyWebsite,
@@ -3013,6 +3015,17 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                               <option value="Indian">Indian</option>
                               <option value="Others">Others</option>
                             </select>
+                          </div>
+                          <div className="col-span-2">
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Dietary Preference</label>
+                            <div className="flex w-full rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
+                              {(['Vegetarian', 'Halal', 'Normal'] as const).map((opt) => (
+                                <label key={opt} className="cursor-pointer flex-1 flex">
+                                  <input type="radio" name="inlineDietaryPreference" value={opt.toLowerCase()} checked={inlineValues.dietaryPreference === opt.toLowerCase()} onChange={e => setInlineValues({ ...inlineValues, dietaryPreference: e.target.value })} className="hidden" />
+                                  <span className={`flex-1 text-center px-1 md:px-4 py-2 text-[10px] md:text-sm font-medium transition-colors ${inlineValues.dietaryPreference === opt.toLowerCase() ? 'bg-jci-blue text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{opt}</span>
+                                </label>
+                              ))}
+                            </div>
                           </div>
                           <div>
                             <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
