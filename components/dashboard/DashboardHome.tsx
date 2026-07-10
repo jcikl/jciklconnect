@@ -99,6 +99,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<Event | null>(null);
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
   const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
+  const [expandedJourneySteps, setExpandedJourneySteps] = useState<Set<string>>(new Set());
 
 
   const handleRestrictedAction = (viewType: string) => {
@@ -1032,23 +1033,54 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                     {data.steps.map((step, i) => {
                       const isCurrent = i === data.currentIndex && step.achieved;
+                      const isExpanded = expandedJourneySteps.has(step.title);
+                      const allEntries = step.details ?? (step.detail ? [step.detail] : []);
+                      const hasMore = allEntries.length > 1;
+                      const visibleEntries = allEntries.slice(0, 1);
                       return (
-                        <div key={step.title} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: step.achieved ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)', border: step.achieved ? '1px solid rgba(52,211,153,0.20)' : '1px solid rgba(255,255,255,0.07)' }}>
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${step.achieved
-                            ? isCurrent ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
-                            : 'bg-white/10 text-white/25'
-                            }`}>
-                            {step.achieved ? <CheckCircle size={13} /> : i + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className={`text-sm leading-tight ${step.achieved ? 'font-bold text-white' : 'font-medium text-white/35'}`}>{step.title}</p>
-                              {isCurrent && (
-                                <span className="text-[9px] font-black uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
+                        <div key={step.title} className="rounded-xl overflow-hidden" style={{ background: step.achieved ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)', border: step.achieved ? '1px solid rgba(52,211,153,0.20)' : '1px solid rgba(255,255,255,0.07)' }}>
+                          <div className="flex items-center gap-3 px-3 py-2.5">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${step.achieved
+                              ? isCurrent ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
+                              : 'bg-white/10 text-white/25'
+                              }`}>
+                              {step.achieved ? <CheckCircle size={13} /> : i + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className={`text-sm leading-tight ${step.achieved ? 'font-bold text-white' : 'font-medium text-white/35'}`}>{step.title}</p>
+                                {isCurrent && (
+                                  <span className="text-[9px] font-black uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
+                                )}
+                              </div>
+                              {visibleEntries.length > 0 && (
+                                <div className="mt-0.5 space-y-0.5">
+                                  {visibleEntries.map((e, ei) => (
+                                    <p key={ei} className="text-[11px] text-white/30 truncate">{e}</p>
+                                  ))}
+                                </div>
                               )}
                             </div>
-                            {step.detail && <p className="text-[11px] text-white/30 mt-0.5 truncate">{step.detail}</p>}
+                            {hasMore && (
+                              <button
+                                onClick={() => setExpandedJourneySteps(prev => {
+                                  const next = new Set(prev);
+                                  isExpanded ? next.delete(step.title) : next.add(step.title);
+                                  return next;
+                                })}
+                                className="flex-shrink-0 text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full border transition-colors bg-white/10 text-white/40 border-white/15 hover:bg-white/15"
+                              >
+                                {isExpanded ? '−' : `+${allEntries.length - 1}`}
+                              </button>
+                            )}
                           </div>
+                          {isExpanded && allEntries.length > 1 && (
+                            <div className="px-3 pb-2.5 space-y-1 border-t border-white/5 pt-2">
+                              {allEntries.slice(1).map((e, ei) => (
+                                <p key={ei} className="text-[11px] text-white/30 truncate pl-10">{e}</p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

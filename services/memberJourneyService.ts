@@ -8,6 +8,8 @@ export interface JourneyStep {
   title: string;
   achieved: boolean;
   detail?: string;
+  /** All entries when there are multiple (Commission Director, Board of Director, etc.) */
+  details?: string[];
 }
 
 export interface MemberJourney {
@@ -51,6 +53,7 @@ export class MemberJourneyService {
     let hasNationalOfficer = false;
     let hasJciOfficer = false;
     const details: Record<string, string> = {};
+    const multiDetails: Record<string, string[]> = {};
 
     if (!isDevMode()) {
       const [boardPositions, commissionPositions, projects] = await Promise.all([
@@ -78,9 +81,11 @@ export class MemberJourneyService {
       // Board of Directors records
       hasCommissionDirector = commissionPositions.length > 0;
       if (hasCommissionDirector) {
-        const cp = commissionPositions[0];
-        details['Commission Director'] = cp.position ? `${cp.position} · ${cp.term}` : cp.term;
+        const cdEntries = commissionPositions.map(cp => cp.position ? `${cp.position} · ${cp.term}` : cp.term);
+        details['Commission Director'] = cdEntries[0];
+        if (cdEntries.length > 1) multiDetails['Commission Director'] = cdEntries;
       }
+      const boardEntries: string[] = [];
       for (const bp of boardPositions) {
         if (bp.position === 'President') { hasPresident = true; details['President'] = bp.term; }
         else if (bp.position === 'Area Officer') { hasAreaOfficer = true; details['Area Officer'] = bp.term; }
@@ -88,8 +93,12 @@ export class MemberJourneyService {
         else if (bp.position === 'JCI Officer') { hasJciOfficer = true; details['JCI Officer'] = bp.term; }
         if (!NATIONAL_LEVEL_POSITIONS.includes(bp.position)) {
           hasBoard = true;
-          if (!details['Board of Director']) details['Board of Director'] = `${bp.position} · ${bp.term}`;
+          boardEntries.push(`${bp.position} · ${bp.term}`);
         }
+      }
+      if (boardEntries.length > 0) {
+        details['Board of Director'] = boardEntries[0];
+        if (boardEntries.length > 1) multiDetails['Board of Director'] = boardEntries;
       }
     }
 
@@ -109,6 +118,7 @@ export class MemberJourneyService {
       title,
       achieved: achievedMap[title],
       detail: details[title],
+      details: multiDetails[title],
     }));
     const currentIndex = steps.reduce((acc, s, i) => (s.achieved ? i : acc), 0);
     return { steps, currentIndex };
