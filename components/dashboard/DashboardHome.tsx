@@ -1038,7 +1038,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       const hasMore = allEntries.length > 1;
                       const visibleEntries = allEntries.slice(0, 1);
                       return (
-                        <div key={step.title} className="rounded-xl overflow-hidden" style={{ background: step.achieved ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)', border: step.achieved ? '1px solid rgba(52,211,153,0.20)' : '1px solid rgba(255,255,255,0.07)' }}>
+                        <div
+                          key={step.title}
+                          className={`rounded-xl overflow-hidden ${hasMore ? 'cursor-pointer' : ''}`}
+                          style={{ background: step.achieved ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)', border: step.achieved ? '1px solid rgba(52,211,153,0.20)' : '1px solid rgba(255,255,255,0.07)' }}
+                          onClick={hasMore ? () => setExpandedJourneySteps(prev => { const next = new Set(prev); isExpanded ? next.delete(step.title) : next.add(step.title); return next; }) : undefined}
+                        >
                           <div className="flex items-center gap-3 px-3 py-2.5">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${step.achieved
                               ? isCurrent ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
@@ -1058,16 +1063,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                               )}
                             </div>
                             {hasMore && (
-                              <button
-                                onClick={() => setExpandedJourneySteps(prev => {
-                                  const next = new Set(prev);
-                                  isExpanded ? next.delete(step.title) : next.add(step.title);
-                                  return next;
-                                })}
-                                className="flex-shrink-0 text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full border transition-colors bg-white/10 text-white/40 border-white/15 hover:bg-white/15"
-                              >
+                              <span className="flex-shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full border bg-white/10 text-white/40 border-white/15">
                                 {isExpanded ? '−' : `+${allEntries.length}`}
-                              </button>
+                              </span>
                             )}
                           </div>
                           {isExpanded && allEntries.length > 0 && (
