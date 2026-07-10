@@ -3818,11 +3818,19 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         </div>
 
                         <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
-                        <div className="flex gap-4">
-                          {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Linkedin size={20} /></a>}
-                          {member.facebook && <a href={member.facebook} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Facebook size={20} /></a>}
-                          {member.instagram && <a href={member.instagram} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-jci-blue"><Instagram size={20} /></a>}
-                          {member.wechat && <div className="text-slate-400 flex items-center gap-1"><MessageCircle size={20} /><span className="text-xs font-medium">{member.wechat}</span></div>}
+                        <div className="flex gap-4 items-center">
+                          {member.linkedin
+                            ? <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-jci-blue hover:text-jci-navy"><Linkedin size={20} /></a>
+                            : <span className="text-slate-200"><Linkedin size={20} /></span>}
+                          {member.facebook
+                            ? <a href={member.facebook} target="_blank" rel="noreferrer" className="text-jci-blue hover:text-jci-navy"><Facebook size={20} /></a>
+                            : <span className="text-slate-200"><Facebook size={20} /></span>}
+                          {member.instagram
+                            ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-jci-blue hover:text-jci-navy"><Instagram size={20} /></a>
+                            : <span className="text-slate-200"><Instagram size={20} /></span>}
+                          {member.wechat
+                            ? <div className="text-jci-blue flex items-center gap-1"><MessageCircle size={20} /><span className="text-xs font-medium">{member.wechat}</span></div>
+                            : <span className="text-slate-200"><MessageCircle size={20} /></span>}
                         </div>
                       </div>
                     </div>
