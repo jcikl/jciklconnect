@@ -1255,23 +1255,26 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dietary</p>
                           <span className="text-[10px] text-slate-400">{totalActive} total</span>
                         </div>
-                        <div className="divide-y divide-slate-100">
-                          {[
-                            { label: 'Normal', count: dietaryCounts.normal, bar: 'bg-slate-400', text: 'text-slate-700' },
-                            { label: '🌿 Vegetarian', count: dietaryCounts.vegetarian, bar: 'bg-emerald-500', text: 'text-emerald-700' },
-                            { label: '☪️ Halal', count: dietaryCounts.halal, bar: 'bg-teal-500', text: 'text-teal-700' },
-                            ...(dietaryCounts.unspecified > 0 ? [{ label: 'Not specified', count: dietaryCounts.unspecified, bar: 'bg-slate-200', text: 'text-slate-400' }] : []),
-                          ].map(({ label, count, bar, text }) => (
-                            <div key={label} className="px-3.5 py-2.5 bg-white">
-                              <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-xs text-slate-600">{label}</span>
-                                <span className={`text-xs font-bold tabular-nums ${text}`}>{count} <span className="font-normal text-slate-400">({pct(count, totalActive)}%)</span></span>
+                        <div className="px-3.5 py-3 bg-white space-y-3">
+                          <div className="flex h-4 rounded-full overflow-hidden gap-px">
+                            {dietaryCounts.normal > 0 && <div className="bg-slate-400 transition-all" style={{ width: `${pct(dietaryCounts.normal, totalActive)}%` }} />}
+                            {dietaryCounts.vegetarian > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${pct(dietaryCounts.vegetarian, totalActive)}%` }} />}
+                            {dietaryCounts.halal > 0 && <div className="bg-teal-500 transition-all" style={{ width: `${pct(dietaryCounts.halal, totalActive)}%` }} />}
+                            {dietaryCounts.unspecified > 0 && <div className="bg-slate-200 transition-all" style={{ width: `${pct(dietaryCounts.unspecified, totalActive)}%` }} />}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                            {[
+                              { label: 'Normal', count: dietaryCounts.normal, cls: 'bg-slate-400', text: 'text-slate-700' },
+                              { label: '🌿 Vegetarian', count: dietaryCounts.vegetarian, cls: 'bg-emerald-500', text: 'text-emerald-700' },
+                              { label: '☪️ Halal', count: dietaryCounts.halal, cls: 'bg-teal-500', text: 'text-teal-700' },
+                              ...(dietaryCounts.unspecified > 0 ? [{ label: 'N/A', count: dietaryCounts.unspecified, cls: 'bg-slate-200', text: 'text-slate-400' }] : []),
+                            ].map(({ label, count, cls, text }) => (
+                              <div key={label} className="flex items-center gap-1.5">
+                                <div className={`w-2 h-2 rounded-full ${cls} shrink-0`} />
+                                <span className="text-[11px] text-slate-500">{label} <span className={`font-bold tabular-nums ${text}`}>{count}</span> <span className="text-slate-400">({pct(count, totalActive)}%)</span></span>
                               </div>
-                              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div className={`h-full ${bar} rounded-full transition-all`} style={{ width: `${pct(count, totalActive)}%` }} />
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </div>
 
