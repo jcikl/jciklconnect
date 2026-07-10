@@ -4,6 +4,11 @@ node_modules/
 # Service account credentials — never commit
 scripts/serviceAccount.json
 **/serviceAccount.json
+serviceAccountKey.json
+
+# Generated schema / introspection outputs
+firestore-schema.json
+extractFirestoreSchema.cjs
 
 # Android signing — never commit
 android/jcikl-release.jks
