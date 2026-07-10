@@ -325,7 +325,18 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setLoadingParticipants(true);
     try {
       const list = await EventRegistrationService.listByEvent(event.id);
-      setParticipations(list);
+      // Supplement with synthetic entries for members registered before EventRegistration docs existed
+      const docMemberIds = new Set(list.map((r) => r.memberId));
+      const syntheticEntries: EventRegistration[] = (event.registeredMembers ?? [])
+        .filter((mid) => !docMemberIds.has(mid))
+        .map((mid) => ({
+          id: `synthetic-${mid}`,
+          eventId: event.id,
+          memberId: mid,
+          status: 'registered' as const,
+          createdAt: event.date ?? new Date().toISOString(),
+        }));
+      setParticipations([...list, ...syntheticEntries]);
     } catch {
       setParticipations([]);
     } finally {
@@ -341,11 +352,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   }, [event.id, member?.id]);
 
   const handleSelfCancel = async () => {
-    if (!member || !myRegistration || !onCancelRegistration) return;
-    setUpdatingRegId(myRegistration.id);
+    if (!member || !onCancelRegistration) return;
+    setUpdatingRegId('self');
     try {
       await onCancelRegistration(member.id, member.id, member.name ?? member.id, 'self');
-      setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled', cancelledByRole: 'self' } : prev);
+      setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled', cancelledByRole: 'self' } : { id: '', eventId: event.id, memberId: member.id, status: 'cancelled', cancelledByRole: 'self', createdAt: new Date().toISOString() });
       showToast('已撤销报名', 'success');
     } catch {
       showToast('撤销失败', 'error');
@@ -423,7 +434,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const priceMax = event.priceMax;
   const isRegistered = member && event.registeredMembers?.includes(member.id);
   const isSelfCancelled = myRegistration?.status === 'cancelled';
-  const canSelfCancel = !!myRegistration && myRegistration.status !== 'cancelled' && myRegistration.status !== 'checked_in' && !!onCancelRegistration && event.status !== 'Completed';
+  // canSelfCancel: use doc status if available, otherwise fall back to registeredMembers array (pre-Story-8.1 registrations)
+  const canSelfCancel = !!isRegistered && !isSelfCancelled && myRegistration?.status !== 'checked_in' && !!onCancelRegistration && event.status !== 'Completed';
   const attendancePercent = event.maxAttendees ? Math.round(((event.attendees || 0) / event.maxAttendees) * 100) : 0;
 
   const registerButton = (
