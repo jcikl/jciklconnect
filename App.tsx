@@ -3800,10 +3800,12 @@ export const JCIKLApp: React.FC = () => {
     setLoginModalOpen(true);
   };
 
+  const [isSignOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
+
   const handleLogout = async () => {
     try {
       await handleSignOut();
-      localStorage.removeItem('jc_last_view'); // Clear persisted view on logout
+      localStorage.removeItem('jc_last_view');
       navigate('/', { replace: true });
       setView('GUEST');
       showToast('Logged out successfully', 'success');
@@ -4482,7 +4484,7 @@ export const JCIKLApp: React.FC = () => {
 
                   {/* Logout (desktop only) */}
                   <button
-                    onClick={handleLogout}
+                    onClick={() => setSignOutConfirmOpen(true)}
                     className="hidden md:flex p-2 rounded-lg hover:bg-white/15 transition-all"
                     title="Sign Out"
                   >
@@ -4526,6 +4528,20 @@ export const JCIKLApp: React.FC = () => {
           onNavigate={handleViewChange}
         />
 
+        <Modal
+          isOpen={isSignOutConfirmOpen}
+          onClose={() => setSignOutConfirmOpen(false)}
+          title="Sign Out"
+          size="sm"
+        >
+          <div className="px-4 pb-4 space-y-4">
+            <p className="text-sm text-slate-500">Are you sure you want to sign out?</p>
+            <div className="flex gap-3">
+              <Button variant="ghost" className="flex-1" onClick={() => setSignOutConfirmOpen(false)}>Cancel</Button>
+              <Button variant="danger" className="flex-1" onClick={() => { setSignOutConfirmOpen(false); handleLogout(); }}>Sign Out</Button>
+            </div>
+          </div>
+        </Modal>
 
       </div >
 
@@ -4766,7 +4782,7 @@ export const JCIKLApp: React.FC = () => {
                   {/* Logout */}
                   <div className="mt-4 pt-4">
                     <button
-                      onClick={() => { setShowMobileMenu(false); handleLogout(); }}
+                      onClick={() => { setShowMobileMenu(false); setSignOutConfirmOpen(true); }}
                       className={`w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] ${'bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-950/50'}`}
                     >
                       <LogOut size={16} />
