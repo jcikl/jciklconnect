@@ -41,6 +41,10 @@ export const EventRegistrationService = {
         createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? new Date().toISOString(),
         updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? data.updatedAt ?? null,
         loId: data.loId ?? null,
+        cancelledAt: data.cancelledAt?.toDate?.()?.toISOString?.() ?? data.cancelledAt ?? null,
+        cancelledBy: data.cancelledBy ?? null,
+        cancelledByName: data.cancelledByName ?? null,
+        cancelledByRole: data.cancelledByRole ?? null,
       } as EventRegistration;
     });
   },
@@ -143,5 +147,34 @@ export const EventRegistrationService = {
     if (options?.paidAt != null) updateData.paidAt = options.paidAt;
     if (options?.checkedInAt != null) updateData.checkedInAt = options.checkedInAt;
     await updateDoc(ref, updateData);
+  },
+
+  async cancel(
+    registrationId: string,
+    cancelledBy: string,
+    cancelledByName: string,
+    cancelledByRole: 'self' | 'admin' | 'board' | 'committee'
+  ): Promise<void> {
+    if (isDevMode()) {
+      const r = MOCK_REGISTRATIONS.find((x) => x.id === registrationId);
+      if (r) {
+        r.status = 'cancelled';
+        r.cancelledAt = new Date().toISOString();
+        r.cancelledBy = cancelledBy;
+        r.cancelledByName = cancelledByName;
+        r.cancelledByRole = cancelledByRole;
+        r.updatedAt = new Date().toISOString();
+      }
+      return;
+    }
+    const ref = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);
+    await updateDoc(ref, {
+      status: 'cancelled',
+      cancelledAt: Timestamp.now(),
+      cancelledBy,
+      cancelledByName,
+      cancelledByRole,
+      updatedAt: Timestamp.now(),
+    });
   },
 };

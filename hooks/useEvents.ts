@@ -117,6 +117,23 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
     }
   };
 
+  const cancelRegistration = async (
+    eventId: string,
+    memberId: string,
+    cancelledBy: string,
+    cancelledByName: string,
+    cancelledByRole: 'self' | 'admin' | 'board' | 'committee'
+  ) => {
+    try {
+      await EventsService.cancelRegistration(eventId, memberId, cancelledBy, cancelledByName, cancelledByRole);
+      await loadEvents();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '撤销失败';
+      showToast(errorMessage, 'error');
+      throw err;
+    }
+  };
+
   return {
     events,
     loading,
@@ -127,6 +144,7 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
     deleteEvent,
     registerForEvent,
     markAttendance,
+    cancelRegistration,
   };
 };
 

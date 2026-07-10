@@ -254,17 +254,28 @@ export class EventsService {
   }
 
   // Cancel event registration
-  static async cancelRegistration(eventId: string, memberId: string): Promise<void> {
+  static async cancelRegistration(
+    eventId: string,
+    memberId: string,
+    cancelledBy: string,
+    cancelledByName: string,
+    cancelledByRole: 'self' | 'admin' | 'board' | 'committee'
+  ): Promise<void> {
+    if (isDevMode()) return;
     try {
       const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
       const event = await this.getEventById(eventId);
-
       if (!event) throw new Error('Event not found');
 
       await updateDoc(eventRef, {
         attendees: Math.max(0, event.attendees - 1),
         registeredMembers: arrayRemove(memberId),
       });
+
+      const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
+      if (reg) {
+        await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, cancelledByRole);
+      }
     } catch (error) {
       console.error('Error canceling registration:', error);
       throw error;

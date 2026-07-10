@@ -765,7 +765,7 @@ export interface Event {
 }
 
 /** 活动参与状态：报名/缴费/签到一致可查（Story 8.1） */
-export type EventRegistrationStatus = 'registered' | 'paid' | 'checked_in';
+export type EventRegistrationStatus = 'registered' | 'paid' | 'checked_in' | 'cancelled';
 
 export interface EventRegistration {
   id: string;
@@ -777,6 +777,10 @@ export interface EventRegistration {
   createdAt: string;
   updatedAt?: string | null;
   loId?: string | null;
+  cancelledAt?: string | null;
+  cancelledBy?: string | null;       // memberId of who cancelled
+  cancelledByName?: string | null;   // display name
+  cancelledByRole?: 'self' | 'admin' | 'board' | 'committee' | null;
 }
 
 /** 非会员留资：联络方式与兴趣，供组织跟进与推广（Story 9.1 / FR27） */

@@ -25,7 +25,7 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const { events, loading, error, registerForEvent, markAttendance, updateEvent } = useEvents();
+  const { events, loading, error, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents();
   const { member } = useAuth();
   const { showToast } = useToast();
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
@@ -180,6 +180,9 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
               setSelectedEvent(null);
             }
           }}
+          onCancelRegistration={async (memberId, cancelledBy, cancelledByName, cancelledByRole) => {
+            await cancelRegistration(selectedEvent.id, memberId, cancelledBy, cancelledByName, cancelledByRole);
+          }}
           member={member}
           members={memberOptions}
         />
@@ -267,6 +270,7 @@ export interface EventDetailModalProps {
   onClose: () => void;
   onRegister: () => void;
   onCheckIn: () => void;
+  onCancelRegistration?: (memberId: string, cancelledBy: string, cancelledByName: string, cancelledByRole: 'self' | 'admin' | 'board' | 'committee') => Promise<void>;
   member: any;
   members: Member[];
 }
@@ -276,6 +280,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onClose,
   onRegister,
   onCheckIn,
+  onCancelRegistration,
   member,
   members,
 }) => {
@@ -288,6 +293,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [myRegistration, setMyRegistration] = useState<EventRegistration | null | undefined>(undefined);
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
 
@@ -324,6 +330,48 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       setParticipations([]);
     } finally {
       setLoadingParticipants(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!member) return;
+    EventRegistrationService.getByEventAndMember(event.id, member.id)
+      .then(setMyRegistration)
+      .catch(() => setMyRegistration(null));
+  }, [event.id, member?.id]);
+
+  const handleSelfCancel = async () => {
+    if (!member || !myRegistration || !onCancelRegistration) return;
+    setUpdatingRegId(myRegistration.id);
+    try {
+      await onCancelRegistration(member.id, member.id, member.name ?? member.id, 'self');
+      setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled', cancelledByRole: 'self' } : prev);
+      showToast('已撤销报名', 'success');
+    } catch {
+      showToast('撤销失败', 'error');
+    } finally {
+      setUpdatingRegId(null);
+    }
+  };
+
+  const handleAdminCancel = async (reg: EventRegistration) => {
+    if (!member || !onCancelRegistration) return;
+    setUpdatingRegId(reg.id);
+    const role: 'admin' | 'board' | 'committee' = isAdmin ? 'admin' : isBoard ? 'board' : 'committee';
+    try {
+      await onCancelRegistration(reg.memberId, member.id, member.name ?? member.id, role);
+      setParticipations((prev) =>
+        prev.map((r) =>
+          r.id === reg.id
+            ? { ...r, status: 'cancelled' as const, cancelledByRole: role, cancelledByName: member.name ?? member.id, cancelledAt: new Date().toISOString() }
+            : r
+        )
+      );
+      showToast('已撤销该会员报名', 'success');
+    } catch {
+      showToast('撤销失败', 'error');
+    } finally {
+      setUpdatingRegId(null);
     }
   };
 
@@ -374,22 +422,39 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const priceMin = event.priceMin ?? event.price;
   const priceMax = event.priceMax;
   const isRegistered = member && event.registeredMembers?.includes(member.id);
+  const isSelfCancelled = myRegistration?.status === 'cancelled';
+  const canSelfCancel = !!myRegistration && myRegistration.status !== 'cancelled' && myRegistration.status !== 'checked_in' && !!onCancelRegistration && event.status !== 'Completed';
   const attendancePercent = event.maxAttendees ? Math.round(((event.attendees || 0) / event.maxAttendees) * 100) : 0;
 
   const registerButton = (
-    <Button
-      className={`w-full h-12 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${isRegistered
-        ? 'bg-green-500 text-white hover:bg-green-600 shadow-green-100'
-        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
-        }`}
-      disabled={isRegistered || event.status === 'Completed' || event.status === 'Cancelled'}
-      onClick={onRegister}
-    >
-      {event.status === 'Completed' ? <span>Event Ended</span>
-        : event.status === 'Cancelled' ? <span>Cancelled</span>
-          : isRegistered ? <><CheckCircle size={18} className="stroke-[3]" /><span>Registered</span></>
-            : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}
-    </Button>
+    <div className="flex flex-col gap-2">
+      <Button
+        className={`w-full h-12 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${isSelfCancelled
+          ? 'bg-slate-200 text-slate-500 shadow-none cursor-default'
+          : isRegistered
+            ? 'bg-green-500 text-white hover:bg-green-600 shadow-green-100'
+            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+          }`}
+        disabled={isSelfCancelled || (!!isRegistered && !canSelfCancel) || event.status === 'Completed' || event.status === 'Cancelled'}
+        onClick={!isRegistered && !isSelfCancelled ? onRegister : undefined}
+      >
+        {event.status === 'Completed' ? <span>Event Ended</span>
+          : event.status === 'Cancelled' ? <span>Cancelled</span>
+            : isSelfCancelled ? <><span>已撤销报名</span></>
+              : isRegistered ? <><CheckCircle size={18} className="stroke-[3]" /><span>Registered</span></>
+                : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}
+      </Button>
+      {canSelfCancel && (
+        <Button
+          variant="secondary"
+          className="w-full h-9 rounded-xl text-xs text-red-500 border-red-200 hover:bg-red-50"
+          disabled={updatingRegId !== null}
+          onClick={handleSelfCancel}
+        >
+          撤销报名
+        </Button>
+      )}
+    </div>
   );
 
   return (
@@ -541,7 +606,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 <div className="animate-fade-in">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs text-blue-700 font-medium flex items-center gap-1.5">
-                      <Users size={13} /> Committee Access · {participations.length} registered
+                      <Users size={13} /> Committee Access · {participations.filter(r => r.status !== 'cancelled').length} registered
                     </p>
                   </div>
                   {loadingParticipants ? (
@@ -557,25 +622,38 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
                       {participations.map((r) => {
                         const mem = members.find((m) => m.id === r.memberId);
+                        const isCancelled = r.status === 'cancelled';
+                        const cancelLabel = isCancelled
+                          ? r.cancelledByRole === 'self'
+                            ? '撤销 by self'
+                            : `撤销 by ${r.cancelledByRole ?? 'admin'}: ${r.cancelledByName ?? ''}`
+                          : null;
                         return (
-                          <div key={r.id} className="flex items-center justify-between px-3 py-2.5 bg-white hover:bg-slate-50 transition-colors">
+                          <div key={r.id} className={`flex items-center justify-between px-3 py-2.5 transition-colors ${isCancelled ? 'bg-red-50/40 opacity-70' : 'bg-white hover:bg-slate-50'}`}>
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                                 <Users size={14} className="text-slate-400" />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-900 truncate">{mem?.name ?? 'Unknown'}</p>
-                                <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'} className="text-[10px]">
-                                  {r.status === 'registered' ? 'Registered' : r.status === 'paid' ? 'Paid' : 'Checked In'}
-                                </Badge>
+                                <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{mem?.name ?? 'Unknown'}</p>
+                                {isCancelled ? (
+                                  <Badge variant="error" className="text-[10px]">{cancelLabel}</Badge>
+                                ) : (
+                                  <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'} className="text-[10px]">
+                                    {r.status === 'registered' ? 'Registered' : r.status === 'paid' ? 'Paid' : 'Checked In'}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             <div className="flex gap-1 shrink-0">
-                              {r.status === 'registered' && (
+                              {!isCancelled && r.status === 'registered' && (
                                 <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(r)}>Paid</Button>
                               )}
-                              {(r.status === 'registered' || r.status === 'paid') && (
+                              {!isCancelled && (r.status === 'registered' || r.status === 'paid') && (
                                 <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(r)}>Check In</Button>
+                              )}
+                              {!isCancelled && onCancelRegistration && (
+                                <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}>撤销</Button>
                               )}
                             </div>
                           </div>
