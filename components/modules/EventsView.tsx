@@ -878,7 +878,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                       <span className="shrink-0 inline-flex items-center justify-center text-[8px] font-semibold w-10 h-5 rounded-full bg-jci-blue/10 text-jci-blue">{shortPos(getBoardPos(m))}</span>
                                     )}
                                     <p className="text-sm font-semibold truncate text-slate-900">{m.name}</p>
-                                    {(reg?.dietary === 'vegetarian' || (!reg?.dietary && reg?.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" title="Vegetarian" />}
+                                    {(reg?.dietary === 'vegetarian' || (!reg?.dietary && reg?.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" />}
                                     {reg?.dietary === 'halal' && <span className="shrink-0 text-[10px]" title="Halal">☪️</span>}
                                     {reg?.tshirtSize && <span className="shrink-0 text-[10px] font-medium text-slate-400">{reg.tshirtSize}</span>}
                                   </div>
@@ -1077,7 +1077,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                       'bg-slate-100 text-slate-400'
                                     }`}>{roleLabel}</span>
                                     <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{mem?.name ?? r.memberName ?? 'Unknown'}</p>
-                                    {(r.dietary === 'vegetarian' || (!r.dietary && r.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" title="Vegetarian" />}
+                                    {(r.dietary === 'vegetarian' || (!r.dietary && r.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" />}
                                     {r.dietary === 'halal' && <span className="shrink-0 text-[10px]" title="Halal">☪️</span>}
                                     {r.tshirtSize && <span className="shrink-0 text-[10px] font-medium text-slate-400">{r.tshirtSize}</span>}
                                   </div>
