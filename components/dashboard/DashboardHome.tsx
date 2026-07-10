@@ -1053,12 +1053,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                   <span className="text-[9px] font-black uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
                                 )}
                               </div>
-                              {(!hasMore || isExpanded) && visibleEntries.length > 0 && (
-                                <div className="mt-0.5 space-y-0.5">
-                                  {visibleEntries.map((e, ei) => (
-                                    <p key={ei} className="text-[11px] text-white/30 truncate">{e}</p>
-                                  ))}
-                                </div>
+                              {!hasMore && visibleEntries.length > 0 && (
+                                <p className="text-[11px] text-white/30 truncate mt-0.5">{visibleEntries[0]}</p>
                               )}
                             </div>
                             {hasMore && (
@@ -1070,14 +1066,17 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                 })}
                                 className="flex-shrink-0 text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full border transition-colors bg-white/10 text-white/40 border-white/15 hover:bg-white/15"
                               >
-                                {isExpanded ? '−' : `+${allEntries.length - 1}`}
+                                {isExpanded ? '−' : `+${allEntries.length}`}
                               </button>
                             )}
                           </div>
-                          {isExpanded && allEntries.length > 1 && (
-                            <div className="px-3 pb-2.5 space-y-1 border-t border-white/5 pt-2">
-                              {allEntries.slice(1).map((e, ei) => (
-                                <p key={ei} className="text-[11px] text-white/30 truncate pl-10">{e}</p>
+                          {isExpanded && allEntries.length > 0 && (
+                            <div className="px-3 pb-3 pt-1 space-y-1.5 border-t border-white/6 mt-0">
+                              {allEntries.map((e, ei) => (
+                                <div key={ei} className="flex items-center gap-2 pl-9">
+                                  <div className="w-1 h-1 rounded-full bg-emerald-400/50 flex-shrink-0" />
+                                  <p className="text-[11px] text-white/50 truncate">{e}</p>
+                                </div>
                               ))}
                             </div>
                           )}
