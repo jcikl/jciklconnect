@@ -212,12 +212,10 @@ export const Combobox: React.FC<ComboboxProps> = ({
                     placeholder={placeholder}
                     disabled={disabled}
                     className={`
-          block w-full rounded-lg border-slate-300 shadow-sm py-2 px-3
-          focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 sm:text-sm
+          block w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm
+          focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20
           disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
           transition-colors
-          border-slate-300
-          
           `}
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center">
