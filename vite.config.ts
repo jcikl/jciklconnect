@@ -53,6 +53,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
+        external: ['@capacitor/app'],
         output: {
           manualChunks: {
             'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
