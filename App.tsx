@@ -4703,6 +4703,12 @@ export const JCIKLApp: React.FC = () => {
                             <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Evts Mgt</span>
                           </div>
                         )}
+                        {canViewEventsManagement && !isPlainMember && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-violet-950/30 text-violet-400 border-violet-900/50'}`}><Briefcase size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Flagship</span>
+                          </div>
+                        )}
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SURVEYS'); setShowMobileMenu(false); }}>
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-rose-950/30 text-rose-400 border-rose-900/50'}`}><CheckSquare size={22} /></div>
                           <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Surveys</span>
@@ -4724,6 +4730,12 @@ export const JCIKLApp: React.FC = () => {
                               <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Inventory</span>
                             </div>
                           </>
+                        )}
+                        {(isBoard || isAdmin) && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ADVERTISEMENTS'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-orange-950/30 text-orange-400 border-orange-900/50'}`}><Megaphone size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Partners</span>
+                          </div>
                         )}
                         {canAccessWorkspaceModules && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('GAMIFICATION'); setShowMobileMenu(false); }}>
@@ -4759,18 +4771,6 @@ export const JCIKLApp: React.FC = () => {
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Megaphone size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Partners</span>
                         </div>
-                        {canViewEventsManagement && !isPlainMember && (
-                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setShowMobileMenu(false); }}>
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Briefcase size={22} /></div>
-                            <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Flagship</span>
-                          </div>
-                        )}
-                        {(isBoard || isAdmin) && (
-                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ADVERTISEMENTS'); setShowMobileMenu(false); }}>
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Megaphone size={22} /></div>
-                            <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Ads</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
