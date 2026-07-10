@@ -45,6 +45,7 @@ export const EventRegistrationService = {
         cancelledBy: data.cancelledBy ?? null,
         cancelledByName: data.cancelledByName ?? null,
         cancelledByRole: data.cancelledByRole ?? null,
+        dietary: (data.dietary ?? null) as EventRegistration['dietary'],
         isVegetarian: data.isVegetarian ?? null,
         emergencyContactName: data.emergencyContactName ?? null,
         emergencyContactPhone: data.emergencyContactPhone ?? null,
@@ -52,6 +53,8 @@ export const EventRegistrationService = {
         memberName: data.memberName ?? data.name ?? null,
         registeredBy: data.registeredBy ?? null,
         registeredByName: data.registeredByName ?? null,
+        paidByName: data.paidByName ?? null,
+        checkedInByName: data.checkedInByName ?? null,
       } as EventRegistration;
     });
   },
@@ -114,6 +117,7 @@ export const EventRegistrationService = {
     memberId: string,
     loId?: string,
     extraFields?: {
+      dietary?: 'normal' | 'vegetarian' | 'halal' | null;
       isVegetarian?: boolean | null;
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
@@ -145,6 +149,7 @@ export const EventRegistrationService = {
       updatedAt: Timestamp.now(),
       loId: lid,
     };
+    if (extraFields?.dietary) payload.dietary = extraFields.dietary;
     if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
     if (extraFields?.emergencyContactName) payload.emergencyContactName = extraFields.emergencyContactName;
     if (extraFields?.emergencyContactPhone) payload.emergencyContactPhone = extraFields.emergencyContactPhone;
@@ -159,14 +164,14 @@ export const EventRegistrationService = {
   async updateStatus(
     registrationId: string,
     status: EventRegistrationStatus,
-    options?: { paidAt?: string; checkedInAt?: string; registeredBy?: string | null; registeredByName?: string | null }
+    options?: { paidAt?: string | null; checkedInAt?: string | null; registeredBy?: string | null; registeredByName?: string | null; paidByName?: string | null; checkedInByName?: string | null }
   ): Promise<void> {
     if (isDevMode()) {
       const r = MOCK_REGISTRATIONS.find((x) => x.id === registrationId);
       if (r) {
         r.status = status;
-        if (options?.paidAt) r.paidAt = options.paidAt;
-        if (options?.checkedInAt) r.checkedInAt = options.checkedInAt;
+        if (options?.paidAt !== undefined) r.paidAt = options.paidAt;
+        if (options?.checkedInAt !== undefined) r.checkedInAt = options.checkedInAt;
         if (options?.registeredBy !== undefined) r.registeredBy = options.registeredBy;
         if (options?.registeredByName !== undefined) r.registeredByName = options.registeredByName;
         r.updatedAt = new Date().toISOString();
@@ -175,10 +180,12 @@ export const EventRegistrationService = {
     }
     const ref = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);
     const updateData: Record<string, unknown> = { status, updatedAt: Timestamp.now() };
-    if (options?.paidAt != null) updateData.paidAt = options.paidAt;
-    if (options?.checkedInAt != null) updateData.checkedInAt = options.checkedInAt;
+    if (options?.paidAt !== undefined) updateData.paidAt = options.paidAt ?? null;
+    if (options?.checkedInAt !== undefined) updateData.checkedInAt = options.checkedInAt ?? null;
     if (options?.registeredBy !== undefined) updateData.registeredBy = options.registeredBy;
     if (options?.registeredByName !== undefined) updateData.registeredByName = options.registeredByName;
+    if (options?.paidByName !== undefined) updateData.paidByName = options.paidByName ?? null;
+    if (options?.checkedInByName !== undefined) updateData.checkedInByName = options.checkedInByName ?? null;
     await updateDoc(ref, updateData);
   },
 

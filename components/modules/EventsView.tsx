@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown } from 'lucide-react';
+import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown, Leaf } from 'lucide-react';
 import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useEvents } from '../../hooks/useEvents';
@@ -269,7 +269,7 @@ const EventRow: React.FC<{
 
 // Event Detail Modal with Budget Management
 export interface RegistrationFormData {
-  isVegetarian: boolean;
+  dietary: 'normal' | 'vegetarian' | 'halal';
   emergencyContactName: string;
   emergencyContactPhone: string;
   tshirtSize: string;
@@ -310,9 +310,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addMemberId, setAddMemberId] = useState('');
   const [addingParticipant, setAddingParticipant] = useState(false);
+  const [addForm, setAddForm] = useState<{ dietary: 'normal' | 'vegetarian' | 'halal'; tshirtSize: string }>({ dietary: 'normal', tshirtSize: '' });
   const [showRegForm, setShowRegForm] = useState(false);
   const [regForm, setRegForm] = useState<RegistrationFormData>({
-    isVegetarian: false,
+    dietary: (member?.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
     emergencyContactName: '',
     emergencyContactPhone: '',
     tshirtSize: '',
@@ -367,6 +368,21 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   };
   const isBoardMember = (m: Member) => boardMemberIds.has(m.id);
   const isDirector = (m: Member) => commDirIds.has(m.id);
+
+  const nameInitials = (name: string) => {
+    const parts = (name ?? '').trim().split(/\s+/);
+    return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (parts[0] ?? '?').slice(0, 2).toUpperCase();
+  };
+  const initialsColor = (id: string) => {
+    const palette = ['bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700'];
+    return palette[(id ?? '').charCodeAt(0) % palette.length];
+  };
+  const memberAvatar = (m: Member) => m.general?.avatarUrl ?? m.avatarUrl ?? m.avatar ?? undefined;
+  const fmtDate = (iso: string | null | undefined) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
 
   const isCommitteeMember = useMemo(() => {
     if (!member) return false;
@@ -438,7 +454,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       .catch(() => setMyRegistration(null));
     // Pre-fill registration form from member profile
     setRegForm({
-      isVegetarian: false,
+      dietary: (member.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
       emergencyContactName: member.emergencyContactName ?? member.emergencyContact ?? '',
       emergencyContactPhone: member.emergencyContactPhone ?? '',
       tshirtSize: member.tshirtSize ?? '',
@@ -502,20 +518,17 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setAddingParticipant(true);
     try {
       const added = members.find(m => m.id === addMemberId);
-      await EventsService.registerForEvent(event.id, addMemberId, { memberName: added?.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
-      const newReg: EventRegistration = {
-        id: `manual-${Date.now()}`,
-        eventId: event.id,
-        memberId: addMemberId,
-        status: 'registered',
-        createdAt: new Date().toISOString(),
-        loId: null,
+      await EventsService.registerForEvent(event.id, addMemberId, {
+        memberName: added?.name,
         registeredBy: member?.id,
         registeredByName: member?.name ?? member?.id,
-      };
-      setParticipations(prev => [newReg, ...prev]);
+        dietary: addForm.dietary,
+        tshirtSize: addForm.tshirtSize || undefined,
+      });
+      await loadParticipations();
       showToast(`${added?.name ?? 'Member'} added`, 'success');
       setAddMemberId('');
+      setAddForm({ dietary: 'normal', tshirtSize: '' });
       setShowAddParticipant(false);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to add participant', 'error');
@@ -527,9 +540,25 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const handleMarkPaid = async (reg: EventRegistration) => {
     setUpdatingRegId(reg.id);
     try {
-      await EventRegistrationService.updateStatus(reg.id, 'paid', { paidAt: new Date().toISOString() });
-      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: new Date().toISOString() } : r)));
+      const now = new Date().toISOString();
+      const actorName = member?.name ?? member?.id ?? 'Admin';
+      await EventRegistrationService.updateStatus(reg.id, 'paid', { paidAt: now, paidByName: actorName });
+      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: now, paidByName: actorName } : r)));
       showToast('Marked as paid', 'success');
+    } catch {
+      showToast('Operation failed', 'error');
+    } finally {
+      setUpdatingRegId(null);
+    }
+  };
+
+  const handleUndoPaid = async (reg: EventRegistration) => {
+    setUpdatingRegId(reg.id);
+    const nextStatus = reg.status === 'checked_in' ? 'checked_in' : 'registered';
+    try {
+      await EventRegistrationService.updateStatus(reg.id, nextStatus, { paidAt: null, paidByName: null });
+      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: nextStatus as EventRegistration['status'], paidAt: null, paidByName: null } : r)));
+      showToast('Payment reverted', 'success');
     } catch {
       showToast('Operation failed', 'error');
     } finally {
@@ -540,9 +569,25 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const handleMarkCheckedIn = async (reg: EventRegistration) => {
     setUpdatingRegId(reg.id);
     try {
-      await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: new Date().toISOString() });
-      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'checked_in' as const, checkedInAt: new Date().toISOString() } : r)));
+      const now = new Date().toISOString();
+      const actorName = member?.name ?? member?.id ?? 'Admin';
+      await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: now, checkedInByName: actorName });
+      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'checked_in' as const, checkedInAt: now, checkedInByName: actorName } : r)));
       showToast('Marked as checked in', 'success');
+    } catch {
+      showToast('Operation failed', 'error');
+    } finally {
+      setUpdatingRegId(null);
+    }
+  };
+
+  const handleUndoCheckedIn = async (reg: EventRegistration) => {
+    setUpdatingRegId(reg.id);
+    const prevStatus = reg.paidAt ? 'paid' : 'registered';
+    try {
+      await EventRegistrationService.updateStatus(reg.id, prevStatus, { checkedInAt: null, checkedInByName: null });
+      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: prevStatus as EventRegistration['status'], checkedInAt: null, checkedInByName: null } : r)));
+      showToast('Check-in reverted', 'success');
     } catch {
       showToast('Operation failed', 'error');
     } finally {
@@ -780,37 +825,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                             {t.count != null && <span className={`text-[10px] font-bold ${participantSubTab === t.key ? 'opacity-80' : 'opacity-60'}`}>({t.count})</span>}
                           </button>
                         ))}
-                        <div className="ml-auto shrink-0">
-                          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px]" onClick={() => setShowAddParticipant(v => !v)}>
-                            <Plus size={12} className="mr-1" />Add
-                          </Button>
-                        </div>
                       </div>
                     );
                   })()}
-
-                  {showAddParticipant && (
-                    <div className="mb-3 p-3 rounded-xl border border-blue-100 bg-blue-50/40 space-y-2">
-                      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">手动添加参与者</p>
-                      <MemberSelector
-                        members={members.filter(m =>
-                          !participations.some(r => r.memberId === m.id && r.status !== 'cancelled') &&
-                          !isBoardMember(m) &&
-                          !isDirector(m)
-                        )}
-                        value={addMemberId}
-                        onChange={setAddMemberId}
-                        placeholder="搜索会员..."
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" className="flex-1" disabled={!addMemberId || addingParticipant} onClick={handleAddParticipant}>
-                          {addingParticipant ? <RefreshCw size={12} className="animate-spin mr-1" /> : null}
-                          确认添加
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { setShowAddParticipant(false); setAddMemberId(''); }}>取消</Button>
-                      </div>
-                    </div>
-                  )}
                   {loadingParticipants ? (
                     <div className="flex items-center justify-center py-10">
                       <RefreshCw className="animate-spin text-jci-blue" size={22} />
@@ -846,50 +863,65 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                           const reg = participations.find(r => r.memberId === m.id && r.status !== 'cancelled');
                           const regStatus = reg?.status;
                           return (
-                            <div key={m.id} className="flex items-center justify-between px-3 py-2.5 bg-white">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                                  <Users size={14} className="text-slate-400" />
-                                </div>
-                                <div className="min-w-0">
+                            <div key={m.id} className="px-3 py-2.5 bg-white">
+                              <div className="flex items-start gap-2.5">
+                                {memberAvatar(m) ? (
+                                  <img src={memberAvatar(m)} alt={m.name ?? ''} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
+                                ) : (
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold ${initialsColor(m.id)}`}>
+                                    {nameInitials(m.name ?? '')}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     {getBoardPos(m) && (
-                                      <span className="shrink-0 inline-flex items-center justify-center text-[10px] font-semibold w-14 py-0.5 rounded-full bg-jci-blue/10 text-jci-blue">{shortPos(getBoardPos(m))}</span>
+                                      <span className="shrink-0 inline-flex items-center justify-center text-[8px] font-semibold w-10 h-5 rounded-full bg-jci-blue/10 text-jci-blue">{shortPos(getBoardPos(m))}</span>
                                     )}
                                     <p className="text-sm font-semibold truncate text-slate-900">{m.name}</p>
+                                    {(reg?.dietary === 'vegetarian' || (!reg?.dietary && reg?.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" title="Vegetarian" />}
+                                    {reg?.dietary === 'halal' && <span className="shrink-0 text-[10px]" title="Halal">☪️</span>}
+                                    {reg?.tshirtSize && <span className="shrink-0 text-[10px] font-medium text-slate-400">{reg.tshirtSize}</span>}
                                   </div>
-                                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                  {regStatus ? (
-                                    <Badge variant={regStatus === 'checked_in' ? 'success' : regStatus === 'paid' ? 'warning' : 'neutral'} className="text-[10px]">
-                                      {regStatus === 'registered' ? 'Registered' : regStatus === 'paid' ? 'Paid' : 'Checked In'}
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="error" className="text-[10px]">Not Registered</Badge>
+                                  <div className="flex items-center justify-between gap-2 mt-1">
+                                    <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                                      {regStatus ? (
+                                        <Badge variant={regStatus === 'checked_in' ? 'success' : regStatus === 'paid' ? 'warning' : 'neutral'} className="text-[10px] shrink-0 h-5 !py-0">
+                                          {regStatus === 'registered' ? 'Pending Payment' : regStatus === 'paid' ? 'Pending Check-In' : 'Checked In'}
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="error" className="text-[10px] shrink-0 h-5 !py-0">Not Registered</Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                      {reg && (
+                                        <Button size="sm" variant={reg.paidAt ? 'outline' : 'secondary'} className="h-5 px-1" title={reg.paidAt ? 'Undo Payment' : 'Mark Paid'} disabled={updatingRegId !== null} onClick={() => reg.paidAt ? handleUndoPaid(reg) : handleMarkPaid(reg)}><DollarSign size={12} /></Button>
+                                      )}
+                                      {reg && (
+                                        <Button size="sm" variant={reg.status === 'checked_in' ? 'outline' : 'secondary'} className="h-5 px-1" title={reg.status === 'checked_in' ? 'Undo Check-In' : 'Check In'} disabled={updatingRegId !== null} onClick={() => reg.status === 'checked_in' ? handleUndoCheckedIn(reg) : handleMarkCheckedIn(reg)}><CheckCircle size={12} /></Button>
+                                      )}
+                                      {reg && onCancelRegistration && (
+                                        <Button size="sm" variant="secondary" className="h-5 px-1 text-red-500 border-red-200 hover:bg-red-50" title="Cancel registration" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(reg)}><Trash2 size={12} /></Button>
+                                      )}
+                                      {!reg && (
+                                        <Button size="sm" variant="outline" className="h-5 px-1" title="Register" onClick={async () => {
+                                          try {
+                                            await EventsService.registerForEvent(event.id, m.id, { memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
+                                            const newReg: EventRegistration = { id: `manual-${Date.now()}`, eventId: event.id, memberId: m.id, status: 'registered', createdAt: new Date().toISOString(), loId: null, memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id };
+                                            setParticipations(prev => [newReg, ...prev]);
+                                            showToast(`${m.name} added`, 'success');
+                                          } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
+                                        }}><Plus size={14} /></Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {reg && (
+                                    <div className="flex items-center gap-1 mt-0.5 text-[10px] text-slate-400 flex-wrap">
+                                      <span>Reg: {reg.registeredByName ?? 'Self'}</span>
+                                      {reg.paidByName && <><span className="opacity-40">|</span><span>Verified: {reg.paidByName}</span></>}
+                                      {reg.checkedInByName && <><span className="opacity-40">|</span><span>Check-in by: {reg.checkedInByName}</span></>}
+                                    </div>
                                   )}
-                                  {reg && <span className="text-[10px] text-slate-400">{reg.registeredByName ? `由 ${reg.registeredByName} 报名` : 'Self registered'}</span>}
-                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex gap-1 shrink-0">
-                                {reg && reg.status === 'registered' && (
-                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(reg)}>Paid</Button>
-                                )}
-                                {reg && (reg.status === 'registered' || reg.status === 'paid') && (
-                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(reg)}>Check In</Button>
-                                )}
-                                {reg && onCancelRegistration && (
-                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(reg)}>Cancel</Button>
-                                )}
-                                {!reg && (
-                                  <Button size="sm" variant="outline" className="text-[10px] h-7 px-2" onClick={async () => {
-                                    try {
-                                      await EventsService.registerForEvent(event.id, m.id, { memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
-                                      const newReg: EventRegistration = { id: `manual-${Date.now()}`, eventId: event.id, memberId: m.id, status: 'registered', createdAt: new Date().toISOString(), loId: null, memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id };
-                                      setParticipations(prev => [newReg, ...prev]);
-                                      showToast(`${m.name} added`, 'success');
-                                    } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
-                                  }}>Add</Button>
-                                )}
                               </div>
                             </div>
                           );
@@ -905,12 +937,6 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       if (participantSubTab === 'guest') return !m || m.role === 'GUEST' || m.role === 'guest';
                       return true;
                     });
-                    if (filtered.length === 0) return (
-                      <div className="text-center py-10 text-slate-400">
-                        <Users size={36} className="mx-auto mb-2 opacity-20" />
-                        <p className="text-sm">No registrations yet.</p>
-                      </div>
-                    );
                     const roleOrder = (r: EventRegistration) => {
                       const m = members.find(x => x.id === r.memberId);
                       if (!m) return 4;
@@ -929,6 +955,70 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     });
                     return (
                     <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                      {isCommitteeMember && !showAddParticipant && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAddParticipant(true)}
+                          className="w-full flex items-center gap-3 px-3 py-3 text-slate-400 hover:bg-slate-50/50 hover:text-jci-blue transition-colors group"
+                        >
+                          <div className="w-8 h-8 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                            <Plus size={14} />
+                          </div>
+                          <span className="text-sm font-semibold">Add Participant</span>
+                        </button>
+                      )}
+                      {showAddParticipant && (
+                        <div className="px-3 py-3 bg-blue-50/40 space-y-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-8 h-8 rounded-lg bg-jci-blue/10 flex items-center justify-center shrink-0">
+                              <Plus size={14} className="text-jci-blue" />
+                            </div>
+                            <span className="text-sm font-semibold text-slate-700">Add Participant</span>
+                          </div>
+                          <MemberSelector
+                            members={members.filter(m =>
+                              !participations.some(r => r.memberId === m.id && r.status !== 'cancelled') &&
+                              !isBoardMember(m) &&
+                              !isDirector(m)
+                            )}
+                            value={addMemberId}
+                            onChange={setAddMemberId}
+                            placeholder="Search members..."
+                          />
+                          <div className="flex gap-1.5">
+                            {(['normal', 'vegetarian', 'halal'] as const).map(opt => (
+                              <button key={opt} type="button"
+                                onClick={() => setAddForm(f => ({ ...f, dietary: opt }))}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${addForm.dietary === opt ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-jci-blue/40'}`}>
+                                {opt === 'normal' ? 'Normal' : opt === 'vegetarian' ? '🌿 Veg' : '☪️ Halal'}
+                              </button>
+                            ))}
+                          </div>
+                          <select
+                            value={addForm.tshirtSize}
+                            onChange={e => setAddForm(f => ({ ...f, tshirtSize: e.target.value }))}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue bg-white"
+                          >
+                            <option value="">T-Shirt Size (optional)</option>
+                            {(['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'] as const).map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="flex-1" disabled={!addMemberId || addingParticipant} onClick={handleAddParticipant}>
+                              {addingParticipant ? <RefreshCw size={12} className="animate-spin mr-1" /> : null}
+                              Confirm
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => { setShowAddParticipant(false); setAddMemberId(''); setAddForm({ dietary: 'normal', tshirtSize: '' }); }}>Cancel</Button>
+                          </div>
+                        </div>
+                      )}
+                      {filtered.length === 0 && !showAddParticipant && (
+                        <div className="text-center py-10 text-slate-400">
+                          <Users size={36} className="mx-auto mb-2 opacity-20" />
+                          <p className="text-sm">No registrations yet.</p>
+                        </div>
+                      )}
                       {sorted.map((r) => {
                         const mem = members.find((m) => m.id === r.memberId);
                         const roleLabel = (() => {
@@ -949,11 +1039,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                             : `Cancelled by ${r.cancelledByRole ?? 'admin'}: ${r.cancelledByName ?? ''}`
                           : null;
                         const isRowExpanded = expandedRows.has(r.id);
-                        const hasDetails = r.isVegetarian != null || r.emergencyContactName || r.emergencyContactPhone || r.tshirtSize;
+                        const hasDetails = r.dietary != null || r.isVegetarian != null || r.emergencyContactName || r.emergencyContactPhone || r.tshirtSize;
                         return (
                           <div key={r.id} className={`transition-colors ${isCancelled ? 'bg-red-50/40 opacity-70' : 'bg-white'}`}>
-                            <div className="flex items-center justify-between px-3 py-2.5">
-                              <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="px-3 py-2.5">
+                              <div className="flex items-start gap-2.5">
                                 <button
                                   type="button"
                                   onClick={() => hasDetails && setExpandedRows(prev => {
@@ -961,13 +1051,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                     next.has(r.id) ? next.delete(r.id) : next.add(r.id);
                                     return next;
                                   })}
-                                  className={`w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0 ${hasDetails ? 'cursor-pointer hover:bg-slate-200' : ''}`}
+                                  className={`relative w-7 h-7 rounded-full shrink-0 mt-0.5 overflow-hidden ${hasDetails ? 'cursor-pointer' : 'cursor-default'}`}
                                 >
-                                  {hasDetails
-                                    ? <ChevronDown size={14} className={`text-slate-400 transition-transform ${isRowExpanded ? 'rotate-180' : ''}`} />
-                                    : <Users size={14} className="text-slate-400" />}
+                                  {mem && memberAvatar(mem) ? (
+                                    <img src={memberAvatar(mem)} alt={mem.name ?? ''} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className={`w-full h-full flex items-center justify-center text-[10px] font-bold ${initialsColor(mem?.id ?? r.memberId ?? '')}`}>
+                                      {nameInitials(mem?.name ?? r.memberName ?? '?')}
+                                    </div>
+                                  )}
+                                  {hasDetails && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                      <ChevronDown size={13} className={`text-white transition-transform ${isRowExpanded ? 'rotate-180' : ''}`} />
+                                    </div>
+                                  )}
                                 </button>
-                                <div className="min-w-0">
+                                <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                                       roleLabel === 'Board' ? 'bg-jci-blue/10 text-jci-blue' :
@@ -978,57 +1077,74 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                       'bg-slate-100 text-slate-400'
                                     }`}>{roleLabel}</span>
                                     <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{mem?.name ?? r.memberName ?? 'Unknown'}</p>
+                                    {(r.dietary === 'vegetarian' || (!r.dietary && r.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" title="Vegetarian" />}
+                                    {r.dietary === 'halal' && <span className="shrink-0 text-[10px]" title="Halal">☪️</span>}
+                                    {r.tshirtSize && <span className="shrink-0 text-[10px] font-medium text-slate-400">{r.tshirtSize}</span>}
                                   </div>
-                                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                  {isCancelled ? (
-                                    <Badge variant="error" className="text-[10px]">{cancelLabel}</Badge>
-                                  ) : (
-                                    <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'} className="text-[10px]">
-                                      {r.status === 'registered' ? 'Registered' : r.status === 'paid' ? 'Paid' : 'Checked In'}
-                                    </Badge>
+                                  <div className="flex items-center justify-between gap-2 mt-1">
+                                    <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                                      {isCancelled ? (
+                                        <Badge variant="error" className="text-[10px] shrink-0 h-5 !py-0">{cancelLabel}</Badge>
+                                      ) : (
+                                        <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'} className="text-[10px] shrink-0 h-5 !py-0">
+                                          {r.status === 'registered' ? 'Pending Payment' : r.status === 'paid' ? 'Pending Check-In' : 'Checked In'}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                      {isCancelled && isCommitteeMember && (
+                                        <Button size="sm" variant="outline" className="h-5 px-1" title="Re-register" disabled={updatingRegId !== null} onClick={async () => {
+                                          try {
+                                            await EventsService.registerForEvent(event.id, r.memberId, { memberName: mem?.name ?? r.memberName, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
+                                            setParticipations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'registered' as const, cancelledAt: null, cancelledBy: null, cancelledByName: null, cancelledByRole: null, registeredBy: member?.id, registeredByName: member?.name ?? member?.id } : x));
+                                            showToast(`${mem?.name ?? r.memberName ?? 'Member'} re-registered`, 'success');
+                                          } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
+                                        }}><RefreshCw size={12} /></Button>
+                                      )}
+                                      {!isCancelled && (
+                                        <Button size="sm" variant={r.paidAt ? 'outline' : 'secondary'} className="h-5 px-1" title={r.paidAt ? 'Undo Payment' : 'Mark Paid'} disabled={updatingRegId !== null} onClick={() => r.paidAt ? handleUndoPaid(r) : handleMarkPaid(r)}><DollarSign size={12} /></Button>
+                                      )}
+                                      {!isCancelled && (
+                                        <Button size="sm" variant={r.status === 'checked_in' ? 'outline' : 'secondary'} className="h-5 px-1" title={r.status === 'checked_in' ? 'Undo Check-In' : 'Check In'} disabled={updatingRegId !== null} onClick={() => r.status === 'checked_in' ? handleUndoCheckedIn(r) : handleMarkCheckedIn(r)}><CheckCircle size={12} /></Button>
+                                      )}
+                                      {!isCancelled && onCancelRegistration && (
+                                        <Button size="sm" variant="secondary" className="h-5 px-1 text-red-500 border-red-200 hover:bg-red-50" title="Cancel registration" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}><Trash2 size={12} /></Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {!isCancelled && (
+                                    <div className="flex items-center gap-1 mt-0.5 text-[10px] text-slate-400 flex-wrap">
+                                      <span>Reg: {r.registeredByName ?? 'Self'}</span>
+                                      {r.paidByName && <><span className="opacity-40">|</span><span>Verified: {r.paidByName}</span></>}
+                                      {r.checkedInByName && <><span className="opacity-40">|</span><span>Check-in by: {r.checkedInByName}</span></>}
+                                    </div>
                                   )}
-                                  {!isCancelled && <span className="text-[10px] text-slate-400">{r.registeredByName ? `由 ${r.registeredByName} 报名` : 'Self registered'}</span>}
-                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex gap-1 shrink-0">
-                                {isCancelled && isCommitteeMember && (
-                                  <Button size="sm" variant="outline" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={async () => {
-                                    try {
-                                      await EventsService.registerForEvent(event.id, r.memberId, { memberName: mem?.name ?? r.memberName, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
-                                      setParticipations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'registered' as const, cancelledAt: null, cancelledBy: null, cancelledByName: null, cancelledByRole: null, registeredBy: member?.id, registeredByName: member?.name ?? member?.id } : x));
-                                      showToast(`${mem?.name ?? r.memberName ?? 'Member'} re-registered`, 'success');
-                                    } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
-                                  }}>Re-register</Button>
-                                )}
-                                {!isCancelled && r.status === 'registered' && (
-                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(r)}>Paid</Button>
-                                )}
-                                {!isCancelled && (r.status === 'registered' || r.status === 'paid') && (
-                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(r)}>Check In</Button>
-                                )}
-                                {!isCancelled && onCancelRegistration && (
-                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}>Cancel</Button>
-                                )}
                               </div>
                             </div>
                             {isRowExpanded && hasDetails && (
                               <div className="px-3 pb-2.5 pl-[52px] grid grid-cols-2 gap-x-4 gap-y-1.5">
-                                {r.isVegetarian != null && (
+                                {(r.dietary != null || r.isVegetarian != null) && (
                                   <div className="col-span-2 flex items-center gap-1.5">
-                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">素食者</span>
-                                    <Badge variant={r.isVegetarian ? 'success' : 'neutral'} className="text-[10px]">{r.isVegetarian ? '是 Yes' : '否 No'}</Badge>
+                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Dietary</span>
+                                    {r.dietary === 'vegetarian' || (!r.dietary && r.isVegetarian) ? (
+                                      <Badge variant="success" className="text-[10px]">🌿 Vegetarian</Badge>
+                                    ) : r.dietary === 'halal' ? (
+                                      <Badge variant="success" className="text-[10px]">☪️ Halal</Badge>
+                                    ) : (
+                                      <Badge variant="neutral" className="text-[10px]">Normal</Badge>
+                                    )}
                                   </div>
                                 )}
                                 {r.tshirtSize && (
                                   <div>
-                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">衣服尺码</p>
+                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">T-Shirt Size</p>
                                     <p className="text-xs font-medium text-slate-700">{r.tshirtSize}</p>
                                   </div>
                                 )}
                                 {(r.emergencyContactName || r.emergencyContactPhone) && (
                                   <div>
-                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">紧急联络</p>
+                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Emergency Contact</p>
                                     {r.emergencyContactName && <p className="text-xs font-medium text-slate-700 truncate">{r.emergencyContactName}</p>}
                                     {r.emergencyContactPhone && <p className="text-xs text-slate-500">{r.emergencyContactPhone}</p>}
                                   </div>
@@ -1046,8 +1162,15 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
               {activeTab === 'stats' && (() => {
                 const activeRegs = participations.filter(r => r.status !== 'cancelled');
-                const vegCount = activeRegs.filter(r => r.isVegetarian === true).length;
-                const nonVegCount = activeRegs.filter(r => r.isVegetarian === false).length;
+                const dietaryCounts = { normal: 0, vegetarian: 0, halal: 0, unspecified: 0 };
+                activeRegs.forEach(r => {
+                  if (r.dietary === 'vegetarian') dietaryCounts.vegetarian++;
+                  else if (r.dietary === 'halal') dietaryCounts.halal++;
+                  else if (r.dietary === 'normal') dietaryCounts.normal++;
+                  else if (r.isVegetarian === true) dietaryCounts.vegetarian++; // legacy veg
+                  else if (r.isVegetarian === false) dietaryCounts.normal++; // legacy normal
+                  else dietaryCounts.unspecified++;
+                });
                 const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
                 const sizeCounts = activeRegs.reduce<Record<string, number>>((acc, r) => {
                   if (r.tshirtSize) acc[r.tshirtSize] = (acc[r.tshirtSize] ?? 0) + 1;
@@ -1065,17 +1188,23 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       </div>
                       <div className="divide-y divide-slate-100">
                         <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                          <span className="text-sm text-slate-700">Vegetarian</span>
-                          <span className="text-sm font-bold text-jci-blue">{vegCount}</span>
+                          <span className="text-sm text-slate-700">Normal</span>
+                          <span className="text-sm font-bold text-slate-700">{dietaryCounts.normal}</span>
                         </div>
                         <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                          <span className="text-sm text-slate-700">Non-vegetarian</span>
-                          <span className="text-sm font-bold text-slate-700">{nonVegCount}</span>
+                          <span className="text-sm text-slate-700">🌿 Vegetarian</span>
+                          <span className="text-sm font-bold text-emerald-600">{dietaryCounts.vegetarian}</span>
                         </div>
                         <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                          <span className="text-sm text-slate-400">Not specified</span>
-                          <span className="text-sm font-bold text-slate-400">{activeRegs.length - vegCount - nonVegCount}</span>
+                          <span className="text-sm text-slate-700">☪️ Halal</span>
+                          <span className="text-sm font-bold text-teal-600">{dietaryCounts.halal}</span>
                         </div>
+                        {dietaryCounts.unspecified > 0 && (
+                          <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                            <span className="text-sm text-slate-400">Not specified</span>
+                            <span className="text-sm font-bold text-slate-400">{dietaryCounts.unspecified}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="rounded-xl border border-slate-100 overflow-hidden">
@@ -1226,19 +1355,23 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           }
         >
           <div className="space-y-4">
-            {/* Vegetarian */}
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <div>
-                <p className="text-sm font-medium text-slate-800">素食者</p>
-                <p className="text-xs text-slate-400">Vegetarian</p>
+            {/* Dietary */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                饮食要求 <span className="normal-case font-normal">Dietary Preference</span>
+              </label>
+              <div className="flex gap-2">
+                {(['normal', 'vegetarian', 'halal'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setRegForm(f => ({ ...f, dietary: opt }))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${regForm.dietary === opt ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-jci-blue/40'}`}
+                  >
+                    {opt === 'normal' ? 'Normal' : opt === 'vegetarian' ? '🌿 Veg' : '☪️ Halal'}
+                  </button>
+                ))}
               </div>
-              <button
-                type="button"
-                onClick={() => setRegForm(f => ({ ...f, isVegetarian: !f.isVegetarian }))}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${regForm.isVegetarian ? 'bg-jci-blue' : 'bg-slate-200'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${regForm.isVegetarian ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
             </div>
 
             {/* Emergency contact name */}

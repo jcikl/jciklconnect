@@ -1,6 +1,7 @@
 // Events Data Hook
 import { useState, useEffect } from 'react';
 import { EventsService } from '../services/eventsService';
+import { MembersService } from '../services/membersService';
 import { Event } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
@@ -97,7 +98,7 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
     eventId: string,
     memberId: string,
     extraFields?: {
-      isVegetarian?: boolean | null;
+      dietary?: 'normal' | 'vegetarian' | 'halal' | null;
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
       tshirtSize?: string | null;
@@ -105,6 +106,16 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
   ) => {
     try {
       await EventsService.registerForEvent(eventId, memberId, extraFields);
+      if (extraFields && memberId) {
+        const profileUpdate: Record<string, unknown> = {};
+        if (extraFields.dietary) profileUpdate.dietaryPreference = extraFields.dietary;
+        if (extraFields.emergencyContactName != null) profileUpdate.emergencyContactName = extraFields.emergencyContactName;
+        if (extraFields.emergencyContactPhone != null) profileUpdate.emergencyContactPhone = extraFields.emergencyContactPhone;
+        if (extraFields.tshirtSize != null) profileUpdate.tshirtSize = extraFields.tshirtSize;
+        if (Object.keys(profileUpdate).length > 0) {
+          MembersService.updateMember(memberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(() => {});
+        }
+      }
       await loadEvents();
       showToast('Successfully registered for event', 'success');
     } catch (err) {

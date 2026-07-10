@@ -225,6 +225,7 @@ export class EventsService {
     eventId: string,
     memberId: string,
     extraFields?: {
+      dietary?: 'normal' | 'vegetarian' | 'halal' | null;
       isVegetarian?: boolean | null;
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
