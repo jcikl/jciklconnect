@@ -376,12 +376,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   }, [event.committee, event.organizerId, member, isAdmin, isBoard]);
 
   const availableTabs = useMemo(() => {
-    const tabs = ['Event Details'];
+    const tabs = [{ id: 'Event Details', label: 'Details' }];
     if (isCommitteeMember) {
-      tabs.push('Participants');
-      tabs.push('Stats');
+      tabs.push({ id: 'Participants', label: 'Participants' });
+      tabs.push({ id: 'Stats', label: 'Stats' });
     }
-    tabs.push('Feedback');
+    tabs.push({ id: 'Feedback', label: 'Feedback' });
     return tabs;
   }, [isCommitteeMember]);
 

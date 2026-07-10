@@ -354,7 +354,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
         onScroll={handleScroll}
         className="overflow-x-auto no-scrollbar scroll-smooth"
       >
-        <nav className="-mb-1px flex space-x-8 px-2" aria-label="Tabs">
+        <nav className="-mb-1px flex space-x-4 px-2" aria-label="Tabs">
           {tabs.map((tab) => {
             const id = typeof tab === 'string' ? tab : tab.id;
             const label = typeof tab === 'string' ? tab : tab.label;
