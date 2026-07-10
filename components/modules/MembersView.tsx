@@ -3829,7 +3829,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={20} /></a>
                             : <Instagram size={20} className="text-slate-300" />}
                           {member.wechat
-                            ? <div className="text-[#07C160] flex items-center gap-1"><MessageCircle size={20} /><span className="text-xs font-medium">{member.wechat}</span></div>
+                            ? <div className="text-[#07C160] flex items-center gap-1"><MessageCircle size={20} /></div>
                             : <MessageCircle size={20} className="text-slate-300" />}
                         </div>
                       </div>
@@ -4314,35 +4314,35 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
             {/* Config Overview Card — points info is President-only */}
             {isPresident && (
-            <Card title="Points Standard Reference" className="bg-slate-50/50">
-              <div className="text-xs space-y-3 text-slate-600">
-                <p className="font-semibold text-slate-800 border-b pb-1.5 mb-2">How points are credited:</p>
-                <div className="flex justify-between items-center">
-                  <span>Organising Chairman Role</span>
-                  <span className="font-bold text-slate-900">5 pts</span>
+              <Card title="Points Standard Reference" className="bg-slate-50/50">
+                <div className="text-xs space-y-3 text-slate-600">
+                  <p className="font-semibold text-slate-800 border-b pb-1.5 mb-2">How points are credited:</p>
+                  <div className="flex justify-between items-center">
+                    <span>Organising Chairman Role</span>
+                    <span className="font-bold text-slate-900">5 pts</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Committee Member Role</span>
+                    <span className="font-bold text-slate-900">3 pts</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Ex-Officio Role</span>
+                    <span className="font-bold text-slate-900">2 pts</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Certified Training</span>
+                    <span className="font-bold text-slate-900">1 pt / hr</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Member Recruitment</span>
+                    <span className="font-bold text-slate-900">10 pts / pax</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Sponsorship Obtained</span>
+                    <span className="font-bold text-slate-900">2 pts / RM100</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span>Committee Member Role</span>
-                  <span className="font-bold text-slate-900">3 pts</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Ex-Officio Role</span>
-                  <span className="font-bold text-slate-900">2 pts</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Certified Training</span>
-                  <span className="font-bold text-slate-900">1 pt / hr</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Member Recruitment</span>
-                  <span className="font-bold text-slate-900">10 pts / pax</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Sponsorship Obtained</span>
-                  <span className="font-bold text-slate-900">2 pts / RM100</span>
-                </div>
-              </div>
-            </Card>
+              </Card>
             )}
           </div>
         </div>
