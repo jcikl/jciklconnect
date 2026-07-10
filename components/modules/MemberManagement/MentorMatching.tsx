@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Users,
   UserCheck,
@@ -329,7 +329,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                           />
                           <div>
                             <h4 className="font-medium text-slate-900">{mentee.name}</h4>
-                            <p className="text-sm text-slate-500">{mentee.business?.title ?? mentee.profession}</p>
+                            <p className="text-sm text-slate-500">{mentee.business?.position}</p>
                           </div>
                         </div>
 
@@ -401,7 +401,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                         />
                         <div>
                           <h3 className="font-medium text-slate-900">Finding matches for {selectedMentee.name}</h3>
-                          <p className="text-sm text-slate-500">{selectedMentee.business?.title ?? selectedMentee.profession}</p>
+                          <p className="text-sm text-slate-500">{selectedMentee.business?.position}</p>
                         </div>
                       </div>
                       <button
@@ -505,7 +505,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                                       {match.matchScore}% {getScoreLabel(match.matchScore)}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-slate-600 mb-2">{match.mentor.business?.title ?? match.mentor.profession}</p>
+                                  <p className="text-sm text-slate-600 mb-2">{match.mentor.business?.position}</p>
 
                                   <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 mb-3">
                                     <div>

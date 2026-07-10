@@ -852,7 +852,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                             <h4 className={`font-black text-slate-900 truncate ${isPresident ? 'text-lg' : 'text-sm'}`}>
                               {bm.fullName || bm.name}
                             </h4>
-                            <p className="text-xs text-slate-500 truncate">{bm.companyName || (bm.business?.title ?? bm.profession) || 'JCI Member'}</p>
+                            <p className="text-xs text-slate-500 truncate">{bm.companyName || (bm.business?.position) || 'JCI Member'}</p>
                           </div>
                         </div>
 

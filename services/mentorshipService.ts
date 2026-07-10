@@ -125,8 +125,8 @@ export class MentorshipService {
     }
 
     // Professional background alignment
-    const mentorTitle = mentor.business?.title ?? mentor.profession;
-    const menteeTitle = mentee.business?.title ?? mentee.profession;
+    const mentorTitle = mentor.business?.position;
+    const menteeTitle = mentee.business?.position;
     if (mentorTitle && menteeTitle) {
       if (mentorTitle.toLowerCase().includes(menteeTitle.toLowerCase()) ||
           menteeTitle.toLowerCase().includes(mentorTitle.toLowerCase())) {

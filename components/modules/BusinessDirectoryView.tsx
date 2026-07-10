@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { Building2, Globe, Search, Send, MapPin, Users, Network, Gift, SlidersHorizontal, CheckSquare, Square, Lock, Bookmark } from 'lucide-react';
 
 const BUSINESS_CATEGORIES = [
@@ -22,7 +22,7 @@ const MOCK_SISTER_CHAPTER_MEMBERS = [
   {
     id: "scm1",
     name: "Kenji Tanaka",
-    chineseName: "田中 健二",
+    chineseName: "ç”°ä¸­ å¥äºŒ",
     avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=120",
     jciChapter: "JCI Nagoya",
     country: "Japan",
@@ -56,7 +56,7 @@ const MOCK_SISTER_CHAPTER_MEMBERS = [
   {
     id: "scm3",
     name: "Christopher Chen",
-    chineseName: "陈志豪",
+    chineseName: "é™ˆå¿—è±ª",
     avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=120",
     jciChapter: "JCI Orchid",
     country: "Singapore",
@@ -73,7 +73,7 @@ const MOCK_SISTER_CHAPTER_MEMBERS = [
   {
     id: "scm4",
     name: "Irene Hsu",
-    chineseName: "徐奕雯",
+    chineseName: "å¾å¥•é›¯",
     avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=120",
     jciChapter: "JCI E-Metro",
     country: "Taiwan",
@@ -90,7 +90,7 @@ const MOCK_SISTER_CHAPTER_MEMBERS = [
   {
     id: "scm5",
     name: "David Lim",
-    chineseName: "林耀祖",
+    chineseName: "æž—è€€ç¥–",
     avatarUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=120",
     jciChapter: "JCI City",
     country: "Singapore",
@@ -196,7 +196,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         setSelectedBiz(bizToSelect);
         setInquiryForm({
           name: currentUser?.name || '',
-          jobTitle: currentUser?.business?.title || '',
+          jobTitle: currentUser?.business?.position || '',
           company: currentUser?.companyName || '',
           phone: currentUser?.phone || '',
           requirements: ''
@@ -323,7 +323,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     // Auto-fill form from current user info
     setInquiryForm({
       name: currentUser?.name || '',
-      jobTitle: currentUser?.business?.title || '',
+      jobTitle: currentUser?.business?.position || '',
       company: currentUser?.companyName || '',
       phone: currentUser?.phone || '',
       requirements: ''
@@ -377,7 +377,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
       if (channel === 'whatsapp_direct' && waUrl) {
         window.open(waUrl, '_blank', 'noopener,noreferrer');
-        showToast('Opening WhatsApp — your message is pre-filled!', 'success');
+        showToast('Opening WhatsApp â€” your message is pre-filled!', 'success');
       } else if (channel === 'whapi_bot') {
         showToast('Inquiry sent! The member and admin will be notified via WhatsApp.', 'success');
       } else {
@@ -437,7 +437,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         <div className="bg-transparent">
           {activeTab === 'local' ? (
             <>
-              {/* ── Mobile: compact list rows ── */}
+              {/* â”€â”€ Mobile: compact list rows â”€â”€ */}
               <div className="md:hidden space-y-2">
                 <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                   <div className="relative flex-1">
@@ -476,7 +476,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       const ownerMember = members.find(m => m.id === biz.memberId);
                       const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
                       const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
-                      const position = ownerMember?.business?.title || 'Representative';
+                      const position = ownerMember?.business?.position || 'Representative';
                       const intlStatus = biz.acceptsInternationalBusiness;
                       return (
                         <React.Fragment key={biz.id}>
@@ -496,9 +496,9 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
                                 {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
-                                {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
+                                {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">âœ¦ Ideal</span>}
                               </div>
-                              <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
+                              <p className="text-xs text-slate-500 truncate">{position} Â· {biz.companyName}</p>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{biz.industry}</span>}
                                 {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
@@ -529,7 +529,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </LoadingState>
               </div>
 
-              {/* ── Desktop: sidebar + card grid ── */}
+              {/* â”€â”€ Desktop: sidebar + card grid â”€â”€ */}
               <div className="hidden md:flex gap-6 pt-2 items-start">
                 {/* Left sidebar */}
                 <aside className="w-52 shrink-0 space-y-3 sticky top-4">
@@ -597,7 +597,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                     <Search size={15} className="text-slate-400 shrink-0" />
                     <input
                       type="text"
-                      placeholder="Search by name, company, industry…"
+                      placeholder="Search by name, company, industryâ€¦"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400"
@@ -612,7 +612,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                     {!isGuest && filteredBusinesses.length > 0 && (() => {
                       const firstScore = getBizScore(filteredBusinesses[0]);
                       if (firstScore === 0) return <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Bookmark size={10} className="fill-slate-400 text-slate-400" /> Bookmarked</p>;
-                      if (firstScore === 1) return <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">✦ Suggested for You</p>;
+                      if (firstScore === 1) return <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">âœ¦ Suggested for You</p>;
                       return null;
                     })()}
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -625,7 +625,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                         const ownerMember = members.find(m => m.id === biz.memberId);
                         const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
                         const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
-                        const position = ownerMember?.business?.title || 'Representative';
+                        const position = ownerMember?.business?.position || 'Representative';
                         const intlStatus = biz.acceptsInternationalBusiness;
                         return (
                           <React.Fragment key={biz.id}>
@@ -644,7 +644,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5">
                                     <p className="font-bold text-sm text-slate-900 truncate leading-tight">{biz.ownerName}</p>
-                                    {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
+                                    {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">âœ¦ Ideal</span>}
                                   </div>
                                   {chineseName && <p className="text-[11px] text-slate-400 truncate">{chineseName}</p>}
                                   <p className="text-xs text-slate-500 truncate mt-0.5">{position}</p>
@@ -718,7 +718,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 setSelectedBiz(biz);
                 setInquiryForm({
                   name: currentUser?.name || '',
-                  jobTitle: currentUser?.business?.title || '',
+                  jobTitle: currentUser?.business?.position || '',
                   company: currentUser?.companyName || '',
                   phone: currentUser?.phone || '',
                   requirements: ''
@@ -758,7 +758,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 onClick={() => {
                   setIsDetailOpen(false);
                   setSelectedBiz(detailBiz);
-                  setInquiryForm({ name: currentUser?.name || '', jobTitle: currentUser?.business?.title || '', company: currentUser?.companyName || '', phone: currentUser?.phone || '', requirements: '' });
+                  setInquiryForm({ name: currentUser?.name || '', jobTitle: currentUser?.business?.position || '', company: currentUser?.companyName || '', phone: currentUser?.phone || '', requirements: '' });
                   setInquiryErrors({});
                   setInquiryModalOpen(true);
                 }}
@@ -773,7 +773,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
             const ownerMember = members.find(m => m.id === biz.memberId);
             const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
             const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
-            const position = ownerMember?.business?.title || 'Representative';
+            const position = ownerMember?.business?.position || 'Representative';
             const intlStatus = biz.acceptsInternationalBusiness;
             return (
               <div className="space-y-5">
@@ -782,7 +782,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   <img src={avatarUrl} alt={biz.ownerName} className="w-16 h-16 rounded-full object-cover border border-slate-200 flex-shrink-0 shadow-sm" />
                   <div className="min-w-0">
                     <h3 className="text-base font-bold text-slate-900">{biz.ownerName}{chineseName && <span className="text-sm text-slate-400 font-normal ml-1">({chineseName})</span>}</h3>
-                    <p className="text-sm text-slate-500">{position} · {biz.companyName}</p>
+                    <p className="text-sm text-slate-500">{position} Â· {biz.companyName}</p>
                     <p className="text-xs text-jci-blue font-bold mt-0.5">JCI Kuala Lumpur</p>
                   </div>
                 </div>
@@ -1022,7 +1022,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 Cancel
               </Button>
               <Button className="flex-1 font-bold shadow-lg shadow-jci-blue/20" onClick={handleSendInquiry} disabled={isSubmitting}>
-                <Send size={16} className="mr-2" /> {isSubmitting ? 'Sending…' : 'Send Inquiry'}
+                <Send size={16} className="mr-2" /> {isSubmitting ? 'Sendingâ€¦' : 'Send Inquiry'}
               </Button>
             </div>
           </div>
@@ -1088,7 +1088,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
               </div>
 
-              {/* Industry — multi-select pills */}
+              {/* Industry â€” multi-select pills */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Industry</p>
@@ -1111,7 +1111,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
               </div>
 
-              {/* Business Category — multi-select pills */}
+              {/* Business Category â€” multi-select pills */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Business Category</p>
@@ -1136,7 +1136,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
               </div>
 
-              {/* Ideal Referral Industry — radio list */}
+              {/* Ideal Referral Industry â€” radio list */}
               {uniqueInterestedIndustries.length > 1 && (
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ideal Referral Industry</p>
@@ -1156,7 +1156,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
               )}
 
-              {/* Ideal Referral Type — radio list */}
+              {/* Ideal Referral Type â€” radio list */}
               {uniqueIdealReferrals.length > 1 && (
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ideal Referral Type</p>
@@ -1178,7 +1178,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
             </div>
           ) : (
             <div className="p-5 space-y-6">
-              {/* Country — pill buttons */}
+              {/* Country â€” pill buttons */}
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Country</p>
                 <div className="flex gap-2 flex-wrap">
@@ -1196,7 +1196,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
               </div>
 
-              {/* Chapter — radio list */}
+              {/* Chapter â€” radio list */}
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">JCI Chapter</p>
                 <div className="space-y-1">
@@ -1214,7 +1214,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 </div>
               </div>
 
-              {/* Industry — radio list */}
+              {/* Industry â€” radio list */}
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Industry</p>
                 <div className="space-y-1">
@@ -1328,7 +1328,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
 
   return (
     <div className="space-y-2">
-      {/* ── Mobile layout ── */}
+      {/* â”€â”€ Mobile layout â”€â”€ */}
       <div className="md:hidden space-y-2">
         <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
           <div className="relative flex-1">
@@ -1363,7 +1363,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                     <span className="text-sm font-bold text-slate-900 truncate">{member.name}</span>
                     {member.chineseName && member.chineseName !== member.name && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({member.chineseName})</span>}
                   </div>
-                  <p className="text-xs text-slate-500 truncate">{member.position} · {member.companyName}</p>
+                  <p className="text-xs text-slate-500 truncate">{member.position} Â· {member.companyName}</p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{member.businessCategory}</span>
                     {member.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
@@ -1377,7 +1377,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
         )}
       </div>
 
-      {/* ── Desktop: sidebar + card grid ── */}
+      {/* â”€â”€ Desktop: sidebar + card grid â”€â”€ */}
       <div className="hidden md:flex gap-6 pt-2 items-start">
         {/* Sidebar */}
         <aside className="w-52 shrink-0 space-y-3 sticky top-4">
@@ -1434,7 +1434,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
         <div className="flex-1 min-w-0 space-y-4">
           <div className="flex gap-3 items-center bg-white p-3 rounded-xl border border-slate-200">
             <Search size={15} className="text-slate-400 shrink-0" />
-            <input type="text" placeholder="Search by name, company, chapter, industry…"
+            <input type="text" placeholder="Search by name, company, chapter, industryâ€¦"
               value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400" />
             {searchTerm && <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>}
@@ -1530,7 +1530,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               </button>
             </div>
 
-            {/* Country — pill group */}
+            {/* Country â€” pill group */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Country</p>
@@ -1553,7 +1553,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               </div>
             </div>
 
-            {/* Chapter — pill group */}
+            {/* Chapter â€” pill group */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">JCI Chapter</p>
@@ -1576,7 +1576,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               </div>
             </div>
 
-            {/* Industry — pill group */}
+            {/* Industry â€” pill group */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Industry</p>
@@ -1633,8 +1633,8 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               <img src={detailMember.avatarUrl} alt={detailMember.name} className="w-14 h-14 rounded-full object-cover border border-slate-200 flex-shrink-0" />
               <div>
                 <div className="font-bold text-slate-900">{detailMember.name}{detailMember.chineseName && detailMember.chineseName !== detailMember.name && <span className="text-sm text-slate-500 font-normal ml-1">({detailMember.chineseName})</span>}</div>
-                <div className="text-sm text-slate-500">{detailMember.position} · {detailMember.companyName}</div>
-                <div className="text-xs text-jci-blue font-bold mt-0.5">{detailMember.jciChapter} · {detailMember.country}</div>
+                <div className="text-sm text-slate-500">{detailMember.position} Â· {detailMember.companyName}</div>
+                <div className="text-xs text-jci-blue font-bold mt-0.5">{detailMember.jciChapter} Â· {detailMember.country}</div>
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5">

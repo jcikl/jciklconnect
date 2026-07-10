@@ -2589,7 +2589,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     bizTagsScore += tags.filter(t => bizTagItems.includes(t)).length * 5;
     const bizBase = 40;
     const bizWillingness = member.acceptInternationalBusiness === 'Yes' ? 25 : member.acceptInternationalBusiness === 'Willing to Explore' ? 12 : 0;
-    const bizProfile = ((member.companyName || member.business?.title)) ? 5 : 0;
+    const bizProfile = ((member.companyName || member.business?.position)) ? 5 : 0;
     const bizPersona = member.personaType?.includes('Practical') ? 10 : 0;
     const business = Math.min(99, Math.max(15, bizBase + Math.min(25, bizTagsScore) + bizWillingness + bizProfile + bizPersona));
 

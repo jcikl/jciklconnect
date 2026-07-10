@@ -46,12 +46,13 @@ const MIGRATIONS = [
   },
 
   // business.*
-  // profession → business.title (only when business.title is absent)
+  // business.title → business.position (nested field rename)
+  // profession → business.position (flat field migration, only when business.position is absent)
   {
     flatField: 'profession',
     subObject: 'business',
-    nestedField: 'title',
-    conditionFn: (data) => data.business != null && (data.business.title == null || data.business.title === ''),
+    nestedField: 'position',
+    conditionFn: (data) => data.business != null && (data.business.position == null || data.business.position === ''),
   },
   { flatField: 'levelOfManagement',     subObject: 'business', nestedField: 'levelOfManagement' },
   { flatField: 'departmentAndPosition', subObject: 'business', nestedField: 'departmentAndPosition' },
@@ -80,6 +81,12 @@ const MIGRATIONS = [
  */
 function buildUpdate(data) {
   const update = {};
+
+  // Special case: rename business.title → business.position (nested field rename)
+  if (data.business != null && 'title' in data.business && !('position' in data.business)) {
+    update['business.position'] = data.business.title;
+    update['business.title'] = FieldValue.delete();
+  }
 
   for (const rule of MIGRATIONS) {
     const { flatField, subObject, nestedField, conditionFn } = rule;

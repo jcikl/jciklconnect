@@ -275,10 +275,10 @@ export class MembersService {
     if (data.introduction !== undefined) business.introduction = data.introduction;
     else if (data.companyDescription !== undefined) business.introduction = data.companyDescription;
     if (data.companyDescription !== undefined) business.companyDescription = data.companyDescription;
-    if (data.title !== undefined) business.title = data.title;
-    else if (data.position !== undefined) business.title = data.position;
-    else if (data.profession !== undefined) business.title = data.profession;
-    else if (data.departmentAndPosition !== undefined) business.title = data.departmentAndPosition;
+    if (data.title !== undefined) business.position = data.title;
+    else if (data.position !== undefined) business.position = data.position;
+    else if (data.profession !== undefined) business.position = data.profession;
+    else if (data.departmentAndPosition !== undefined) business.position = data.departmentAndPosition;
     if (data.departmentAndPosition !== undefined) business.departmentAndPosition = data.departmentAndPosition;
     if (data.industry !== undefined) business.industry = data.industry;
     if (data.businessCategory !== undefined) business.businessCategory = data.businessCategory;
@@ -626,7 +626,7 @@ export class MembersService {
         companyName: firstText(
           memberAny.business?.companyName,
           memberAny.companyName,
-          memberAny.business?.title,
+          memberAny.business?.position,
           memberAny.departmentAndPosition
         ),
       };

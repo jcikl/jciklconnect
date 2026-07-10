@@ -428,7 +428,7 @@ export interface Member {
     companyWebsite?: string;
     companyLogoUrl?: string;
     introduction?: string;
-    title: string; // e.g. "Managing Director"
+    position: string; // e.g. "Managing Director"
     industry: string; // Select from MSIC-2008 mapped categories
     businessCategory: string[]; // Curated tags
     specialOffer?: string; // Discount/Offer for JCI members
@@ -603,7 +603,7 @@ export interface Member {
   dietaryPreference?: 'vegetarian' | 'halal' | 'normal' | null;
   /** @deprecated use business.interestedIndustries */
   interestedIndustries?: string[];
-  /** @deprecated use business.title */
+  /** @deprecated use business.position */
   profession?: string;
   /** @deprecated use jciCareer.senatorshipValidatedAt */
   senatorshipValidatedAt?: string;

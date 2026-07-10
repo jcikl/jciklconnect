@@ -387,7 +387,7 @@ export class ReportService {
         ethnicity: race,
         birthDate: dob,
         birthPlace: (m.general as any)?.birthPlace || m.birthPlace || '',
-        occupation: m.business?.title || m.title || m.profession || m.departmentAndPosition || '',
+        occupation: m.business?.position || m.title || m.profession || m.departmentAndPosition || '',
         homeAddress: m.contact?.address || m.address || '',
         contactNumber: m.contact?.phone || m.phone || '',
         email: m.contact?.email || m.email || '',
