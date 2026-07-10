@@ -3853,7 +3853,7 @@ export const JCIKLApp: React.FC = () => {
           CapApp.exitApp();
         } else {
           backPressedOnceRef.current = true;
-          showToast('再按一次退出应用', 'info');
+          showToast('Press back again to exit', 'info');
           backPressTimerRef.current = setTimeout(() => {
             backPressedOnceRef.current = false;
           }, 2000);

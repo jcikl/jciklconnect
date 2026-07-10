@@ -263,7 +263,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const existingProfile = await MembersService.getMemberByEmail(email);
       if (!existingProfile) {
         await firebaseSignOut(auth);
-        throw new Error('此帳號在會員名單中不存在，無法登入。請聯絡管理員。');
+        throw new Error('This account does not exist in the member list. Please contact the administrator.');
       }
       // Note: Linking is handled by onAuthStateChanged listener
     }
@@ -398,7 +398,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const result = await FirebaseAuthentication.signInWithGoogle();
       const idToken = result.credential?.idToken;
       if (!idToken) {
-        throw new Error('Google 登入失敗：未取得憑證，請重試。');
+        throw new Error('Google sign-in failed: no credential received. Please try again.');
       }
       const credential = GoogleAuthProvider.credential(idToken, result.credential?.accessToken);
       userCredential = await signInWithCredential(auth, credential);
@@ -410,7 +410,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     if (!email) {
       await firebaseSignOut(auth);
-      throw new Error('無法获取 Google 帳號的电邮地址。');
+      throw new Error('Unable to retrieve email address from Google account.');
     }
 
     // Require member document to exist (by UID or Email) — no auto-create; must be in member list to log in
@@ -419,7 +419,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const existingProfile = await MembersService.getMemberByEmail(email);
       if (!existingProfile) {
         await firebaseSignOut(auth);
-        throw new Error('此帳號在會員名單中不存在，無法登入。請聯絡管理员。');
+        throw new Error('This account does not exist in the member list. Please contact the administrator.');
       }
       // Note: Linking to UID is handled automatically by the onAuthStateChanged listener above
     }

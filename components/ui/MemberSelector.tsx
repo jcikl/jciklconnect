@@ -5,11 +5,11 @@ import { MEMBER_LOOKUP_FIELDS } from '../../types';
 import type { Member } from '../../types';
 
 const FIELD_LABELS: Record<string, string> = {
-  name: '姓名',
-  email: '邮箱',
-  phone: '电话',
-  fullName: '全名',
-  currentBoardYear: '届别',
+  name: 'Name',
+  email: 'Email',
+  phone: 'Phone',
+  fullName: 'Full name',
+  currentBoardYear: 'Board year',
   loId: 'LO',
 };
 
@@ -48,13 +48,13 @@ export interface MemberSelectorProps {
 }
 
 export const MemberSelector: React.FC<MemberSelectorProps> = ({
-  label = '选择会员',
+  label = 'Select member',
   members,
   value,
   onChange,
   selfOption = true,
-  selfLabel = '本人',
-  placeholder = '搜索姓名、电话、邮箱…',
+  selfLabel = 'Myself',
+  placeholder = 'Search by name, phone, or email…',
   disabled = false,
   loading = false,
   error,
@@ -139,7 +139,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          aria-label={label ?? '选择会员'}
+          aria-label={label ?? 'Select member'}
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-activedescendant={open && displayList[highlight] ? `member-opt-${displayList[highlight].id || 'self'}` : undefined}
@@ -152,7 +152,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
           `}
         />
         {loading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">加载中…</div>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Loading…</div>
         )}
         {open && (
           <ul
@@ -160,7 +160,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
             className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1"
           >
             {displayList.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-slate-500">无匹配会员</li>
+              <li className="px-3 py-2 text-sm text-slate-500">No matching members</li>
             ) : (
               displayList.map((m, i) => (
                 <li
@@ -174,7 +174,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
                   onClick={() => handleSelect(m.id)}
                 >
                   {getOptionLabel ? getOptionLabel(m) : m.name}
-                  {!m.id && selfOption && <span className="text-slate-400 ml-1">（当前登录）</span>}
+                  {!m.id && selfOption && <span className="text-slate-400 ml-1">(current user)</span>}
                 </li>
               ))
             )}
@@ -184,7 +184,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
       {showLookupFields && selectedMember && (
         <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm border-l-4 border-l-jci-teal">
-          <p className="font-medium text-slate-700 mb-1">主档带出</p>
+          <p className="font-medium text-slate-700 mb-1">Member details</p>
           {MEMBER_LOOKUP_FIELDS.map((key) => {
             const v = (selectedMember as unknown as Record<string, unknown>)[key];
             if (v == null || v === '') return null;

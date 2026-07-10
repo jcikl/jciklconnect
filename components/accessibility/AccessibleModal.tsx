@@ -74,7 +74,7 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
       document.body.style.overflow = 'hidden';
 
       // 向屏幕阅读器宣布模态框打开
-      announce(`对话框已打开：${title}`, 'assertive');
+      announce(`Dialog opened: ${title}`, 'assertive');
 
       // 设置初始焦点
       setTimeout(() => {
@@ -97,7 +97,7 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
       }
 
       // 向屏幕阅读器宣布模态框关闭
-      announce('对话框已关闭', 'assertive');
+      announce('Dialog closed', 'assertive');
     }
 
     return () => {
@@ -148,7 +148,7 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
               focus:outline-none focus:ring-2 focus:ring-jci-blue focus:ring-offset-2
               transition-colors
             "
-            aria-label="关闭对话框"
+            aria-label="Close dialog"
             type="button"
           >
             <X className="w-5 h-5" aria-hidden="true" />
@@ -188,8 +188,8 @@ export const AccessibleConfirmDialog: React.FC<AccessibleConfirmDialogProps> = (
   onCancel,
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   variant = 'info'
 }) => {
   const confirmButtonRef = useRef<HTMLButtonElement>(null);

@@ -109,53 +109,53 @@ export const ErrorRecovery: React.FC<ErrorRecoveryProps> = ({
     switch (errorType) {
       case 'network':
         return {
-          title: '网络连接问题',
-          description: '请检查您的网络连接并重试',
+          title: 'Network connection issue',
+          description: 'Please check your network connection and try again',
           icon: isOnline ? Wifi : WifiOff,
           canRetry: isOnline,
           suggestions: [
-            '检查网络连接',
-            '刷新页面',
-            '稍后重试'
+            'Check network connection',
+            'Refresh page',
+            'Try again later'
           ]
         };
       
       case 'permission':
         return {
-          title: '权限不足',
-          description: '您没有执行此操作的权限',
+          title: 'Insufficient permissions',
+          description: 'You do not have permission to perform this action',
           icon: AlertCircle,
           canRetry: false,
           suggestions: [
-            '联系管理员获取权限',
-            '使用其他账户登录',
-            '返回上一页'
+            'Contact administrator for access',
+            'Sign in with a different account',
+            'Go back'
           ]
         };
       
       case 'validation':
         return {
-          title: '数据验证失败',
-          description: '请检查输入的数据是否正确',
+          title: 'Validation failed',
+          description: 'Please check that your input is correct',
           icon: AlertCircle,
           canRetry: true,
           suggestions: [
-            '检查必填字段',
-            '验证数据格式',
-            '重新提交'
+            'Check required fields',
+            'Verify data format',
+            'Resubmit'
           ]
         };
       
       default:
         return {
-          title: '未知错误',
-          description: '发生了意外错误',
+          title: 'Unknown error',
+          description: 'An unexpected error occurred',
           icon: AlertCircle,
           canRetry: true,
           suggestions: [
-            '刷新页面',
-            '清除浏览器缓存',
-            '联系技术支持'
+            'Refresh page',
+            'Clear browser cache',
+            'Contact support'
           ]
         };
     }
@@ -191,7 +191,7 @@ export const ErrorRecovery: React.FC<ErrorRecoveryProps> = ({
 
           {/* Recovery suggestions */}
           <div className="mt-3">
-            <h4 className="text-sm font-medium text-red-800">建议的解决方案:</h4>
+            <h4 className="text-sm font-medium text-red-800">Suggested actions:</h4>
             <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
               {strategy.suggestions.map((suggestion, index) => (
                 <li key={index}>{suggestion}</li>
@@ -202,14 +202,14 @@ export const ErrorRecovery: React.FC<ErrorRecoveryProps> = ({
           {/* Retry information */}
           {retryCount > 0 && (
             <div className="mt-3 text-sm text-red-600">
-              已重试 {retryCount} / {maxRetries} 次
+              Retried {retryCount} / {maxRetries} times
             </div>
           )}
 
           {/* Auto retry countdown */}
           {autoRetry && countdown > 0 && canRetry && (
             <div className="mt-2 text-sm text-red-600">
-              {countdown} 秒后自动重试...
+              Retrying automatically in {countdown}s...
             </div>
           )}
 
@@ -219,12 +219,12 @@ export const ErrorRecovery: React.FC<ErrorRecoveryProps> = ({
               {isOnline ? (
                 <>
                   <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-green-700">网络已连接</span>
+                  <span className="text-green-700">Connected</span>
                 </>
               ) : (
                 <>
                   <WifiOff className="h-4 w-4 text-red-500 mr-1" />
-                  <span className="text-red-700">网络未连接</span>
+                  <span className="text-red-700">No connection</span>
                 </>
               )}
             </div>
@@ -241,12 +241,12 @@ export const ErrorRecovery: React.FC<ErrorRecoveryProps> = ({
                 {isRetrying ? (
                   <>
                     <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                    重试中...
+                    Retrying...
                   </>
                 ) : (
                   <>
                     <RefreshCw className="-ml-1 mr-2 h-4 w-4" />
-                    重试 ({maxRetries - retryCount} 次剩余)
+                    Retry ({maxRetries - retryCount} left)
                   </>
                 )}
               </button>
@@ -254,7 +254,7 @@ export const ErrorRecovery: React.FC<ErrorRecoveryProps> = ({
 
             {retryCount >= maxRetries && (
               <div className="text-sm text-red-600">
-                已达到最大重试次数。请刷新页面或联系技术支持。
+                Maximum retries reached. Please refresh the page or contact support.
               </div>
             )}
           </div>

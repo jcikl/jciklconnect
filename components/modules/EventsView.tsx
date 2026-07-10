@@ -470,7 +470,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             : canSelfCancel
               ? <div className="flex flex-col items-center leading-none gap-0.5">
                   <span className="flex items-center gap-1.5"><CheckCircle size={15} className="stroke-[3]" />Registered</span>
-                  <span className="text-[10px] font-normal normal-case tracking-normal opacity-80">点击撤销报名</span>
+                  <span className="text-[10px] font-normal normal-case tracking-normal opacity-80">Tap to cancel</span>
                 </div>
               : isRegistered ? <><CheckCircle size={18} className="stroke-[3]" /><span>Registered</span></>
                 : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}

@@ -163,9 +163,9 @@ const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Me
     <div className="space-y-6">
       <Card className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div><span className="text-slate-500">姓名</span><p className="font-medium">{member.name}</p></div>
-          <div><span className="text-slate-500">角色</span><p className="font-medium">{member.role}</p></div>
-          <div><span className="text-slate-500">入会日期</span><p className="font-medium">{formatDateToDDMMMYYYY(member.joinDate)}</p></div>
+          <div><span className="text-slate-500">Name</span><p className="font-medium">{member.name}</p></div>
+          <div><span className="text-slate-500">Role</span><p className="font-medium">{member.role}</p></div>
+          <div><span className="text-slate-500">Join date</span><p className="font-medium">{formatDateToDDMMMYYYY(member.joinDate)}</p></div>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {MEMBER_SELF_EDITABLE_FIELDS.map((key) => (
@@ -3997,9 +3997,9 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         return items.map((item, idx) => {
                           if (item.type === 'board') {
                             const statusConfig = {
-                              current: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700', label: '现任', icon: 'text-amber-500' },
+                              current: { dot: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700', label: 'Current', icon: 'text-amber-500' },
                               elected: { dot: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700', label: 'Elected', icon: 'text-blue-500' },
-                              former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: '历届', icon: 'text-slate-400' },
+                              former: { dot: 'bg-slate-100 text-slate-500', badge: 'bg-slate-100 text-slate-600', label: 'Former', icon: 'text-slate-400' },
                             };
                             const cfg = statusConfig[item.bodStatus!] ?? statusConfig.former;
                             return (
@@ -4338,7 +4338,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <button
                 type="button"
                 onClick={() => setAssessmentShowZh(v => !v)}
-                title={assessmentShowZh ? 'Switch to English' : '切换到中文'}
+                title={assessmentShowZh ? 'Switch to English' : 'Switch to Chinese'}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${assessmentShowZh
                   ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
                   : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'

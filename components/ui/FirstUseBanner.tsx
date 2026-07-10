@@ -21,7 +21,7 @@ export interface FirstUseBannerProps {
 export const FirstUseBanner: React.FC<FirstUseBannerProps> = ({
   flowId,
   children,
-  dismissLabel = '知道了',
+  dismissLabel = 'Got it',
   onHelpClick,
   variant = 'info',
 }) => {
@@ -49,7 +49,7 @@ export const FirstUseBanner: React.FC<FirstUseBannerProps> = ({
   return (
     <div
       role="region"
-      aria-label="首次使用引导"
+      aria-label="Getting started guide"
       className={`rounded-lg border p-4 ${bgClass} flex flex-wrap items-start justify-between gap-3`}
     >
       <div className="flex-1 min-w-0 flex items-start gap-2">
@@ -63,14 +63,14 @@ export const FirstUseBanner: React.FC<FirstUseBannerProps> = ({
             onClick={onHelpClick}
             className="text-sm text-jci-blue hover:underline font-medium"
           >
-            查看详细说明
+            View details
           </button>
         )}
         <button
           type="button"
           onClick={handleDismiss}
           className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 font-medium"
-          aria-label={`关闭引导，${dismissLabel}`}
+          aria-label={`Dismiss guide, ${dismissLabel}`}
         >
           <X size={16} />
           {dismissLabel}

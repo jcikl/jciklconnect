@@ -52,14 +52,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           const methods = await fetchSignInMethodsForEmail(auth, email);
           if (methods.includes('password')) {
             // Account has a password (may also have Google) — this is simply a wrong password
-            errorMessage = '密码错误，请重试。您也可以点击下方「Forgot password?」重置密码，或使用 Google 登入。';
+            errorMessage = 'Incorrect password. You can reset it via "Forgot password?" below, or sign in with Google.';
           } else if (methods.includes('google.com')) {
             // Google-only account, no password set — direct them to the Google button
-            errorMessage = '此帳號使用 Google 註冊，尚未設置密碼。請點擊下方「Sign in with Google」登入。';
+            errorMessage = 'This account was registered with Google and has no password set. Please use "Sign in with Google" below.';
           } else if (methods.length > 0) {
-            errorMessage = '密码错误，请重试。';
+            errorMessage = 'Incorrect password. Please try again.';
           } else {
-            errorMessage = '电邮未注册';
+            errorMessage = 'Email not registered.';
           }
         } catch (methodErr) {
           // 如果 Firebase 开启了“电邮枚举保护”，fetchSignInMethodsForEmail 会抛出错误。
@@ -68,12 +68,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             const { MembersService } = await import('../../services/membersService');
             const member = await MembersService.getMemberByEmail(email);
             if (member) {
-              errorMessage = '电邮或密码错误。若您曾使用 Google 登入，请直接点击下方的 Google 登入，或重置密码。';
+              errorMessage = 'Incorrect email or password. If you previously signed in with Google, use the Google button below or reset your password.';
             } else {
-              errorMessage = '电邮未注册';
+              errorMessage = 'Email not registered.';
             }
           } catch (e) {
-            errorMessage = '电邮未注册';
+            errorMessage = 'Email not registered.';
           }
         }
       }
@@ -95,7 +95,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     } catch (err: any) {
       let errorMessage = err?.message || 'Failed to login with Google.';
       if (errorMessage.includes('auth/invalid-credential')) {
-        errorMessage = '电邮未注册';
+        errorMessage = 'Email not registered.';
       }
       setError(errorMessage);
       showToast(errorMessage, 'error');

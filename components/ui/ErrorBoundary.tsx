@@ -138,17 +138,17 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
 
               <h2 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">
-                抱歉，出现了一些问题
+                Sorry, something went wrong
               </h2>
               <p className="text-slate-500 text-sm leading-relaxed mb-8">
-                应用程序遇到了意外错误。这可能是暂时的系统波动，我们已经记录了此问题并正在努力修复。
+                The application encountered an unexpected error. This may be a temporary issue — we have logged it and are working on a fix.
               </p>
 
               {this.state.errorId && (
                 <div className="bg-slate-50 rounded-2xl p-4 mb-8 border border-slate-100 flex items-center justify-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    错误编号: <span className="text-slate-800 font-mono">{this.state.errorId}</span>
+                    Error ID: <span className="text-slate-800 font-mono">{this.state.errorId}</span>
                   </p>
                 </div>
               )}
@@ -159,7 +159,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="w-full h-14 bg-jci-blue text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-[0_12px_24px_-8px_rgba(0,151,215,0.4)] hover:bg-blue-600 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
                 >
                   <RefreshCw className="w-5 h-5" />
-                  立即重试
+                  Retry Now
                 </button>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -168,7 +168,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     className="h-12 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                   >
                     <RefreshCw className="w-4 h-4" />
-                    刷新页面
+                    Refresh Page
                   </button>
 
                   <button
@@ -176,7 +176,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     className="h-12 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                   >
                     <Home className="w-4 h-4" />
-                    返回首页
+                    Back to Home
                   </button>
                 </div>
               </div>
@@ -184,17 +184,17 @@ export class ErrorBoundary extends Component<Props, State> {
                 {(this.props.showDetails !== false) && (
                   <details className="mt-6 text-left">
                     <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
-                      显示错误详情
+                      Show error details
                     </summary>
                     <div className="mt-3 p-3 bg-red-50 rounded-md">
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="text-sm font-medium text-red-800">错误信息:</h4>
+                        <h4 className="text-sm font-medium text-red-800">Error message:</h4>
                         <button
                           onClick={this.copyErrorDetails}
                           className="text-xs text-red-600 hover:text-red-800 flex items-center"
                         >
                           <Bug className="w-3 h-3 mr-1" />
-                          复制详情
+                          Copy details
                         </button>
                       </div>
                       <pre className="text-xs text-red-700 whitespace-pre-wrap break-all">
@@ -203,7 +203,7 @@ export class ErrorBoundary extends Component<Props, State> {
                       
                       {this.state.error?.stack && (
                         <>
-                          <h4 className="text-sm font-medium text-red-800 mt-3 mb-1">堆栈跟踪:</h4>
+                          <h4 className="text-sm font-medium text-red-800 mt-3 mb-1">Stack trace:</h4>
                           <pre className="text-xs text-red-700 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
                             {this.state.error.stack}
                           </pre>
@@ -212,7 +212,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
                       {this.state.errorInfo?.componentStack && (
                         <>
-                          <h4 className="text-sm font-medium text-red-800 mt-3 mb-1">组件堆栈:</h4>
+                          <h4 className="text-sm font-medium text-red-800 mt-3 mb-1">Component stack:</h4>
                           <pre className="text-xs text-red-700 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
                             {this.state.errorInfo.componentStack}
                           </pre>
