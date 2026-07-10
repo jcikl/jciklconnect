@@ -569,6 +569,7 @@ export interface Member {
   leaderboardVisibility?: boolean | string;
   hasPaidInitiationFee?: boolean;
   ethnicity?: string;
+  dietaryPreference?: 'vegetarian' | 'halal' | 'normal' | null;
   interestedIndustries?: string[];
   profession?: string;
   senatorshipValidatedAt?: string;
@@ -783,13 +784,16 @@ export interface EventRegistration {
   cancelledByName?: string | null;   // display name
   cancelledByRole?: 'self' | 'admin' | 'board' | 'committee' | null;
   // Registration form fields
-  isVegetarian?: boolean | null;
+  dietary?: 'normal' | 'vegetarian' | 'halal' | null;
+  isVegetarian?: boolean | null; // legacy, replaced by dietary
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   tshirtSize?: string | null;
   memberName?: string | null;
   registeredBy?: string | null;
   registeredByName?: string | null;
+  paidByName?: string | null;
+  checkedInByName?: string | null;
 }
 
 /** 非会员留资：联络方式与兴趣，供组织跟进与推广（Story 9.1 / FR27） */

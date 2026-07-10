@@ -44,6 +44,7 @@ function initFormValues(member: Member) {
     avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
     hobbies: Array.isArray(member.hobbies) ? member.hobbies : (member.hobbies ? [member.hobbies] : []),
     skills: Array.isArray(member.skills) ? member.skills.join(', ') : (member.skills || ''),
+    dietaryPreference: member.dietaryPreference || '',
 
     // Membership & Status
     role: member.role,
@@ -231,6 +232,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       idNumber: formValues.idNumber || undefined,
       gender: (formValues.gender as Member['gender']) || undefined,
       ethnicity: (formValues.ethnicity as Member['ethnicity']) || undefined,
+      dietaryPreference: (formValues.dietaryPreference as Member['dietaryPreference']) || undefined,
       nationality: formValues.nationality || undefined,
       dateOfBirth: formValues.dateOfBirth || undefined,
       hobbies: formValues.hobbies.length > 0 ? formValues.hobbies : undefined,
@@ -402,6 +404,17 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                   <label key={opt} className="cursor-pointer flex-1 flex">
                     <input type="radio" name="ethnicity" value={opt} checked={formValues.ethnicity === opt} onChange={(e) => handleChange('ethnicity', e.target.value)} className="hidden" />
                     <span className={`flex-1 text-center px-1 md:px-4 py-2 md:py-2 text-[10px] md:text-sm font-medium transition-colors ${formValues.ethnicity === opt ? 'bg-jci-blue text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{opt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Dietary Preference</label>
+              <div className="flex w-full rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
+                {['Vegetarian', 'Halal', 'Normal'].map((opt) => (
+                  <label key={opt} className="cursor-pointer flex-1 flex">
+                    <input type="radio" name="dietaryPreference" value={opt.toLowerCase()} checked={formValues.dietaryPreference === opt.toLowerCase()} onChange={(e) => handleChange('dietaryPreference', e.target.value)} className="hidden" />
+                    <span className={`flex-1 text-center px-1 md:px-4 py-2 text-[10px] md:text-sm font-medium transition-colors ${formValues.dietaryPreference === opt.toLowerCase() ? 'bg-jci-blue text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{opt}</span>
                   </label>
                 ))}
               </div>
