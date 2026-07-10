@@ -386,6 +386,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             : r
         )
       );
+      // If the cancelled member is the current user, update the register button immediately
+      if (reg.memberId === member.id) {
+        setLocalRegistered(false);
+        setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled' as const, cancelledByRole: role } : prev);
+      }
       showToast('已撤销该会员报名', 'success');
     } catch {
       showToast('撤销失败', 'error');
