@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button, Tabs } from '../ui/Common';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
-import { Member, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
+import { Combobox } from '../ui/Combobox';
+import { Member, Project, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS, nationalityOptionsForValue } from '../../config/constants';
 import {
@@ -10,6 +11,10 @@ import {
 } from '../../services/membershipConfigService';
 import { MembershipTypeDisplay } from '../shared/MembershipTypeDisplay';
 import { deleteFromCloudinary, uploadMemberAvatarToCloudinary } from '../../services/cloudinaryService';
+import { getBirthPlaceFromIC, isMalaysianIC, getGenderFromIC, getDateOfBirthFromIC } from '../../utils/malaysianIdUtils';
+import { IntroducerSelector } from '../ui/IntroducerSelector';
+import { MembersService } from '../../services/membersService';
+import { ProjectsService } from '../../services/projectsService';
 
 interface MemberEditFormProps {
   member: Member;
@@ -29,14 +34,22 @@ const HOBBY_OPTIONS = [
   "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
 ];
 
+function normalizeGender(value: string): string {
+  const v = value.trim().toLowerCase();
+  if (v === 'male' || v === 'm') return 'Male';
+  if (v === 'female' || v === 'f') return 'Female';
+  return value;
+}
+
 function initFormValues(member: Member) {
   return {
     // Basic Information
     name: member.name || '',
     fullName: member.fullName || '',
-    idNumber: member.idNumber || '',
-    dateOfBirth: member.dateOfBirth || '',
-    gender: member.gender || '',
+    idNumber: member.idNumber || member.general?.idNumber || '',
+    birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
+    dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
+    gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return normalizeGender(isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || '')); })(),
     ethnicity: member.ethnicity || '',
     nationality: member.nationality || 'Malaysia',
     introducer: member.introducer || '',
@@ -103,6 +116,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   );
   const [formValues, setFormValues] = useState(() => initFormValues(member));
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+  const [allMembers, setAllMembers] = useState<Member[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
   const [avatarTs, setAvatarTs] = useState(0);
@@ -116,6 +131,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
 
   useEffect(() => {
     MembershipConfigService.getRules().then(setMembershipRules).catch(() => { });
+    MembersService.getAllMembers().then(setAllMembers).catch(() => { });
+    ProjectsService.getAllProjects().then(setAllProjects).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -138,6 +155,16 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   const handleChange = (field: string, value: string | number | boolean | string[]) => {
     setFormValues(prev => {
       const newValues = { ...prev, [field]: value };
+
+      // Auto-derive birth place, gender, and date of birth from Malaysian IC
+      if (field === 'idNumber' && typeof value === 'string' && isMalaysianIC(value)) {
+        const birthPlace = getBirthPlaceFromIC(value);
+        if (birthPlace) newValues.birthPlace = birthPlace;
+        const dob = getDateOfBirthFromIC(value);
+        if (dob) newValues.dateOfBirth = dob;
+        const gender = getGenderFromIC(value);
+        if (gender) newValues.gender = gender;
+      }
 
       // If role changed to PROBATION, default the year to joinDate year (from original member or form)
       if (field === 'role' && value === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role)) {
@@ -230,6 +257,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
 
       fullName: formValues.fullName || undefined,
       idNumber: formValues.idNumber || undefined,
+      birthPlace: formValues.birthPlace || undefined,
       gender: (formValues.gender as Member['gender']) || undefined,
       ethnicity: (formValues.ethnicity as Member['ethnicity']) || undefined,
       dietaryPreference: (formValues.dietaryPreference as Member['dietaryPreference']) || undefined,
@@ -372,6 +400,18 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 <input name="idNumber" value={formValues.idNumber} onChange={(e) => handleChange('idNumber', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
               <div>
+                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">
+                  Birth Place
+                </label>
+                <input
+                  name="birthPlace"
+                  value={formValues.birthPlace}
+                  onChange={(e) => handleChange('birthPlace', e.target.value)}
+                  placeholder={isMalaysianIC(formValues.idNumber) ? getBirthPlaceFromIC(formValues.idNumber) || 'Enter birth place' : 'Enter birth place'}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                />
+              </div>
+              <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
                 <input name="dateOfBirth" type="date" value={formValues.dateOfBirth} onChange={(e) => handleChange('dateOfBirth', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
               </div>
@@ -388,13 +428,21 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               </div>
               <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
-                <select name="nationality" value={formValues.nationality} onChange={(e) => handleChange('nationality', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white">
-                  {nationalityOptionsForValue(formValues.nationality).map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <Combobox
+                  options={nationalityOptionsForValue(formValues.nationality)}
+                  value={formValues.nationality}
+                  onChange={(val) => handleChange('nationality', val)}
+                  placeholder="Select nationality..."
+                />
               </div>
               <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
-                <input name="introducer" value={formValues.introducer} onChange={(e) => handleChange('introducer', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <IntroducerSelector
+                  value={formValues.introducer}
+                  onChange={(val) => handleChange('introducer', val)}
+                  members={allMembers}
+                  projects={allProjects}
+                />
               </div>
             </div>
             <div>

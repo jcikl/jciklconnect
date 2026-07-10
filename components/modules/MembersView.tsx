@@ -45,13 +45,16 @@ const getAttendanceDisplay = (m: Member) => {
   const checkins = m.attendanceYear === year ? (m.attendanceCheckins || 0) : 0;
   return { checkins, months, text: `${checkins} / ${months}`, ratio: Math.min(100, (checkins / months) * 100) };
 };
-import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS, JOIN_US_SURVEY_QUESTIONS } from '../../config/constants';
+import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS, JOIN_US_SURVEY_QUESTIONS, nationalityOptionsForValue } from '../../config/constants';
+import { Combobox } from '../ui/Combobox';
 import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../config/constants';
 import { HobbyClubsService } from '../../services/hobbyClubsService';
+import { getBirthPlaceFromIC, isMalaysianIC, getDateOfBirthFromIC, getGenderFromIC } from '../../utils/malaysianIdUtils';
 import { HobbyClub } from '../../types';
 import { DataImportExportService } from '../../services/dataImportExportService';
 import { MemberStatsService, MemberStatistics } from '../../services/memberStatsService';
+import { DuplicateMembersView } from './Members/DuplicateMembersView';
 import { deleteFromCloudinary, uploadMemberAvatarToCloudinary } from '../../services/cloudinaryService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { EventsService } from '../../services/eventsService';
@@ -246,7 +249,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeTab, setActiveTab] = useState<
-    'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'mentorship' | 'promotion-tracking' | 'senatorship' | 'introducer'
+    'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'mentorship' | 'promotion-tracking' | 'senatorship' | 'introducer' | 'duplicates'
   >('directory');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -660,6 +663,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     { id: 'promotion-tracking', label: 'Promotions', short: 'Promotions', icon: TrendingUp },
     { id: 'senatorship', label: 'Senatorship', short: 'Senators', icon: Trophy },
     { id: 'introducer', label: 'Introducer', short: 'Introducers', icon: Network },
+    { id: 'duplicates', label: 'Duplicates', short: 'Duplicates', icon: AlertCircle },
   ] as const;
 
   const activeTabConfig = TAB_CONFIG.find(t => t.id === activeTab) ?? TAB_CONFIG[0];
@@ -757,7 +761,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           <div className="md:hidden mb-4">
             <button
               onClick={() => setShowTabSheet(true)}
-              className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm w-full"
+              className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm w-full mb-4"
             >
               {React.createElement(activeTabConfig.icon, { size: 16, className: 'text-jci-blue shrink-0' })}
               <span className="font-bold text-slate-800 flex-1 text-left text-sm">{activeTabConfig.label}</span>
@@ -867,6 +871,13 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 allProjects={allProjects}
                 onUpdateMember={updateMember}
                 onBatchUpdateMembers={batchUpdateMembers}
+              />
+            )}
+
+            {activeTab === 'duplicates' && (
+              <DuplicateMembersView
+                members={members}
+                onMembersChanged={loadMembers}
               />
             )}
           </div>
@@ -1274,6 +1285,7 @@ const MemberStatisticsView: React.FC<{
   members: Member[];
 }> = ({ statistics, loading, members = [] }) => {
   const [isMobile, setIsMobile] = React.useState(false);
+  const [drawerSegment, setDrawerSegment] = React.useState<{ label: string; members: Member[] } | null>(null);
 
   React.useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -1372,7 +1384,11 @@ const MemberStatisticsView: React.FC<{
 
   const COLORS = ['#0097D7', '#6EC4E8', '#1C3F94', '#00B5B5', '#A5B4FC', '#F472B6'];
 
-  const DonutChart: React.FC<{ data: { name: string; value: number }[]; colorOffset?: number }> = ({ data, colorOffset = 0 }) => {
+  const DonutChart: React.FC<{
+    data: { name: string; value: number }[];
+    colorOffset?: number;
+    onSegmentClick?: (name: string) => void;
+  }> = ({ data, colorOffset = 0, onSegmentClick }) => {
     const total = data.reduce((s, d) => s + d.value, 0);
     return (
       <ResponsiveContainer width="100%" height={isMobile ? 300 : 260}>
@@ -1387,7 +1403,12 @@ const MemberStatisticsView: React.FC<{
             dataKey="value"
           >
             {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[(index + colorOffset) % COLORS.length]} />
+              <Cell
+                key={`cell-${index}`}
+                fill={COLORS[(index + colorOffset) % COLORS.length]}
+                onClick={onSegmentClick ? () => onSegmentClick(entry.name) : undefined}
+                style={onSegmentClick ? { cursor: 'pointer' } : undefined}
+              />
             ))}
           </Pie>
           <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-900" style={{ fontSize: 22, fontWeight: 900 }}>{total}</text>
@@ -1463,10 +1484,37 @@ const MemberStatisticsView: React.FC<{
       {/* 2×2 donut chart grid */}
       <div className="grid md:grid-cols-4 gap-4">
         <Card title="Age Demographics">
-          <DonutChart data={ageData} colorOffset={0} />
+          <DonutChart
+            data={ageData}
+            colorOffset={0}
+            onSegmentClick={name => {
+              const filtered = members.filter(m => {
+                const dobStr = m.general?.dob || m.dob || m.dateOfBirth;
+                const age = calculateAge(dobStr);
+                if (name === 'Other / Unknown') return age === null || age < 18 || age > 40;
+                if (name === '18 - 25') return age !== null && age >= 18 && age <= 25;
+                if (name === '26 - 30') return age !== null && age >= 26 && age <= 30;
+                if (name === '31 - 40') return age !== null && age >= 31 && age <= 40;
+                return false;
+              });
+              setDrawerSegment({ label: `Age ${name}`, members: filtered });
+            }}
+          />
         </Card>
         <Card title="Gender Demographics">
-          <DonutChart data={genderData} colorOffset={2} />
+          <DonutChart
+            data={genderData}
+            colorOffset={2}
+            onSegmentClick={name => {
+              const filtered = members.filter(m => {
+                const g = (m.general?.gender || m.gender || '').toLowerCase().trim();
+                if (name === 'Male') return g === 'male';
+                if (name === 'Female') return g === 'female';
+                return g !== 'male' && g !== 'female';
+              });
+              setDrawerSegment({ label: `Gender: ${name}`, members: filtered });
+            }}
+          />
         </Card>
         <Card title="Membership Type Breakdown">
           {(() => {
@@ -1475,7 +1523,18 @@ const MemberStatisticsView: React.FC<{
             const data = types
               .map(key => ({ name: labels[key], value: members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length }))
               .filter(d => d.value > 0);
-            return <DonutChart data={data} colorOffset={0} />;
+            return (
+              <DonutChart
+                data={data}
+                colorOffset={0}
+                onSegmentClick={name => {
+                  const keyMap: Record<string, string> = { 'Full Member': 'Full', 'Probation': 'Probation', 'Guest': 'Guest', 'Senator': 'Senator', 'Honorary': 'Honorary' };
+                  const key = keyMap[name] || name;
+                  const filtered = members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase());
+                  setDrawerSegment({ label: `Membership: ${name}`, members: filtered });
+                }}
+              />
+            );
           })()}
         </Card>
         <Card title="Level of Management">
@@ -1492,10 +1551,64 @@ const MemberStatisticsView: React.FC<{
               ...Object.keys(counts).filter(k => !knownOrder.includes(k) && k !== 'Not Specified').sort().map(k => ({ name: k, value: counts[k] })),
               ...(counts['Not Specified'] ? [{ name: 'Not Specified', value: counts['Not Specified'] }] : []),
             ];
-            return <DonutChart data={data} colorOffset={1} />;
+            return (
+              <DonutChart
+                data={data}
+                colorOffset={1}
+                onSegmentClick={name => {
+                  const filtered = members.filter(m => m.membershipType !== 'Guest' && ((m.levelOfManagement?.trim() || 'Not Specified') === name));
+                  setDrawerSegment({ label: `Management: ${name}`, members: filtered });
+                }}
+              />
+            );
           })()}
         </Card>
       </div>
+
+      {/* Segment member drawer */}
+      {drawerSegment && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setDrawerSegment(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 shrink-0">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Segment</p>
+                <h3 className="text-lg font-black text-slate-900">{drawerSegment.label}</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="bg-jci-blue/10 text-jci-blue text-sm font-black px-3 py-1 rounded-full">{drawerSegment.members.length} 人</span>
+                <button onClick={() => setDrawerSegment(null)} className="p-2 rounded-full hover:bg-slate-100 text-slate-400">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-3 space-y-2">
+              {drawerSegment.members.length === 0 ? (
+                <p className="text-slate-400 text-sm text-center py-8">No members in this segment</p>
+              ) : (
+                drawerSegment.members
+                  .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                  .map(m => (
+                    <div key={m.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
+                      {m.avatar ? (
+                        <img src={m.avatar} alt={m.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-jci-blue/10 flex items-center justify-center shrink-0 text-jci-blue font-bold text-sm">
+                          {(m.name || m.fullName || '?')[0].toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-800 text-sm truncate">{m.name || m.fullName}</p>
+                        <p className="text-xs text-slate-400 truncate">{m.email || m.contact?.email || m.phone || m.contact?.phone || ''}</p>
+                      </div>
+                      <span className="text-xs text-slate-400 shrink-0">{m.membershipType || m.role || ''}</span>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -1940,9 +2053,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       name: member.name || '',
       avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
       fullName: member.fullName || '',
-      idNumber: member.idNumber || '',
-      dateOfBirth: member.dateOfBirth || '',
-      gender: member.gender || '',
+      idNumber: member.idNumber || member.general?.idNumber || '',
+      birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
+      dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
+      gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || ''); })(),
       ethnicity: member.ethnicity || '',
       dietaryPreference: member.dietaryPreference || '',
       nationality: member.nationality || 'Malaysia',
@@ -2036,6 +2150,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       await updateMember(member.id, {
         avatar: inlineValues.avatar || '', avatarUrl: inlineValues.avatar || '',
         name: inlineValues.name, fullName: inlineValues.fullName, idNumber: inlineValues.idNumber,
+        birthPlace: inlineValues.birthPlace || undefined,
         dateOfBirth: inlineValues.dateOfBirth, gender: inlineValues.gender, ethnicity: inlineValues.ethnicity,
         dietaryPreference: (inlineValues.dietaryPreference as Member['dietaryPreference']) || undefined,
         nationality: inlineValues.nationality, introducer: inlineValues.introducer, bio: inlineValues.bio,
@@ -2977,7 +3092,16 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             <input
                               type="text"
                               value={inlineValues.idNumber}
-                              onChange={e => setInlineValues({ ...inlineValues, idNumber: e.target.value })}
+                              onChange={e => {
+                                const ic = e.target.value;
+                                const updates: any = { idNumber: ic };
+                                if (isMalaysianIC(ic)) {
+                                  const bp = getBirthPlaceFromIC(ic); if (bp) updates.birthPlace = bp;
+                                  const dob = getDateOfBirthFromIC(ic); if (dob) updates.dateOfBirth = dob;
+                                  const gender = getGenderFromIC(ic); if (gender) updates.gender = gender;
+                                }
+                                setInlineValues({ ...inlineValues, ...updates });
+                              }}
                               className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
                             />
                           </div>
@@ -2987,6 +3111,24 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                               type="date"
                               value={inlineValues.dateOfBirth}
                               onChange={e => setInlineValues({ ...inlineValues, dateOfBirth: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
+                            <Combobox
+                              options={nationalityOptionsForValue(inlineValues.nationality)}
+                              value={inlineValues.nationality}
+                              onChange={val => setInlineValues({ ...inlineValues, nationality: val })}
+                              placeholder="Select nationality..."
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Birth Place</label>
+                            <input
+                              type="text"
+                              value={inlineValues.birthPlace || ''}
+                              onChange={e => setInlineValues({ ...inlineValues, birthPlace: e.target.value })}
                               className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
                             />
                           </div>
@@ -3026,15 +3168,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                                 </label>
                               ))}
                             </div>
-                          </div>
-                          <div>
-                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
-                            <input
-                              type="text"
-                              value={inlineValues.nationality}
-                              onChange={e => setInlineValues({ ...inlineValues, nationality: e.target.value })}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                            />
                           </div>
                           <div>
                             <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
@@ -3111,6 +3244,29 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
                           </div>
                           <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
+                            <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
+                            <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Birth Place</span>
+                            {(() => {
+                              const bp = member.birthPlace
+                                || (isMalaysianIC(member.idNumber || '') ? getBirthPlaceFromIC(member.idNumber || '') : '');
+                              return (
+                                <p className="font-medium text-slate-900 flex items-center gap-1.5">
+                                  {bp || 'Not provided'}
+                                  {!member.birthPlace && bp && (
+                                    <span className="text-[10px] text-jci-blue font-normal">from IC</span>
+                                  )}
+                                </p>
+                              );
+                            })()}
+                          </div>
+                          <div>
                             <span className="text-slate-500 block text-xs uppercase font-medium">Gender</span>
                             <p className="font-medium text-slate-900">{member.gender || 'Not provided'}</p>
                           </div>
@@ -3121,14 +3277,6 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                           <div>
                             <span className="text-slate-500 block text-xs uppercase font-medium">Dietary Preference</span>
                             <p className="font-medium text-slate-900 capitalize">{member.dietaryPreference || 'Not provided'}</p>
-                          </div>
-                          <div>
-                            <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
-                            <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
-                          </div>
-                          <div>
-                            <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
-                            <p className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.dateOfBirth)}</p>
                           </div>
                         </div>
 

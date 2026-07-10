@@ -204,6 +204,7 @@ export class MembersService {
     if (data.race !== undefined) general.race = data.race;
     else if (data.ethnicity !== undefined) general.race = data.ethnicity;
     if (data.nationality !== undefined) general.nationality = data.nationality;
+    if (data.birthPlace !== undefined) general.birthPlace = data.birthPlace;
     if (data.avatarUrl !== undefined) general.avatarUrl = data.avatarUrl;
     else if (data.avatar !== undefined) general.avatarUrl = data.avatar;
 
