@@ -4731,6 +4731,14 @@ export const JCIKLApp: React.FC = () => {
                             <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Gamify</span>
                           </div>
                         )}
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('TEMPLATES'); setShowMobileMenu(false); }}>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><FileText size={22} /></div>
+                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Templates</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('REPORTS'); setShowMobileMenu(false); }}>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><BarChart3 size={22} /></div>
+                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Reports</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -4771,14 +4779,6 @@ export const JCIKLApp: React.FC = () => {
                         <div className="flex-1 h-px bg-slate-700/60" />
                       </div>
                       <div className="grid grid-cols-5 gap-y-4 gap-x-1">
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('TEMPLATES'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><FileText size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Templates</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('REPORTS'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><BarChart3 size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Reports</span>
-                        </div>
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('DATA_IMPORT_EXPORT'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Database size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Data I/O</span>
