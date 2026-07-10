@@ -441,27 +441,24 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const registerButton = (
     <div className="flex flex-col gap-2">
       <Button
-        className={`w-full h-12 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${isSelfCancelled
-          ? 'bg-slate-200 text-slate-500 shadow-none cursor-default'
-          : canSelfCancel
-            ? 'bg-green-500 text-white hover:bg-red-500 shadow-green-100 group'
-            : isRegistered
-              ? 'bg-green-500 text-white shadow-green-100 cursor-default'
-              : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+        className={`w-full h-12 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${canSelfCancel
+          ? 'bg-green-500 text-white hover:bg-red-500 shadow-green-100 group'
+          : isRegistered
+            ? 'bg-green-500 text-white shadow-green-100 cursor-default'
+            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
           }`}
-        disabled={isSelfCancelled || (!!isRegistered && !canSelfCancel) || event.status === 'Completed' || event.status === 'Cancelled'}
-        onClick={canSelfCancel ? handleSelfCancel : (!isRegistered && !isSelfCancelled ? onRegister : undefined)}
+        disabled={(!!isRegistered && !canSelfCancel) || event.status === 'Completed' || event.status === 'Cancelled'}
+        onClick={canSelfCancel ? handleSelfCancel : (!isRegistered ? onRegister : undefined)}
       >
         {event.status === 'Completed' ? <span>Event Ended</span>
           : event.status === 'Cancelled' ? <span>Cancelled</span>
-            : isSelfCancelled ? <span>已撤销报名</span>
-              : canSelfCancel
-                ? <>
-                    <CheckCircle size={18} className="stroke-[3] group-hover:hidden" /><span className="group-hover:hidden">Registered</span>
-                    <span className="hidden group-hover:inline">撤销报名</span>
-                  </>
-                : isRegistered ? <><CheckCircle size={18} className="stroke-[3]" /><span>Registered</span></>
-                  : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}
+            : canSelfCancel
+              ? <>
+                  <CheckCircle size={18} className="stroke-[3] group-hover:hidden" /><span className="group-hover:hidden">Registered</span>
+                  <span className="hidden group-hover:inline">撤销报名</span>
+                </>
+              : isRegistered ? <><CheckCircle size={18} className="stroke-[3]" /><span>Registered</span></>
+                : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}
       </Button>
     </div>
   );

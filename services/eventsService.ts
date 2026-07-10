@@ -234,7 +234,7 @@ export class EventsService {
       if (!event) throw new Error('Event not found');
 
       const existing = await EventRegistrationService.getByEventAndMember(eventId, memberId);
-      if (existing) throw new Error('You have already registered for this event');
+      if (existing && existing.status !== 'cancelled') throw new Error('You have already registered for this event');
 
       if (event.maxAttendees && event.attendees >= event.maxAttendees) {
         throw new Error('Event is full');
@@ -245,8 +245,12 @@ export class EventsService {
         attendees: event.attendees + 1,
         registeredMembers: arrayUnion(memberId),
       });
-      // 报名/缴费/签到统一名单（Story 8.1）
-      await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID);
+      // Re-register: reset existing cancelled doc; otherwise create new
+      if (existing && existing.status === 'cancelled') {
+        await EventRegistrationService.updateStatus(existing.id, 'registered');
+      } else {
+        await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID);
+      }
     } catch (error) {
       console.error('Error registering for event:', error);
       throw error;
