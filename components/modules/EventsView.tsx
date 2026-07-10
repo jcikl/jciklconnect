@@ -681,7 +681,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     else if (tab === 'Participants') setActiveTab('participants');
                     else setActiveTab('feedback');
                   }}
-                  className="border-none mb-4"
+                  className="mb-4"
                 />
               )}
 
