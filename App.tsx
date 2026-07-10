@@ -3831,7 +3831,7 @@ export const JCIKLApp: React.FC = () => {
   useEffect(() => {
     let listener: { remove: () => void } | null = null;
     let cancelled = false;
-    import('@capacitor/app').then(({ App: CapApp }) => {
+    import(/* @vite-ignore */ '@capacitor/app').then(({ App: CapApp }) => {
       if (cancelled) return;
       CapApp.addListener('backButton', () => {
         // Close any open drawer/modal first
