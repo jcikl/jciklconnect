@@ -7,6 +7,20 @@ import { MembersService } from '../../services/membersService';
 
 const MEMBERSHIP_TYPES: MembershipType[] = ['Guest', 'Probation', 'Full', 'Honorary', 'Senator', 'Visiting', 'Associate'];
 
+const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = ({ checked, onChange }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-jci-blue focus:ring-offset-1 ${checked ? 'bg-jci-blue' : 'bg-slate-200'}`}
+  >
+    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+  </button>
+);
+
+const fieldCls = "px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-jci-blue bg-white";
+
 export const MembershipConfigView: React.FC = () => {
   const [rules, setRules] = useState<Record<MembershipType, MembershipRuleConfig>>(DEFAULT_MEMBERSHIP_RULES);
   const [calculationMode, setCalculationMode] = useState<'calendar' | 'payment_date'>('calendar');
@@ -17,9 +31,7 @@ export const MembershipConfigView: React.FC = () => {
   const [syncYear, setSyncYear] = useState(new Date().getFullYear());
   const { showToast } = useToast();
 
-  useEffect(() => {
-    loadRules();
-  }, []);
+  useEffect(() => { loadRules(); }, []);
 
   const loadRules = async () => {
     try {
@@ -46,255 +58,235 @@ export const MembershipConfigView: React.FC = () => {
   };
 
   const handleBatchSyncMembershipTypes = async () => {
-    const confirmed = window.confirm(
-      `根据 ${syncYear} 年会费记录与当前 Config，批量推断并写入 members.membershipType？\n\n` +
-        '不修改 membership 字段。请先保存 Config 再执行。'
-    );
-    if (!confirmed) return;
-
+    if (!window.confirm(`根据 ${syncYear} 年会费记录与当前 Config，批量推断并写入 members.membershipType？\n\n不修改 membership 字段。请先保存 Config 再执行。`)) return;
     setSyncingTypes(true);
     try {
       const result = await MembersService.batchSyncMembershipTypes({ year: syncYear });
-      showToast(
-        `membershipType: updated ${result.updated}, unchanged ${result.alreadyCorrect}`,
-        'success'
-      );
-      if (result.errors.length > 0) {
-        console.error('batchSyncMembershipTypes errors:', result.errors);
-      }
+      showToast(`membershipType: updated ${result.updated}, unchanged ${result.alreadyCorrect}`, 'success');
     } catch (e) {
       showToast('Failed to sync membershipType', 'error');
-    } finally {
-      setSyncingTypes(false);
-    }
+    } finally { setSyncingTypes(false); }
   };
 
   const handleBatchSyncMembershipRecords = async () => {
-    const confirmed = window.confirm(
-      `根据 membershipType 与当前 Config，批量更新 ${syncYear} 年 members.membership？\n\n` +
-        '仅更新已有 membership 记录（不新建）。请先保存 Config。'
-    );
-    if (!confirmed) return;
-
+    if (!window.confirm(`根据 membershipType 与当前 Config，批量更新 ${syncYear} 年 members.membership？\n\n仅更新已有 membership 记录（不新建）。请先保存 Config。`)) return;
     setSyncingRecords(true);
     try {
-      const result = await MembersService.batchSyncMembershipRecords({
-        year: syncYear,
-        onlyExistingRecords: true,
-      });
-      showToast(
-        `membership: updated ${result.updated}, already correct ${result.alreadyCorrect}`,
-        'success'
-      );
-      if (result.errors.length > 0) {
-        console.error('batchSyncMembershipRecords errors:', result.errors);
-      }
+      const result = await MembersService.batchSyncMembershipRecords({ year: syncYear, onlyExistingRecords: true });
+      showToast(`membership: updated ${result.updated}, already correct ${result.alreadyCorrect}`, 'success');
     } catch (e) {
       showToast('Failed to sync membership records', 'error');
-    } finally {
-      setSyncingRecords(false);
-    }
+    } finally { setSyncingRecords(false); }
   };
 
-  const updateRule = (type: MembershipType, updates: Partial<MembershipRuleConfig>) => {
-    setRules(prev => ({
-      ...prev,
-      [type]: {
-        ...prev[type],
-        ...updates
-      }
-    }));
-  };
+  const updateRule = (type: MembershipType, updates: Partial<MembershipRuleConfig>) =>
+    setRules(prev => ({ ...prev, [type]: { ...prev[type], ...updates } }));
 
-  if (loading) {
-    return <div className="p-8 text-center text-slate-500">Loading rules...</div>;
-  }
+  if (loading) return <div className="py-12 text-center text-slate-400 text-sm">Loading…</div>;
+
+  const isBusy = syncingTypes || syncingRecords || saving;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Membership Config</h2>
-          <p className="text-sm text-slate-500">Configure dues and requirements for each membership type.</p>
+    <div className="space-y-4">
+
+      {/* Toolbar */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 shrink-0">Year</span>
+          <input
+            type="number"
+            className="w-16 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-jci-blue"
+            value={syncYear}
+            onChange={(e) => setSyncYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
+          />
+          <div className="flex-1" />
+          <Button size="sm" onClick={handleSave} disabled={isBusy} className="flex items-center gap-1.5 shrink-0">
+            <Save size={12} />
+            {saving ? 'Saving…' : 'Save Changes'}
+          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <span>Sync year</span>
-            <input
-              type="number"
-              className="w-24 p-2 border rounded-lg text-sm"
-              value={syncYear}
-              onChange={(e) => setSyncYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
-            />
-          </label>
-          <Button
-            variant="outline"
-            onClick={handleBatchSyncMembershipTypes}
-            disabled={syncingTypes || syncingRecords || saving}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw size={16} className={syncingTypes ? 'animate-spin' : ''} />
-            {syncingTypes ? 'Syncing...' : 'Sync membershipType'}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleBatchSyncMembershipTypes} disabled={isBusy} className="flex items-center gap-1.5">
+            <RefreshCw size={11} className={syncingTypes ? 'animate-spin' : ''} />
+            Sync Type
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleBatchSyncMembershipRecords}
-            disabled={syncingTypes || syncingRecords || saving}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw size={16} className={syncingRecords ? 'animate-spin' : ''} />
-            {syncingRecords ? 'Syncing...' : 'Sync membership'}
-          </Button>
-          <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
-            <Save size={16} />
-            {saving ? 'Saving...' : 'Save Changes'}
+          <Button variant="outline" size="sm" onClick={handleBatchSyncMembershipRecords} disabled={isBusy} className="flex items-center gap-1.5">
+            <RefreshCw size={11} className={syncingRecords ? 'animate-spin' : ''} />
+            Sync Records
           </Button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
-                <th className="p-4">Type</th>
-                <th className="p-4">Dues (RM)</th>
-                <th className="p-4">Nationality Limit</th>
-                <th className="p-4">Age Limit</th>
-                <th className="p-4">Requires Senatorship</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm text-slate-700">
-              {MEMBERSHIP_TYPES.map(type => {
-                const rule = rules[type];
-                return (
-                  <tr key={type} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="p-4 font-medium">{type} {type === 'Full' ? '(Official)' : ''}</td>
-                    <td className="p-4">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-24 p-2 border rounded"
-                        value={rule.duesAmount}
-                        onChange={(e) => updateRule(type, { duesAmount: Number(e.target.value) })}
-                      />
-                    </td>
-                    <td className="p-4">
-                      <select
-                        className="p-2 border rounded"
-                        value={rule.nationalityLimit}
-                        onChange={(e) => updateRule(type, { nationalityLimit: e.target.value as any })}
-                      >
-                        <option value="None">None</option>
-                        <option value="Malaysian">Malaysian Only</option>
-                        <option value="Non-Malaysian">Non-Malaysian Only</option>
-                      </select>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          placeholder="Min"
-                          className="w-16 p-2 border rounded"
-                          value={rule.ageLimit.min ?? ''}
-                          onChange={(e) => updateRule(type, {
-                            ageLimit: { ...rule.ageLimit, min: e.target.value ? Number(e.target.value) : undefined }
-                          })}
-                        />
-                        <span className="text-slate-400">-</span>
-                        <input
-                          type="number"
-                          placeholder="Max"
-                          className="w-16 p-2 border rounded"
-                          value={rule.ageLimit.max ?? ''}
-                          onChange={(e) => updateRule(type, {
-                            ageLimit: { ...rule.ageLimit, max: e.target.value ? Number(e.target.value) : undefined }
-                          })}
-                        />
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded text-jci-blue"
-                          checked={rule.requiresSenatorship}
-                          onChange={(e) => updateRule(type, { requiresSenatorship: e.target.checked })}
-                        />
-                        <span>Required</span>
-                      </label>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div className="bg-amber-50 p-4 border-t border-amber-100 text-amber-800 text-sm flex items-start gap-3">
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          <p>
-            Changes saved here will apply to future member updates. The validation order when assigning a membership type is: <strong>Nationality &gt; Senatorship ID &gt; Age</strong>.
-          </p>
-        </div>
-      </div>
-
-      {/* 会费起算与计算策略 */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">Dues Year Calculation Mode (会费年度起算策略)</h3>
-          <p className="text-sm text-slate-500">
-            Define how the starting year of a member's dues is calculated for status and exceptions.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Calendar Year Option */}
-          <label className={`flex flex-col p-4 border rounded-xl cursor-pointer transition-all ${
-            calculationMode === 'calendar'
-              ? 'border-blue-500 bg-blue-50/30 ring-1 ring-blue-500'
-              : 'border-slate-200 hover:bg-slate-50'
-          }`}>
-            <div className="flex items-center gap-3 mb-2">
-              <input
-                type="radio"
-                name="calculationMode"
-                value="calendar"
-                checked={calculationMode === 'calendar'}
-                onChange={() => setCalculationMode('calendar')}
-                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="font-semibold text-slate-900 text-sm">Calendar Year Mode (按日历年度计算)</span>
+      {/* ── Mobile: compact cards ── */}
+      <div className="md:hidden bg-white rounded-xl border border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+        {MEMBERSHIP_TYPES.map(type => {
+          const rule = rules[type];
+          return (
+            <div key={type} className="px-4 py-3 space-y-2.5">
+              {/* Header row: name + senatorship */}
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-sm text-slate-800">
+                  {type}{type === 'Full' ? ' (Official)' : ''}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Senatorship</span>
+                  <Toggle
+                    checked={rule.requiresSenatorship}
+                    onChange={(v) => updateRule(type, { requiresSenatorship: v })}
+                  />
+                </div>
+              </div>
+              {/* Data row: dues + nationality + age */}
+              <div className="flex items-center gap-2">
+                {/* Dues */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-xs text-slate-400 shrink-0">RM</span>
+                  <input
+                    type="number" min="0"
+                    className={`${fieldCls} w-16`}
+                    value={rule.duesAmount}
+                    onChange={(e) => updateRule(type, { duesAmount: Number(e.target.value) })}
+                  />
+                </div>
+                {/* Nationality */}
+                <select
+                  className={`${fieldCls} flex-1 min-w-0`}
+                  value={rule.nationalityLimit}
+                  onChange={(e) => updateRule(type, { nationalityLimit: e.target.value as any })}
+                >
+                  <option value="None">Any nationality</option>
+                  <option value="Malaysian">Malaysian only</option>
+                  <option value="Non-Malaysian">Non-Malaysian</option>
+                </select>
+                {/* Age range */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <input
+                    type="number" placeholder="Min"
+                    className={`${fieldCls} w-12 text-center`}
+                    value={rule.ageLimit.min ?? ''}
+                    onChange={(e) => updateRule(type, { ageLimit: { ...rule.ageLimit, min: e.target.value ? Number(e.target.value) : undefined } })}
+                  />
+                  <span className="text-slate-300 text-xs">–</span>
+                  <input
+                    type="number" placeholder="Max"
+                    className={`${fieldCls} w-12 text-center`}
+                    value={rule.ageLimit.max ?? ''}
+                    onChange={(e) => updateRule(type, { ageLimit: { ...rule.ageLimit, max: e.target.value ? Number(e.target.value) : undefined } })}
+                  />
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-slate-500 pl-7 leading-relaxed">
-              Based on the member's join date. <strong>Exception:</strong> Members who join on or after 
-              <strong> October 1st</strong> are rolled over and considered as next year's members for dues.
+          );
+        })}
+      </div>
+
+      {/* ── Desktop: table ── */}
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Dues (RM)</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Nationality</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Age Min – Max</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Senatorship</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {MEMBERSHIP_TYPES.map(type => {
+              const rule = rules[type];
+              return (
+                <tr key={type} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-4 py-2.5 text-sm font-medium text-slate-700 whitespace-nowrap">
+                    {type}{type === 'Full' ? ' (Official)' : ''}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input type="number" min="0"
+                      className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-jci-blue"
+                      value={rule.duesAmount}
+                      onChange={(e) => updateRule(type, { duesAmount: Number(e.target.value) })} />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <select className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-jci-blue"
+                      value={rule.nationalityLimit}
+                      onChange={(e) => updateRule(type, { nationalityLimit: e.target.value as any })}>
+                      <option value="None">None</option>
+                      <option value="Malaysian">Malaysian Only</option>
+                      <option value="Non-Malaysian">Non-Malaysian Only</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <input type="number" placeholder="Min"
+                        className="w-14 px-2 py-1.5 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-1 focus:ring-jci-blue"
+                        value={rule.ageLimit.min ?? ''}
+                        onChange={(e) => updateRule(type, { ageLimit: { ...rule.ageLimit, min: e.target.value ? Number(e.target.value) : undefined } })} />
+                      <span className="text-slate-300 text-xs">–</span>
+                      <input type="number" placeholder="Max"
+                        className="w-14 px-2 py-1.5 border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-1 focus:ring-jci-blue"
+                        value={rule.ageLimit.max ?? ''}
+                        onChange={(e) => updateRule(type, { ageLimit: { ...rule.ageLimit, max: e.target.value ? Number(e.target.value) : undefined } })} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <Toggle
+                      checked={rule.requiresSenatorship}
+                      onChange={(v) => updateRule(type, { requiresSenatorship: v })}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="px-4 py-3 bg-amber-50 border-t border-amber-100 text-amber-800 text-xs flex items-center gap-2">
+          <AlertCircle size={13} className="shrink-0" />
+          Changes apply to future updates. Validation order: <strong>Nationality › Senatorship › Age</strong>.
+        </div>
+      </div>
+
+      {/* Mobile amber notice */}
+      <div className="md:hidden bg-amber-50 px-4 py-3 rounded-xl border border-amber-100 text-amber-800 text-xs flex items-start gap-2">
+        <AlertCircle size={13} className="mt-0.5 shrink-0" />
+        Changes apply to future updates. Validation order: <strong>Nationality › Senatorship › Age</strong>.
+      </div>
+
+      {/* Dues Year Calculation Mode */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800">Dues Year Calculation Mode</h3>
+          <p className="text-xs text-slate-500 mt-0.5">How the starting year of a member's dues is calculated.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className={`flex flex-col p-3.5 border rounded-xl cursor-pointer transition-all ${
+            calculationMode === 'calendar' ? 'border-blue-500 bg-blue-50/30 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50'
+          }`}>
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <input type="radio" name="calculationMode" value="calendar"
+                checked={calculationMode === 'calendar'} onChange={() => setCalculationMode('calendar')}
+                className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500" />
+              <span className="font-semibold text-slate-800 text-sm">Calendar Year</span>
+            </div>
+            <p className="text-xs text-slate-500 pl-6 leading-relaxed">
+              Based on join date. Members joining on or after <strong>Oct 1</strong> roll over to next year.
             </p>
           </label>
-
-          {/* Payment Date Option */}
-          <label className={`flex flex-col p-4 border rounded-xl cursor-pointer transition-all ${
-            calculationMode === 'payment_date'
-              ? 'border-blue-500 bg-blue-50/30 ring-1 ring-blue-500'
-              : 'border-slate-200 hover:bg-slate-50'
+          <label className={`flex flex-col p-3.5 border rounded-xl cursor-pointer transition-all ${
+            calculationMode === 'payment_date' ? 'border-blue-500 bg-blue-50/30 ring-1 ring-blue-500' : 'border-slate-200 hover:bg-slate-50'
           }`}>
-            <div className="flex items-center gap-3 mb-2">
-              <input
-                type="radio"
-                name="calculationMode"
-                value="payment_date"
-                checked={calculationMode === 'payment_date'}
-                onChange={() => setCalculationMode('payment_date')}
-                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="font-semibold text-slate-900 text-sm">Payment Date Mode (按首笔支付日期计算)</span>
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <input type="radio" name="calculationMode" value="payment_date"
+                checked={calculationMode === 'payment_date'} onChange={() => setCalculationMode('payment_date')}
+                className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500" />
+              <span className="font-semibold text-slate-800 text-sm">Payment Date</span>
             </div>
-            <p className="text-xs text-slate-500 pl-7 leading-relaxed">
-              Calculates the starting year from the date of the member's <strong>oldest Membership payment 
-              transaction</strong> in the system. Falls back to join date year if no transactions exist.
+            <p className="text-xs text-slate-500 pl-6 leading-relaxed">
+              Based on the member's <strong>oldest membership payment</strong>. Falls back to join date if none exists.
             </p>
           </label>
         </div>
       </div>
+
     </div>
   );
 };

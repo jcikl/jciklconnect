@@ -32,6 +32,34 @@ export interface ReportOptions {
   filters?: Record<string, any>;
 }
 
+export interface MykdRow {
+  no: number;
+  fullName: string;
+  nationalId: string;
+  age: number | string;
+  ethnicity: string;
+  birthDate: string;
+  birthPlace: string;
+  occupation: string;
+  homeAddress: string;
+  contactNumber: string;
+  email: string;
+}
+
+export const MYKD_COLUMNS: { key: keyof MykdRow; label: string }[] = [
+  { key: 'no',            label: 'No.' },
+  { key: 'fullName',      label: 'Full Name' },
+  { key: 'nationalId',    label: 'National ID' },
+  { key: 'age',           label: 'Age' },
+  { key: 'ethnicity',     label: 'Ethnicity' },
+  { key: 'birthDate',     label: 'Birth Date' },
+  { key: 'birthPlace',    label: 'Birth Place' },
+  { key: 'occupation',    label: 'Occupation' },
+  { key: 'homeAddress',   label: 'Home Address' },
+  { key: 'contactNumber', label: 'Contact Number' },
+  { key: 'email',         label: 'Email' },
+];
+
 export class ReportService {
   // Generate financial report
   static async generateFinancialReport(options: ReportOptions): Promise<ReportData> {
@@ -300,6 +328,91 @@ export class ReportService {
       console.error('Error generating project report:', error);
       throw error;
     }
+  }
+
+  // Generate MYKD (ROY) member report
+  static async generateMykdReport(options: ReportOptions): Promise<ReportData & { rows: MykdRow[] }> {
+    const calcAge = (dob: string): number => {
+      if (!dob) return 0;
+      const birth = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      if (
+        today.getMonth() < birth.getMonth() ||
+        (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())
+      ) age--;
+      return age;
+    };
+
+    if (isDevMode()) {
+      const mockRows: MykdRow[] = Array.from({ length: 5 }, (_, i) => ({
+        no: i + 1,
+        fullName: `Member ${i + 1}`,
+        nationalId: `000000-00-000${i}`,
+        age: 25 + i,
+        ethnicity: ['Malay', 'Chinese', 'Indian', 'Others'][i % 4],
+        birthDate: `199${i}-01-01`,
+        birthPlace: 'Kuala Lumpur',
+        occupation: 'Business Owner',
+        homeAddress: `No. ${i + 1}, Jalan Test, KL`,
+        contactNumber: `+6011-0000000${i}`,
+        email: `member${i + 1}@example.com`,
+      }));
+      return {
+        title: 'MYKD (ROY) Member Report',
+        period: 'All Time',
+        generatedAt: new Date(),
+        data: { rows: mockRows },
+        rows: mockRows,
+      };
+    }
+
+    const members = await MembersService.getAllMembers();
+    let filtered = members;
+    if (options.startDate && options.endDate) {
+      filtered = members.filter(m => {
+        const d = new Date(m.joinDate || m.joinedDate || '');
+        return d >= options.startDate! && d <= options.endDate!;
+      });
+    }
+
+    const rows: MykdRow[] = filtered.map((m, i) => {
+      const dob = m.general?.dob || m.dob || m.dateOfBirth || '';
+      const race = (m.general?.race || m.race || m.ethnicity || '') as string;
+      return {
+        no: i + 1,
+        fullName: m.general?.name || m.fullName || m.name || '',
+        nationalId: m.general?.idNumber || m.nationalId || m.idNumber || '',
+        age: dob ? calcAge(dob) : '',
+        ethnicity: race,
+        birthDate: dob,
+        birthPlace: (m.general as any)?.birthPlace || m.birthPlace || '',
+        occupation: m.business?.title || m.profession || m.business?.companyName || '',
+        homeAddress: m.contact?.address || m.address || '',
+        contactNumber: m.contact?.phone || m.phone || '',
+        email: m.contact?.email || m.email || '',
+      };
+    });
+
+    return {
+      title: 'MYKD (ROY) Member Report',
+      period: options.startDate && options.endDate
+        ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
+        : 'All Time',
+      generatedAt: new Date(),
+      data: { rows },
+      rows,
+    };
+  }
+
+  // Export MYKD rows to CSV
+  static exportMykdToCSV(rows: MykdRow[]): string {
+    const headers = MYKD_COLUMNS.map(c => c.label).join(',');
+    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const body = rows.map(r =>
+      MYKD_COLUMNS.map(c => escape(r[c.key])).join(',')
+    ).join('\n');
+    return `${headers}\n${body}`;
   }
 
   // Export report to CSV

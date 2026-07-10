@@ -385,6 +385,7 @@ export interface Member {
     chineseName?: string;
     idNumber: string; // NRIC or Passport
     dob: string; // YYYY-MM-DD
+    birthPlace?: string;
     gender: GenderType;
     race: RaceType;
     nationality: string; // Default: 'Malaysia'
@@ -569,6 +570,7 @@ export interface Member {
   leaderboardVisibility?: boolean | string;
   hasPaidInitiationFee?: boolean;
   ethnicity?: string;
+  birthPlace?: string;
   dietaryPreference?: 'vegetarian' | 'halal' | 'normal' | null;
   interestedIndustries?: string[];
   profession?: string;

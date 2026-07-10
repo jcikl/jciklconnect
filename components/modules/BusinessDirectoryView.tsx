@@ -481,9 +481,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                               <span className={`text-[10px] font-black uppercase tracking-widest ${mobileDividerStyle}`}>{mobileDividerLabel}</span>
                             </div>
                           )}
-                          <button type="button"
-                            className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-                            onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                            onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailBiz(biz); setIsDetailOpen(true); } }}>
                             <img src={avatarUrl} alt={biz.ownerName} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
@@ -514,7 +517,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                                 </button>
                               )
                             }
-                          </button>
+                          </div>
                         </React.Fragment>
                       );
                     })}

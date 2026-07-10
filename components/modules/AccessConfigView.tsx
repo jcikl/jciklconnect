@@ -1,46 +1,85 @@
-import React, { useState, useEffect } from 'react';
-import { Save, Shield, Users, UserCog } from 'lucide-react';
+import React, { useState } from 'react';
+import { Save, Shield } from 'lucide-react';
 import { Button, useToast, Tabs } from '../ui/Common';
 import { UserRole } from '../../types';
+
+// Reuse same Toggle as MembershipConfigView
+const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }> = ({ checked, onChange, disabled }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={() => !disabled && onChange(!checked)}
+    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-jci-blue focus:ring-offset-1 ${
+      disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+    } ${checked ? 'bg-jci-blue' : 'bg-slate-200'}`}
+  >
+    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+  </button>
+);
+
+const PERMISSION_KEYS = [
+  'canViewMembers', 'canEditMembers', 'canViewFinance', 'canEditFinance',
+  'canManageProjects', 'canManageEvents', 'canManageInventory',
+  'canManageAutomation', 'canViewReports', 'canManageSettings', 'canApproveClaims',
+] as const;
+
+type PermKey = typeof PERMISSION_KEYS[number];
+type Perms = Record<PermKey, boolean>;
+
+const ALL_ON: Perms = Object.fromEntries(PERMISSION_KEYS.map(k => [k, true])) as Perms;
+const ALL_OFF: Perms = Object.fromEntries(PERMISSION_KEYS.map(k => [k, false])) as Perms;
+
+const CONFIGURABLE_ROLES: UserRole[] = [UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE];
+
+const ROLE_LABELS: Record<string, string> = {
+  [UserRole.GUEST]: 'Guest',
+  [UserRole.MEMBER]: 'Member',
+  [UserRole.ADMIN]: 'Admin',
+  [UserRole.SUPER_ADMIN]: 'Super Admin',
+  [UserRole.INACTIVE]: 'Inactive',
+};
+
+function formatPermLabel(key: string) {
+  return key.replace(/^can/, '').replace(/([A-Z])/g, ' $1').trim();
+}
+
+// Compact permission list shared by both tabs
+const PermList: React.FC<{
+  perms: Perms;
+  onToggle: (k: PermKey) => void;
+  disabled?: boolean;
+}> = ({ perms, onToggle, disabled }) => (
+  <div className="divide-y divide-slate-100">
+    {PERMISSION_KEYS.map(key => (
+      <div key={key} className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50/60 transition-colors">
+        <span className="text-sm text-slate-700">{formatPermLabel(key)}</span>
+        <Toggle checked={perms[key]} onChange={() => onToggle(key)} disabled={disabled} />
+      </div>
+    ))}
+  </div>
+);
 
 export const AccessConfigView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
 
-  const [boardPermissions, setBoardPermissions] = useState({
-    canViewMembers: true,
-    canEditMembers: true,
-    canViewFinance: true,
-    canEditFinance: true,
-    canManageProjects: true,
-    canManageEvents: true,
-    canManageInventory: true,
-    canManageAutomation: true,
-    canViewReports: true,
-    canManageSettings: true,
-    canApproveClaims: true,
-  });
-
+  const [boardPerms, setBoardPerms] = useState<Perms>({ ...ALL_ON });
   const [activeTab, setActiveTab] = useState<'dynamic' | 'roles'>('dynamic');
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.MEMBER);
 
-  // Only the 5 core base roles are configurable
-  const CONFIGURABLE_ROLES: UserRole[] = [UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE];
-
-  // In a real app, this would be fetched from Firestore / config service
-  const [rolePermissions, setRolePermissions] = useState<Record<string, typeof boardPermissions>>({
-    [UserRole.GUEST]: { canViewMembers: false, canEditMembers: false, canViewFinance: false, canEditFinance: false, canManageProjects: false, canManageEvents: false, canManageInventory: false, canManageAutomation: false, canViewReports: false, canManageSettings: false, canApproveClaims: false },
-    [UserRole.MEMBER]: { canViewMembers: true, canEditMembers: false, canViewFinance: false, canEditFinance: false, canManageProjects: false, canManageEvents: true, canManageInventory: false, canManageAutomation: false, canViewReports: false, canManageSettings: false, canApproveClaims: false },
-    [UserRole.ADMIN]: { canViewMembers: true, canEditMembers: true, canViewFinance: true, canEditFinance: true, canManageProjects: true, canManageEvents: true, canManageInventory: true, canManageAutomation: true, canViewReports: true, canManageSettings: true, canApproveClaims: true },
-    [UserRole.SUPER_ADMIN]: { canViewMembers: true, canEditMembers: true, canViewFinance: true, canEditFinance: true, canManageProjects: true, canManageEvents: true, canManageInventory: true, canManageAutomation: true, canViewReports: true, canManageSettings: true, canApproveClaims: true },
-    [UserRole.INACTIVE]: { canViewMembers: false, canEditMembers: false, canViewFinance: false, canEditFinance: false, canManageProjects: false, canManageEvents: false, canManageInventory: false, canManageAutomation: false, canViewReports: false, canManageSettings: false, canApproveClaims: false },
+  const [rolePerms, setRolePerms] = useState<Record<string, Perms>>({
+    [UserRole.GUEST]:       { ...ALL_OFF },
+    [UserRole.MEMBER]:      { ...ALL_OFF, canViewMembers: true, canManageEvents: true },
+    [UserRole.ADMIN]:       { ...ALL_ON },
+    [UserRole.SUPER_ADMIN]: { ...ALL_ON },
+    [UserRole.INACTIVE]:    { ...ALL_OFF },
   });
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      // In a real app, save to Firestore
-      // await SecondaryAccessConfigService.updateBoardPermissions(boardPermissions);
       await new Promise(r => setTimeout(r, 800));
       showToast('Access permissions updated successfully', 'success');
     } catch (e) {
@@ -50,121 +89,92 @@ export const AccessConfigView: React.FC = () => {
     }
   };
 
-  const toggleBoardPermission = (key: keyof typeof boardPermissions) => {
-    setBoardPermissions(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const toggleRolePermission = (role: string, key: keyof typeof boardPermissions) => {
-    setRolePermissions(prev => ({
-      ...prev,
-      [role]: { ...prev[role], [key]: !prev[role][key] }
-    }));
-  };
+  const isSuperAdmin = selectedRole === UserRole.SUPER_ADMIN;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Shield size={24} className="text-jci-blue" />
-            Access Permissions Config
-          </h2>
-          <p className="text-sm text-slate-500">Configure base role permissions and dynamic system privileges.</p>
-        </div>
-        <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
-          <Save size={16} />
-          {saving ? 'Saving...' : 'Save Changes'}
+    <div className="space-y-4">
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">Configure board and role-based access permissions.</p>
+        <Button onClick={handleSave} disabled={saving} size="sm" className="flex items-center gap-1.5 shrink-0">
+          <Save size={12} />
+          {saving ? 'Saving…' : 'Save Changes'}
         </Button>
       </div>
 
+      {/* Inner tabs — short labels to fit mobile */}
       <Tabs
         tabs={[
-          { id: 'dynamic', label: 'Dynamic Assignment (Board)' },
-          { id: 'roles', label: 'Base Role Permissions' }
+          { id: 'dynamic', label: 'Board' },
+          { id: 'roles',   label: 'Roles' },
         ]}
         activeTab={activeTab}
         onTabChange={(id) => setActiveTab(id as 'dynamic' | 'roles')}
       />
 
+      {/* ── Board tab ── */}
       {activeTab === 'dynamic' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-          <div className="p-6 border-b border-slate-200 bg-slate-50">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Users size={20} className="text-blue-600" />
-              Current Board Members (Dynamic)
-            </h3>
-            <p className="text-sm text-slate-600 mt-1">
-              Members who hold a board position in the current calendar year automatically receive these permissions, regardless of their base system role.
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-800">Current Board Members</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Board position holders automatically receive these permissions regardless of base role.
             </p>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(boardPermissions).map(([key, value]) => (
-                <label key={key} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                  <span className="font-medium text-slate-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={() => toggleBoardPermission(key as keyof typeof boardPermissions)}
-                    className="w-5 h-5 rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
-                  />
-                </label>
-              ))}
+          <PermList
+            perms={boardPerms}
+            onToggle={(k) => setBoardPerms(prev => ({ ...prev, [k]: !prev[k] }))}
+          />
+        </div>
+      )}
+
+      {/* ── Roles tab ── */}
+      {activeTab === 'roles' && (
+        <div className="space-y-3">
+          {/* Role selector: horizontal pills (mobile) / stays as pills (desktop too, simpler) */}
+          <div className="flex gap-1.5 flex-wrap">
+            {CONFIGURABLE_ROLES.map(role => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setSelectedRole(role)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  selectedRole === role
+                    ? 'bg-jci-blue text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {ROLE_LABELS[role]}
+              </button>
+            ))}
+          </div>
+
+          {/* Permissions for selected role */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{ROLE_LABELS[selectedRole]} Permissions</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isSuperAdmin ? 'System-reserved — cannot be changed.' : `Permissions for any user with the ${ROLE_LABELS[selectedRole]} role.`}
+                </p>
+              </div>
+              {isSuperAdmin && (
+                <Shield size={16} className="text-slate-400 shrink-0" />
+              )}
             </div>
+            <PermList
+              perms={rolePerms[selectedRole]}
+              onToggle={(k) => setRolePerms(prev => ({
+                ...prev,
+                [selectedRole]: { ...prev[selectedRole], [k]: !prev[selectedRole][k] }
+              }))}
+              disabled={isSuperAdmin}
+            />
           </div>
         </div>
       )}
 
-      {activeTab === 'roles' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
-          <div className="flex border-b border-slate-200">
-            <div className="w-64 border-r border-slate-200 bg-slate-50 p-4">
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <UserCog size={16} className="text-slate-500" />
-                Select Role
-              </h3>
-              <div className="space-y-1">
-                {CONFIGURABLE_ROLES.map(role => (
-                  <button
-                    key={role}
-                    onClick={() => setSelectedRole(role)}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      selectedRole === role ? 'bg-jci-blue text-white shadow-sm' : 'text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {role.replace(/_/g, ' ')}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1 p-6 bg-white">
-              <div className="mb-6">
-                <h3 className="text-lg font-bold text-slate-900">{selectedRole.replace(/_/g, ' ')} Permissions</h3>
-                <p className="text-sm text-slate-500">Configure base permissions granted to any user with the {selectedRole.replace(/_/g, ' ')} role.</p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {rolePermissions[selectedRole] && Object.entries(rolePermissions[selectedRole]).map(([key, value]) => (
-                  <label key={key} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                    <span className="font-medium text-slate-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                    <input
-                      type="checkbox"
-                      checked={value}
-                      onChange={() => toggleRolePermission(selectedRole, key as keyof typeof boardPermissions)}
-                      className="w-5 h-5 rounded border-slate-300 text-jci-blue focus:ring-jci-blue"
-                      disabled={selectedRole === UserRole.SUPER_ADMIN}
-                    />
-                  </label>
-                ))}
-              </div>
-              {selectedRole === UserRole.SUPER_ADMIN && (
-                <p className="mt-4 text-sm text-amber-600 bg-amber-50 p-3 rounded-md">
-                  Note: SUPER_ADMIN permissions are system-reserved and cannot be disabled.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

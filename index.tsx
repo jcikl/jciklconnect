@@ -4,7 +4,6 @@ import App from './App';
 import './index.css';
 // import './styles/accessibility.css';
 import { AuthProvider } from './hooks/useAuth';
-import { AccessibilityRunner } from './components/accessibility/AccessibilityRunner';
 import { ToastProvider } from './components/ui/Common';
 import { errorLoggingService } from './services/errorLoggingService';
 
@@ -36,9 +35,7 @@ root.render(
   <React.StrictMode>
     <ToastProvider>
       <AuthProvider>
-        <AccessibilityRunner>
-          <App />
-        </AccessibilityRunner>
+        <App />
       </AuthProvider>
     </ToastProvider>
   </React.StrictMode>

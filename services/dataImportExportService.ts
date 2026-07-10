@@ -17,6 +17,7 @@ import {
   Transaction
 } from '../types';
 import { MembersService } from './membersService';
+import { isMalaysianIC, getBirthPlaceFromIC, getDateOfBirthFromIC, getGenderFromIC } from '../utils/malaysianIdUtils';
 import { EventsService } from './eventsService';
 
 export class DataImportExportService {
@@ -434,8 +435,34 @@ export class DataImportExportService {
             value = parseInt(value, 10);
           }
 
+          // Normalize gender to 'Male' / 'Female'
+          if (normalizedHeader === 'gender' && typeof value === 'string') {
+            const g = value.trim().toLowerCase();
+            if (g === 'male' || g === 'm') value = 'Male';
+            else if (g === 'female' || g === 'f') value = 'Female';
+          }
+
           normalizedRow[normalizedHeader] = value;
         });
+
+        // Auto-derive from Malaysian IC if idNumber is present
+        if (entityType === 'members') {
+          const ic: string = normalizedRow.idNumber || normalizedRow.nationalId || '';
+          if (isMalaysianIC(ic)) {
+            if (!normalizedRow.birthPlace) {
+              const bp = getBirthPlaceFromIC(ic);
+              if (bp) normalizedRow.birthPlace = bp;
+            }
+            if (!normalizedRow.dateOfBirth) {
+              const dob = getDateOfBirthFromIC(ic);
+              if (dob) normalizedRow.dateOfBirth = dob;
+            }
+            if (!normalizedRow.gender) {
+              const gender = getGenderFromIC(ic);
+              if (gender) normalizedRow.gender = gender;
+            }
+          }
+        }
 
         const existingId = await this.checkIfRecordExists(normalizedRow, entityType);
         if (existingId) {

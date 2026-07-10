@@ -8,7 +8,7 @@ import {
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
   ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw, ArrowLeft,
-  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock
+  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock, SlidersHorizontal
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -72,6 +72,7 @@ const WhapiConfigView = lazy(() => import('./components/modules/WhapiConfigView'
 const ApiConfigView = lazy(() => import('./components/modules/ApiConfigView').then(m => ({ default: m.ApiConfigView })));
 const MembershipConfigView = lazy(() => import('./components/modules/MembershipConfigView').then(m => ({ default: m.MembershipConfigView })));
 const AccessConfigView = lazy(() => import('./components/modules/AccessConfigView').then(m => ({ default: m.AccessConfigView })));
+const SystemConfigView = lazy(() => import('./components/modules/SystemConfigView').then(m => ({ default: m.SystemConfigView })));
 const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
 const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
@@ -83,7 +84,7 @@ import { AdvertisementService } from './services/advertisementService';
 
 // --- View Definitions ---
 
-type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'WHAPI_CONFIG' | 'API_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
+type ViewType = 'GUEST' | 'GUEST_EVENTS' | 'FLAGSHIP_PROJECTS' | 'GUEST_ABOUT' | 'GUEST_ENEWSLETTERS' | 'GUEST_DIRECTORY' | 'GUEST_PARTNERSHIPS' | 'DASHBOARD' | 'MEMBERS' | 'EVENTS' | 'PROJECTS' | 'ACTIVITIES' | 'FINANCE' | 'PAYMENT_REQUESTS' | 'GAMIFICATION' | 'INVENTORY' | 'DIRECTORY' | 'AUTOMATION' | 'KNOWLEDGE' | 'COMMUNICATION' | 'CLUBS' | 'SURVEYS' | 'BENEFITS' | 'DATA_IMPORT_EXPORT' | 'ADVERTISEMENTS' | 'AI_INSIGHTS' | 'TEMPLATES' | 'ACTIVITY_PLANS' | 'REPORTS' | 'DEVELOPER' | 'TOYYIB' | 'WHAPI_CONFIG' | 'API_CONFIG' | 'MEMBERSHIP_CONFIG' | 'ACCESS_CONFIG' | 'SYSTEM_CONFIG' | 'PUBLICATIONS' | 'RADAR_IMPORTER' | 'FLAGSHIP_PROJECTS_MGT';
 
 // --- Helper Components ---
 
@@ -3274,13 +3275,13 @@ const SearchDropdown: React.FC<{
 
   const q = searchQuery.toLowerCase().trim();
   const filteredMembers = q ? members.filter(m =>
-    m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+    (m.name || '').toLowerCase().includes(q) || (m.email || '').toLowerCase().includes(q)
   ).slice(0, 4) : [];
   const filteredEvents = q ? events.filter(e =>
-    e.title.toLowerCase().includes(q)
+    (e.title || '').toLowerCase().includes(q)
   ).slice(0, 3) : [];
   const filteredProjects = q ? projects.filter(p =>
-    p.name.toLowerCase().includes(q)
+    (p.name || '').toLowerCase().includes(q)
   ).slice(0, 3) : [];
   const filteredBusinesses = q ? businesses.filter(b =>
     (b.companyName || '').toLowerCase().includes(q) || (b.industry || '').toLowerCase().includes(q)
@@ -4008,8 +4009,9 @@ export const JCIKLApp: React.FC = () => {
       case 'TOYYIB': return <ApiConfigView />;
       case 'WHAPI_CONFIG': return <ApiConfigView />;
       case 'API_CONFIG': return <ApiConfigView />;
-      case 'MEMBERSHIP_CONFIG': return <MembershipConfigView />;
-      case 'ACCESS_CONFIG': return <AccessConfigView />;
+      case 'MEMBERSHIP_CONFIG': return <SystemConfigView />;
+      case 'ACCESS_CONFIG': return <SystemConfigView />;
+      case 'SYSTEM_CONFIG': return <SystemConfigView />;
       case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
       default:
         if ((isBoard || isAdmin) && showBoardDashboard) {
@@ -4270,17 +4272,10 @@ export const JCIKLApp: React.FC = () => {
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem
-                        icon={<Users size={18} />}
-                        label="Membership Config"
-                        isActive={view === 'MEMBERSHIP_CONFIG'}
-                        onClick={() => { handleViewChange('MEMBERSHIP_CONFIG'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<Shield size={18} />}
-                        label="Access Config"
-                        isActive={view === 'ACCESS_CONFIG'}
-                        onClick={() => { handleViewChange('ACCESS_CONFIG'); setIsSidebarOpen(false); }}
+                        icon={<SlidersHorizontal size={18} />}
+                        label="Config"
+                        isActive={view === 'SYSTEM_CONFIG' || view === 'MEMBERSHIP_CONFIG' || view === 'ACCESS_CONFIG'}
+                        onClick={() => { handleViewChange('SYSTEM_CONFIG'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem
@@ -4791,13 +4786,9 @@ export const JCIKLApp: React.FC = () => {
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><CreditCard size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">API Settings</span>
                         </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('MEMBERSHIP_CONFIG'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Users size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Mbr Config</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ACCESS_CONFIG'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Shield size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Access Cfg</span>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SYSTEM_CONFIG'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><SlidersHorizontal size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Config</span>
                         </div>
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('AUTOMATION'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Activity size={22} /></div>

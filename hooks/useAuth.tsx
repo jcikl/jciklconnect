@@ -41,7 +41,10 @@ interface AuthContextType {
   simulateAsMember: (memberId: string, role: UserRole) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Persist context reference across Vite HMR reloads to avoid "must be used within provider" errors
+const _w = window as any;
+const AuthContext: React.Context<AuthContextType | undefined> =
+  _w.__jcikl_auth_ctx__ ?? (_w.__jcikl_auth_ctx__ = createContext<AuthContextType | undefined>(undefined));
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
