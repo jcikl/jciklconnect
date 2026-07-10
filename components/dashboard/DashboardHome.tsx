@@ -1058,7 +1058,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                   <span className="text-[9px] font-black uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
                                 )}
                               </div>
-                              {!hasMore && visibleEntries.length > 0 && (
+                              {visibleEntries.length > 0 && (
                                 <p className="text-[11px] text-white/30 truncate mt-0.5">{visibleEntries[0]}</p>
                               )}
                             </div>
