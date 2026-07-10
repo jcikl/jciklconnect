@@ -4547,9 +4547,7 @@ export const JCIKLApp: React.FC = () => {
             >
               <X size={18} />
             </button>
-            <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
-              <LogOut size={24} className="text-red-500" />
-            </div>
+            <img src="/mascot/logout.png" alt="" className="w-20 h-20 object-contain" />
             <div className="space-y-1.5">
               <p className="font-semibold text-slate-800 text-base">Sign out?</p>
               <p className="text-sm text-slate-400">You'll need to log in again to access your account.</p>
