@@ -1253,7 +1253,20 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       <div className="rounded-xl border border-slate-100 overflow-hidden">
                         <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dietary</p>
-                          <span className="text-[10px] text-slate-400">{totalActive} total</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400">{totalActive} total</span>
+                            <button
+                              onClick={() => {
+                                const text = `Dietary breakdown (${totalActive} total):\nNormal: ${dietaryCounts.normal} (${pct(dietaryCounts.normal, totalActive)}%)\nVegetarian: ${dietaryCounts.vegetarian} (${pct(dietaryCounts.vegetarian, totalActive)}%)\nHalal: ${dietaryCounts.halal} (${pct(dietaryCounts.halal, totalActive)}%)${dietaryCounts.unspecified > 0 ? `\nNot specified: ${dietaryCounts.unspecified}` : ''}`;
+                                navigator.clipboard.writeText(text);
+                                showToast('Dietary stats copied', 'success');
+                              }}
+                              className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded"
+                              title="Copy dietary stats"
+                            >
+                              <Copy size={12} />
+                            </button>
+                          </div>
                         </div>
                         <div className="px-3.5 py-3 bg-white space-y-3">
                           <div className="flex h-4 rounded-full overflow-hidden gap-px">
