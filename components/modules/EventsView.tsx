@@ -1295,7 +1295,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       <div className="rounded-xl border border-slate-100 overflow-hidden">
                         <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">T-Shirt Sizes</p>
-                          <span className="text-[10px] text-slate-400">{sizes.reduce((s, [, c]) => s + c, 0)} specified</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400">{sizes.reduce((s, [, c]) => s + c, 0)} specified</span>
+                            <button
+                              onClick={() => {
+                                const lines = sizes.map(([size, count]) => `${size}: ${count} (${pct(count, totalActive)}%)`);
+                                if (sizeUnspecified > 0) lines.push(`Not specified: ${sizeUnspecified}`);
+                                const text = `T-Shirt Sizes (${totalActive} total):\n${lines.join('\n')}`;
+                                navigator.clipboard.writeText(text);
+                                showToast('T-shirt sizes copied', 'success');
+                              }}
+                              className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded"
+                              title="Copy t-shirt size stats"
+                            >
+                              <Copy size={12} />
+                            </button>
+                          </div>
                         </div>
                         {sizes.length === 0 ? (
                           <div className="px-3.5 py-6 text-center text-sm text-slate-400">No size data collected</div>
