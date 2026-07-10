@@ -3106,6 +3106,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                             <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
                           </div>
                           <div>
+                            <span className="text-slate-500 block text-xs uppercase font-medium">Dietary Preference</span>
+                            <p className="font-medium text-slate-900 capitalize">{member.dietaryPreference || 'Not provided'}</p>
+                          </div>
+                          <div>
                             <span className="text-slate-500 block text-xs uppercase font-medium">Nationality</span>
                             <p className="font-medium text-slate-900">{member.nationality || 'Not provided'}</p>
                           </div>
