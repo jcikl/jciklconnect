@@ -170,7 +170,7 @@ const GuestHeader = ({
 
           {/* Right side: Login + Mobile Menu Toggle */}
           <div className="flex items-center gap-3">
-            <Button onClick={onLogin} size="sm" className="hidden sm:inline-flex">Log In</Button>
+            <Button onClick={onLogin} size="sm">Log In</Button>
             <button
               className="md:hidden w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
