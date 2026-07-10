@@ -45,6 +45,13 @@ export const EventRegistrationService = {
         cancelledBy: data.cancelledBy ?? null,
         cancelledByName: data.cancelledByName ?? null,
         cancelledByRole: data.cancelledByRole ?? null,
+        isVegetarian: data.isVegetarian ?? null,
+        emergencyContactName: data.emergencyContactName ?? null,
+        emergencyContactPhone: data.emergencyContactPhone ?? null,
+        tshirtSize: data.tshirtSize ?? null,
+        memberName: data.memberName ?? data.name ?? null,
+        registeredBy: data.registeredBy ?? null,
+        registeredByName: data.registeredByName ?? null,
       } as EventRegistration;
     });
   },
@@ -102,7 +109,20 @@ export const EventRegistrationService = {
     });
   },
 
-  async create(eventId: string, memberId: string, loId?: string): Promise<string> {
+  async create(
+    eventId: string,
+    memberId: string,
+    loId?: string,
+    extraFields?: {
+      isVegetarian?: boolean | null;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+      tshirtSize?: string | null;
+      memberName?: string | null;
+      registeredBy?: string | null;
+      registeredByName?: string | null;
+    }
+  ): Promise<string> {
     const lid = loId ?? DEFAULT_LO_ID;
     if (isDevMode()) {
       const id = `mock-er-${Date.now()}`;
@@ -113,24 +133,33 @@ export const EventRegistrationService = {
         status: 'registered',
         createdAt: new Date().toISOString(),
         loId: lid,
+        ...extraFields,
       });
       return id;
     }
-    const ref = await addDoc(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), {
+    const payload: Record<string, unknown> = {
       eventId,
       memberId,
       status: 'registered',
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
       loId: lid,
-    });
+    };
+    if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
+    if (extraFields?.emergencyContactName) payload.emergencyContactName = extraFields.emergencyContactName;
+    if (extraFields?.emergencyContactPhone) payload.emergencyContactPhone = extraFields.emergencyContactPhone;
+    if (extraFields?.tshirtSize) payload.tshirtSize = extraFields.tshirtSize;
+    if (extraFields?.memberName) payload.memberName = extraFields.memberName;
+    if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
+    if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
+    const ref = await addDoc(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), payload);
     return ref.id;
   },
 
   async updateStatus(
     registrationId: string,
     status: EventRegistrationStatus,
-    options?: { paidAt?: string; checkedInAt?: string }
+    options?: { paidAt?: string; checkedInAt?: string; registeredBy?: string | null; registeredByName?: string | null }
   ): Promise<void> {
     if (isDevMode()) {
       const r = MOCK_REGISTRATIONS.find((x) => x.id === registrationId);
@@ -138,6 +167,8 @@ export const EventRegistrationService = {
         r.status = status;
         if (options?.paidAt) r.paidAt = options.paidAt;
         if (options?.checkedInAt) r.checkedInAt = options.checkedInAt;
+        if (options?.registeredBy !== undefined) r.registeredBy = options.registeredBy;
+        if (options?.registeredByName !== undefined) r.registeredByName = options.registeredByName;
         r.updatedAt = new Date().toISOString();
       }
       return;
@@ -146,6 +177,8 @@ export const EventRegistrationService = {
     const updateData: Record<string, unknown> = { status, updatedAt: Timestamp.now() };
     if (options?.paidAt != null) updateData.paidAt = options.paidAt;
     if (options?.checkedInAt != null) updateData.checkedInAt = options.checkedInAt;
+    if (options?.registeredBy !== undefined) updateData.registeredBy = options.registeredBy;
+    if (options?.registeredByName !== undefined) updateData.registeredByName = options.registeredByName;
     await updateDoc(ref, updateData);
   },
 

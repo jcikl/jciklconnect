@@ -1183,8 +1183,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         <EventDetailModal
           event={events.find(e => e.id === selectedEventForDetail.id) || selectedEventForDetail}
           onClose={() => setSelectedEventForDetail(null)}
-          onRegister={() => {
-            if (member) registerForEvent(selectedEventForDetail.id!, member.id);
+          onRegister={(formData) => {
+            if (member) registerForEvent(selectedEventForDetail.id!, member.id, formData);
           }}
           onCheckIn={() => {
             if (member) markAttendance(selectedEventForDetail.id!, member.id);

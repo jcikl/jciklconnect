@@ -256,6 +256,8 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           memberGroupPhotoUrl: termSettings.memberGroupPhotoUrl,
         }),
       ]);
+      // Sync member docs immediately after save so replaced members lose board flags
+      await BoardManagementService.syncCurrentYearBoardAssignees().catch(() => {});
       showToast(`Board for ${selectedTerm} updated successfully`, 'success');
       setShowManageModal(false);
       loadTerms();

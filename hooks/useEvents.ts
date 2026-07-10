@@ -93,15 +93,24 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
     }
   };
 
-  const registerForEvent = async (eventId: string, memberId: string) => {
+  const registerForEvent = async (
+    eventId: string,
+    memberId: string,
+    extraFields?: {
+      isVegetarian?: boolean | null;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+      tshirtSize?: string | null;
+    }
+  ) => {
     try {
-      await EventsService.registerForEvent(eventId, memberId);
+      await EventsService.registerForEvent(eventId, memberId, extraFields);
       await loadEvents();
       showToast('Successfully registered for event', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to register for event';
       showToast(errorMessage, 'error');
-      // Don't re-throw: caller often doesn't await, which causes unhandled rejection
+      throw err;
     }
   };
 

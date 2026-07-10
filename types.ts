@@ -577,6 +577,7 @@ export interface Member {
   currentBoardYear?: number;
   currentBoardPosition?: string;
   isCurrentBoardMember?: boolean;
+  isCurrentCommissionDirector?: boolean;
   probationApprovedBy?: string;
   probationApprovedAt?: string;
   cutStyle?: string;
@@ -781,6 +782,14 @@ export interface EventRegistration {
   cancelledBy?: string | null;       // memberId of who cancelled
   cancelledByName?: string | null;   // display name
   cancelledByRole?: 'self' | 'admin' | 'board' | 'committee' | null;
+  // Registration form fields
+  isVegetarian?: boolean | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  tshirtSize?: string | null;
+  memberName?: string | null;
+  registeredBy?: string | null;
+  registeredByName?: string | null;
 }
 
 /** 非会员留资：联络方式与兴趣，供组织跟进与推广（Story 9.1 / FR27） */

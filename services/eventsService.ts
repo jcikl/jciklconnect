@@ -221,9 +221,20 @@ export class EventsService {
   }
 
   // Register member for event
-  static async registerForEvent(eventId: string, memberId: string): Promise<void> {
+  static async registerForEvent(
+    eventId: string,
+    memberId: string,
+    extraFields?: {
+      isVegetarian?: boolean | null;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+      tshirtSize?: string | null;
+      memberName?: string | null;
+      registeredBy?: string | null;
+      registeredByName?: string | null;
+    }
+  ): Promise<void> {
     if (isDevMode()) {
-      // In dev mode, just return without doing anything
       return;
     }
 
@@ -247,9 +258,12 @@ export class EventsService {
       });
       // Re-register: reset existing cancelled doc; otherwise create new
       if (existing && existing.status === 'cancelled') {
-        await EventRegistrationService.updateStatus(existing.id, 'registered');
+        await EventRegistrationService.updateStatus(existing.id, 'registered', {
+          registeredBy: extraFields?.registeredBy,
+          registeredByName: extraFields?.registeredByName,
+        });
       } else {
-        await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID);
+        await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID, extraFields);
       }
     } catch (error) {
       console.error('Error registering for event:', error);
@@ -377,61 +391,28 @@ export class EventsService {
     }
 
     try {
-      const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-      const event = await this.getEventById(eventId);
+      const col = collection(db, COLLECTIONS.GUEST_REGISTRATIONS);
+      const [emailSnap, phoneSnap] = await Promise.all([
+        getDocs(query(col, where('eventId', '==', eventId), where('email', '==', guestData.email))),
+        getDocs(query(col, where('eventId', '==', eventId), where('phone', '==', guestData.phone))),
+      ]);
+      const isDuplicate = (snap: { docs: { data(): Record<string, unknown> }[] }) =>
+        snap.docs.some(d => d.data().status !== 'Cancelled');
+      if (isDuplicate(emailSnap)) throw new Error('This email has already been registered for this event.');
+      if (isDuplicate(phoneSnap)) throw new Error('This phone number has already been registered for this event.');
 
-      if (!event) throw new Error('Event not found');
-
-      // Check if event is full
-      if (event.maxAttendees && event.attendees >= event.maxAttendees) {
-        throw new Error('Event is full');
-      }
-
-      // Store guest registration in a separate collection (Firestore rejects undefined)
       const guestRegistration: Record<string, unknown> = {
         eventId,
-        eventTitle: event.title,
         name: guestData.name,
         email: guestData.email,
         phone: guestData.phone,
         registeredAt: Timestamp.now(),
         status: 'Pending' as const,
       };
-      if (guestData.organization != null)      if (guestData.notes != null) guestRegistration.notes = guestData.notes;
+      if (guestData.organization != null) guestRegistration.organization = guestData.organization;
+      if (guestData.notes != null) guestRegistration.notes = guestData.notes;
 
-      await addDoc(collection(db, COLLECTIONS.GUEST_REGISTRATIONS || 'guestRegistrations'), guestRegistration);
-
-      // Increment attendee count (or keep separate count for guests)
-      await updateDoc(eventRef, {
-        attendees: event.attendees + 1,
-        guestRegistrations: arrayUnion({
-          name: guestData.name,
-          email: guestData.email,
-          phone: guestData.phone,
-          registeredAt: Timestamp.now(),
-        }),
-      });
-
-      // Optionally send confirmation email
-      const { EmailService } = await import('./emailService');
-      await EmailService.sendEmail({
-        to: guestData.email,
-        subject: `Registration Confirmation: ${event.title}`,
-        html: `
-          <p>Dear ${guestData.name},</p>
-          <p>Thank you for registering for "${event.title}".</p>
-          <p><strong>Event Details:</strong></p>
-          <ul>
-            <li>Date: ${new Date(event.date).toLocaleString()}</li>
-            <li>Location: ${event.location}</li>
-          </ul>
-          <p>We will contact you soon with more details.</p>
-          <p>Best regards,<br>JCI Kuala Lumpur</p>
-        `,
-        text: `Thank you for registering for ${event.title}. We will contact you soon.`,
-        tags: ['event-registration', 'guest'],
-        metadata: { eventId, guestName: guestData.name },
-      });
+      await addDoc(col, guestRegistration);
     } catch (error) {
       console.error('Error registering guest for event:', error);
       throw error;

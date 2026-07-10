@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info } from 'lucide-react';
+import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown } from 'lucide-react';
 import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useEvents } from '../../hooks/useEvents';
@@ -11,10 +11,13 @@ import type { Member } from '../../types';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { MemberSelector } from '../ui/MemberSelector';
 import { useMembers } from '../../hooks/useMembers';
-import { DEFAULT_LO_ID } from '../../config/constants';
+import { DEFAULT_LO_ID, COLLECTIONS } from '../../config/constants';
 import { EventBudgetService, EventBudget, BudgetItem } from '../../services/eventBudgetService';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { EventFeedbackService, EventFeedback, EventFeedbackSummary } from '../../services/eventFeedbackService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
+import { EventsService } from '../../services/eventsService';
 import type { EventRegistration } from '../../types';
 import { formatCurrency } from '../../utils/formatUtils';
 import { formatDate } from '../../utils/dateUtils';
@@ -168,9 +171,9 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
         <EventDetailModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
-          onRegister={() => {
+          onRegister={(formData) => {
             if (member) {
-              registerForEvent(selectedEvent.id, member.id);
+              registerForEvent(selectedEvent.id, member.id, formData);
               setSelectedEvent(null);
             }
           }}
@@ -265,10 +268,17 @@ const EventRow: React.FC<{
 }
 
 // Event Detail Modal with Budget Management
+export interface RegistrationFormData {
+  isVegetarian: boolean;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  tshirtSize: string;
+}
+
 export interface EventDetailModalProps {
   event: Event;
   onClose: () => void;
-  onRegister: () => void;
+  onRegister: (formData: RegistrationFormData) => void;
   onCheckIn: () => void;
   onCancelRegistration?: (memberId: string, cancelledBy: string, cancelledByName: string, cancelledByRole: 'self' | 'admin' | 'board' | 'committee') => Promise<void>;
   member: any;
@@ -290,13 +300,73 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [updatingRegId, setUpdatingRegId] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [participantSubTab, setParticipantSubTab] = useState<'all' | 'board' | 'director' | 'member' | 'guest' | 'stats'>('all');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [myRegistration, setMyRegistration] = useState<EventRegistration | null | undefined>(undefined);
   const [localRegistered, setLocalRegistered] = useState<boolean | null>(null);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
+  const [addMemberId, setAddMemberId] = useState('');
+  const [addingParticipant, setAddingParticipant] = useState(false);
+  const [showRegForm, setShowRegForm] = useState(false);
+  const [regForm, setRegForm] = useState<RegistrationFormData>({
+    isVegetarian: false,
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    tshirtSize: '',
+  });
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
+  const [commDirIds, setCommDirIds] = useState<Set<string>>(new Set());
+  const [boardMemberIds, setBoardMemberIds] = useState<Set<string>>(new Set());
+  const [boardPositions, setBoardPositions] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const currentYear = new Date().getFullYear();
+    getDocs(query(collection(db, 'boardMembers'), where('isActive', '==', true)))
+      .then(snap => {
+        const commIds = new Set<string>();
+        const bmIds = new Set<string>();
+        const posMap = new Map<string, string>();
+        snap.docs.forEach(d => {
+          const data = d.data();
+          if (parseInt(data.term, 10) === currentYear) {
+            if (data.memberId) {
+              bmIds.add(data.memberId as string);
+              if (data.position) posMap.set(data.memberId as string, data.position as string);
+            }
+            (data.commissionDirectorIds ?? [] as string[]).forEach((id: string) => commIds.add(id));
+          }
+        });
+        setCommDirIds(commIds);
+        setBoardMemberIds(bmIds);
+        setBoardPositions(posMap);
+      }).catch(() => {});
+  }, []);
+
+  const currentYear = new Date().getFullYear();
+  const getBoardPos = (m: Member) => boardPositions.get(m.id) ?? m.currentBoardPosition ?? m.jciCareer?.currentBoardPosition ?? '';
+  const shortPos = (pos: string): string => {
+    const p = pos.toLowerCase();
+    if (p.includes('immediate past')) return 'IPP';
+    if (p.includes('executive vice')) return 'EVP';
+    if (p.includes('local organ') || p.includes('lom')) return 'VPLOM';
+    if (p.includes('international')) return 'VPIA';
+    if (p.includes('individual')) return 'VPI';
+    if (p.includes('business')) return 'VPB';
+    if (p.includes('community')) return 'VPC';
+    if (p.includes('vice president')) return 'VP';
+    if (p.includes('president')) return 'Pres';
+    if (p.includes('honorary treasurer') || p.includes('treasurer')) return 'HT';
+    if (p.includes('secretary general')) return 'SG';
+    if (p.includes('secretary')) return 'SG';
+    if (p.includes('legal council') || p.includes('legal counsel') || p.includes('glc')) return 'GLC';
+    return pos;
+  };
+  const isBoardMember = (m: Member) => boardMemberIds.has(m.id);
+  const isDirector = (m: Member) => commDirIds.has(m.id);
 
   const isCommitteeMember = useMemo(() => {
     if (!member) return false;
@@ -325,9 +395,24 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const loadParticipations = async () => {
     setLoadingParticipants(true);
     try {
-      const list = await EventRegistrationService.listByEvent(event.id);
+      const [list, guestSnap] = await Promise.all([
+        EventRegistrationService.listByEvent(event.id),
+        getDocs(query(collection(db, COLLECTIONS.GUEST_REGISTRATIONS), where('eventId', '==', event.id))),
+      ]);
+      // Map guestRegistrations docs → EventRegistration shape
+      const guestEntries: EventRegistration[] = guestSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: `guest-${d.id}`,
+          eventId: event.id,
+          memberId: `guest-${d.id}`,
+          status: (data.status === 'Cancelled' ? 'cancelled' : 'registered') as any,
+          createdAt: data.registeredAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
+          memberName: data.name ?? null,
+        } as EventRegistration;
+      });
       // Supplement with synthetic entries for members registered before EventRegistration docs existed
-      const docMemberIds = new Set(list.map((r) => r.memberId));
+      const docMemberIds = new Set([...list, ...guestEntries].map((r) => r.memberId));
       const syntheticEntries: EventRegistration[] = (event.registeredMembers ?? [])
         .filter((mid) => !docMemberIds.has(mid))
         .map((mid) => ({
@@ -337,7 +422,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           status: 'registered' as const,
           createdAt: event.date ?? new Date().toISOString(),
         }));
-      setParticipations([...list, ...syntheticEntries]);
+      setParticipations([...list, ...guestEntries, ...syntheticEntries]);
     } catch {
       setParticipations([]);
     } finally {
@@ -350,11 +435,23 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     EventRegistrationService.getByEventAndMember(event.id, member.id)
       .then(setMyRegistration)
       .catch(() => setMyRegistration(null));
+    // Pre-fill registration form from member profile
+    setRegForm({
+      isVegetarian: false,
+      emergencyContactName: member.emergencyContactName ?? member.emergencyContact ?? '',
+      emergencyContactPhone: member.emergencyContactPhone ?? '',
+      tshirtSize: member.tshirtSize ?? '',
+    });
   }, [event.id, member?.id]);
 
   const handleRegister = () => {
+    setShowRegForm(true);
+  };
+
+  const handleRegFormSubmit = () => {
+    setShowRegForm(false);
     setLocalRegistered(true);
-    onRegister();
+    onRegister(regForm);
   };
 
   const handleSelfCancel = async () => {
@@ -396,6 +493,33 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       showToast('Cancellation failed', 'error');
     } finally {
       setUpdatingRegId(null);
+    }
+  };
+
+  const handleAddParticipant = async () => {
+    if (!addMemberId) return;
+    setAddingParticipant(true);
+    try {
+      const added = members.find(m => m.id === addMemberId);
+      await EventsService.registerForEvent(event.id, addMemberId, { memberName: added?.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
+      const newReg: EventRegistration = {
+        id: `manual-${Date.now()}`,
+        eventId: event.id,
+        memberId: addMemberId,
+        status: 'registered',
+        createdAt: new Date().toISOString(),
+        loId: null,
+        registeredBy: member?.id,
+        registeredByName: member?.name ?? member?.id,
+      };
+      setParticipations(prev => [newReg, ...prev]);
+      showToast(`${added?.name ?? 'Member'} added`, 'success');
+      setAddMemberId('');
+      setShowAddParticipant(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to add participant', 'error');
+    } finally {
+      setAddingParticipant(false);
     }
   };
 
@@ -625,63 +749,359 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
               {activeTab === 'participants' && (
                 <div className="animate-fade-in">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs text-blue-700 font-medium flex items-center gap-1.5">
-                      <Users size={13} /> Committee Access · {participations.filter(r => r.status !== 'cancelled').length} registered
-                    </p>
-                  </div>
+                  {/* Sub-tabs */}
+                  {(() => {
+                    const boardMembers = members.filter(m => isBoardMember(m));
+                    const directorMembers = members.filter(m => isDirector(m) && !isBoardMember(m));
+                    const boardIds = new Set([...boardMembers, ...directorMembers].map(m => m.id));
+                    const activeRegs = participations.filter(r => r.status !== 'cancelled');
+                    const boardRegs = activeRegs.filter(r => boardMembers.some(m => m.id === r.memberId));
+                    const directorRegs = activeRegs.filter(r => directorMembers.some(m => m.id === r.memberId));
+                    const memberRegs = activeRegs.filter(r => { const m = members.find(x => x.id === r.memberId); return m && !boardIds.has(m.id) && (m.role === 'MEMBER' || m.role === 'member'); });
+                    const guestRegs = activeRegs.filter(r => { const m = members.find(x => x.id === r.memberId); return !m || m.role === 'GUEST' || m.role === 'guest'; });
+                    const subTabs: { key: typeof participantSubTab; label: string; count?: number }[] = [
+                      { key: 'all', label: 'All', count: activeRegs.length },
+                      { key: 'board', label: 'Board', count: boardRegs.length },
+                      { key: 'director', label: 'Comm. Dir.', count: directorRegs.length },
+                      { key: 'member', label: 'Member', count: memberRegs.length },
+                      { key: 'guest', label: 'Guest', count: guestRegs.length },
+                      { key: 'stats', label: 'Stats' },
+                    ];
+                    return (
+                      <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1 scrollbar-none">
+                        {subTabs.map(t => (
+                          <button
+                            key={t.key}
+                            onClick={() => setParticipantSubTab(t.key)}
+                            className={`flex items-center gap-1 shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${participantSubTab === t.key ? 'bg-jci-blue text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                          >
+                            {t.label}
+                            {t.count != null && <span className={`text-[10px] font-bold ${participantSubTab === t.key ? 'opacity-80' : 'opacity-60'}`}>({t.count})</span>}
+                          </button>
+                        ))}
+                        <div className="ml-auto shrink-0">
+                          <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px]" onClick={() => setShowAddParticipant(v => !v)}>
+                            <Plus size={12} className="mr-1" />Add
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {showAddParticipant && (
+                    <div className="mb-3 p-3 rounded-xl border border-blue-100 bg-blue-50/40 space-y-2">
+                      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">手动添加参与者</p>
+                      <MemberSelector
+                        members={members.filter(m =>
+                          !participations.some(r => r.memberId === m.id && r.status !== 'cancelled') &&
+                          !isBoardMember(m) &&
+                          !isDirector(m)
+                        )}
+                        value={addMemberId}
+                        onChange={setAddMemberId}
+                        placeholder="搜索会员..."
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1" disabled={!addMemberId || addingParticipant} onClick={handleAddParticipant}>
+                          {addingParticipant ? <RefreshCw size={12} className="animate-spin mr-1" /> : null}
+                          确认添加
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => { setShowAddParticipant(false); setAddMemberId(''); }}>取消</Button>
+                      </div>
+                    </div>
+                  )}
                   {loadingParticipants ? (
                     <div className="flex items-center justify-center py-10">
                       <RefreshCw className="animate-spin text-jci-blue" size={22} />
                     </div>
-                  ) : participations.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400">
-                      <Users size={36} className="mx-auto mb-2 opacity-20" />
-                      <p className="text-sm">No registrations yet.</p>
-                    </div>
-                  ) : (
+                  ) : participantSubTab === 'stats' ? (() => {
+                    const activeRegs = participations.filter(r => r.status !== 'cancelled');
+                    const vegCount = activeRegs.filter(r => r.isVegetarian === true).length;
+                    const nonVegCount = activeRegs.filter(r => r.isVegetarian === false).length;
+                    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+                    const sizeCounts = activeRegs.reduce<Record<string, number>>((acc, r) => {
+                      if (r.tshirtSize) acc[r.tshirtSize] = (acc[r.tshirtSize] ?? 0) + 1;
+                      return acc;
+                    }, {});
+                    const sizes = Object.entries(sizeCounts).sort(([a], [b]) => {
+                      const ai = sizeOrder.indexOf(a), bi = sizeOrder.indexOf(b);
+                      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                    });
+                    return (
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-slate-100 overflow-hidden">
+                          <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dietary</p>
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                              <span className="text-sm text-slate-700">Vegetarian</span>
+                              <span className="text-sm font-bold text-jci-blue">{vegCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                              <span className="text-sm text-slate-700">Non-vegetarian</span>
+                              <span className="text-sm font-bold text-slate-700">{nonVegCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                              <span className="text-sm text-slate-400">Not specified</span>
+                              <span className="text-sm font-bold text-slate-400">{activeRegs.length - vegCount - nonVegCount}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-slate-100 overflow-hidden">
+                          <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">T-Shirt Sizes</p>
+                          </div>
+                          {sizes.length === 0 ? (
+                            <div className="px-3.5 py-4 text-center text-sm text-slate-400">No size data collected</div>
+                          ) : (
+                            <div className="divide-y divide-slate-100">
+                              {sizes.map(([size, count]) => (
+                                <div key={size} className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                                  <span className="text-sm text-slate-700">{size}</span>
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                      <div className="h-full bg-jci-blue rounded-full" style={{ width: `${Math.round((count / activeRegs.length) * 100)}%` }} />
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-700 w-4 text-right">{count}</span>
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
+                                <span className="text-sm text-slate-400">Not specified</span>
+                                <span className="text-sm font-bold text-slate-400">{activeRegs.length - sizes.reduce((s, [, c]) => s + c, 0)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })() : (participantSubTab === 'board' || participantSubTab === 'director') ? (() => {
+                    const targetMembers = participantSubTab === 'board'
+                      ? members.filter(m => isBoardMember(m))
+                      : members.filter(m => isDirector(m) && !isBoardMember(m));
+                    if (targetMembers.length === 0) return (
+                      <div className="text-center py-10 text-slate-400">
+                        <Users size={36} className="mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">No {participantSubTab === 'board' ? 'board members' : 'commission directors'} found.</p>
+                      </div>
+                    );
+                    return (
+                      <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                        {[...targetMembers].sort((a, b) => {
+                          const aReg = participations.find(r => r.memberId === a.id && r.status !== 'cancelled');
+                          const bReg = participations.find(r => r.memberId === b.id && r.status !== 'cancelled');
+                          const regDiff = (aReg ? 0 : 1) - (bReg ? 0 : 1);
+                          if (regDiff !== 0) return regDiff;
+                          if (participantSubTab === 'board') {
+                            const posRank = (m: Member) => {
+                              const p = shortPos(getBoardPos(m));
+                              const order: Record<string, number> = { Pres: 1, IPP: 2, EVP: 3, VPI: 4, VPIA: 5, VPB: 6, VPC: 7, VPLOM: 8, HT: 9, SG: 10, GLC: 11 };
+                              return order[p] ?? 99;
+                            };
+                            const posDiff = posRank(a) - posRank(b);
+                            if (posDiff !== 0) return posDiff;
+                          }
+                          return (a.name ?? '').localeCompare(b.name ?? '');
+                        }).map(m => {
+                          const reg = participations.find(r => r.memberId === m.id && r.status !== 'cancelled');
+                          const regStatus = reg?.status;
+                          return (
+                            <div key={m.id} className="flex items-center justify-between px-3 py-2.5 bg-white">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                  <Users size={14} className="text-slate-400" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    {getBoardPos(m) && (
+                                      <span className="shrink-0 inline-flex items-center justify-center text-[10px] font-semibold w-14 py-0.5 rounded-full bg-jci-blue/10 text-jci-blue">{shortPos(getBoardPos(m))}</span>
+                                    )}
+                                    <p className="text-sm font-semibold truncate text-slate-900">{m.name}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                  {regStatus ? (
+                                    <Badge variant={regStatus === 'checked_in' ? 'success' : regStatus === 'paid' ? 'warning' : 'neutral'} className="text-[10px]">
+                                      {regStatus === 'registered' ? 'Registered' : regStatus === 'paid' ? 'Paid' : 'Checked In'}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="error" className="text-[10px]">Not Registered</Badge>
+                                  )}
+                                  {reg && <span className="text-[10px] text-slate-400">{reg.registeredByName ? `由 ${reg.registeredByName} 报名` : 'Self registered'}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                {reg && reg.status === 'registered' && (
+                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(reg)}>Paid</Button>
+                                )}
+                                {reg && (reg.status === 'registered' || reg.status === 'paid') && (
+                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(reg)}>Check In</Button>
+                                )}
+                                {reg && onCancelRegistration && (
+                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(reg)}>Cancel</Button>
+                                )}
+                                {!reg && (
+                                  <Button size="sm" variant="outline" className="text-[10px] h-7 px-2" onClick={async () => {
+                                    try {
+                                      await EventsService.registerForEvent(event.id, m.id, { memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
+                                      const newReg: EventRegistration = { id: `manual-${Date.now()}`, eventId: event.id, memberId: m.id, status: 'registered', createdAt: new Date().toISOString(), loId: null, memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id };
+                                      setParticipations(prev => [newReg, ...prev]);
+                                      showToast(`${m.name} added`, 'success');
+                                    } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
+                                  }}>Add</Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })() : (() => {
+                    const _boardIds = new Set(members.filter(m => isBoardMember(m) || isDirector(m)).map(m => m.id));
+                    const filtered = participations.filter(r => {
+                      if (participantSubTab === 'all') return true;
+                      const m = members.find(x => x.id === r.memberId);
+                      if (participantSubTab === 'member') return m && !_boardIds.has(m.id) && (m.role === 'MEMBER' || m.role === 'member');
+                      if (participantSubTab === 'guest') return !m || m.role === 'GUEST' || m.role === 'guest';
+                      return true;
+                    });
+                    if (filtered.length === 0) return (
+                      <div className="text-center py-10 text-slate-400">
+                        <Users size={36} className="mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">No registrations yet.</p>
+                      </div>
+                    );
+                    const roleOrder = (r: EventRegistration) => {
+                      const m = members.find(x => x.id === r.memberId);
+                      if (!m) return 4;
+                      if (isBoardMember(m) && !isDirector(m)) return 1;
+                      if (isDirector(m)) return 2;
+                      return 3;
+                    };
+                    const sorted = [...filtered].sort((a, b) => {
+                      const cancelledDiff = (a.status === 'cancelled' ? 1 : 0) - (b.status === 'cancelled' ? 1 : 0);
+                      if (cancelledDiff !== 0) return cancelledDiff;
+                      const roleDiff = roleOrder(a) - roleOrder(b);
+                      if (roleDiff !== 0) return roleDiff;
+                      const nameA = members.find(x => x.id === a.memberId)?.name ?? a.memberName ?? '';
+                      const nameB = members.find(x => x.id === b.memberId)?.name ?? b.memberName ?? '';
+                      return nameA.localeCompare(nameB);
+                    });
+                    return (
                     <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
-                      {participations.map((r) => {
+                      {sorted.map((r) => {
                         const mem = members.find((m) => m.id === r.memberId);
+                        const roleLabel = (() => {
+                          if (!mem) return 'Public';
+                          if (isDirector(mem)) return 'Comm. Dir.';
+                          if (isBoardMember(mem)) return 'Board';
+                          const rv = (mem.role ?? mem.systemRole ?? '').toUpperCase();
+                          if (rv === 'ADMIN' || rv === 'SUPER_ADMIN') return 'Admin';
+                          if (rv === 'BOARD') return 'Board';
+                          if (rv === 'MEMBER') return 'Member';
+                          if (rv === 'PROBATION') return 'Probation';
+                          return 'Guest';
+                        })();
                         const isCancelled = r.status === 'cancelled';
                         const cancelLabel = isCancelled
                           ? r.cancelledByRole === 'self'
                             ? 'Cancelled by self'
                             : `Cancelled by ${r.cancelledByRole ?? 'admin'}: ${r.cancelledByName ?? ''}`
                           : null;
+                        const isRowExpanded = expandedRows.has(r.id);
+                        const hasDetails = r.isVegetarian != null || r.emergencyContactName || r.emergencyContactPhone || r.tshirtSize;
                         return (
-                          <div key={r.id} className={`flex items-center justify-between px-3 py-2.5 transition-colors ${isCancelled ? 'bg-red-50/40 opacity-70' : 'bg-white hover:bg-slate-50'}`}>
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                                <Users size={14} className="text-slate-400" />
+                          <div key={r.id} className={`transition-colors ${isCancelled ? 'bg-red-50/40 opacity-70' : 'bg-white'}`}>
+                            <div className="flex items-center justify-between px-3 py-2.5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() => hasDetails && setExpandedRows(prev => {
+                                    const next = new Set(prev);
+                                    next.has(r.id) ? next.delete(r.id) : next.add(r.id);
+                                    return next;
+                                  })}
+                                  className={`w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0 ${hasDetails ? 'cursor-pointer hover:bg-slate-200' : ''}`}
+                                >
+                                  {hasDetails
+                                    ? <ChevronDown size={14} className={`text-slate-400 transition-transform ${isRowExpanded ? 'rotate-180' : ''}`} />
+                                    : <Users size={14} className="text-slate-400" />}
+                                </button>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                                      roleLabel === 'Board' ? 'bg-jci-blue/10 text-jci-blue' :
+                                      roleLabel === 'Admin' ? 'bg-purple-100 text-purple-700' :
+                                      roleLabel === 'Member' ? 'bg-slate-100 text-slate-500' :
+                                      roleLabel === 'Probation' ? 'bg-yellow-100 text-yellow-700' :
+                                      roleLabel === 'Public' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-slate-100 text-slate-400'
+                                    }`}>{roleLabel}</span>
+                                    <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{mem?.name ?? r.memberName ?? 'Unknown'}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                  {isCancelled ? (
+                                    <Badge variant="error" className="text-[10px]">{cancelLabel}</Badge>
+                                  ) : (
+                                    <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'} className="text-[10px]">
+                                      {r.status === 'registered' ? 'Registered' : r.status === 'paid' ? 'Paid' : 'Checked In'}
+                                    </Badge>
+                                  )}
+                                  {!isCancelled && <span className="text-[10px] text-slate-400">{r.registeredByName ? `由 ${r.registeredByName} 报名` : 'Self registered'}</span>}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="min-w-0">
-                                <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{mem?.name ?? 'Unknown'}</p>
-                                {isCancelled ? (
-                                  <Badge variant="error" className="text-[10px]">{cancelLabel}</Badge>
-                                ) : (
-                                  <Badge variant={r.status === 'checked_in' ? 'success' : r.status === 'paid' ? 'warning' : 'neutral'} className="text-[10px]">
-                                    {r.status === 'registered' ? 'Registered' : r.status === 'paid' ? 'Paid' : 'Checked In'}
-                                  </Badge>
+                              <div className="flex gap-1 shrink-0">
+                                {isCancelled && isCommitteeMember && (
+                                  <Button size="sm" variant="outline" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={async () => {
+                                    try {
+                                      await EventsService.registerForEvent(event.id, r.memberId, { memberName: mem?.name ?? r.memberName, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
+                                      setParticipations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'registered' as const, cancelledAt: null, cancelledBy: null, cancelledByName: null, cancelledByRole: null, registeredBy: member?.id, registeredByName: member?.name ?? member?.id } : x));
+                                      showToast(`${mem?.name ?? r.memberName ?? 'Member'} re-registered`, 'success');
+                                    } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
+                                  }}>Re-register</Button>
+                                )}
+                                {!isCancelled && r.status === 'registered' && (
+                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(r)}>Paid</Button>
+                                )}
+                                {!isCancelled && (r.status === 'registered' || r.status === 'paid') && (
+                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(r)}>Check In</Button>
+                                )}
+                                {!isCancelled && onCancelRegistration && (
+                                  <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}>Cancel</Button>
                                 )}
                               </div>
                             </div>
-                            <div className="flex gap-1 shrink-0">
-                              {!isCancelled && r.status === 'registered' && (
-                                <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkPaid(r)}>Paid</Button>
-                              )}
-                              {!isCancelled && (r.status === 'registered' || r.status === 'paid') && (
-                                <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(r)}>Check In</Button>
-                              )}
-                              {!isCancelled && onCancelRegistration && (
-                                <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}>Cancel</Button>
-                              )}
-                            </div>
+                            {isRowExpanded && hasDetails && (
+                              <div className="px-3 pb-2.5 pl-[52px] grid grid-cols-2 gap-x-4 gap-y-1.5">
+                                {r.isVegetarian != null && (
+                                  <div className="col-span-2 flex items-center gap-1.5">
+                                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">素食者</span>
+                                    <Badge variant={r.isVegetarian ? 'success' : 'neutral'} className="text-[10px]">{r.isVegetarian ? '是 Yes' : '否 No'}</Badge>
+                                  </div>
+                                )}
+                                {r.tshirtSize && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">衣服尺码</p>
+                                    <p className="text-xs font-medium text-slate-700">{r.tshirtSize}</p>
+                                  </div>
+                                )}
+                                {(r.emergencyContactName || r.emergencyContactPhone) && (
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">紧急联络</p>
+                                    {r.emergencyContactName && <p className="text-xs font-medium text-slate-700 truncate">{r.emergencyContactName}</p>}
+                                    {r.emergencyContactPhone && <p className="text-xs text-slate-500">{r.emergencyContactPhone}</p>}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 
@@ -787,6 +1207,83 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             loadEventFeedback();
           }}
         />
+      )}
+
+      {showRegForm && (
+        <Modal
+          isOpen
+          onClose={() => setShowRegForm(false)}
+          title="活动报名"
+          size="sm"
+          footer={
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setShowRegForm(false)}>取消</Button>
+              <Button onClick={handleRegFormSubmit}>确认报名</Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {/* Vegetarian */}
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div>
+                <p className="text-sm font-medium text-slate-800">素食者</p>
+                <p className="text-xs text-slate-400">Vegetarian</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRegForm(f => ({ ...f, isVegetarian: !f.isVegetarian }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${regForm.isVegetarian ? 'bg-jci-blue' : 'bg-slate-200'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${regForm.isVegetarian ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            {/* Emergency contact name */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                紧急联络人姓名 <span className="normal-case font-normal">Emergency Contact</span>
+              </label>
+              <input
+                type="text"
+                value={regForm.emergencyContactName}
+                onChange={e => setRegForm(f => ({ ...f, emergencyContactName: e.target.value }))}
+                placeholder="Full name"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+              />
+            </div>
+
+            {/* Emergency contact phone */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                紧急联络人电话 <span className="normal-case font-normal">Emergency Phone</span>
+              </label>
+              <input
+                type="tel"
+                value={regForm.emergencyContactPhone}
+                onChange={e => setRegForm(f => ({ ...f, emergencyContactPhone: e.target.value }))}
+                placeholder="+60 12-345 6789"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+              />
+            </div>
+
+            {/* T-shirt size */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                衣服尺码 <span className="normal-case font-normal">T-Shirt Size</span>
+              </label>
+              <select
+                value={regForm.tshirtSize}
+                onChange={e => setRegForm(f => ({ ...f, tshirtSize: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue bg-white"
+              >
+                <option value="">-- 请选择 --</option>
+                {(['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'] as const).map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Modal>
       )}
     </>
   );

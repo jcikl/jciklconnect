@@ -450,6 +450,17 @@ export class BoardManagementService {
       currentBoardYear: deleteField(),
       currentBoardPosition: deleteField(),
       isCurrentBoardMember: false,
+      isCurrentCommissionDirector: false,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /** Clear commission director flag only (member may still be a regular member). */
+  private static async clearCommissionDirectorStatus(memberId: string): Promise<void> {
+    if (isDevMode()) return;
+    const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+    await updateDoc(memberRef, {
+      isCurrentCommissionDirector: false,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -459,7 +470,7 @@ export class BoardManagementService {
    */
   private static async syncMemberDocumentsForTerm(
     year: string,
-    assignments: Array<{ memberId: string; position: string }>,
+    assignments: Array<{ memberId: string; position: string; commissionDirectorIds?: string[] }>,
     previousBoardRecords: BoardMember[]
   ): Promise<void> {
     const yearNum = parseInt(year, 10);
@@ -470,19 +481,42 @@ export class BoardManagementService {
     );
 
     if (isCurrentTerm) {
+      // Update board member docs
       for (const { memberId, position } of assignments) {
         if (!memberId) continue;
         await MembersService.updateMember(memberId, {
           currentBoardYear: yearNum,
           currentBoardPosition: position,
           isCurrentBoardMember: true,
+          isCurrentCommissionDirector: false,
         });
       }
 
+      // Clear docs for board members removed from this term
       const previousIds = new Set(previousBoardRecords.map((b) => b.memberId));
       for (const memberId of previousIds) {
         if (!newMemberIds.has(memberId)) {
           await this.clearMemberCurrentBoardStatus(memberId);
+        }
+      }
+
+      // Sync commission director flags
+      const newCommDirIds = new Set(
+        assignments.flatMap((a) => a.commissionDirectorIds ?? []).filter(Boolean)
+      );
+      // Remove board members from comm dir set (they take precedence as board)
+      for (const id of newMemberIds) newCommDirIds.delete(id);
+
+      const prevCommDirIds = new Set(
+        previousBoardRecords.flatMap((b) => (b as any).commissionDirectorIds ?? []).filter(Boolean)
+      );
+
+      for (const id of newCommDirIds) {
+        await MembersService.updateMember(id, { isCurrentCommissionDirector: true });
+      }
+      for (const id of prevCommDirIds) {
+        if (!newCommDirIds.has(id)) {
+          await this.clearCommissionDirectorStatus(id);
         }
       }
       return;
@@ -503,10 +537,34 @@ export class BoardManagementService {
     const year = String(getCurrentBoardCalendarYear());
     const board = await this.getBoardMembersByYear(year);
     const active = board.filter((b) => b.isActive !== false);
+    const activeMemberIds = new Set(active.map((b) => b.memberId));
+
+    // Build previousBoardRecords from ALL members currently flagged as board,
+    // so the clear path fires for ghost records with no active boardMembers doc.
+    const ghostSnap = await getDocs(
+      query(collection(db, COLLECTIONS.MEMBERS), where('isCurrentBoardMember', '==', true))
+    );
+    const ghostRecords: BoardMember[] = ghostSnap.docs
+      .filter((d) => !activeMemberIds.has(d.id))
+      .map((d) => ({ id: d.id, memberId: d.id, position: '', term: year } as unknown as BoardMember));
+
+    // Also clear ghost commission directors
+    const commDirGhostSnap = await getDocs(
+      query(collection(db, COLLECTIONS.MEMBERS), where('isCurrentCommissionDirector', '==', true))
+    );
+    const activeCommDirIds = new Set(
+      active.flatMap((b) => (b as any).commissionDirectorIds ?? [])
+    );
+    for (const d of commDirGhostSnap.docs) {
+      if (!activeCommDirIds.has(d.id)) {
+        await this.clearCommissionDirectorStatus(d.id);
+      }
+    }
+
     await this.syncMemberDocumentsForTerm(
       year,
-      active.map((b) => ({ memberId: b.memberId, position: b.position })),
-      active
+      active.map((b) => ({ memberId: b.memberId, position: b.position, commissionDirectorIds: (b as any).commissionDirectorIds })),
+      [...active, ...ghostRecords]
     );
   }
 
