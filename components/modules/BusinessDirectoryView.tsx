@@ -8,6 +8,7 @@ const BUSINESS_CATEGORIES = [
   'Distributor / Exporter / Importer',
 ];
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { useMembers } from '../../hooks/useMembers';
@@ -287,12 +288,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     const term = (searchQuery || searchTerm).toLowerCase();
     const result = term
       ? filtered.filter(biz =>
-          (biz.companyName ?? '').toLowerCase().includes(term) ||
-          (biz.ownerName ?? '').toLowerCase().includes(term) ||
-          (biz.industry ?? '').toLowerCase().includes(term) ||
-          (biz.description ?? '').toLowerCase().includes(term) ||
-          (biz.businessCategory ?? '').toLowerCase().includes(term)
-        )
+        (biz.companyName ?? '').toLowerCase().includes(term) ||
+        (biz.ownerName ?? '').toLowerCase().includes(term) ||
+        (biz.industry ?? '').toLowerCase().includes(term) ||
+        (biz.description ?? '').toLowerCase().includes(term) ||
+        (biz.businessCategory ?? '').toLowerCase().includes(term)
+      )
       : filtered;
 
     return result.sort((a, b) => {
@@ -390,18 +391,11 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   const isGuestRole = !isGuest && (currentUser?.role || '') === 'GUEST';
 
   return (
-    <div className="space-y-2 relative">
+    <div className={`space-y-2 relative${isGuestRole ? ' pt-px' : ''}`}>
       {isGuestRole && (
-        <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/60 rounded-2xl flex flex-col items-center justify-start pt-24 md:pt-32 px-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-jci-blue/10 flex items-center justify-center mb-4">
-            <Lock size={28} className="text-jci-blue" />
-          </div>
-          <h3 className="text-lg font-black text-slate-900 mb-2">Members Only</h3>
-          <p className="text-sm text-slate-500 leading-relaxed max-w-sm">
-            The member business directory is exclusive to JCI Kuala Lumpur members.
-            Join us to connect with local businesses and the global JCI network.
-          </p>
-        </div>
+        <MembersOnlyOverlay
+          description="The member business directory is exclusive to JCI Kuala Lumpur members. Join us to connect with local businesses and the global JCI network."
+        />
       )}
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -482,45 +476,45 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       const intlStatus = biz.acceptsInternationalBusiness;
                       return (
                         <React.Fragment key={biz.id}>
-                        {showMobileDivider && (
-                          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-t border-slate-100">
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${mobileDividerStyle}`}>{mobileDividerLabel}</span>
-                          </div>
-                        )}
-                        <button type="button"
-                          className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-                          onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
-                          <img src={avatarUrl} alt={biz.ownerName} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
-                              {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
-                              {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
+                          {showMobileDivider && (
+                            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-t border-slate-100">
+                              <span className={`text-[10px] font-black uppercase tracking-widest ${mobileDividerStyle}`}>{mobileDividerLabel}</span>
                             </div>
-                            <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{biz.industry}</span>}
-                              {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
-                              {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
+                          )}
+                          <button type="button"
+                            className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                            onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
+                            <img src={avatarUrl} alt={biz.ownerName} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
+                                {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
+                                {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
+                              </div>
+                              <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{biz.industry}</span>}
+                                {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                                {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
+                              </div>
                             </div>
-                          </div>
-                          {isGuest
-                            ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
-                            : (
-                              <button
-                                type="button"
-                                className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                                onClick={(e) => toggleBookmark(e, biz.id)}
-                                aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
-                              >
-                                <Bookmark
-                                  size={16}
-                                  className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300'}
-                                />
-                              </button>
-                            )
-                          }
-                        </button>
+                            {isGuest
+                              ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
+                              : (
+                                <button
+                                  type="button"
+                                  className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                                  onClick={(e) => toggleBookmark(e, biz.id)}
+                                  aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
+                                >
+                                  <Bookmark
+                                    size={16}
+                                    className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300'}
+                                  />
+                                </button>
+                              )
+                            }
+                          </button>
                         </React.Fragment>
                       );
                     })}
@@ -635,74 +629,74 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                                 <div className="flex-1 h-px bg-slate-200" />
                               </div>
                             )}
-                          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
-                            onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
-                            {/* Card header */}
-                            <div className="p-4 flex gap-3 items-start border-b border-slate-50">
-                              <img src={avatarUrl} alt={biz.ownerName} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                  <p className="font-bold text-sm text-slate-900 truncate leading-tight">{biz.ownerName}</p>
-                                  {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
+                              onClick={() => { setDetailBiz(biz); setIsDetailOpen(true); }}>
+                              {/* Card header */}
+                              <div className="p-4 flex gap-3 items-start border-b border-slate-50">
+                                <img src={avatarUrl} alt={biz.ownerName} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="font-bold text-sm text-slate-900 truncate leading-tight">{biz.ownerName}</p>
+                                    {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
+                                  </div>
+                                  {chineseName && <p className="text-[11px] text-slate-400 truncate">{chineseName}</p>}
+                                  <p className="text-xs text-slate-500 truncate mt-0.5">{position}</p>
+                                  <p className="text-xs font-semibold text-slate-700 truncate">{biz.companyName}</p>
                                 </div>
-                                {chineseName && <p className="text-[11px] text-slate-400 truncate">{chineseName}</p>}
-                                <p className="text-xs text-slate-500 truncate mt-0.5">{position}</p>
-                                <p className="text-xs font-semibold text-slate-700 truncate">{biz.companyName}</p>
+                                {!isGuest && (
+                                  <button
+                                    type="button"
+                                    className="flex-shrink-0 p-1 rounded-lg hover:bg-slate-100 transition-colors -mt-0.5 -mr-0.5"
+                                    onClick={(e) => toggleBookmark(e, biz.id)}
+                                    aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
+                                  >
+                                    <Bookmark
+                                      size={15}
+                                      className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300 group-hover:text-slate-400'}
+                                    />
+                                  </button>
+                                )}
                               </div>
-                              {!isGuest && (
-                                <button
-                                  type="button"
-                                  className="flex-shrink-0 p-1 rounded-lg hover:bg-slate-100 transition-colors -mt-0.5 -mr-0.5"
-                                  onClick={(e) => toggleBookmark(e, biz.id)}
-                                  aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
-                                >
-                                  <Bookmark
-                                    size={15}
-                                    className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300 group-hover:text-slate-400'}
-                                  />
-                                </button>
-                              )}
-                            </div>
-                            {/* Card body */}
-                            <div className="p-4 flex-1 flex flex-col gap-3">
-                              <div className="flex flex-wrap gap-1.5">
-                                {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{biz.industry}</span>}
-                                {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
-                                {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
-                              </div>
-                              {biz.description ? (
-                                <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{biz.description}</p>
-                              ) : (
-                                <p className="text-xs text-slate-300 italic flex-1">No description yet.</p>
-                              )}
-                              {biz.offer && (
-                                <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
-                                  <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Member Deal</p>
-                                  <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{biz.offer}</p>
+                              {/* Card body */}
+                              <div className="p-4 flex-1 flex flex-col gap-3">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {biz.industry && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{biz.industry}</span>}
+                                  {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
+                                  {biz.offer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
                                 </div>
-                              )}
+                                {biz.description ? (
+                                  <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{biz.description}</p>
+                                ) : (
+                                  <p className="text-xs text-slate-300 italic flex-1">No description yet.</p>
+                                )}
+                                {biz.offer && (
+                                  <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Member Deal</p>
+                                    <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{biz.offer}</p>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Card footer */}
+                              <div className="px-4 pb-4">
+                                {isGuest ? (
+                                  <button
+                                    className="w-full bg-slate-100 text-slate-400 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 relative overflow-hidden group/lock"
+                                    onClick={(e) => { e.stopPropagation(); onGuestCta?.(); }}
+                                  >
+                                    <span className="absolute inset-0 bg-jci-blue/0 group-hover/lock:bg-jci-blue/5 transition-colors" />
+                                    <Lock size={10} className="text-slate-400 group-hover/lock:text-jci-blue transition-colors" />
+                                    <span className="group-hover/lock:text-jci-blue transition-colors">Join to Contact</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="w-full bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5"
+                                    onClick={(e) => { e.stopPropagation(); setDetailBiz(biz); setIsDetailOpen(true); }}
+                                  >
+                                    <Send size={11} /> Contact
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            {/* Card footer */}
-                            <div className="px-4 pb-4">
-                              {isGuest ? (
-                                <button
-                                  className="w-full bg-slate-100 text-slate-400 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 relative overflow-hidden group/lock"
-                                  onClick={(e) => { e.stopPropagation(); onGuestCta?.(); }}
-                                >
-                                  <span className="absolute inset-0 bg-jci-blue/0 group-hover/lock:bg-jci-blue/5 transition-colors" />
-                                  <Lock size={10} className="text-slate-400 group-hover/lock:text-jci-blue transition-colors" />
-                                  <span className="group-hover/lock:text-jci-blue transition-colors">Join to Contact</span>
-                                </button>
-                              ) : (
-                                <button
-                                  className="w-full bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5"
-                                  onClick={(e) => { e.stopPropagation(); setDetailBiz(biz); setIsDetailOpen(true); }}
-                                >
-                                  <Send size={11} /> Contact
-                                </button>
-                              )}
-                            </div>
-                          </div>
                           </React.Fragment>
                         );
                       })}

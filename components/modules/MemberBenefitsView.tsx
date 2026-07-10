@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Gift, Users, Calendar, CheckCircle, History, AlertCircle, Clock, Sparkles, Star, Lock } from 'lucide-react';
+import { Gift, Users, Calendar, CheckCircle, Clock, Sparkles, Star } from 'lucide-react';
 import { Button, Card, Badge, Modal, useToast } from '../ui/Common';
+import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
 import { useAuth } from '../../hooks/useAuth';
@@ -104,19 +105,12 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const isGuest = (member?.role || '') === 'GUEST';
 
   return (
-    <div className="space-y-6 relative">
+    <div className={`space-y-6 relative${isGuest ? ' pt-px' : ''}`}>
       {/* Guest mask — benefits are visible only to members */}
       {isGuest && (
-        <div className="absolute inset-0 z-30 backdrop-blur-md bg-white/60 rounded-2xl flex flex-col items-center justify-start pt-24 md:pt-32 px-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-jci-blue/10 flex items-center justify-center mb-4">
-            <Lock size={28} className="text-jci-blue" />
-          </div>
-          <h3 className="text-lg font-black text-slate-900 mb-2">Members Only</h3>
-          <p className="text-sm text-slate-500 leading-relaxed max-w-sm">
-            Member benefits are exclusive to JCI Kuala Lumpur members.
-            Join us to unlock discounts and privileges from our partners.
-          </p>
-        </div>
+        <MembersOnlyOverlay
+          description="Member benefits are exclusive to JCI Kuala Lumpur members. Join us to unlock discounts and privileges from our partners."
+        />
       )}
 
       {/* Header */}

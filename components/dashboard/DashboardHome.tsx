@@ -3,10 +3,11 @@ import React from 'react';
 import {
   Calendar, Briefcase, Award, Sparkles, AlertTriangle, CheckCircle,
   TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
-  CheckSquare, Heart, BookOpen, LayoutDashboard, Building2, Gift,
+  CheckSquare, Heart, BookOpen, LayoutDashboard, Building2,
   Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, RefreshCw, ChevronRight
 } from 'lucide-react';
 import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal, Skeleton } from '../ui/Common';
+import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useEvents } from '../../hooks/useEvents';
@@ -460,13 +461,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         <div className="w-full relative rounded-2xl overflow-hidden">
           {/* Guest mask — partner benefits are members only */}
           {member?.role === UserRole.GUEST && (
-            <div className="absolute inset-0 z-20 backdrop-blur-md bg-white/60 rounded-2xl flex flex-col items-center justify-center px-6 text-center">
-              <div className="w-10 h-10 rounded-xl bg-jci-blue/10 flex items-center justify-center mb-2">
-                <Gift size={20} className="text-jci-blue" />
-              </div>
-              <p className="text-sm font-black text-slate-900">Members Only</p>
-              <p className="text-xs text-slate-500 mt-0.5">Join JCI KL to unlock partner privileges.</p>
-            </div>
+            <MembersOnlyOverlay compact description="Join JCI KL to unlock partner privileges." />
           )}
           <Swiper
             modules={[Autoplay, Pagination]}
