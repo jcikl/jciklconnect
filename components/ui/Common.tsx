@@ -438,6 +438,8 @@ interface ModalProps {
   noDragHandle?: boolean;
   /** Render drag handle inside the header (above title row), matching journey modal layout */
   dragHandleInHeader?: boolean;
+  /** Hide the header bar entirely (no title, no close button) */
+  noHeader?: boolean;
   /** Initial height on mobile for drawer/bottomSheet */
   mobileHeight?: string;
   /** Scroll event handler */
@@ -461,6 +463,7 @@ export const Modal: React.FC<ModalProps> = ({
   headerStyle,
   noDragHandle,
   dragHandleInHeader,
+  noHeader,
   mobileHeight,
   onScroll,
 }) => {
@@ -524,7 +527,7 @@ export const Modal: React.FC<ModalProps> = ({
             <div className="w-12 h-1.5 bg-white/30 rounded-full" />
           </div>
         )}
-        {title !== null && (
+        {!noHeader && title !== null && (
           <div
             className={`
               flex sticky top-0 z-10

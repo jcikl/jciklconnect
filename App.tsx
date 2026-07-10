@@ -4533,8 +4533,16 @@ export const JCIKLApp: React.FC = () => {
           onClose={() => setSignOutConfirmOpen(false)}
           title=""
           size="sm"
+          noHeader
         >
-          <div className="flex flex-col items-center text-center px-6 pb-6 pt-2 gap-5">
+          <div className="relative flex flex-col items-center text-center px-6 pt-8 pb-6 gap-5">
+            <button
+              onClick={() => setSignOutConfirmOpen(false)}
+              className="absolute top-0 right-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
             <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
               <LogOut size={24} className="text-red-500" />
             </div>
