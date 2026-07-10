@@ -291,6 +291,7 @@ export class AdvertisementService {
 
       // Only include optional fields if they are defined
       if (adData.imageUrl !== undefined) newAd.imageUrl = adData.imageUrl;
+      if (adData.logoUrl !== undefined) newAd.logoUrl = adData.logoUrl;
       if (adData.linkUrl !== undefined) newAd.linkUrl = adData.linkUrl;
       if (adData.budget !== undefined) newAd.budget = adData.budget;
       if (adData.targetAudience !== undefined) newAd.targetAudience = adData.targetAudience;
@@ -324,6 +325,7 @@ export class AdvertisementService {
       if (updates.type !== undefined) updateData.type = updates.type;
       if (updates.placement !== undefined) updateData.placement = updates.placement;
       if (updates.imageUrl !== undefined) updateData.imageUrl = updates.imageUrl;
+      if (updates.logoUrl !== undefined) updateData.logoUrl = updates.logoUrl;
       if (updates.linkUrl !== undefined) updateData.linkUrl = updates.linkUrl;
       if (updates.budget !== undefined) updateData.budget = updates.budget;
       if (updates.targetAudience !== undefined) updateData.targetAudience = updates.targetAudience;
