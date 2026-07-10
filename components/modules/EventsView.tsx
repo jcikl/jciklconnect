@@ -308,7 +308,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const availableTabs = useMemo(() => {
     const tabs = ['Event Details'];
     if (isCommitteeMember) {
-      tabs.push('参与名单');
+      tabs.push('Participants');
     }
     tabs.push('Feedback');
     return tabs;
@@ -364,10 +364,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     try {
       await onCancelRegistration(member.id, member.id, member.name ?? member.id, 'self');
       setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled', cancelledByRole: 'self' } : { id: '', eventId: event.id, memberId: member.id, status: 'cancelled', cancelledByRole: 'self', createdAt: new Date().toISOString() });
-      showToast('已撤销报名', 'success');
+      showToast('Registration cancelled', 'success');
     } catch {
       setLocalRegistered(null);
-      showToast('撤销失败', 'error');
+      showToast('Cancellation failed', 'error');
     } finally {
       setUpdatingRegId(null);
     }
@@ -391,9 +391,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         setLocalRegistered(false);
         setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled' as const, cancelledByRole: role } : prev);
       }
-      showToast('已撤销该会员报名', 'success');
+      showToast('Member registration cancelled', 'success');
     } catch {
-      showToast('撤销失败', 'error');
+      showToast('Cancellation failed', 'error');
     } finally {
       setUpdatingRegId(null);
     }
@@ -404,9 +404,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     try {
       await EventRegistrationService.updateStatus(reg.id, 'paid', { paidAt: new Date().toISOString() });
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: new Date().toISOString() } : r)));
-      showToast('已标记为已缴费', 'success');
+      showToast('Marked as paid', 'success');
     } catch {
-      showToast('操作失败', 'error');
+      showToast('Operation failed', 'error');
     } finally {
       setUpdatingRegId(null);
     }
@@ -417,9 +417,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     try {
       await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: new Date().toISOString() });
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'checked_in' as const, checkedInAt: new Date().toISOString() } : r)));
-      showToast('已标记为已签到', 'success');
+      showToast('Marked as checked in', 'success');
     } catch {
-      showToast('操作失败', 'error');
+      showToast('Operation failed', 'error');
     } finally {
       setUpdatingRegId(null);
     }
@@ -456,11 +456,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const registerButton = (
     <div className="flex flex-col gap-2">
       <Button
-        className={`w-full h-12 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${canSelfCancel
-          ? 'bg-green-500 text-white hover:bg-red-500 shadow-green-100 group'
+        className={`w-full rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${canSelfCancel
+          ? 'h-14 bg-green-500 text-white hover:bg-red-500 shadow-green-100 flex-col gap-0'
           : isRegistered
-            ? 'bg-green-500 text-white shadow-green-100 cursor-default'
-            : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+            ? 'h-12 bg-green-500 text-white shadow-green-100 cursor-default'
+            : 'h-12 bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
           }`}
         disabled={(!!isRegistered && !canSelfCancel) || event.status === 'Completed' || event.status === 'Cancelled'}
         onClick={canSelfCancel ? handleSelfCancel : (!isRegistered ? handleRegister : undefined)}
@@ -468,10 +468,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         {event.status === 'Completed' ? <span>Event Ended</span>
           : event.status === 'Cancelled' ? <span>Cancelled</span>
             : canSelfCancel
-              ? <>
-                  <CheckCircle size={18} className="stroke-[3] group-hover:hidden" /><span className="group-hover:hidden">Registered</span>
-                  <span className="hidden group-hover:inline">撤销报名</span>
-                </>
+              ? <div className="flex flex-col items-center leading-none gap-0.5">
+                  <span className="flex items-center gap-1.5"><CheckCircle size={15} className="stroke-[3]" />Registered</span>
+                  <span className="text-[10px] font-normal normal-case tracking-normal opacity-80">点击撤销报名</span>
+                </div>
               : isRegistered ? <><CheckCircle size={18} className="stroke-[3]" /><span>Registered</span></>
                 : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}
       </Button>
@@ -551,10 +551,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               {availableTabs.length > 1 && (
                 <Tabs
                   tabs={availableTabs}
-                  activeTab={activeTab === 'details' ? 'Event Details' : activeTab === 'participants' ? '参与名单' : 'Feedback'}
+                  activeTab={activeTab === 'details' ? 'Event Details' : activeTab === 'participants' ? 'Participants' : 'Feedback'}
                   onTabChange={(tab) => {
                     if (tab === 'Event Details') setActiveTab('details');
-                    else if (tab === '参与名单') setActiveTab('participants');
+                    else if (tab === 'Participants') setActiveTab('participants');
                     else setActiveTab('feedback');
                   }}
                   className="border-none mb-4"
@@ -646,8 +646,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                         const isCancelled = r.status === 'cancelled';
                         const cancelLabel = isCancelled
                           ? r.cancelledByRole === 'self'
-                            ? '撤销 by self'
-                            : `撤销 by ${r.cancelledByRole ?? 'admin'}: ${r.cancelledByName ?? ''}`
+                            ? 'Cancelled by self'
+                            : `Cancelled by ${r.cancelledByRole ?? 'admin'}: ${r.cancelledByName ?? ''}`
                           : null;
                         return (
                           <div key={r.id} className={`flex items-center justify-between px-3 py-2.5 transition-colors ${isCancelled ? 'bg-red-50/40 opacity-70' : 'bg-white hover:bg-slate-50'}`}>
@@ -674,7 +674,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                 <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2" disabled={updatingRegId !== null} onClick={() => handleMarkCheckedIn(r)}>Check In</Button>
                               )}
                               {!isCancelled && onCancelRegistration && (
-                                <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}>撤销</Button>
+                                <Button size="sm" variant="secondary" className="text-[10px] h-7 px-2 text-red-500 border-red-200 hover:bg-red-50" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}>Cancel</Button>
                               )}
                             </div>
                           </div>
