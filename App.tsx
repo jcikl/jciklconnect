@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
+import { App as CapApp } from '@capacitor/app';
 import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
@@ -3811,14 +3812,55 @@ export const JCIKLApp: React.FC = () => {
     }
   };
 
+  const [viewHistory, setViewHistory] = useState<ViewType[]>([]);
+  const backPressedOnceRef = useRef(false);
+  const backPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleViewChange = (newView: ViewType, selectedId?: string) => {
     setSearchQuery('');
+    setViewHistory(prev => [...prev, view]);
     setView(newView);
     if (newView === 'MEMBERS' && selectedId) setInitialSelectedMemberId(selectedId);
     if (newView === 'EVENTS' && selectedId) setInitialSelectedEventId(selectedId);
     if (newView === 'PROJECTS' && selectedId) setInitialSelectedProjectId(selectedId);
     if (newView === 'DIRECTORY' && selectedId) setInitialSelectedBusinessId(selectedId);
   };
+
+  // Android hardware back button
+  useEffect(() => {
+    let listener: { remove: () => void } | null = null;
+    CapApp.addListener('backButton', () => {
+      // Close any open drawer/modal first
+      if (isMenuDrawerOpen) { setIsMenuDrawerOpen(false); return; }
+      if (isNotificationDrawerOpen) { setNotificationDrawerOpen(false); return; }
+      if (isSearchDrawerOpen) { setSearchDrawerOpen(false); return; }
+      if (isLoginModalOpen) { setLoginModalOpen(false); return; }
+
+      // Navigate back through view history
+      if (viewHistory.length > 0) {
+        const prev = viewHistory[viewHistory.length - 1];
+        setViewHistory(h => h.slice(0, -1));
+        setView(prev);
+        return;
+      }
+
+      // On root view (DASHBOARD or GUEST) — double-press to exit
+      if (backPressedOnceRef.current) {
+        CapApp.exitApp();
+      } else {
+        backPressedOnceRef.current = true;
+        showToast('再按一次退出应用', 'info');
+        backPressTimerRef.current = setTimeout(() => {
+          backPressedOnceRef.current = false;
+        }, 2000);
+      }
+    }).then(l => { listener = l; });
+
+    return () => {
+      listener?.remove();
+      if (backPressTimerRef.current) clearTimeout(backPressTimerRef.current);
+    };
+  }, [view, viewHistory, isMenuDrawerOpen, isNotificationDrawerOpen, isSearchDrawerOpen, isLoginModalOpen]);
 
   const handleEditProfile = () => {
     if (member) {
