@@ -378,7 +378,7 @@ export class ReportService {
 
     const rows: MykdRow[] = filtered.map((m, i) => {
       const dob = m.general?.dob || m.dob || m.dateOfBirth || '';
-      const race = (m.general?.race || m.race || m.ethnicity || '') as string;
+      const race = (m.general?.race || m.general?.ethnicity || m.race || m.ethnicity || '') as string;
       return {
         no: i + 1,
         fullName: m.general?.name || m.fullName || m.name || '',

@@ -131,7 +131,7 @@ export const EngagementAutoSuggestService = {
 
     if (!member) throw new Error('Member not found');
 
-    const existingProgress = member.engagementProgress?.[year] ?? {};
+    const existingProgress = (member.jciCareer?.engagementProgress ?? member.engagementProgress)?.[year] ?? {};
     const results: AutoSuggestResult[] = [];
 
     // Track which requirement keys have already been handled (first match wins)
@@ -255,7 +255,7 @@ export const EngagementAutoSuggestService = {
   ): Promise<void> {
     const memberDoc = await MembersService.getMemberById(memberId);
     if (!memberDoc) throw new Error('Member not found');
-    const existing = memberDoc.engagementProgress?.[year]?.[requirementKey];
+    const existing = (memberDoc.jciCareer?.engagementProgress ?? memberDoc.engagementProgress)?.[year]?.[requirementKey];
     if (!existing) throw new Error('Requirement not found');
 
     await PromotionService.saveEngagementRequirement(memberId, year, requirementKey, {

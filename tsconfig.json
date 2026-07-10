@@ -49,6 +49,7 @@
     "node_modules",
     "dist",
     ".git",
-    "temp.tsx"
+    "temp.tsx",
+    "trash/**"
   ]
 }

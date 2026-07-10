@@ -390,6 +390,8 @@ export interface Member {
     race: RaceType;
     nationality: string; // Default: 'Malaysia'
     avatarUrl?: string;
+    ethnicity?: string;
+    dietaryPreference?: 'vegetarian' | 'halal' | 'normal' | null;
   };
   contact?: {
     email: string; // Primary email (must match Auth email)
@@ -433,6 +435,11 @@ export interface Member {
     acceptInternationalBusiness: 'Yes' | 'No' | 'Willing to Explore';
     idealReferrals?: string[];
     connections?: InternationalConnection[];
+    levelOfManagement?: string;
+    departmentAndPosition?: string;
+    companyDescription?: string;
+    interestedIndustries?: string[];
+    idealReferralTypes?: string[];
   };
   jciCareer?: {
     // Membership classification
@@ -466,10 +473,25 @@ export interface Member {
     probationTasks: ProbationTask[];
     promotionProgress?: MemberPromotionProgress;
     isDuesPaidCurrentYear?: boolean;
+
+    // Engagement & gamification
+    engagementProgress?: {
+      firstYear?: Record<string, MemberEngagementRequirementProgress>;
+      secondYear?: Record<string, MemberEngagementRequirementProgress>;
+    };
+    radarStats?: RadarStats;
+    radarStatsByYear?: Record<string, RadarStats>;
+    membershipDuesHistory?: Record<string, MembershipRecord>;
+    leaderboardVisibility?: boolean | string;
+    hasPaidInitiationFee?: boolean;
+    senatorshipValidatedAt?: string;
+    senatorshipValidatedBy?: string;
   };
   createdAt?: any;
   updatedAt?: any;
+  /** @deprecated use jciCareer.radarStats */
   radarStats?: RadarStats;
+  /** @deprecated use jciCareer.radarStatsByYear */
   radarStatsByYear?: Record<string, RadarStats>;
 
   // --- Flat compatibility properties for legacy views/services ---
@@ -512,6 +534,7 @@ export interface Member {
   wechat?: string;
   weChat?: string;
   companyName?: string;
+  /** @deprecated use business.levelOfManagement */
   levelOfManagement?: string;
   companyWebsite?: string;
   companyLogoUrl?: string;
@@ -545,6 +568,7 @@ export interface Member {
   projectSummary?: string[];
   bodSummary?: string[];
   achievementSummary?: string[];
+  /** @deprecated use jciCareer.membershipDuesHistory */
   membershipDuesHistory?: Record<string, MembershipRecord>;
   membership?: Record<string, MembershipRecord> | any;
   probationTasks?: ProbationTask[];
@@ -567,14 +591,22 @@ export interface Member {
   menteeIds?: string[];
   boardHistory?: any[];
   careerHistory?: any[];
+  /** @deprecated use jciCareer.leaderboardVisibility */
   leaderboardVisibility?: boolean | string;
+  /** @deprecated use jciCareer.hasPaidInitiationFee */
   hasPaidInitiationFee?: boolean;
+  /** @deprecated use general.ethnicity */
   ethnicity?: string;
+  /** @deprecated use general.birthPlace */
   birthPlace?: string;
+  /** @deprecated use general.dietaryPreference */
   dietaryPreference?: 'vegetarian' | 'halal' | 'normal' | null;
+  /** @deprecated use business.interestedIndustries */
   interestedIndustries?: string[];
   profession?: string;
+  /** @deprecated use jciCareer.senatorshipValidatedAt */
   senatorshipValidatedAt?: string;
+  /** @deprecated use jciCareer.senatorshipValidatedBy */
   senatorshipValidatedBy?: string;
   age?: number;
   currentBoardYear?: number;
@@ -585,14 +617,18 @@ export interface Member {
   probationApprovedAt?: string;
   cutStyle?: string;
   personaType?: string;
+  /** @deprecated use business.departmentAndPosition */
   departmentAndPosition?: string;
+  /** @deprecated use business.idealReferralTypes */
   idealReferralTypes?: string[];
+  /** @deprecated use business.companyDescription */
   companyDescription?: string;
   emergencyContactPhone?: string;
   surveyAnswers?: Record<string, string | string[]>;
   tendencyTags?: string[];
   internationalConnections?: InternationalConnection[];
   internationalPartnershipTypes?: string[];
+  /** @deprecated use jciCareer.engagementProgress */
   engagementProgress?: {
     firstYear?: Record<string, MemberEngagementRequirementProgress>;
     secondYear?: Record<string, MemberEngagementRequirementProgress>;

@@ -574,7 +574,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
       const interestedIndustries = addModalInterestedIndustries.length > 0 ? addModalInterestedIndustries : undefined;
 
-      const newMember: MemberCreateInput = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const newMember: MemberCreateInput & Record<string, any> = {
         name,
         email,
         phone: formData.get('phone') as string || '',
@@ -589,6 +590,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         skills,
         hobbies,
         interestedIndustries,
+        'business.interestedIndustries': interestedIndustries,
         businessCategory: formData.getAll('businessCategory').length > 0 ? (formData.getAll('businessCategory') as string[]) : undefined,
 
         // Basic Info
@@ -596,10 +598,14 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         idNumber: formData.get('idNumber') as string || undefined,
         gender: (formData.get('gender') as any) || undefined,
         ethnicity: (formData.get('ethnicity') as any) || undefined,
+        'general.ethnicity': (formData.get('ethnicity') as any) || undefined,
         nationality: formData.get('nationality') as string || 'Malaysia',
         dateOfBirth: formData.get('dateOfBirth') as string || undefined,
+        'general.birthPlace': (formData.get('birthPlace') as string) || undefined,
         introducer: formData.get('introducer') as string || undefined,
         bio: formData.get('bio') as string || undefined,
+        dietaryPreference: (formData.get('dietaryPreference') as any) || undefined,
+        'general.dietaryPreference': (formData.get('dietaryPreference') as any) || undefined,
 
         senatorshipId: formSenatorshipId,
 
@@ -607,7 +613,9 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         companyName: formData.get('companyName') as string || undefined,
         companyWebsite: formData.get('companyWebsite') as string || undefined,
         companyDescription: formData.get('companyDescription') as string || undefined,
+        'business.companyDescription': (formData.get('companyDescription') as string) || undefined,
         departmentAndPosition: formData.get('departmentAndPosition') as string || undefined,
+        'business.departmentAndPosition': (formData.get('departmentAndPosition') as string) || undefined,
         industry: formData.get('industry') as string || undefined,
         companyLogoUrl: formData.get('companyLogoUrl') as string || undefined,
         specialOffer: formData.get('specialOffer') as string || undefined,
@@ -1542,7 +1550,7 @@ const MemberStatisticsView: React.FC<{
             const activeMembers = members.filter(m => m.membershipType !== 'Guest');
             const counts: Record<string, number> = {};
             activeMembers.forEach(m => {
-              const lvl = m.levelOfManagement?.trim() || 'Not Specified';
+              const lvl = (m.business?.levelOfManagement ?? m.levelOfManagement)?.trim() || 'Not Specified';
               counts[lvl] = (counts[lvl] || 0) + 1;
             });
             const knownOrder = ['Top Management', 'Senior Management', 'Middle Management', 'Junior Management', 'Non-Management'];
@@ -1556,7 +1564,7 @@ const MemberStatisticsView: React.FC<{
                 data={data}
                 colorOffset={1}
                 onSegmentClick={name => {
-                  const filtered = members.filter(m => m.membershipType !== 'Guest' && ((m.levelOfManagement?.trim() || 'Not Specified') === name));
+                  const filtered = members.filter(m => m.membershipType !== 'Guest' && (((m.business?.levelOfManagement ?? m.levelOfManagement)?.trim() || 'Not Specified') === name));
                   setDrawerSegment({ label: `Management: ${name}`, members: filtered });
                 }}
               />
@@ -2057,8 +2065,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
       dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
       gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || ''); })(),
-      ethnicity: member.ethnicity || '',
-      dietaryPreference: member.dietaryPreference || '',
+      ethnicity: (member.general?.ethnicity ?? member.ethnicity) || '',
+      dietaryPreference: (member.general?.dietaryPreference ?? member.dietaryPreference) || '',
       nationality: member.nationality || 'Malaysia',
       introducer: member.introducer || '',
       bio: member.bio || '',
@@ -2067,13 +2075,13 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
       companyName: member.companyName || '',
       companyWebsite: member.companyWebsite || '',
-      companyDescription: member.companyDescription || '',
-      departmentAndPosition: member.departmentAndPosition || '',
+      companyDescription: (member.business?.companyDescription ?? member.companyDescription) || '',
+      departmentAndPosition: (member.business?.departmentAndPosition ?? member.departmentAndPosition) || '',
       acceptInternationalBusiness: member.acceptInternationalBusiness || '',
       businessCategory: Array.isArray(member.businessCategory) ? [...member.businessCategory] : [],
       industry: member.industry || '',
-      interestedIndustries: Array.isArray(member.interestedIndustries) ? [...member.interestedIndustries] : [],
-      levelOfManagement: member.levelOfManagement || '',
+      interestedIndustries: Array.isArray(member.business?.interestedIndustries ?? member.interestedIndustries) ? [...(member.business?.interestedIndustries ?? member.interestedIndustries)!] : [],
+      levelOfManagement: (member.business?.levelOfManagement ?? member.levelOfManagement) || '',
       idealReferralIndustry: member.idealReferralIndustry || '',
       idealReferral: member.idealReferral || (Array.isArray(member.idealReferrals) ? member.idealReferrals.join(', ') : ''),
       specialOffer: member.specialOffer || '',
@@ -2100,8 +2108,8 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       senatorCertified: !!member.senatorCertified,
       senatorshipId: member.senatorshipId || '',
       senatorshipBoardValidated: !!member.senatorshipBoardValidated,
-      senatorshipValidatedBy: member.senatorshipValidatedBy || '',
-      senatorshipValidatedAt: member.senatorshipValidatedAt || '',
+      senatorshipValidatedBy: (member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) || '',
+      senatorshipValidatedAt: (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) || '',
     });
     setActiveInlineEditCard(card);
     setIsEditMode(true);
@@ -2147,19 +2155,29 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
     if (!inlineValues) return;
     const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
     try {
-      await updateMember(member.id, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (updateMember as (id: string, updates: any) => Promise<void>)(member.id, {
         avatar: inlineValues.avatar || '', avatarUrl: inlineValues.avatar || '',
         name: inlineValues.name, fullName: inlineValues.fullName, idNumber: inlineValues.idNumber,
         birthPlace: inlineValues.birthPlace || undefined,
+        'general.birthPlace': inlineValues.birthPlace || undefined,
         dateOfBirth: inlineValues.dateOfBirth, gender: inlineValues.gender, ethnicity: inlineValues.ethnicity,
+        'general.ethnicity': inlineValues.ethnicity || undefined,
         dietaryPreference: (inlineValues.dietaryPreference as Member['dietaryPreference']) || undefined,
+        'general.dietaryPreference': (inlineValues.dietaryPreference as Member['dietaryPreference']) || undefined,
         nationality: inlineValues.nationality, introducer: inlineValues.introducer, bio: inlineValues.bio,
         hobbies: inlineValues.hobbies, skills: skillsArr,
         companyName: inlineValues.companyName, companyWebsite: inlineValues.companyWebsite,
-        companyDescription: inlineValues.companyDescription, departmentAndPosition: inlineValues.departmentAndPosition,
+        companyDescription: inlineValues.companyDescription,
+        'business.companyDescription': inlineValues.companyDescription || undefined,
+        departmentAndPosition: inlineValues.departmentAndPosition,
+        'business.departmentAndPosition': inlineValues.departmentAndPosition || undefined,
         acceptInternationalBusiness: inlineValues.acceptInternationalBusiness, businessCategory: inlineValues.businessCategory,
         industry: inlineValues.industry, interestedIndustries: inlineValues.interestedIndustries,
-        levelOfManagement: inlineValues.levelOfManagement, idealReferralIndustry: inlineValues.idealReferralIndustry,
+        'business.interestedIndustries': inlineValues.interestedIndustries,
+        levelOfManagement: inlineValues.levelOfManagement,
+        'business.levelOfManagement': inlineValues.levelOfManagement || undefined,
+        idealReferralIndustry: inlineValues.idealReferralIndustry,
         idealReferral: inlineValues.idealReferral, specialOffer: inlineValues.specialOffer,
         phone: inlineValues.phone, alternatePhone: inlineValues.alternatePhone, email: inlineValues.email,
         whatsappGroup: inlineValues.whatsappGroup, address: inlineValues.address,
@@ -2171,7 +2189,9 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
         senatorshipId: inlineValues.senatorshipId?.trim(), senatorCertified: inlineValues.senatorCertified,
         senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
         senatorshipValidatedBy: inlineValues.senatorshipValidatedBy?.trim(),
+        'jciCareer.senatorshipValidatedBy': inlineValues.senatorshipValidatedBy?.trim(),
         senatorshipValidatedAt: inlineValues.senatorshipValidatedAt?.trim(),
+        'jciCareer.senatorshipValidatedAt': inlineValues.senatorshipValidatedAt?.trim(),
       });
       const finalAvatar = inlineValues.avatar;
       const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
@@ -2612,7 +2632,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
 
   // Elite Leaderboard Radar Data
   const radarData = useMemo(() => {
-    const stats = member.radarStats || {
+    const stats = (member.jciCareer?.radarStats ?? member.radarStats) || {
       training: 0,
       leadership: 0,
       events: 0,
@@ -2629,7 +2649,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
       ...item,
       displaySubject: `${item.subject}: ${item.value}`
     }));
-  }, [member.radarStats]);
+  }, [member.jciCareer?.radarStats, member.radarStats]);
 
   const maxRadarVal = useMemo(() => {
     const vals = radarData.map(d => d.value);
@@ -2670,10 +2690,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-white font-black text-xl leading-tight">{member.name}</h1>
               </div>
-              {(member.companyName || member.departmentAndPosition) && (
+              {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
                 <p className="text-white/70 text-xs mt-0.5 truncate">
                   <Briefcase size={10} className="inline mr-1 opacity-70" />
-                  {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
+                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
               <div className="flex flex-col gap-0.5 mt-1 text-white/60 text-[10px]">
@@ -2776,10 +2796,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <div className="flex flex-row items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.name}</h1>
               </div>
-              {(member.companyName || member.departmentAndPosition) && (
+              {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
                 <p className="text-sm font-semibold text-white/70 flex items-center gap-1.5">
                   <Briefcase size={13} className="text-white/50 shrink-0" />
-                  {[member.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
+                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
             </div>
@@ -3254,12 +3274,13 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                           <div>
                             <span className="text-slate-500 block text-xs uppercase font-medium">Birth Place</span>
                             {(() => {
-                              const bp = member.birthPlace
+                              const storedBp = member.general?.birthPlace ?? member.birthPlace;
+                              const bp = storedBp
                                 || (isMalaysianIC(member.idNumber || '') ? getBirthPlaceFromIC(member.idNumber || '') : '');
                               return (
                                 <p className="font-medium text-slate-900 flex items-center gap-1.5">
                                   {bp || 'Not provided'}
-                                  {!member.birthPlace && bp && (
+                                  {!storedBp && bp && (
                                     <span className="text-[10px] text-jci-blue font-normal">from IC</span>
                                   )}
                                 </p>
@@ -3272,11 +3293,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                           </div>
                           <div>
                             <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
-                            <p className="font-medium text-slate-900">{member.ethnicity || 'Not provided'}</p>
+                            <p className="font-medium text-slate-900">{(member.general?.ethnicity ?? member.ethnicity) || 'Not provided'}</p>
                           </div>
                           <div>
                             <span className="text-slate-500 block text-xs uppercase font-medium">Dietary Preference</span>
-                            <p className="font-medium text-slate-900 capitalize">{member.dietaryPreference || 'Not provided'}</p>
+                            <p className="font-medium text-slate-900 capitalize">{(member.general?.dietaryPreference ?? member.dietaryPreference) || 'Not provided'}</p>
                           </div>
                         </div>
 
@@ -3524,16 +3545,16 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                               {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
                             </Badge>
                           </div>
-                          {member.senatorshipBoardValidated && member.senatorshipValidatedBy && (
+                          {member.senatorshipBoardValidated && (member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) && (
                             <div className="flex items-center justify-between text-xs text-slate-500">
                               <span>Validated By:</span>
-                              <span className="font-medium">{member.senatorshipValidatedBy}</span>
+                              <span className="font-medium">{member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}</span>
                             </div>
                           )}
-                          {member.senatorshipBoardValidated && member.senatorshipValidatedAt && (
+                          {member.senatorshipBoardValidated && (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) && (
                             <div className="flex items-center justify-between text-xs text-slate-500">
                               <span>Validated At:</span>
-                              <span className="font-medium">{formatDateToDDMMMYYYY(member.senatorshipValidatedAt)}</span>
+                              <span className="font-medium">{formatDateToDDMMMYYYY((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!)}</span>
                             </div>
                           )}
                         </div>
@@ -3550,7 +3571,7 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
-                  <p className="text-sm text-slate-500 mt-0.5">{[member.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+                  <p className="text-sm text-slate-500 mt-0.5">{[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.industry].filter(Boolean).join(' · ')}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
                   {member.industry && (
@@ -3707,11 +3728,11 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                         </div>
                         <div>
                           <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                          <p className="font-medium text-slate-900 mt-0.5">{member.departmentAndPosition || 'Not provided'}</p>
+                          <p className="font-medium text-slate-900 mt-0.5">{(member.business?.departmentAndPosition ?? member.departmentAndPosition) || 'Not provided'}</p>
                         </div>
                         <div>
                           <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
-                          <p className="font-medium text-slate-900 mt-0.5">{member.levelOfManagement || 'Not provided'}</p>
+                          <p className="font-medium text-slate-900 mt-0.5">{(member.business?.levelOfManagement ?? member.levelOfManagement) || 'Not provided'}</p>
                         </div>
                         <div>
                           <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
@@ -3764,10 +3785,10 @@ const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: 
                           </div>
                         </div>
 
-                        {member.companyDescription && (
+                        {(member.business?.companyDescription ?? member.companyDescription) && (
                           <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
                             <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
-                            <p className="text-xs text-slate-600 leading-relaxed">{member.companyDescription}</p>
+                            <p className="text-xs text-slate-600 leading-relaxed">{member.business?.companyDescription ?? member.companyDescription}</p>
                           </div>
                         )}
 
@@ -5013,7 +5034,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
           ...(selectedGuest?.membership || {}),
           [yearStr]: {
             year: approvalYear,
-            dues: (selectedGuest?.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
+            dues: ((selectedGuest?.jciCareer?.hasPaidInitiationFee ?? selectedGuest?.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
             amount: 0,
             status: 'pending',
             transactionId: []
@@ -5077,7 +5098,7 @@ const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: strin
             ...(guest?.membership || {}),
             [yearStr]: {
               year: approvalYear,
-              dues: (guest?.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
+              dues: ((guest?.jciCareer?.hasPaidInitiationFee ?? guest?.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
               amount: 0,
               status: 'pending',
               transactionId: []

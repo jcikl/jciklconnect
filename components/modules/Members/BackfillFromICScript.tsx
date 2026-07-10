@@ -44,7 +44,7 @@ function getMemberGender(m: Member): string {
 }
 
 function getMemberBirthPlace(m: Member): string {
-  return (m.birthPlace || (m.general as any)?.birthPlace || '').trim();
+  return (m.general?.birthPlace ?? m.birthPlace ?? '').trim();
 }
 
 export const BackfillFromICScript: React.FC<Props> = ({ members, onMembersChanged }) => {
@@ -84,7 +84,7 @@ export const BackfillFromICScript: React.FC<Props> = ({ members, onMembersChange
             changed: !!inferredGender && inferredGender !== curGender,
           },
           {
-            key: 'birthPlace',
+            key: 'general.birthPlace',
             label: '出生地',
             current: curBP,
             inferred: inferredBP,

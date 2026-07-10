@@ -203,6 +203,8 @@ export class MembersService {
     if (data.gender !== undefined) general.gender = data.gender;
     if (data.race !== undefined) general.race = data.race;
     else if (data.ethnicity !== undefined) general.race = data.ethnicity;
+    if (data.ethnicity !== undefined) general.ethnicity = data.ethnicity;
+    if (data.dietaryPreference !== undefined) general.dietaryPreference = data.dietaryPreference;
     if (data.nationality !== undefined) general.nationality = data.nationality;
     if (data.birthPlace !== undefined) general.birthPlace = data.birthPlace;
     if (data.avatarUrl !== undefined) general.avatarUrl = data.avatarUrl;
@@ -272,9 +274,11 @@ export class MembersService {
     if (data.companyLogoUrl !== undefined) business.companyLogoUrl = data.companyLogoUrl;
     if (data.introduction !== undefined) business.introduction = data.introduction;
     else if (data.companyDescription !== undefined) business.introduction = data.companyDescription;
+    if (data.companyDescription !== undefined) business.companyDescription = data.companyDescription;
     if (data.title !== undefined) business.title = data.title;
     else if (data.position !== undefined) business.title = data.position;
     else if (data.departmentAndPosition !== undefined) business.title = data.departmentAndPosition;
+    if (data.departmentAndPosition !== undefined) business.departmentAndPosition = data.departmentAndPosition;
     if (data.industry !== undefined) business.industry = data.industry;
     if (data.businessCategory !== undefined) business.businessCategory = data.businessCategory;
     else if (data.category !== undefined) business.businessCategory = data.category;
@@ -294,6 +298,9 @@ export class MembersService {
         : data.idealReferralIndustry;
     }
     if (data.connections !== undefined) business.connections = data.connections;
+    if (data.levelOfManagement !== undefined) business.levelOfManagement = data.levelOfManagement;
+    if (data.interestedIndustries !== undefined) business.interestedIndustries = data.interestedIndustries;
+    if (data.idealReferralTypes !== undefined) business.idealReferralTypes = data.idealReferralTypes;
 
     if (Object.keys(business).length > 0 || existing?.business) {
       result.business = business;
@@ -328,6 +335,14 @@ export class MembersService {
     if (data.probationTasks !== undefined) jciCareer.probationTasks = data.probationTasks;
     if (data.promotionProgress !== undefined) jciCareer.promotionProgress = data.promotionProgress;
     if (data.isDuesPaidCurrentYear !== undefined) jciCareer.isDuesPaidCurrentYear = data.isDuesPaidCurrentYear;
+    if (data.engagementProgress !== undefined) jciCareer.engagementProgress = data.engagementProgress;
+    if (data.radarStats !== undefined) jciCareer.radarStats = data.radarStats;
+    if (data.radarStatsByYear !== undefined) jciCareer.radarStatsByYear = data.radarStatsByYear;
+    if (data.membershipDuesHistory !== undefined) jciCareer.membershipDuesHistory = data.membershipDuesHistory;
+    if (data.leaderboardVisibility !== undefined) jciCareer.leaderboardVisibility = data.leaderboardVisibility;
+    if (data.hasPaidInitiationFee !== undefined) jciCareer.hasPaidInitiationFee = data.hasPaidInitiationFee;
+    if (data.senatorshipValidatedAt !== undefined) jciCareer.senatorshipValidatedAt = data.senatorshipValidatedAt;
+    if (data.senatorshipValidatedBy !== undefined) jciCareer.senatorshipValidatedBy = data.senatorshipValidatedBy;
 
     if (Object.keys(jciCareer.senatorship).length === 0 && !existing?.jciCareer?.senatorship) delete jciCareer.senatorship;
     if (Object.keys(jciCareer).length > 0 || existing?.jciCareer) {
@@ -569,6 +584,8 @@ export class MembersService {
       senatorCertified: false,
       senatorshipValidatedAt: deleteField(),
       senatorshipValidatedBy: deleteField(),
+      'jciCareer.senatorshipValidatedAt': deleteField(),
+      'jciCareer.senatorshipValidatedBy': deleteField(),
       updatedAt: Timestamp.now(),
       ...(revokedBy ? { updatedBy: revokedBy } : {}),
     });

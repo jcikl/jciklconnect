@@ -316,7 +316,7 @@ export class PromotionService {
   }
 
   static buildEngagementProgress(member: Member, year: EngagementYear): MemberEngagementProgressSummary {
-    const storedProgress = member.engagementProgress?.[year] || {};
+    const storedProgress = (member.jciCareer?.engagementProgress ?? member.engagementProgress)?.[year] || {};
 
     const requirements = this.ENGAGEMENT_REQUIREMENTS[year].map((definition) => {
       const progress = storedProgress[definition.key] || {};
@@ -356,7 +356,7 @@ export class PromotionService {
     const member = await this.getMemberById(memberId);
     if (!member) throw new Error('Member not found');
 
-    const currentEngagement = member.engagementProgress || {};
+    const currentEngagement = member.jciCareer?.engagementProgress ?? member.engagementProgress ?? {};
     const yearProgress = currentEngagement[year] || {};
     const cleanProgress: Record<string, any> = {
       detail: progress.detail || '',
@@ -371,14 +371,16 @@ export class PromotionService {
     if (progress.rejectedBy !== undefined) cleanProgress.rejectedBy = progress.rejectedBy;
     if (progress.rejectedAt !== undefined) cleanProgress.rejectedAt = progress.rejectedAt;
 
-    await MembersService.updateMember(memberId, {
-      engagementProgress: {
-        ...currentEngagement,
-        [year]: {
-          ...yearProgress,
-          [requirementKey]: cleanProgress
-        }
+    const updatedEngagement = {
+      ...currentEngagement,
+      [year]: {
+        ...yearProgress,
+        [requirementKey]: cleanProgress
       }
+    };
+    await MembersService.updateMember(memberId, {
+      'jciCareer.engagementProgress': updatedEngagement,
+      engagementProgress: updatedEngagement,
     } as any);
   }
 

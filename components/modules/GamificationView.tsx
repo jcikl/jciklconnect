@@ -48,8 +48,9 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
 
   // Load member's visibility preference
   React.useEffect(() => {
-    if (member?.leaderboardVisibility) {
-      setLeaderboardVisibility(member.leaderboardVisibility as any);
+    const lbVisibility = member?.jciCareer?.leaderboardVisibility ?? member?.leaderboardVisibility;
+    if (lbVisibility) {
+      setLeaderboardVisibility(lbVisibility as any);
     }
   }, [member]);
 

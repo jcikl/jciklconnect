@@ -314,7 +314,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [addForm, setAddForm] = useState<{ dietary: 'normal' | 'vegetarian' | 'halal'; tshirtSize: string }>({ dietary: 'normal', tshirtSize: '' });
   const [showRegForm, setShowRegForm] = useState(false);
   const [regForm, setRegForm] = useState<RegistrationFormData>({
-    dietary: (member?.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
+    dietary: ((member?.general?.dietaryPreference ?? member?.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
     emergencyContactName: '',
     emergencyContactPhone: '',
     tshirtSize: '',
@@ -455,7 +455,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       .catch(() => setMyRegistration(null));
     // Pre-fill registration form from member profile
     setRegForm({
-      dietary: (member.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
+      dietary: ((member.general?.dietaryPreference ?? member.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
       emergencyContactName: member.emergencyContactName ?? member.emergencyContact ?? '',
       emergencyContactPhone: member.emergencyContactPhone ?? '',
       tshirtSize: member.tshirtSize ?? '',
@@ -526,7 +526,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         dietary: addForm.dietary,
         tshirtSize: addForm.tshirtSize || undefined,
       });
-      const profileUpdate: Record<string, unknown> = { dietaryPreference: addForm.dietary };
+      const profileUpdate: Record<string, unknown> = { dietaryPreference: addForm.dietary, 'general.dietaryPreference': addForm.dietary };
       if (addForm.tshirtSize) profileUpdate.tshirtSize = addForm.tshirtSize;
       MembersService.updateMember(addMemberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(() => {});
       await loadParticipations();
@@ -990,7 +990,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                               setAddMemberId(id);
                               const m = members.find(x => x.id === id);
                               if (m) setAddForm({
-                                dietary: (m.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
+                                dietary: ((m.general?.dietaryPreference ?? m.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
                                 tshirtSize: m.tshirtSize ?? '',
                               });
                             }}
@@ -1183,7 +1183,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 const dietaryCounts = { normal: 0, vegetarian: 0, halal: 0, unspecified: 0 };
                 activeRegs.forEach(r => {
                   const mem = members.find(m => m.id === r.memberId);
-                  const dietary = r.dietary ?? (mem?.dietaryPreference as 'normal' | 'vegetarian' | 'halal' | null | undefined) ?? null;
+                  const dietary = r.dietary ?? ((mem?.general?.dietaryPreference ?? mem?.dietaryPreference) as 'normal' | 'vegetarian' | 'halal' | null | undefined) ?? null;
                   if (dietary === 'vegetarian') dietaryCounts.vegetarian++;
                   else if (dietary === 'halal') dietaryCounts.halal++;
                   else if (dietary === 'normal') dietaryCounts.normal++;

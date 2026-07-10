@@ -38,8 +38,8 @@ export const SenatorshipManagement: React.FC<Props> = ({
 
     const sortFn = (a: Member, b: Member) => {
       if (sortBy === 'date') {
-        const dateA = a.senatorshipValidatedAt ? new Date(a.senatorshipValidatedAt).getTime() : 0;
-        const dateB = b.senatorshipValidatedAt ? new Date(b.senatorshipValidatedAt).getTime() : 0;
+        const dateA = (a.jciCareer?.senatorshipValidatedAt ?? a.senatorshipValidatedAt) ? new Date((a.jciCareer?.senatorshipValidatedAt ?? a.senatorshipValidatedAt)!).getTime() : 0;
+        const dateB = (b.jciCareer?.senatorshipValidatedAt ?? b.senatorshipValidatedAt) ? new Date((b.jciCareer?.senatorshipValidatedAt ?? b.senatorshipValidatedAt)!).getTime() : 0;
         return dateB - dateA;
       }
       return (a.name || '').localeCompare(b.name || '');
@@ -116,10 +116,10 @@ export const SenatorshipManagement: React.FC<Props> = ({
               showDetails={false}
             />
           </div>
-          {mode === 'validated' && member.senatorshipValidatedAt && (
+          {mode === 'validated' && (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) && (
             <p className="text-xs text-slate-500 mt-1">
-              Validated {new Date(member.senatorshipValidatedAt).toLocaleDateString()}
-              {member.senatorshipValidatedBy ? ` by ${member.senatorshipValidatedBy}` : ''}
+              Validated {new Date((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!).toLocaleDateString()}
+              {(member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) ? ` by ${member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}` : ''}
             </p>
           )}
         </div>

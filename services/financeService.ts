@@ -1826,7 +1826,8 @@ export class FinanceService {
 
       // 7. Auto-update hasPaidInitiationFee and role if Guest -> Probation
       if (status === 'paid' || status === 'over paid') {
-        if (!member.hasPaidInitiationFee) {
+        if (!(member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee)) {
+          updates['jciCareer.hasPaidInitiationFee'] = true;
           updates.hasPaidInitiationFee = true;
         }
 
@@ -2432,7 +2433,7 @@ export class FinanceService {
         const membershipType = member.membershipType || 'Full';
         const duesYear = new Date().getFullYear(); // Default to current year or derive from context
         const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
-        const duesAmount = baseDues + (member.hasPaidInitiationFee ? 0 : 50);
+        const duesAmount = baseDues + ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50);
 
         // Find member's dues transaction for the year
         const memberTransactions = duesTransactions.filter(t =>
@@ -2516,7 +2517,7 @@ export class FinanceService {
 
       const membershipType = member.membershipType || 'Full';
       const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
-      const expectedAmount = baseDues + (member.hasPaidInitiationFee ? 0 : 50);
+      const expectedAmount = baseDues + ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50);
 
       // Verify payment amount matches membership type dues
       if (Math.abs(paymentAmount - expectedAmount) > 0.01) {

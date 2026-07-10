@@ -41,6 +41,7 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
     companyName,
     industry: (data.industry as string | undefined) || (business.industry as string | undefined) || 'Other',
     description:
+      ((data.business as Record<string, unknown> | undefined)?.companyDescription as string | undefined) ||
       (data.companyDescription as string | undefined) ||
       (business.introduction as string | undefined) ||
       '',

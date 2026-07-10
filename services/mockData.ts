@@ -76,14 +76,14 @@ export const MOCK_DEV_ADMIN: Member = {
   fullName: 'Admin User',
   idNumber: 'A12345678',
   gender: 'Male',
-  ethnicity: 'Chinese',
+  ethnicity: 'Chinese',          // flat alias — backward compat
   nationality: 'Malaysia',
   dateOfBirth: '1990-05-20',
   hobbies: ['Leadership', 'Public Speaking', 'Reading', 'Travelling'],
   // Professional & Business
   companyName: 'JCI Local Organization',
   companyWebsite: 'https://jci.local',
-  departmentAndPosition: 'Administration / System Admin',
+  departmentAndPosition: 'Administration / System Admin',  // flat alias — backward compat
   industry: 'Non-Profit',
   acceptInternationalBusiness: 'Yes',
   businessCategory: ['Community Service'],

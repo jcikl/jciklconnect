@@ -50,14 +50,14 @@ function initFormValues(member: Member) {
     birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
     dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
     gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return normalizeGender(isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || '')); })(),
-    ethnicity: member.ethnicity || '',
+    ethnicity: member.general?.ethnicity ?? member.ethnicity ?? '',
     nationality: member.nationality || 'Malaysia',
     introducer: member.introducer || '',
     bio: member.bio || '',
     avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
     hobbies: Array.isArray(member.hobbies) ? member.hobbies : (member.hobbies ? [member.hobbies] : []),
     skills: Array.isArray(member.skills) ? member.skills.join(', ') : (member.skills || ''),
-    dietaryPreference: member.dietaryPreference || '',
+    dietaryPreference: member.general?.dietaryPreference ?? member.dietaryPreference ?? '',
 
     // Membership & Status
     role: member.role,
@@ -72,15 +72,15 @@ function initFormValues(member: Member) {
     // Professional & Business
     companyName: member.companyName || '',
     companyWebsite: member.companyWebsite || '',
-    companyDescription: member.companyDescription || '',
-    departmentAndPosition: member.departmentAndPosition || '',
-    levelOfManagement: member.levelOfManagement || '',
+    companyDescription: member.business?.companyDescription ?? member.companyDescription ?? '',
+    departmentAndPosition: member.business?.departmentAndPosition ?? member.departmentAndPosition ?? '',
+    levelOfManagement: member.business?.levelOfManagement ?? member.levelOfManagement ?? '',
     idealReferralIndustry: member.idealReferralIndustry || '',
     idealReferral: member.idealReferral || (Array.isArray(member.idealReferrals) ? member.idealReferrals.join(', ') : ''),
     acceptInternationalBusiness: member.acceptInternationalBusiness || '',
     businessCategory: Array.isArray(member.businessCategory) ? member.businessCategory : (member.businessCategory ? [member.businessCategory] : []),
     industry: member.industry || '',
-    interestedIndustries: Array.isArray(member.interestedIndustries) ? member.interestedIndustries : (member.interestedIndustries ? [member.interestedIndustries] : []),
+    interestedIndustries: (() => { const v = member.business?.interestedIndustries ?? member.interestedIndustries; return Array.isArray(v) ? v : (v ? [v as string] : []); })(),
     internationalPartnershipTypes: Array.isArray(member.internationalPartnershipTypes) ? member.internationalPartnershipTypes : (member.internationalPartnershipTypes ? [member.internationalPartnershipTypes] : []),
 
     // Contact Information
@@ -296,6 +296,17 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       tshirtStatus: (formValues.tshirtStatus as Member['tshirtStatus']) || undefined,
     };
 
+    // Dual-write nested Firestore dot-notation paths for field migration
+    Object.assign(updates, {
+      'general.ethnicity': formValues.ethnicity || undefined,
+      'general.dietaryPreference': formValues.dietaryPreference || undefined,
+      'general.birthPlace': formValues.birthPlace || undefined,
+      'business.companyDescription': formValues.companyDescription || undefined,
+      'business.departmentAndPosition': formValues.departmentAndPosition || undefined,
+      'business.levelOfManagement': formValues.levelOfManagement || undefined,
+      'business.interestedIndustries': interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,
+    });
+
     // Handle GUEST -> PROBATION membership initialization
     if (formValues.role === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role)) {
       const yearStr = String(formValues.membershipYear);
@@ -303,7 +314,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         ...(member.membership || {}),
         [yearStr]: {
           year: formValues.membershipYear,
-          dues: (member.hasPaidInitiationFee ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
+          dues: ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
           amount: 0,
           status: 'pending',
           transactionId: []
@@ -568,11 +579,11 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                     {member.senatorshipBoardValidated && (
                       <p className="text-xs text-green-700 leading-snug">
                         <span className="font-medium">Board validated</span>
-                        {member.senatorshipValidatedAt && (
+                        {(member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) && (
                           <span className="text-slate-500">
                             {' '}
-                            · {new Date(member.senatorshipValidatedAt).toLocaleDateString()}
-                            {member.senatorshipValidatedBy ? ` by ${member.senatorshipValidatedBy}` : ''}
+                            · {new Date((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!).toLocaleDateString()}
+                            {(member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) ? ` by ${member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}` : ''}
                           </span>
                         )}
                       </p>

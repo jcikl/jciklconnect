@@ -108,7 +108,10 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       await EventsService.registerForEvent(eventId, memberId, extraFields);
       if (extraFields && memberId) {
         const profileUpdate: Record<string, unknown> = {};
-        if (extraFields.dietary) profileUpdate.dietaryPreference = extraFields.dietary;
+        if (extraFields.dietary) {
+          profileUpdate.dietaryPreference = extraFields.dietary;
+          profileUpdate['general.dietaryPreference'] = extraFields.dietary;
+        }
         if (extraFields.emergencyContactName != null) profileUpdate.emergencyContactName = extraFields.emergencyContactName;
         if (extraFields.emergencyContactPhone != null) profileUpdate.emergencyContactPhone = extraFields.emergencyContactPhone;
         if (extraFields.tshirtSize != null) profileUpdate.tshirtSize = extraFields.tshirtSize;

@@ -216,8 +216,9 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   const uniqueInterestedIndustries = useMemo(() => {
     const industries = new Set<string>();
     businesses.forEach(b => {
-      if (b.interestedIndustries) {
-        b.interestedIndustries.forEach(ind => industries.add(ind));
+      const interestedIndustries = b.interestedIndustries;
+      if (interestedIndustries) {
+        interestedIndustries.forEach(ind => industries.add(ind));
       }
     });
     return ['All', ...Array.from(industries).sort()];
@@ -226,8 +227,9 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   const uniqueIdealReferrals = useMemo(() => {
     const referrals = new Set<string>();
     businesses.forEach(b => {
-      if (b.idealReferralTypes) {
-        b.idealReferralTypes.forEach(ref => referrals.add(ref));
+      const idealReferralTypes = b.idealReferralTypes;
+      if (idealReferralTypes) {
+        idealReferralTypes.forEach(ref => referrals.add(ref));
       }
     });
     return ['All', ...Array.from(referrals).sort()];
@@ -250,9 +252,10 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       filtered = filtered.filter(biz => selectedIndustries.has(biz.industry));
     }
     if (selectedInterestedIndustry !== 'All') {
-      filtered = filtered.filter(biz =>
-        biz.interestedIndustries && biz.interestedIndustries.includes(selectedInterestedIndustry)
-      );
+      filtered = filtered.filter(biz => {
+        const interestedIndustries = biz.interestedIndustries;
+        return interestedIndustries && interestedIndustries.includes(selectedInterestedIndustry);
+      });
     }
     if (selectedIntlBiz !== 'All') {
       filtered = filtered.filter(biz => {
@@ -276,9 +279,10 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       });
     }
     if (selectedIdealReferral !== 'All') {
-      filtered = filtered.filter(biz =>
-        biz.idealReferralTypes && biz.idealReferralTypes.includes(selectedIdealReferral)
-      );
+      filtered = filtered.filter(biz => {
+        const idealReferralTypes = biz.idealReferralTypes;
+        return idealReferralTypes && idealReferralTypes.includes(selectedIdealReferral);
+      });
     }
 
     if (showDealsOnly) {
@@ -802,16 +806,19 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 )}
 
                 {/* Ideal Referral */}
-                {biz.idealReferralTypes && biz.idealReferralTypes.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Ideal Referral</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {biz.idealReferralTypes.map(ref => (
-                        <span key={ref} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-100">{ref}</span>
-                      ))}
+                {(() => {
+                  const idealReferralTypes = biz.idealReferralTypes;
+                  return idealReferralTypes && idealReferralTypes.length > 0 ? (
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Ideal Referral</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {idealReferralTypes.map(ref => (
+                          <span key={ref} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-100">{ref}</span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null;
+                })()}
 
                 {/* Member Deal */}
                 {biz.offer && (
@@ -905,7 +912,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
                       const owner = members.find(m => m.id === selectedBiz.memberId);
-                      const industries = owner?.interestedIndustries;
+                      const industries = owner?.business?.interestedIndustries ?? owner?.interestedIndustries;
                       return (Array.isArray(industries) && industries.length > 0) ? (
                         industries.map((ind: string, idx: number) => (
                           <Badge key={idx} variant="neutral" className="bg-purple-50/50 text-purple-600 border border-purple-100 font-bold">{ind}</Badge>
@@ -1135,7 +1142,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ideal Referral Industry</p>
                   <div className="space-y-1">
                     {uniqueInterestedIndustries.map(ind => {
-                      const count = ind === 'All' ? businesses.length : businesses.filter(b => b.interestedIndustries?.includes(ind)).length;
+                      const count = ind === 'All' ? businesses.length : businesses.filter(b => (b.interestedIndustries)?.includes(ind)).length;
                       const active = selectedInterestedIndustry === ind;
                       return (
                         <button key={ind} onClick={() => setSelectedInterestedIndustry(ind)}
@@ -1155,7 +1162,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ideal Referral Type</p>
                   <div className="space-y-1">
                     {uniqueIdealReferrals.map(ref => {
-                      const count = ref === 'All' ? businesses.length : businesses.filter(b => b.idealReferralTypes?.includes(ref)).length;
+                      const count = ref === 'All' ? businesses.length : businesses.filter(b => (b.idealReferralTypes)?.includes(ref)).length;
                       const active = selectedIdealReferral === ref;
                       return (
                         <button key={ref} onClick={() => setSelectedIdealReferral(ref)}

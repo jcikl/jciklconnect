@@ -1432,8 +1432,8 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
       aVal = a.points ?? a.jciCareer?.points ?? 0;
       bVal = b.points ?? b.jciCareer?.points ?? 0;
     } else {
-      aVal = a.radarStats?.[sortBy] ?? 0;
-      bVal = b.radarStats?.[sortBy] ?? 0;
+      aVal = (a.jciCareer?.radarStats ?? a.radarStats)?.[sortBy] ?? 0;
+      bVal = (b.jciCareer?.radarStats ?? b.radarStats)?.[sortBy] ?? 0;
     }
 
     if (aVal === bVal) {
@@ -1596,7 +1596,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
             ) : (
               paginatedItems.map(m => {
                 const totalPoints = m.points || m.jciCareer?.points || 0;
-                const stats = m.radarStats || { leadership: 0, training: 0, recruitment: 0, sponsorship: 0, events: 0 };
+                const stats = (m.jciCareer?.radarStats ?? m.radarStats) || { leadership: 0, training: 0, recruitment: 0, sponsorship: 0, events: 0 };
                 const name = getMemberName(m);
                 const isRecalculating = recalculatingId === m.id;
 

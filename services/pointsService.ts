@@ -334,9 +334,10 @@ export class PointsService {
               return requestingMemberId ? m.id === requestingMemberId : false;
             }
             if (visibility === 'members_only') {
-              return m.leaderboardVisibility === 'members_only' || m.leaderboardVisibility === 'public';
+              const lbVis = m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility;
+              return lbVis === 'members_only' || lbVis === 'public';
             }
-            return m.leaderboardVisibility !== 'private';
+            return (m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility) !== 'private';
           })
           .map(m => {
             let hash = 0;
@@ -384,10 +385,11 @@ export class PointsService {
             return requestingMemberId ? m.id === requestingMemberId : false;
           }
           if (visibility === 'members_only') {
-            return m.leaderboardVisibility === 'members_only' || m.leaderboardVisibility === 'public';
+            const lbVis = m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility;
+            return lbVis === 'members_only' || lbVis === 'public';
           }
           // For public view, display anyone unless they explicitly opted out to 'private'
-          return m.leaderboardVisibility !== 'private';
+          return (m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility) !== 'private';
         })
         .map(m => {
           if (year) {
@@ -464,7 +466,8 @@ export class PointsService {
     try {
       const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
       await updateDoc(memberRef, {
-        leaderboardVisibility: visibility,
+        'jciCareer.leaderboardVisibility': visibility,
+        leaderboardVisibility: visibility, // backward compat during migration
         updatedAt: Timestamp.now(),
       });
     } catch (error) {
@@ -1571,7 +1574,14 @@ export class PointsService {
 
       // 6. Update Member doc
       await updateDoc(memberRef, {
-        radarStats: {
+        'jciCareer.radarStats': {
+          leadership,
+          training,
+          recruitment,
+          sponsorship,
+          events
+        },
+        radarStats: { // backward compat during migration
           leadership,
           training,
           recruitment,
