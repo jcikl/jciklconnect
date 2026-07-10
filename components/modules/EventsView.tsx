@@ -1286,27 +1286,34 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                         </div>
                         {sizes.length === 0 ? (
                           <div className="px-3.5 py-6 text-center text-sm text-slate-400">No size data collected</div>
-                        ) : (
-                          <div className="divide-y divide-slate-100">
-                            {sizes.map(([size, count]) => (
-                              <div key={size} className="px-3.5 py-2.5 bg-white">
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <span className="text-xs font-semibold text-slate-700 w-8">{size}</span>
-                                  <span className="text-xs font-bold tabular-nums text-jci-blue">{count} <span className="font-normal text-slate-400">({pct(count, totalActive)}%)</span></span>
-                                </div>
-                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-jci-blue rounded-full transition-all" style={{ width: `${pct(count, totalActive)}%` }} />
-                                </div>
+                        ) : (() => {
+                          const sizeColors = ['#38bdf8','#0ea5e9','#0284c7','#0369a1','#075985','#0c4a6e','#082f49'];
+                          const specifiedTotal = sizes.reduce((s, [, c]) => s + c, 0);
+                          return (
+                            <div className="px-3.5 py-3 bg-white space-y-3">
+                              <div className="flex h-4 rounded-full overflow-hidden gap-px">
+                                {sizes.map(([size, count], i) => (
+                                  <div key={size} className="transition-all" style={{ width: `${pct(count, totalActive)}%`, backgroundColor: sizeColors[i % sizeColors.length] }} />
+                                ))}
+                                {sizeUnspecified > 0 && <div className="bg-slate-200 transition-all" style={{ width: `${pct(sizeUnspecified, totalActive)}%` }} />}
                               </div>
-                            ))}
-                            {sizeUnspecified > 0 && (
-                              <div className="flex items-center justify-between px-3.5 py-2.5 bg-white">
-                                <span className="text-xs text-slate-400">Not specified</span>
-                                <span className="text-xs font-bold text-slate-400 tabular-nums">{sizeUnspecified}</span>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                                {sizes.map(([size, count], i) => (
+                                  <div key={size} className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sizeColors[i % sizeColors.length] }} />
+                                    <span className="text-[11px] text-slate-500">{size} <span className="font-bold tabular-nums text-slate-700">{count}</span> <span className="text-slate-400">({pct(count, totalActive)}%)</span></span>
+                                  </div>
+                                ))}
+                                {sizeUnspecified > 0 && (
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-slate-200 shrink-0" />
+                                    <span className="text-[11px] text-slate-400">N/A <span className="font-bold tabular-nums">{sizeUnspecified}</span></span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
