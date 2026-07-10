@@ -294,6 +294,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [myRegistration, setMyRegistration] = useState<EventRegistration | null | undefined>(undefined);
+  const [localRegistered, setLocalRegistered] = useState<boolean | null>(null);
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
 
@@ -351,14 +352,21 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       .catch(() => setMyRegistration(null));
   }, [event.id, member?.id]);
 
+  const handleRegister = () => {
+    setLocalRegistered(true);
+    onRegister();
+  };
+
   const handleSelfCancel = async () => {
     if (!member || !onCancelRegistration) return;
+    setLocalRegistered(false);
     setUpdatingRegId('self');
     try {
       await onCancelRegistration(member.id, member.id, member.name ?? member.id, 'self');
       setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled', cancelledByRole: 'self' } : { id: '', eventId: event.id, memberId: member.id, status: 'cancelled', cancelledByRole: 'self', createdAt: new Date().toISOString() });
       showToast('已撤销报名', 'success');
     } catch {
+      setLocalRegistered(null);
       showToast('撤销失败', 'error');
     } finally {
       setUpdatingRegId(null);
@@ -432,10 +440,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const eventTime = event.time || (date.getHours() !== 0 || date.getMinutes() !== 0 ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null);
   const priceMin = event.priceMin ?? event.price;
   const priceMax = event.priceMax;
-  const isRegistered = member && event.registeredMembers?.includes(member.id);
-  const isSelfCancelled = myRegistration?.status === 'cancelled';
+  const isRegisteredFromEvent = !!(member && event.registeredMembers?.includes(member.id));
+  // localRegistered overrides event data immediately after cancel/re-register, before loadEvents() returns
+  const isRegistered = localRegistered !== null ? localRegistered : isRegisteredFromEvent;
+  const isSelfCancelled = myRegistration?.status === 'cancelled' && !isRegistered;
   // canSelfCancel: use doc status if available, otherwise fall back to registeredMembers array (pre-Story-8.1 registrations)
-  const canSelfCancel = !!isRegistered && !isSelfCancelled && myRegistration?.status !== 'checked_in' && !!onCancelRegistration && event.status !== 'Completed';
+  const canSelfCancel = !!isRegistered && myRegistration?.status !== 'checked_in' && !!onCancelRegistration && event.status !== 'Completed';
   const attendancePercent = event.maxAttendees ? Math.round(((event.attendees || 0) / event.maxAttendees) * 100) : 0;
 
   const registerButton = (
@@ -448,7 +458,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
           }`}
         disabled={(!!isRegistered && !canSelfCancel) || event.status === 'Completed' || event.status === 'Cancelled'}
-        onClick={canSelfCancel ? handleSelfCancel : (!isRegistered ? onRegister : undefined)}
+        onClick={canSelfCancel ? handleSelfCancel : (!isRegistered ? handleRegister : undefined)}
       >
         {event.status === 'Completed' ? <span>Event Ended</span>
           : event.status === 'Cancelled' ? <span>Cancelled</span>
