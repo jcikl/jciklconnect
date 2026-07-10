@@ -79,13 +79,17 @@ export class MemberJourneyService {
       }
 
       // Board of Directors records
+      const sortByTermDesc = (a: { term: string }, b: { term: string }) =>
+        (parseInt(b.term) || 0) - (parseInt(a.term) || 0);
+
       hasCommissionDirector = commissionPositions.length > 0;
       if (hasCommissionDirector) {
-        const cdEntries = commissionPositions.map(cp => cp.position ? `${cp.position} · ${cp.term}` : cp.term);
+        const sorted = [...commissionPositions].sort(sortByTermDesc);
+        const cdEntries = sorted.map(cp => cp.position ? `${cp.position} · ${cp.term}` : cp.term);
         details['Commission Director'] = cdEntries[0];
         if (cdEntries.length > 1) multiDetails['Commission Director'] = cdEntries;
       }
-      const boardEntries: string[] = [];
+      const boardEntriesRaw: { label: string; term: string }[] = [];
       for (const bp of boardPositions) {
         if (bp.position === 'President') { hasPresident = true; details['President'] = bp.term; }
         else if (bp.position === 'Area Officer') { hasAreaOfficer = true; details['Area Officer'] = bp.term; }
@@ -93,10 +97,12 @@ export class MemberJourneyService {
         else if (bp.position === 'JCI Officer') { hasJciOfficer = true; details['JCI Officer'] = bp.term; }
         if (!NATIONAL_LEVEL_POSITIONS.includes(bp.position)) {
           hasBoard = true;
-          boardEntries.push(`${bp.position} · ${bp.term}`);
+          boardEntriesRaw.push({ label: `${bp.position} · ${bp.term}`, term: bp.term });
         }
       }
-      if (boardEntries.length > 0) {
+      if (boardEntriesRaw.length > 0) {
+        boardEntriesRaw.sort((a, b) => (parseInt(b.term) || 0) - (parseInt(a.term) || 0));
+        const boardEntries = boardEntriesRaw.map(e => e.label);
         details['Board of Director'] = boardEntries[0];
         if (boardEntries.length > 1) multiDetails['Board of Director'] = boardEntries;
       }
