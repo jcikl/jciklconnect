@@ -1,47 +1,20 @@
-// Surveys Data Hook
-import { useState, useEffect } from 'react';
+import { useFirestoreCollection } from './useFirestoreCollection';
 import { SurveysService, Survey, SurveyResponse } from '../services/surveysService';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 
 export const useSurveys = () => {
-  const [surveys, setSurveys] = useState<Survey[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { member } = useAuth();
   const { showToast } = useToast();
 
-  const loadSurveys = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await SurveysService.getAllSurveys();
-      setSurveys(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load surveys';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSurveys();
-  }, []);
+  const { data: surveys, loading, error, reload: loadSurveys } = useFirestoreCollection<Survey>({
+    loader: () => SurveysService.getAllSurveys(),
+  });
 
   const createSurvey = async (surveyData: Omit<Survey, 'id' | 'responsesCount' | 'createdAt'>) => {
     try {
-      if (!member) {
-        throw new Error('You must be logged in to create a survey');
-      }
-      
-      const surveyWithCreator = {
-        ...surveyData,
-        createdBy: member.id,
-      };
-      
-      const id = await SurveysService.createSurvey(surveyWithCreator);
+      if (!member) throw new Error('You must be logged in to create a survey');
+      const id = await SurveysService.createSurvey({ ...surveyData, createdBy: member.id });
       await loadSurveys();
       showToast('Survey created successfully', 'success');
       return id;
@@ -77,17 +50,9 @@ export const useSurveys = () => {
   };
 
   const submitResponse = async (surveyId: string, answers: Record<string, any>) => {
-    if (!member) {
-      showToast('Please login to submit survey', 'error');
-      return;
-    }
-    
+    if (!member) { showToast('Please login to submit survey', 'error'); return; }
     try {
-      await SurveysService.submitResponse({
-        surveyId,
-        memberId: member.id,
-        answers,
-      });
+      await SurveysService.submitResponse({ surveyId, memberId: member.id, answers });
       await loadSurveys();
       showToast('Survey response submitted successfully', 'success');
     } catch (err) {
@@ -119,4 +84,3 @@ export const useSurveys = () => {
     getSurveyResponses,
   };
 };
-

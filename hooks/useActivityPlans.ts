@@ -1,32 +1,13 @@
-// Activity Plans Data Hook
-import { useState, useEffect, useCallback } from 'react';
+import { useFirestoreCollection } from './useFirestoreCollection';
 import { ActivityPlansService, ActivityPlan } from '../services/activityPlansService';
 import { useToast } from '../components/ui/Common';
 
 export const useActivityPlans = () => {
-  const [plans, setPlans] = useState<ActivityPlan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const loadPlans = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await ActivityPlansService.getAllActivityPlans();
-      setPlans(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load activity plans';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    loadPlans();
-  }, [loadPlans]);
+  const { data: plans, loading, error, reload: loadPlans } = useFirestoreCollection<ActivityPlan>({
+    loader: () => ActivityPlansService.getAllActivityPlans(),
+  });
 
   const createPlan = async (planData: Omit<ActivityPlan, 'id' | 'createdAt' | 'updatedAt' | 'version'>) => {
     try {
@@ -120,4 +101,3 @@ export const useActivityPlans = () => {
     deletePlan,
   };
 };
-

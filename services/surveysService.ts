@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_SURVEYS } from './mockData';
 import { removeUndefined } from '../utils/dataUtils';
 
@@ -72,11 +72,7 @@ export interface SurveyResponse {
 export class SurveysService {
   // Get all surveys
   static async getAllSurveys(): Promise<Survey[]> {
-    if (isDevMode()) {
-      return MOCK_SURVEYS;
-    }
-
-    try {
+    return withDevMode<Survey[]>(() => MOCK_SURVEYS as Survey[], async () => {
       const snapshot = await getDocs(
         query(collection(db, COLLECTIONS.SURVEYS), orderBy('createdAt', 'desc'))
       );
@@ -87,10 +83,7 @@ export class SurveysService {
         endDate: doc.data().endDate?.toDate?.()?.toISOString() || doc.data().endDate,
         createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
       } as Survey));
-    } catch (error) {
-      console.error('Error fetching surveys:', error);
-      throw error;
-    }
+    });
   }
 
   // Get survey by ID
@@ -117,28 +110,23 @@ export class SurveysService {
 
   // Create survey
   static async createSurvey(surveyData: Omit<Survey, 'id' | 'responsesCount' | 'createdAt'>): Promise<string> {
-    if (isDevMode()) {
-      // In dev mode, return a mock ID
-      return `mock-survey-${Date.now()}`;
-    }
+    return withDevMode(
+      () => `mock-survey-${Date.now()}`,
+      async () => {
+        const newSurvey = {
+          ...surveyData,
+          responsesCount: 0,
+          startDate: Timestamp.fromDate(new Date(surveyData.startDate)),
+          endDate: Timestamp.fromDate(new Date(surveyData.endDate)),
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        };
 
-    try {
-      const newSurvey = {
-        ...surveyData,
-        responsesCount: 0,
-        startDate: Timestamp.fromDate(new Date(surveyData.startDate)),
-        endDate: Timestamp.fromDate(new Date(surveyData.endDate)),
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-
-      const cleanSurvey = removeUndefined(newSurvey);
-      const docRef = await addDoc(collection(db, COLLECTIONS.SURVEYS), cleanSurvey);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating survey:', error);
-      throw error;
-    }
+        const cleanSurvey = removeUndefined(newSurvey);
+        const docRef = await addDoc(collection(db, COLLECTIONS.SURVEYS), cleanSurvey);
+        return docRef.id;
+      }
+    );
   }
 
   // Update survey
@@ -228,39 +216,33 @@ export class SurveysService {
     surveyId: string,
     channels: ('email' | 'in-app' | 'link')[]
   ): Promise<{ emailsSent: number; notificationsSent: number }> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Would distribute survey ${surveyId} via channels: ${channels.join(', ')}`);
-      return { emailsSent: 0, notificationsSent: 0 };
-    }
+    return withDevMode(
+      () => ({ emailsSent: 0, notificationsSent: 0 }),
+      async () => {
+        const survey = await this.getSurveyById(surveyId);
+        if (!survey) {
+          throw new Error('Survey not found');
+        }
 
-    try {
-      const survey = await this.getSurveyById(surveyId);
-      if (!survey) {
-        throw new Error('Survey not found');
+        // In production, this would:
+        // 1. Send emails if 'email' channel is selected
+        // 2. Create in-app notifications if 'in-app' channel is selected
+        // 3. Generate shareable link if 'link' channel is selected
+
+        // For now, return mock results
+        const emailsSent = channels.includes('email') ? 10 : 0;
+        const notificationsSent = channels.includes('in-app') ? 5 : 0;
+
+        // Update survey with distribution channels
+        await this.updateSurvey(surveyId, {
+          distributionChannels: channels,
+          shareableLink: channels.includes('link') ? `https://jci-kl.app/survey/${surveyId}` : undefined,
+        });
+
+        return { emailsSent, notificationsSent };
       }
-
-      // In production, this would:
-      // 1. Send emails if 'email' channel is selected
-      // 2. Create in-app notifications if 'in-app' channel is selected
-      // 3. Generate shareable link if 'link' channel is selected
-
-      // For now, return mock results
-      const emailsSent = channels.includes('email') ? 10 : 0;
-      const notificationsSent = channels.includes('in-app') ? 5 : 0;
-
-      // Update survey with distribution channels
-      await this.updateSurvey(surveyId, {
-        distributionChannels: channels,
-        shareableLink: channels.includes('link') ? `https://jci-kl.app/survey/${surveyId}` : undefined,
-      });
-
-      return { emailsSent, notificationsSent };
-    } catch (error) {
-      console.error('Error distributing survey:', error);
-      throw error;
-    }
+    );
   }
 }
-
 
 

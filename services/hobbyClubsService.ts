@@ -15,17 +15,13 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { HobbyClub, ClubActivity } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_CLUBS } from './mockData';
 
 export class HobbyClubsService {
   // Get all clubs
   static async getAllClubs(): Promise<HobbyClub[]> {
-    if (isDevMode()) {
-      return MOCK_CLUBS;
-    }
-    
-    try {
+    return withDevMode(() => MOCK_CLUBS, async () => {
       const snapshot = await getDocs(
         query(collection(db, COLLECTIONS.HOBBY_CLUBS), orderBy('name', 'asc'))
       );
@@ -33,10 +29,7 @@ export class HobbyClubsService {
         id: doc.id,
         ...doc.data(),
       } as HobbyClub));
-    } catch (error) {
-      console.error('Error fetching hobby clubs:', error);
-      throw error;
-    }
+    });
   }
 
   // Get club by ID
@@ -44,7 +37,7 @@ export class HobbyClubsService {
     try {
       const docRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
       const docSnap = await getDoc(docRef);
-      
+
       if (docSnap.exists()) {
         return { id: docSnap.id, ...docSnap.data() } as HobbyClub;
       }
@@ -57,26 +50,20 @@ export class HobbyClubsService {
 
   // Create club
   static async createClub(clubData: Omit<HobbyClub, 'id' | 'membersCount'>): Promise<string> {
-    if (isDevMode()) {
-      const newId = `mock-club-${Date.now()}`;
-      console.log(`[DEV MODE] Simulating creation of hobby club with ID: ${newId}`);
-      return newId;
-    }
-    
-    try {
-      const newClub = {
-        ...clubData,
-        membersCount: 1, // Creator is first member
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-      
-      const docRef = await addDoc(collection(db, COLLECTIONS.HOBBY_CLUBS), newClub);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating hobby club:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => `mock-club-${Date.now()}`,
+      async () => {
+        const newClub = {
+          ...clubData,
+          membersCount: 1, // Creator is first member
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        };
+
+        const docRef = await addDoc(collection(db, COLLECTIONS.HOBBY_CLUBS), newClub);
+        return docRef.id;
+      }
+    );
   }
 
   // Update club
@@ -105,15 +92,10 @@ export class HobbyClubsService {
 
   // Join club
   static async joinClub(clubId: string, memberId: string): Promise<void> {
-    if (isDevMode()) {
-      // In dev mode, just return without doing anything
-      return;
-    }
-    
-    try {
+    return withDevMode(() => {}, async () => {
       const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
       const clubSnap = await getDoc(clubRef);
-      
+
       if (clubSnap.exists()) {
         const currentMembers = clubSnap.data().memberIds || [];
         if (!currentMembers.includes(memberId)) {
@@ -124,10 +106,7 @@ export class HobbyClubsService {
           });
         }
       }
-    } catch (error) {
-      console.error('Error joining club:', error);
-      throw error;
-    }
+    });
   }
 
   // Leave club
@@ -135,7 +114,7 @@ export class HobbyClubsService {
     try {
       const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
       const clubSnap = await getDoc(clubRef);
-      
+
       if (clubSnap.exists()) {
         const currentMembers = clubSnap.data().memberIds || [];
         await updateDoc(clubRef, {
@@ -158,7 +137,7 @@ export class HobbyClubsService {
         where('category', '==', category),
         orderBy('name', 'asc')
       );
-      
+
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -246,7 +225,7 @@ export class HobbyClubsService {
     try {
       const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
       const clubSnap = await getDoc(clubRef);
-      
+
       if (clubSnap.exists()) {
         return clubSnap.data().memberIds || [];
       }
@@ -257,4 +236,3 @@ export class HobbyClubsService {
     }
   }
 }
-

@@ -1,66 +1,38 @@
-// Business Directory Data Hook
-import { useState, useEffect } from 'react';
+import { useFirestoreCollection } from './useFirestoreCollection';
 import { BusinessDirectoryService } from '../services/businessDirectoryService';
 import { BusinessProfile } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 
 export const useBusinessDirectory = () => {
-  const [businesses, setBusinesses] = useState<BusinessProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { member, user } = useAuth();
   const { showToast } = useToast();
 
-  const loadBusinesses = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const publicOnly = !user;
-      const data = await BusinessDirectoryService.getAllBusinesses(publicOnly);
-      setBusinesses(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load businesses';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadBusinesses();
-  }, []);
+  const { data: businesses, loading, error, reload: loadBusinesses } = useFirestoreCollection<BusinessProfile>({
+    loader: () => BusinessDirectoryService.getAllBusinesses(!user),
+    deps: [!!user],
+  });
 
   const searchBusinesses = async (searchTerm: string) => {
     try {
-      setLoading(true);
       const results = await BusinessDirectoryService.searchBusinesses(searchTerm);
-      setBusinesses(results);
+      return results;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search businesses';
-      setError(errorMessage);
       showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
+      throw err;
     }
   };
 
-  const getMyBusinesses = async () => {
+  const getMyBusinesses = async (): Promise<BusinessProfile[]> => {
     try {
       if (!member) return [];
-
-      setLoading(true);
-      // In aggregation model, business ID is member ID.
-      // And a member has at most one business profile derived from their profile.
       const business = await BusinessDirectoryService.getBusinessById(member.id);
       return business ? [business] : [];
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load your businesses';
       showToast(errorMessage, 'error');
       return [];
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -73,4 +45,3 @@ export const useBusinessDirectory = () => {
     getMyBusinesses,
   };
 };
-

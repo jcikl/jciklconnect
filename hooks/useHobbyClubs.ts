@@ -1,48 +1,21 @@
-// Hobby Clubs Data Hook
-import { useState, useEffect } from 'react';
+import { useFirestoreCollection } from './useFirestoreCollection';
 import { HobbyClubsService } from '../services/hobbyClubsService';
 import { HobbyClub } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 
 export const useHobbyClubs = () => {
-  const [clubs, setClubs] = useState<HobbyClub[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { member } = useAuth();
   const { showToast } = useToast();
 
-  const loadClubs = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await HobbyClubsService.getAllClubs();
-      setClubs(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load hobby clubs';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadClubs();
-  }, []);
+  const { data: clubs, loading, error, reload: loadClubs } = useFirestoreCollection<HobbyClub>({
+    loader: () => HobbyClubsService.getAllClubs(),
+  });
 
   const createClub = async (clubData: Omit<HobbyClub, 'id' | 'membersCount'>) => {
     try {
-      if (!member) {
-        throw new Error('You must be logged in to create a club');
-      }
-      
-      const clubWithLead = {
-        ...clubData,
-        lead: member.name,
-      };
-      
-      const id = await HobbyClubsService.createClub(clubWithLead);
+      if (!member) throw new Error('You must be logged in to create a club');
+      const id = await HobbyClubsService.createClub({ ...clubData, lead: member.name });
       await loadClubs();
       showToast('Club created successfully', 'success');
       return id;
@@ -78,11 +51,7 @@ export const useHobbyClubs = () => {
   };
 
   const joinClub = async (clubId: string) => {
-    if (!member) {
-      showToast('Please login to join clubs', 'error');
-      return;
-    }
-    
+    if (!member) { showToast('Please login to join clubs', 'error'); return; }
     try {
       await HobbyClubsService.joinClub(clubId, member.id);
       await loadClubs();
@@ -95,11 +64,7 @@ export const useHobbyClubs = () => {
   };
 
   const leaveClub = async (clubId: string) => {
-    if (!member) {
-      showToast('Please login to leave clubs', 'error');
-      return;
-    }
-    
+    if (!member) { showToast('Please login to leave clubs', 'error'); return; }
     try {
       await HobbyClubsService.leaveClub(clubId, member.id);
       await loadClubs();
@@ -173,4 +138,3 @@ export const useHobbyClubs = () => {
     getClubMembers,
   };
 };
-

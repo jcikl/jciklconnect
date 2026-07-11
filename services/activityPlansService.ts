@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface ActivityPlan {
   id?: string;
@@ -56,18 +56,18 @@ export interface ActivityPlan {
 export class ActivityPlansService {
   // Get all activity plans
   static async getAllActivityPlans(): Promise<ActivityPlan[]> {
-    if (isDevMode()) {
-      return [
+    return withDevMode<ActivityPlan[]>(
+      () => [
         {
           id: 'ap1',
           title: 'Summer Leadership Summit',
           description: 'Annual leadership development program for young professionals',
-          type: 'Community',
+          type: 'Community' as const,
           proposedDate: '2024-07-15',
           proposedBudget: 15000,
           objectives: 'Develop leadership skills, network building, community impact',
           expectedImpact: '50+ participants, 10+ partnerships, media coverage',
-          status: 'Under Review',
+          status: 'Under Review' as const,
           submittedBy: 'u1',
           version: 1,
           createdAt: new Date('2024-01-10'),
@@ -77,41 +77,37 @@ export class ActivityPlansService {
           id: 'ap2',
           title: 'Business Networking Mixer',
           description: 'Quarterly networking event for members and local businesses',
-          type: 'Business',
+          type: 'Business' as const,
           proposedDate: '2024-03-20',
           proposedBudget: 5000,
           objectives: 'Facilitate business connections, member engagement',
           expectedImpact: '100+ attendees, 20+ business connections',
-          status: 'Draft',
+          status: 'Draft' as const,
           submittedBy: 'u2',
           version: 1,
           createdAt: new Date('2024-02-01'),
           updatedAt: new Date('2024-02-05'),
         },
-      ];
-    }
-
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.PROJECTS),
-          where('status', 'in', ['Draft', 'Submitted', 'Under Review', 'Rejected']),
-          orderBy('createdAt', 'desc')
-        )
-      );
-      return snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        proposedDate: d.data().proposedDate?.toDate?.()?.toISOString?.() ?? d.data().proposedDate,
-        submittedDate: d.data().submittedDate?.toDate?.() ?? d.data().submittedDate,
-        reviewedDate: d.data().reviewedDate?.toDate?.() ?? d.data().reviewedDate,
-        createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
-        updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
-      })) as ActivityPlan[];
-    } catch (error) {
-      console.error('Error fetching activity plans:', error);
-      throw error;
-    }
+      ],
+      async () => {
+        const snapshot = await getDocs(
+          query(
+            collection(db, COLLECTIONS.PROJECTS),
+            where('status', 'in', ['Draft', 'Submitted', 'Under Review', 'Rejected']),
+            orderBy('createdAt', 'desc')
+          )
+        );
+        return snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data(),
+          proposedDate: d.data().proposedDate?.toDate?.()?.toISOString?.() ?? d.data().proposedDate,
+          submittedDate: d.data().submittedDate?.toDate?.() ?? d.data().submittedDate,
+          reviewedDate: d.data().reviewedDate?.toDate?.() ?? d.data().reviewedDate,
+          createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
+          updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
+        })) as ActivityPlan[];
+      }
+    );
   }
 
   // Get activity plan by ID (from projects collection)
@@ -119,7 +115,7 @@ export class ActivityPlansService {
     try {
       const docRef = doc(db, COLLECTIONS.PROJECTS, planId);
       const docSnap = await getDoc(docRef);
-      
+
       if (docSnap.exists()) {
         return {
           id: docSnap.id,
@@ -140,47 +136,44 @@ export class ActivityPlansService {
 
   // Get activity plans for a specific project (parentProjectId)
   static async getActivityPlansByProjectId(projectId: string): Promise<ActivityPlan[]> {
-    if (isDevMode()) {
-      return [
+    return withDevMode<ActivityPlan[]>(
+      () => [
         {
           id: 'ap-p1',
           title: 'Venue & Catering Plan',
           description: 'Detailed plan for venue booking and catering arrangements',
-          type: 'Community',
+          type: 'Community' as const,
           parentProjectId: projectId,
           proposedDate: '2024-06-01',
           proposedBudget: 8000,
           objectives: 'Secure venue, finalize menu',
           expectedImpact: 'Smooth event execution',
-          status: 'Draft',
+          status: 'Draft' as const,
           submittedBy: 'u1',
           version: 1,
           createdAt: new Date('2024-01-15'),
           updatedAt: new Date('2024-01-15'),
         },
-      ];
-    }
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.ACTIVITY_PLANS),
-          where('parentProjectId', '==', projectId),
-          orderBy('createdAt', 'desc')
-        )
-      );
-      return snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        proposedDate: d.data().proposedDate?.toDate?.()?.toISOString?.() ?? d.data().proposedDate,
-        submittedDate: d.data().submittedDate?.toDate?.() ?? d.data().submittedDate,
-        reviewedDate: d.data().reviewedDate?.toDate?.() ?? d.data().reviewedDate,
-        createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
-        updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
-      })) as ActivityPlan[];
-    } catch (error) {
-      console.error('Error fetching activity plans by project:', error);
-      throw error;
-    }
+      ],
+      async () => {
+        const snapshot = await getDocs(
+          query(
+            collection(db, COLLECTIONS.ACTIVITY_PLANS),
+            where('parentProjectId', '==', projectId),
+            orderBy('createdAt', 'desc')
+          )
+        );
+        return snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data(),
+          proposedDate: d.data().proposedDate?.toDate?.()?.toISOString?.() ?? d.data().proposedDate,
+          submittedDate: d.data().submittedDate?.toDate?.() ?? d.data().submittedDate,
+          reviewedDate: d.data().reviewedDate?.toDate?.() ?? d.data().reviewedDate,
+          createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
+          updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
+        })) as ActivityPlan[];
+      }
+    );
   }
 
   // Get activity plans by status
@@ -241,12 +234,12 @@ export class ActivityPlansService {
   static async updateActivityPlan(planId: string, updates: Partial<ActivityPlan>): Promise<void> {
     try {
       const planRef = doc(db, COLLECTIONS.PROJECTS, planId);
-      
+
       // Filter out undefined values - Firestore doesn't accept undefined
       const updateData: Record<string, any> = {
         updatedAt: Timestamp.now(),
       };
-      
+
       // Only include defined values (not undefined)
       Object.keys(updates).forEach(key => {
         const value = updates[key as keyof typeof updates];
@@ -258,7 +251,7 @@ export class ActivityPlansService {
           }
         }
       });
-      
+
       await updateDoc(planRef, updateData);
     } catch (error) {
       console.error('Error updating activity plan:', error);
@@ -287,12 +280,7 @@ export class ActivityPlansService {
     reviewedBy: string,
     comments?: string
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would review activity plan ${planId}: ${decision}`);
-      return;
-    }
-
-    try {
+    return withDevMode(() => {}, async () => {
       const plan = await this.getActivityPlanById(planId);
       if (!plan) {
         throw new Error('Activity plan not found');
@@ -311,7 +299,7 @@ export class ActivityPlansService {
         await CommunicationService.createNotification({
           memberId: plan.submittedBy,
           title: `Activity Plan ${decision}: ${plan.title}`,
-          message: comments 
+          message: comments
             ? `Your activity plan has been ${decision.toLowerCase()}. Comments: ${comments}`
             : `Your activity plan has been ${decision.toLowerCase()}.`,
           type: decision === 'Approved' ? 'success' : 'warning',
@@ -320,10 +308,7 @@ export class ActivityPlansService {
         console.error('Error sending review notification:', notifError);
         // Don't throw - notification failure shouldn't block the review
       }
-    } catch (error) {
-      console.error('Error reviewing activity plan:', error);
-      throw error;
-    }
+    });
   }
 
   // Create new version of activity plan
@@ -345,8 +330,8 @@ export class ActivityPlansService {
 
       // Copy existing plan data (excluding id and version-related fields)
       Object.keys(existingPlan).forEach(key => {
-        if (key !== 'id' && key !== 'version' && key !== 'previousVersionId' && 
-            key !== 'submittedDate' && key !== 'reviewedBy' && key !== 'reviewedDate' && 
+        if (key !== 'id' && key !== 'version' && key !== 'previousVersionId' &&
+            key !== 'submittedDate' && key !== 'reviewedBy' && key !== 'reviewedDate' &&
             key !== 'reviewComments' && key !== 'createdAt' && key !== 'updatedAt') {
           const value = existingPlan[key as keyof ActivityPlan];
           if (value !== undefined) {
@@ -381,4 +366,3 @@ export class ActivityPlansService {
     }
   }
 }
-
