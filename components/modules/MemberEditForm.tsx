@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button, Tabs } from '../ui/Common';
+import { Input } from '../ui/Form';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { Combobox } from '../ui/Combobox';
 import { Member, Project, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
@@ -424,7 +425,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               </div>
               <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
-                <input name="dateOfBirth" type="date" value={formValues.dateOfBirth} onChange={(e) => handleChange('dateOfBirth', e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+                <Input name="dateOfBirth" type="date" value={formValues.dateOfBirth} onChange={(e) => handleChange('dateOfBirth', e.target.value)} />
               </div>
               <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
@@ -572,8 +573,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                       disabled={member.senatorshipBoardValidated === true}
                       placeholder="e.g. 12345"
                       className={`w-full rounded-lg border px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${member.senatorshipBoardValidated
-                          ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed'
-                          : 'border-slate-300 bg-white'
+                        ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed'
+                        : 'border-slate-300 bg-white'
                         }`}
                     />
                     {member.senatorshipBoardValidated && (

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Phone, Mail, MessageCircle, MapPin, Linkedin, Facebook, Instagram } from 'lucide-react';
 import { Button, Card, Badge } from '../../ui/Common';
+import { Input } from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
 import { IntroducerSelector } from '../../ui/IntroducerSelector';
 import type { Member, HobbyClub, Project } from '../../../types';
@@ -118,11 +119,10 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 </div>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
-                  <input
+                  <Input
                     type="date"
                     value={inlineValues.dateOfBirth}
                     onChange={e => setInlineValues({ ...inlineValues, dateOfBirth: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
                   />
                 </div>
                 <div>

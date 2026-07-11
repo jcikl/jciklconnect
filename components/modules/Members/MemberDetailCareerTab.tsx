@@ -4,6 +4,7 @@ import {
   Award, Shield, UserCog
 } from 'lucide-react';
 import { Button, Card, Badge } from '../../ui/Common';
+import { Input } from '../../ui/Form';
 import type { Member, BoardMember } from '../../../types';
 import { UserRole } from '../../../types';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
@@ -122,11 +123,10 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                     </div>
                     <div>
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
-                      <input
+                      <Input
                         type="date"
                         value={inlineValues.senatorshipValidatedAt}
                         onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                       />
                     </div>
                   </div>

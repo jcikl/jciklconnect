@@ -1674,18 +1674,16 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
-                <input
+                <Input
                   type="date"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   value={customDateRange.start}
                   onChange={(e) => setCustomDateRange({ ...customDateRange, start: e.target.value })}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">End Date</label>
-                <input
+                <Input
                   type="date"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                   value={customDateRange.end}
                   onChange={(e) => setCustomDateRange({ ...customDateRange, end: e.target.value })}
                 />

@@ -1390,9 +1390,9 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                             }))}
                           />
                           <div className="flex gap-2">
-                            <input
+                            <Input
                               type="date"
-                              className={`${inputClassName} flex-1 sm:w-36 sm:flex-none`}
+                              className="flex-1 sm:w-36 sm:flex-none"
                               value={values.date}
                               onChange={(e) => setEngagementEditValues(prev => ({
                                 ...prev,

@@ -3,6 +3,7 @@ import { AlertTriangle, Trash2, ChevronDown, ChevronUp, RefreshCw, CalendarX } f
 import { Member } from '../../../types';
 import { MembersService } from '../../../services/membersService';
 import { useToast } from '../../ui/Common';
+import { Input } from '../../ui/Form';
 import { BackfillFromICScript } from './BackfillFromICScript';
 
 // ── Batch delete by import date ───────────────────────────────────────────────
@@ -47,11 +48,10 @@ function BatchDeleteByDate({ members, onMembersChanged }: { members: Member[]; o
         <span className="font-semibold text-red-800 text-sm">批量删除——按导入日期</span>
       </div>
       <div className="flex items-center gap-3 flex-wrap">
-        <input
+        <Input
           type="date"
           value={date}
           onChange={e => { setDate(e.target.value); setConfirmed(false); }}
-          className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
         />
         <span className="text-sm text-red-700 font-medium">
           该日期共 <strong>{targets.length}</strong> 条记录
