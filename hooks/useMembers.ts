@@ -1,10 +1,10 @@
 // Members Data Hook
-import { useState, useEffect, useCallback } from 'react';
 import { MembersService } from '../services/membersService';
 import { Member, MemberCreateInput } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
+import { useFirestoreCollection } from './useFirestoreCollection';
 
 export interface UseMembersResult {
   members: Member[];
@@ -19,49 +19,18 @@ export interface UseMembersResult {
 }
 
 export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
   const { user, member: currentMember, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
 
-  const loadMembers = useCallback(async () => {
-    const inDevMode = isDevMode() || isDevModeFromAuth;
-    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role);
+  const inDevMode = isDevMode() || isDevModeFromAuth;
+  const isFullMember = !!(currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role as string));
+  const enabled = !authLoading && (inDevMode || isFullMember);
 
-    if (!inDevMode && !isFullMember) {
-      setMembers([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await MembersService.getAllMembers(loIdFilter ?? currentMember?.loId ?? undefined);
-      setMembers(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load members';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [loIdFilter, currentMember, isDevModeFromAuth, showToast]);
-
-  useEffect(() => {
-    if (authLoading) return;
-    const inDevMode = isDevMode() || isDevModeFromAuth;
-    const isFullMember = currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role);
-
-    if (!inDevMode && !isFullMember) {
-      setMembers([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    loadMembers();
-  }, [loadMembers, authLoading, currentMember, isDevModeFromAuth]);
+  const { data: members, loading, error, reload: loadMembers } = useFirestoreCollection<Member>({
+    loader: () => MembersService.getAllMembers(loIdFilter ?? currentMember?.loId ?? undefined),
+    enabled,
+    deps: [loIdFilter, currentMember?.loId, currentMember?.role, isDevModeFromAuth, authLoading],
+  });
 
   const createMember = async (memberData: MemberCreateInput) => {
     try {
@@ -94,13 +63,11 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
       await loadMembers();
       showToast('Member deleted successfully', 'success');
     } catch (err) {
-      // Provide a clearer message for Firestore permission errors
       const anyErr = err as any;
-      if (anyErr && anyErr.code === 'permission-denied') {
+      if (anyErr?.code === 'permission-denied') {
         showToast('You are not authorized to delete members. Please contact an ADMIN.', 'error');
       } else {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to delete member';
-        showToast(errorMessage, 'error');
+        showToast(err instanceof Error ? err.message : 'Failed to delete member', 'error');
       }
       throw err;
     }
@@ -112,8 +79,7 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
       await loadMembers();
       showToast(`Successfully updated ${memberIds.length} members`, 'success');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update members';
-      showToast(errorMessage, 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to update members', 'error');
       throw err;
     }
   };
@@ -124,8 +90,7 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
       await loadMembers();
       showToast(`Successfully deleted ${memberIds.length} members`, 'success');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete members';
-      showToast(errorMessage, 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to delete members', 'error');
       throw err;
     }
   };
@@ -142,4 +107,3 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     batchDeleteMembers,
   } satisfies UseMembersResult;
 };
-

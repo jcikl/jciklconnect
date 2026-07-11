@@ -6,6 +6,16 @@ import './index.css';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './components/ui/Common';
 import { errorLoggingService } from './services/errorLoggingService';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 3 * 60 * 1000, // 3 min — matches existing cacheService TTL
+      retry: 1,
+    },
+  },
+});
 
 // Catch async errors that never reach the React ErrorBoundary (APK debugging)
 if (!(window as any).__globalErrorHandlersInstalled) {
@@ -33,10 +43,12 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ToastProvider>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ToastProvider>
+    </QueryClientProvider>
   </React.StrictMode>
 );

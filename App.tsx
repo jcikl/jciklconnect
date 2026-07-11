@@ -4496,16 +4496,18 @@ export const JCIKLApp: React.FC = () => {
 
           {/* Scrollable Area */}
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pt-4 pb-32 md:pb-4 px-5 sm:px-8">
-            <Suspense fallback={
-              <div className="flex flex-col gap-4 animate-pulse pt-2">
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />
-                <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-                <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-                <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-              </div>
-            }>
-              {renderCurrentView(scrollContainerRef)}
-            </Suspense>
+            <AsyncErrorBoundary>
+              <Suspense fallback={
+                <div className="flex flex-col gap-4 animate-pulse pt-2">
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />
+                  <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+                  <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+                  <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+                </div>
+              }>
+                {renderCurrentView(scrollContainerRef)}
+              </Suspense>
+            </AsyncErrorBoundary>
           </div>
         </main>
 
