@@ -115,6 +115,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Only set up listener if not in dev mode
     if (!checkDevMode()) {
       unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        // Snapshot isSigningUpRef at entry — the ref may be reset to false by signUp()
+        // BEFORE this async handler reaches its error-handling branches (race condition).
+        const isMidSignUp = isSigningUpRef.current;
+
         // Check dev mode state at the time of execution using global function
         if (!isMounted || checkDevMode()) {
           if (isMounted) {
@@ -175,7 +179,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setMember(memberData);
             } else if (!memberData && isMounted && !checkDevMode()) {
               // Still no member record — sign out, unless we're mid-signup (doc not written yet)
-              if (!isSigningUpRef.current) {
+              if (!isMidSignUp) {
                 // Delete orphaned Auth account (no members record = system-created by mistake)
                 try {
                   await fetch('/.netlify/functions/delete-auth-user', {
@@ -196,7 +200,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // Don't nullify auth state if we're mid-signup — the member doc hasn't
               // been written yet so getMemberByEmail will throw a permissions error,
               // which is expected. signUp() will set user/member itself on completion.
-              if (!isSigningUpRef.current) {
+              if (!isMidSignUp) {
                 setUser(null);
                 setMember(null);
               }
