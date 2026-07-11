@@ -255,6 +255,12 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft';
     }
 
+    // Self-registration pending review records (written by new PROBATION users, read by admins)
+    match /pendingRegistrations/{docId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin() || isBoard();
+    }
+
     // Story 9.1: 非会员留资
     match /nonMemberLeads/{leadId} {
       allow read: if isAuthenticated() && canReadOrgMembers();

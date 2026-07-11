@@ -185,9 +185,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Only log error if not in dev mode
             if (!checkDevMode() && isMounted) {
               console.error('Error loading member data:', error);
-              // Keep the UI logged-out rather than half-authenticated; session persists for retry
-              setUser(null);
-              setMember(null);
+              // Don't nullify auth state if we're mid-signup — the member doc hasn't
+              // been written yet so getMemberByEmail will throw a permissions error,
+              // which is expected. signUp() will set user/member itself on completion.
+              if (!isSigningUpRef.current) {
+                setUser(null);
+                setMember(null);
+              }
             } else if (checkDevMode()) {
               // In dev mode, silently ignore Firebase errors
               console.log('[DEV MODE] Skipping member data load from Firebase');
