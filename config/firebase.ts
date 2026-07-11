@@ -31,9 +31,15 @@ if (typeof window !== 'undefined') {
   );
 
   if (missingVars.length > 0) {
+    if (import.meta.env.PROD) {
+      throw new Error(
+        `[firebase] Missing required env vars: ${missingVars.join(', ')}. ` +
+        'Check your deployment config — the app will not function correctly without these.'
+      );
+    }
     console.warn(
       `⚠️ Missing Firebase environment variables: ${missingVars.join(', ')}\n` +
-      'Please check your .env file and ensure all Firebase configuration values are set.'
+      'Using fallback values. Set up your .env file for a proper local config.'
     );
   }
 }

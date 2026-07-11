@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fc from 'fast-check';
 import { GamificationService as AchievementService } from '../../services/gamificationService';
 import { Achievement, AchievementMilestone, MemberAchievementProgress, Member } from '../../types';
+import { calculateAwardProgress as calculateAchievementProgress } from '../../utils/gamificationUtils';
 
 // Mock Firebase
 vi.mock('../../config/firebase', () => ({
@@ -256,31 +257,3 @@ describe('Gamification Properties', () => {
   });
 });
 
-// Helper function to calculate achievement progress
-function calculateAchievementProgress(achievement: Achievement & { milestones: AchievementMilestone[] }, currentProgress: number): number {
-  const milestones = achievement.milestones.sort((a, b) => a.threshold - b.threshold);
-  
-  // Find completed milestones
-  let completedMilestones = 0;
-  for (const milestone of milestones) {
-    if (currentProgress >= milestone.threshold) {
-      completedMilestones++;
-    } else {
-      break;
-    }
-  }
-  
-  // If all milestones are completed, return 100%
-  if (completedMilestones === milestones.length) {
-    return 100;
-  }
-  
-  // Calculate progress towards the next milestone
-  const targetMilestone = milestones[completedMilestones];
-  const previousThreshold = completedMilestones > 0 ? milestones[completedMilestones - 1].threshold : 0;
-  
-  const progressInCurrentMilestone = Math.max(0, currentProgress - previousThreshold);
-  const milestoneRange = targetMilestone.threshold - previousThreshold;
-  
-  return Math.min(100, Math.round((progressInCurrentMilestone / milestoneRange) * 100));
-}

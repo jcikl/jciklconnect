@@ -16,6 +16,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode } from '../utils/devMode';
+import { calculateAwardProgress as calculateAwardProgressUtil } from '../utils/gamificationUtils';
 import {
     AwardDefinition,
     MemberAward,
@@ -181,39 +182,8 @@ export class GamificationService {
         return { id: awardDoc.id, ...awardDoc.data() } as AwardDefinition;
     }
 
-    /**
-     * Calculate progress toward an award based on current member activity.
-     */
     static calculateAwardProgress(award: AwardDefinition, currentProgressValue: number): number {
-        // If it's a milestone-based award, use milestone logic
-        if (award.milestones && award.milestones.length > 0) {
-            const sortedMilestones = [...award.milestones].sort((a, b) => a.threshold - b.threshold);
-            let lastThreshold = 0;
-            let currentTarget = sortedMilestones[0];
-
-            for (const milestone of sortedMilestones) {
-                if (currentProgressValue >= milestone.threshold) {
-                    lastThreshold = milestone.threshold;
-                } else {
-                    currentTarget = milestone;
-                    break;
-                }
-            }
-
-            // If all milestones reached
-            if (currentProgressValue >= sortedMilestones[sortedMilestones.length - 1].threshold) {
-                return 100;
-            }
-
-            const range = currentTarget.threshold - lastThreshold;
-            const progressInRange = currentProgressValue - lastThreshold;
-            return Math.min(100, Math.round((progressInRange / range) * 100));
-        }
-
-        // Simple threshold based award
-        const threshold = award.criteria.value;
-        if (threshold <= 0) return 0;
-        return Math.min(100, Math.round((currentProgressValue / threshold) * 100));
+        return calculateAwardProgressUtil(award, currentProgressValue);
     }
 
     /**

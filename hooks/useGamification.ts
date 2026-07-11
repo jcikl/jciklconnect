@@ -1,5 +1,6 @@
 // useGamification.ts - Unified Hook for Awards (Achievements + Badges)
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -23,40 +24,32 @@ export interface EnrichedAward extends AwardDefinition {
 }
 
 export const useGamification = (memberId?: string) => {
-    const [awards, setAwards] = useState<AwardDefinition[]>([]);
     const [memberAwards, setMemberAwards] = useState<EnrichedAward[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [memberAwardsLoading, setMemberAwardsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const { showToast } = useToast();
+    const queryClient = useQueryClient();
 
-    const loadAllAwards = useCallback(async () => {
-        try {
-            setLoading(true);
-            const allAwards = await GamificationService.getAllAwards();
-            setAwards(allAwards);
-        } catch (err) {
-            console.error('Error loading awards:', err);
-            setError('Failed to load award definitions');
-        } finally {
-            if (!memberId) setLoading(false);
-        }
-    }, [memberId]);
+    const { data: awards = [], isLoading: awardsLoading } = useQuery({
+        queryKey: ['awards'],
+        queryFn: () => GamificationService.getAllAwards(),
+        staleTime: 3 * 60 * 1000,
+    });
 
-    useEffect(() => {
-        loadAllAwards();
-    }, [loadAllAwards]);
+    const loading = awardsLoading || (!!memberId && memberAwardsLoading);
+
+    const loadAllAwards = () => queryClient.invalidateQueries({ queryKey: ['awards'] });
 
     useEffect(() => {
         if (!memberId || isDevMode()) {
             if (isDevMode() && memberId) {
-                // In dev mode, simulate some earned awards
                 setMemberAwards(awards.slice(0, 2).map(a => ({
                     ...a,
                     earnedAt: new Date().toISOString(),
                     isEarned: true,
                     progress: 100
                 })));
-                setLoading(false);
+                setMemberAwardsLoading(false);
             }
             return;
         }
@@ -71,7 +64,6 @@ export const useGamification = (memberId?: string) => {
             (snapshot) => {
                 const results = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MemberAward));
 
-                // Enroll definitions into member awards
                 const enrichedResults = results.map(res => {
                     const def = awards.find(a => a.id === res.awardId);
                     return def ? {
@@ -84,12 +76,12 @@ export const useGamification = (memberId?: string) => {
                 }).filter(Boolean) as EnrichedAward[];
 
                 setMemberAwards(enrichedResults);
-                setLoading(false);
+                setMemberAwardsLoading(false);
             },
             (err) => {
                 console.error('Error listening to member awards:', err);
                 setError('Could not keep track of earned awards');
-                setLoading(false);
+                setMemberAwardsLoading(false);
             }
         );
 

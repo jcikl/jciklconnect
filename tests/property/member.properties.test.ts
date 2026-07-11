@@ -1,56 +1,55 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { Member, UserRole } from '../../types';
+import { ROLE_PERMISSIONS } from '../../utils/rolePermissions';
 
 describe('Member Management Properties', () => {
   // Property 29: Board role permission synchronization
   it('Property 29: Board role permission synchronization', () => {
     /**
      * Feature: platform-enhancements, Property 29: Board role permission synchronization
-     * For any board role assignment, the member's permissions must be updated to match the new role.
+     * For any role assignment, the derived ROLE_PERMISSIONS must be consistent with the role hierarchy.
      * Validates: Requirements 12.2
      */
     fc.assert(
       fc.property(
-        fc.record({
-          id: fc.string({ minLength: 1 }),
-          name: fc.string({ minLength: 1 }),
-          email: fc.emailAddress(),
-          role: fc.constantFrom(UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN),
-          permissions: fc.array(fc.string({ minLength: 1 })),
-        }),
-        fc.constantFrom(UserRole.BOARD, UserRole.ADMIN),
-        (member, newRole) => {
-          // Simulate role assignment
-          const updatedMember = {
-            ...member,
-            role: newRole,
-            permissions: getRolePermissions(newRole),
-          };
+        fc.constantFrom(UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN),
+        (role) => {
+          const perms = ROLE_PERMISSIONS[role];
 
-          // Property: Role should be updated
-          expect(updatedMember.role).toBe(newRole);
-
-          // Property: Permissions should match the new role
-          const expectedPermissions = getRolePermissions(newRole);
-          expect(updatedMember.permissions).toEqual(expectedPermissions);
-
-          // Property: Board members should have board permissions
-          if (newRole === UserRole.BOARD) {
-            expect(updatedMember.permissions).toContain('manage_events');
-            expect(updatedMember.permissions).toContain('view_reports');
-            expect(updatedMember.permissions).toContain('manage_projects');
+          // Property: All non-admin active roles must have event access
+          if (role === UserRole.MEMBER || role === UserRole.BOARD) {
+            expect(perms.canManageEvents).toBe(true);
           }
 
-          // Property: Admin members should have all permissions
-          if (newRole === UserRole.ADMIN) {
-            expect(updatedMember.permissions).toContain('manage_members');
-            expect(updatedMember.permissions).toContain('manage_finances');
-            expect(updatedMember.permissions).toContain('system_admin');
+          // Property: Admin/SuperAdmin must have all permissions enabled
+          if (role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN) {
+            expect(perms.canEditMembers).toBe(true);
+            expect(perms.canEditFinance).toBe(true);
+            expect(perms.canManageProjects).toBe(true);
+            expect(perms.canManageAutomation).toBe(true);
+            expect(perms.canViewReports).toBe(true);
+            expect(perms.canManageSettings).toBe(true);
+            expect(perms.canApproveClaims).toBe(true);
           }
+
+          // Property: Static BOARD role does NOT have elevated permissions (elevation is dynamic via isCurrentBoardMember)
+          if (role === UserRole.BOARD) {
+            expect(perms.canEditFinance).toBe(false);
+            expect(perms.canManageSettings).toBe(false);
+          }
+
+          // Property: Permission escalation: ADMIN >= MEMBER for every flag
+          const memberPerms = ROLE_PERMISSIONS[UserRole.MEMBER];
+          const adminPerms = ROLE_PERMISSIONS[UserRole.ADMIN];
+          (Object.keys(memberPerms) as (keyof typeof memberPerms)[]).forEach(key => {
+            if (memberPerms[key]) {
+              expect(adminPerms[key]).toBe(true);
+            }
+          });
         }
       ),
-      { numRuns: 100 }
+      { numRuns: 10 } // deterministic — only 4 enum values
     );
   });
 
@@ -711,35 +710,4 @@ function isValidEmail(email: string): boolean {
 function isValidDate(dateString: string): boolean {
   const date = new Date(dateString);
   return !isNaN(date.getTime());
-}
-function getRolePermissions(role: UserRole): string[] {
-  switch (role) {
-    case UserRole.ADMIN:
-      return [
-        'manage_members',
-        'manage_finances',
-        'system_admin',
-        'manage_events',
-        'view_reports',
-        'manage_projects',
-        'manage_workflows',
-        'manage_gamification'
-      ];
-    case UserRole.BOARD:
-      return [
-        'manage_events',
-        'view_reports',
-        'manage_projects',
-        'manage_workflows',
-        'view_finances'
-      ];
-    case UserRole.MEMBER:
-    default:
-      return [
-        'view_events',
-        'register_events',
-        'view_projects',
-        'participate_activities'
-      ];
-  }
 }

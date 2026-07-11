@@ -1,4 +1,5 @@
 export * from './common';
+export * from './views';
 export * from './member';
 export * from './gamification';
 export * from './project';
