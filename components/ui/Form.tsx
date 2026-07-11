@@ -38,10 +38,22 @@ interface RadioGroupProps {
   error?: string;
 }
 
-export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, className = '', type, ...props }) => {
+export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, className = '', type, onChange, ...props }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
   const inputType = isPassword && showPassword ? 'text' : type;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (type === 'date' && e.target.value) {
+      const parts = e.target.value.split('-');
+      if (parts[0] && parts[0].length > 4) {
+        // Keep last 4 digits of year (sliding window)
+        parts[0] = parts[0].slice(-4);
+        e.target.value = parts.join('-'); // mutate DOM value directly
+      }
+    }
+    onChange?.(e);
+  };
 
   return (
     <div className="w-full">
@@ -59,6 +71,7 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
         )}
         <input
           type={inputType}
+          onChange={handleChange}
           className={`
             block w-full rounded-lg border-slate-300 shadow-sm py-2
             focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 sm:text-sm
