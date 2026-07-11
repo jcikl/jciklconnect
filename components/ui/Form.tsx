@@ -43,16 +43,52 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
   const isPassword = type === 'password';
   const inputType = isPassword && showPassword ? 'text' : type;
 
+  const EMAIL_RE = /[^a-zA-Z0-9@._+\-]/g;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (type === 'date' && e.target.value) {
       const parts = e.target.value.split('-');
       if (parts[0] && parts[0].length > 4) {
-        // Keep last 4 digits of year (sliding window)
         parts[0] = parts[0].slice(-4);
-        e.target.value = parts.join('-'); // mutate DOM value directly
+        e.target.value = parts.join('-');
+      }
+    }
+    if (type === 'email') {
+      const filtered = e.target.value.replace(EMAIL_RE, '');
+      if (filtered !== e.target.value) {
+        e.target.value = filtered;
+        // Pass synthetic event with filtered value so parent state setter gets clean value
+        onChange?.({ ...e, target: { ...e.target, value: filtered } } as React.ChangeEvent<HTMLInputElement>);
+        return;
       }
     }
     onChange?.(e);
+  };
+
+  const handleEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (type !== 'email') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (['Backspace','Delete','Tab','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)) return;
+    if (!/^[a-zA-Z0-9@._+\-]$/.test(e.key)) e.preventDefault();
+  };
+
+  const handleEmailPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (type !== 'email') return;
+    e.preventDefault();
+    const filtered = e.clipboardData.getData('text').replace(EMAIL_RE, '');
+    document.execCommand('insertText', false, filtered);
+  };
+
+  const handleEmailCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    if (type !== 'email') return;
+    const input = e.currentTarget;
+    const filtered = input.value.replace(EMAIL_RE, '');
+    if (filtered !== input.value) {
+      // Force DOM value then fire React's onChange via native input event
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(input, filtered);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   };
 
   return (
@@ -72,6 +108,9 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
         <input
           type={inputType}
           onChange={handleChange}
+          onKeyDown={handleEmailKeyDown}
+          onPaste={handleEmailPaste}
+          onCompositionEnd={handleEmailCompositionEnd}
           className={`
             block w-full rounded-lg border-slate-300 shadow-sm py-2
             focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 sm:text-sm
