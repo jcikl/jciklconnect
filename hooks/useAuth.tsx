@@ -306,7 +306,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         id: mockUser.uid,
         name,
         email,
-        role: UserRole.GUEST,
+        role: UserRole.SUPER_ADMIN,
         tier: 'Bronze' as any,
         points: 0,
         joinDate: new Date().toISOString().split('T')[0],
