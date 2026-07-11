@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Member, UserRole, MemberTier } from '../types';
@@ -23,7 +23,6 @@ import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
 import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored } from '../utils/authStorage';
 import { MembersService } from '../services/membersService';
 import { BoardManagementService } from '../services/boardManagementService';
-import { CommunicationService } from '../services/communicationService';
 
 interface AuthContextType {
   user: User | null;
@@ -403,25 +402,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);
     isSigningUpRef.current = false;
 
-    // 4. Notify admins & board members about the new self-registration
+    // 4. Write a pending-review record to a dedicated collection so admins
+    //    can see it without requiring the new user to list all admin members
+    //    (which would fail Firestore rules for a brand-new PROBATION account).
     if (isNewSelfRegistration) {
       try {
-        const adminRoles = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BOARD];
-        const membersColl = collection(db, COLLECTIONS.MEMBERS);
-        const adminSnap = await getDocs(
-          query(membersColl, where('role', 'in', adminRoles))
-        );
-        const notifyAll = adminSnap.docs.map(d =>
-          CommunicationService.createNotification({
-            memberId: d.id,
-            title: 'New Member Registration — Pending Review',
-            message: `${additionalData?.fullName || name} (${email}) has submitted a membership application and is awaiting approval.`,
-            type: 'info',
-          }).catch(() => { /* don't block signup on notification failure */ })
-        );
-        await Promise.allSettled(notifyAll);
+        const { addDoc, collection: col } = await import('firebase/firestore');
+        await addDoc(col(db, 'pendingRegistrations'), {
+          memberId: userCredential!.user.uid,
+          name: additionalData?.fullName || name,
+          email,
+          submittedAt: new Date().toISOString(),
+          status: 'pending',
+        });
       } catch {
-        // Notification failure must not break the registration flow
+        // Non-critical — admins can still see PROBATION members in GuestManagementView
       }
     }
 
