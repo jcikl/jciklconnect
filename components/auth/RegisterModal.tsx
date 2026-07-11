@@ -54,9 +54,8 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const { signUp } = useAuth();
   const { showToast } = useToast();
 
-  // Real-time duplicate check for email and phone
+  // Real-time duplicate check for email and phone (members collection is the sole gate)
   const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle');
-  const [emailAuthOnly, setEmailAuthOnly] = useState(false); // taken via Google Auth but not in members
   const [phoneStatus, setPhoneStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle');
   const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,14 +69,10 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         body: JSON.stringify({ field, value }),
       });
       const data = await res.json();
-      if (field === 'email') {
-        setEmailStatus(data.exists ? 'taken' : 'available');
-        setEmailAuthOnly(!!data.authOnly);
-      } else {
-        setPhoneStatus(data.exists ? 'taken' : 'available');
-      }
+      if (field === 'email') setEmailStatus(data.exists ? 'taken' : 'available');
+      else setPhoneStatus(data.exists ? 'taken' : 'available');
     } catch {
-      if (field === 'email') { setEmailStatus('idle'); setEmailAuthOnly(false); }
+      if (field === 'email') setEmailStatus('idle');
       else setPhoneStatus('idle');
     }
   };
@@ -148,9 +143,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           return false;
         }
         if (emailStatus === 'taken') {
-          setError(emailAuthOnly
-            ? '此电邮已通过 Google 登录注册，请使用 Google 登录，或联系管理员'
-            : '此电邮已注册，请直接登录');
+          setError('此电邮已注册，请直接登录');
           return false;
         }
         if (emailStatus === 'checking') {
