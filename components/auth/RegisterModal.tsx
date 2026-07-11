@@ -56,6 +56,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
   // Real-time duplicate check for email and phone
   const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle');
+  const [emailAuthOnly, setEmailAuthOnly] = useState(false); // taken via Google Auth but not in members
   const [phoneStatus, setPhoneStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle');
   const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,10 +70,14 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         body: JSON.stringify({ field, value }),
       });
       const data = await res.json();
-      if (field === 'email') setEmailStatus(data.exists ? 'taken' : 'available');
-      else setPhoneStatus(data.exists ? 'taken' : 'available');
+      if (field === 'email') {
+        setEmailStatus(data.exists ? 'taken' : 'available');
+        setEmailAuthOnly(!!data.authOnly);
+      } else {
+        setPhoneStatus(data.exists ? 'taken' : 'available');
+      }
     } catch {
-      if (field === 'email') setEmailStatus('idle');
+      if (field === 'email') { setEmailStatus('idle'); setEmailAuthOnly(false); }
       else setPhoneStatus('idle');
     }
   };
@@ -143,7 +148,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           return false;
         }
         if (emailStatus === 'taken') {
-          setError('此电邮已注册，请直接登录');
+          setError(emailAuthOnly
+            ? '此电邮已通过 Google 登录注册，请使用 Google 登录，或联系管理员'
+            : '此电邮已注册，请直接登录');
           return false;
         }
         if (emailStatus === 'checking') {
@@ -288,7 +295,14 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         agreeToPrivacy: false,
       });
     } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to register. Please try again.';
+      const code = err?.code || '';
+      const errorMessage = code === 'auth/email-already-in-use'
+        ? '此电邮已注册。如使用 Google 登录过，请改用 Google 登录；否则请直接登录'
+        : code === 'auth/weak-password'
+        ? '密码强度不足，请至少使用 6 个字符'
+        : code === 'auth/network-request-failed'
+        ? '网络连接失败，请检查网络后重试'
+        : err?.message || 'Failed to register. Please try again.';
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
