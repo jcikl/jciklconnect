@@ -176,6 +176,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } else if (!memberData && isMounted && !checkDevMode()) {
               // Still no member record — sign out, unless we're mid-signup (doc not written yet)
               if (!isSigningUpRef.current) {
+                // Delete orphaned Auth account (no members record = system-created by mistake)
+                try {
+                  await fetch('/.netlify/functions/delete-auth-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid: firebaseUser.uid }),
+                  });
+                } catch { /* non-critical */ }
                 await firebaseSignOut(auth);
                 setUser(null);
                 setMember(null);
@@ -266,15 +274,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Regular Firebase authentication
-    const userCred = await signInWithEmailAndPassword(auth, email, password);
+    let userCred;
+    try {
+      userCred = await signInWithEmailAndPassword(auth, email, password);
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
+        // Auth doesn't exist — check if this email belongs to a member
+        try {
+          const res = await fetch('/.netlify/functions/check-and-create-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json();
+          if (data.isMember && data.created) {
+            // Auth just created — send password reset so member can set their password
+            const { sendPasswordResetEmail } = await import('firebase/auth');
+            await sendPasswordResetEmail(auth, email);
+            throw new Error('密码重置邮件已发送至您的邮箱，请查收后设置密码再登录');
+          }
+          if (data.isMember && data.authExists) {
+            throw new Error('密码错误，请重试或点击"忘记密码"重置');
+          }
+        } catch (inner: any) {
+          if (inner.message && !inner.message.includes('check-and-create')) throw inner;
+        }
+        throw new Error('账号不存在，请先注册');
+      }
+      throw err;
+    }
 
-    // Check if member exists by UID or email
+    // Login succeeded — check if member record exists
     const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, userCred.user.uid));
     if (!memberDoc.exists()) {
       const existingProfile = await MembersService.getMemberByEmail(email);
       if (!existingProfile) {
+        // Orphaned Auth account (no members record) — delete and kick out
+        try {
+          await fetch('/.netlify/functions/delete-auth-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: userCred.user.uid }),
+          });
+        } catch { /* non-critical */ }
         await firebaseSignOut(auth);
-        throw new Error('This account does not exist in the member list. Please contact the administrator.');
+        throw new Error('账号不存在，请先注册');
       }
       // Note: Linking is handled by onAuthStateChanged listener
     }
@@ -360,19 +405,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let userCredential;
     try {
       userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      isSigningUpRef.current = false;
-      throw err;
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use') {
+        // Orphaned Auth account (no members record verified by earlier check) — delete and retry
+        try {
+          await fetch('/.netlify/functions/delete-auth-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        } catch (retryErr) {
+          isSigningUpRef.current = false;
+          throw retryErr;
+        }
+      } else {
+        isSigningUpRef.current = false;
+        throw err;
+      }
     }
     await updateProfile(userCredential!.user, { displayName: name });
 
     // 3. Create or Update member document
-    // Self-registrations (no pre-imported profile) start at PROBATION pending admin review
+    // Self-registrations (no pre-imported profile) start as GUEST pending admin review
     const isNewSelfRegistration = !existingProfile;
     const newMember: Partial<Member> = {
       name,
       email,
-      role: existingProfile?.role || UserRole.PROBATION,
+      role: existingProfile?.role || UserRole.GUEST,
       tier: existingProfile?.tier || ('Bronze' as any),
       points: existingProfile?.points || 0,
       joinDate: existingProfile?.joinDate || new Date().toISOString().split('T')[0],
@@ -467,8 +527,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!memberDoc.exists()) {
       const existingProfile = await MembersService.getMemberByEmail(email);
       if (!existingProfile) {
+        // Orphaned Auth account (no members record) — delete and kick out
+        try {
+          await fetch('/.netlify/functions/delete-auth-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: userCredential.user.uid }),
+          });
+        } catch { /* non-critical */ }
         await firebaseSignOut(auth);
-        throw new Error('This account does not exist in the member list. Please contact the administrator.');
+        throw new Error('账号不存在，请先注册');
       }
       // Note: Linking to UID is handled automatically by the onAuthStateChanged listener above
     }
