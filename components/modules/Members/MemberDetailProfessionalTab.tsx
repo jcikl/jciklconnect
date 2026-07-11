@@ -13,7 +13,7 @@ interface MemberDetailProfessionalTabProps {
   activeInlineEditCard: string | null;
 }
 
-export const MemberDetailProfessionalTab: React.FC<MemberDetailProfessionalTabProps> = (props) => {
+const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps> = (props) => {
   const { member, isEditMode, inlineValues, setInlineValues, activeInlineEditCard } = props;
 
   return (
@@ -256,3 +256,5 @@ export const MemberDetailProfessionalTab: React.FC<MemberDetailProfessionalTabPr
     </div>
   );
 };
+
+export const MemberDetailProfessionalTab = React.memo(MemberDetailProfessionalTabBase);

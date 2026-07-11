@@ -13,7 +13,7 @@ export interface EventBudgetTabProps {
   onEdit: () => void;
 }
 
-export const EventBudgetTab: React.FC<EventBudgetTabProps> = ({
+const EventBudgetTabBase: React.FC<EventBudgetTabProps> = ({
   event,
   budget,
   loading,
@@ -157,3 +157,5 @@ export const EventBudgetTab: React.FC<EventBudgetTabProps> = ({
     </div>
   );
 };
+
+export const EventBudgetTab = React.memo(EventBudgetTabBase);

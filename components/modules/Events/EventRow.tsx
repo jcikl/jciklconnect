@@ -4,7 +4,7 @@ import { Badge, Button } from '../../ui/Common';
 import { Event } from '../../../types';
 import type { Member } from '../../../types';
 
-export const EventRow: React.FC<{
+const EventRowBase: React.FC<{
   event: Event;
   member?: Member | null;
   onRegister?: () => void;
@@ -76,3 +76,5 @@ export const EventRow: React.FC<{
     </div>
   );
 };
+
+export const EventRow = React.memo(EventRowBase);

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Trash2, Settings, X } from 'lucide-react';
 
 // Batch Action Bar Component
-export const BatchActionBar: React.FC<{
+const BatchActionBarBase: React.FC<{
   selectedCount: number,
   onClear: () => void,
   onBatchDelete: () => void,
@@ -54,3 +54,5 @@ export const BatchActionBar: React.FC<{
     </div>
   );
 };
+
+export const BatchActionBar = React.memo(BatchActionBarBase);

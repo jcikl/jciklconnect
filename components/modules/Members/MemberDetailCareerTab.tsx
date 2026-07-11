@@ -23,7 +23,7 @@ interface MemberDetailCareerTabProps {
   setShowPaymentHistoryModal: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export const MemberDetailCareerTab: React.FC<MemberDetailCareerTabProps> = (props) => {
+const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) => {
   const {
     member, isEditMode, inlineValues, setInlineValues,
     boardPositions, commissionDirectorPositions,
@@ -450,3 +450,5 @@ export const MemberDetailCareerTab: React.FC<MemberDetailCareerTabProps> = (prop
     </div>
   );
 };
+
+export const MemberDetailCareerTab = React.memo(MemberDetailCareerTabBase);

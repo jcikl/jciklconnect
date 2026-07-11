@@ -22,7 +22,7 @@ interface ProjectGridProps {
   projectTrackerTransactions?: ProjectTransaction[];
 }
 
-export const ProjectGrid: React.FC<ProjectGridProps> = ({
+const ProjectGridBase: React.FC<ProjectGridProps> = ({
   projects,
   loading,
   error,
@@ -262,3 +262,5 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
     </LoadingState>
   );
 };
+
+export const ProjectGrid = React.memo(ProjectGridBase);

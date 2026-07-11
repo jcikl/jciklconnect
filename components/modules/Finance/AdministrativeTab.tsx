@@ -24,7 +24,7 @@ interface AdministrativeTabProps {
   projects: Project[];
 }
 
-export const AdministrativeTab: React.FC<AdministrativeTabProps> = ({
+const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
   transactions,
   isTransactionInCategory,
   adminAccountYearFilter,
@@ -290,3 +290,5 @@ export const AdministrativeTab: React.FC<AdministrativeTabProps> = ({
     </div>
   );
 };
+
+export const AdministrativeTab = React.memo(AdministrativeTabBase);

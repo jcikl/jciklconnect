@@ -9,7 +9,7 @@ export interface EventStatsTabProps {
   showToast: (message: string, variant: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
-export const EventStatsTab: React.FC<EventStatsTabProps> = ({ participations, members, showToast }) => {
+const EventStatsTabBase: React.FC<EventStatsTabProps> = ({ participations, members, showToast }) => {
   const allRegs = participations;
   const activeRegs = allRegs.filter(r => r.status !== 'cancelled');
   const totalRegistered = allRegs.filter(r => r.status === 'registered').length;
@@ -197,3 +197,5 @@ export const EventStatsTab: React.FC<EventStatsTabProps> = ({ participations, me
     </div>
   );
 };
+
+export const EventStatsTab = React.memo(EventStatsTabBase);

@@ -14,7 +14,7 @@ export interface EventFeedbackTabProps {
   onSubmitFeedback: () => void;
 }
 
-export const EventFeedbackTab: React.FC<EventFeedbackTabProps> = ({
+const EventFeedbackTabBase: React.FC<EventFeedbackTabProps> = ({
   event,
   feedback,
   loading,
@@ -138,3 +138,5 @@ export const EventFeedbackTab: React.FC<EventFeedbackTabProps> = ({
     </div>
   );
 };
+
+export const EventFeedbackTab = React.memo(EventFeedbackTabBase);

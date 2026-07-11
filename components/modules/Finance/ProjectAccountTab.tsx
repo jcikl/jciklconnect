@@ -30,7 +30,7 @@ interface ProjectAccountTabProps {
   projects: Project[];
 }
 
-export const ProjectAccountTab: React.FC<ProjectAccountTabProps> = ({
+const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
   loadingProjectAccounts,
   filteredProjectAccounts,
   uncategorizedProjectTxCount,
@@ -376,3 +376,5 @@ export const ProjectAccountTab: React.FC<ProjectAccountTabProps> = ({
     </div>
   );
 };
+
+export const ProjectAccountTab = React.memo(ProjectAccountTabBase);

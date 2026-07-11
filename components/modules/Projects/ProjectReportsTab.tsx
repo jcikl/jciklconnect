@@ -9,7 +9,7 @@ export interface ProjectReportsTabProps {
   loading: boolean;
 }
 
-export const ProjectReportsTab: React.FC<ProjectReportsTabProps> = ({
+const ProjectReportsTabBase: React.FC<ProjectReportsTabProps> = ({
   projectName,
   onGenerateReport,
   loading,
@@ -50,3 +50,5 @@ export const ProjectReportsTab: React.FC<ProjectReportsTabProps> = ({
     </div>
   );
 };
+
+export const ProjectReportsTab = React.memo(ProjectReportsTabBase);

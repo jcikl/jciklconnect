@@ -36,7 +36,7 @@ interface MemberDetailBasicTabProps {
   resolveIntroducerDisplay: (introVal?: string) => string;
 }
 
-export const MemberDetailBasicTab: React.FC<MemberDetailBasicTabProps> = (props) => {
+const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) => {
   const {
     member, isEditMode, inlineValues, setInlineValues,
     isAdmin, isDeveloper, loadingChurnPrediction, handleAnalyzeChurn,
@@ -657,3 +657,5 @@ export const MemberDetailBasicTab: React.FC<MemberDetailBasicTabProps> = (props)
     </div>
   );
 };
+
+export const MemberDetailBasicTab = React.memo(MemberDetailBasicTabBase);

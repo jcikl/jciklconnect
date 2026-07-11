@@ -15,7 +15,7 @@ interface MemberDetailActivitiesTabProps {
   isPresident: boolean;
 }
 
-export const MemberDetailActivitiesTab: React.FC<MemberDetailActivitiesTabProps> = (props) => {
+const MemberDetailActivitiesTabBase: React.FC<MemberDetailActivitiesTabProps> = (props) => {
   const {
     activitiesLoading, radarContributions, groupedRadarContributions,
     sponsorshipRecords, projectRoles, recruitedMembers, isPresident,
@@ -203,3 +203,5 @@ export const MemberDetailActivitiesTab: React.FC<MemberDetailActivitiesTabProps>
     </div>
   );
 };
+
+export const MemberDetailActivitiesTab = React.memo(MemberDetailActivitiesTabBase);
