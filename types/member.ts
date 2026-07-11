@@ -263,7 +263,6 @@ export interface Member {
   name?: string;
   fullName?: string;
   chiName?: string;
-  chineseName?: string;
   nickName?: string;
   dob?: string;
   dateOfBirth?: string;

@@ -89,7 +89,6 @@ function getMemberNames(member: any): string[] {
   const names = new Set<string>();
   if (member.name) names.add(member.name.trim().toLowerCase());
   if (member.fullName) names.add(member.fullName.trim().toLowerCase());
-  if (member.chineseName) names.add(member.chineseName.trim().toLowerCase());
   if (member.chiName) names.add(member.chiName.trim().toLowerCase());
   if (member.general) {
     if (member.general.name) names.add(member.general.name.trim().toLowerCase());

@@ -475,7 +475,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       const mobileDividerStyle = thisMobileScore === 1 ? 'text-sky-500' : 'text-slate-400';
                       const ownerMember = members.find(m => m.id === biz.memberId);
                       const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
-                      const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
+                      const chineseName = ownerMember?.general?.chineseName;
                       const position = ownerMember?.business?.position || 'Representative';
                       const intlStatus = biz.acceptsInternationalBusiness;
                       return (
@@ -624,7 +624,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                         const dividerStyle = thisScore === 1 ? 'text-sky-500' : 'text-slate-400';
                         const ownerMember = members.find(m => m.id === biz.memberId);
                         const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
-                        const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
+                        const chineseName = ownerMember?.general?.chineseName;
                         const position = ownerMember?.business?.position || 'Representative';
                         const intlStatus = biz.acceptsInternationalBusiness;
                         return (
@@ -772,7 +772,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
             const biz = detailBiz;
             const ownerMember = members.find(m => m.id === biz.memberId);
             const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
-            const chineseName = ownerMember?.general?.chineseName || ownerMember?.chineseName;
+            const chineseName = ownerMember?.general?.chineseName;
             const position = ownerMember?.business?.position || 'Representative';
             const intlStatus = biz.acceptsInternationalBusiness;
             return (
