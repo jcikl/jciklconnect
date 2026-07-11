@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Phone, Mail, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Sparkles } from 'lucide-react';
+import { Phone, Mail, MessageCircle, MapPin, Linkedin, Facebook, Instagram } from 'lucide-react';
 import { Button, Card, Badge } from '../../ui/Common';
 import { Combobox } from '../../ui/Combobox';
 import { IntroducerSelector } from '../../ui/IntroducerSelector';
@@ -24,8 +24,6 @@ interface MemberDetailBasicTabProps {
   setInlineValues: React.Dispatch<React.SetStateAction<any>>;
   isAdmin: boolean;
   isDeveloper: boolean;
-  loadingChurnPrediction: boolean;
-  handleAnalyzeChurn: () => void;
   loadingClubs: boolean;
   memberClubs: HobbyClub[];
   members: Member[];
@@ -39,7 +37,7 @@ interface MemberDetailBasicTabProps {
 const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) => {
   const {
     member, isEditMode, inlineValues, setInlineValues,
-    isAdmin, isDeveloper, loadingChurnPrediction, handleAnalyzeChurn,
+    isAdmin, isDeveloper,
     loadingClubs, memberClubs, members, allProjects,
     avatarUploading, avatarUploadProgress, handleInlineAvatarUpload,
     resolveIntroducerDisplay,
@@ -333,12 +331,6 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
             </div>
           )}
         </Card>
-
-        {(isAdmin || isDeveloper) && (
-          <Button variant="outline" size="sm" className="w-full" onClick={handleAnalyzeChurn} isLoading={loadingChurnPrediction}>
-            <Sparkles size={14} className="mr-2" /> Analyze Churn Risk
-          </Button>
-        )}
 
         <Card title="Hobby Clubs">
           {loadingClubs ? (

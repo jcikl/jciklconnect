@@ -16,7 +16,6 @@ import { useMembers } from '../../hooks/useMembers';
 import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
 import { NudgeBanner } from '../ui/NudgeBanner';
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
-import { ActivityRecommendationService } from '../../services/activityRecommendationService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { MEMBER_TIERS, MEMBER_PRIVILEGES, BOUNTY_STATUS } from '../../config/constants';
 import { ContractService, CommitmentContract } from '../../services/contractService';
@@ -75,8 +74,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);
-  const [recommendedEvents, setRecommendedEvents] = useState<Event[]>([]);
-  const [loadingRecommendedEvents, setLoadingRecommendedEvents] = useState(false);
   const [myRegistrationEventIds, setMyRegistrationEventIds] = useState<string[]>([]);
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
   const [eventTab, setEventTab] = useState<'upcoming' | 'past'>('upcoming');
@@ -247,23 +244,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       }
     };
     loadRecommendations();
-  }, [member]);
-
-  // Load activity-based recommended events (Story 9.1)
-  useEffect(() => {
-    const load = async () => {
-      if (!member) return;
-      setLoadingRecommendedEvents(true);
-      try {
-        const list = await ActivityRecommendationService.getRecommendedEvents(member.id, 5);
-        setRecommendedEvents(list);
-      } catch {
-        setRecommendedEvents([]);
-      } finally {
-        setLoadingRecommendedEvents(false);
-      }
-    };
-    load();
   }, [member]);
 
   // Calculate stats from real data
@@ -646,7 +626,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 .sort((a, b) => eventTab === 'upcoming' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime())
                 .slice(0, 8)
                 .map(event => {
-                  const isRecommended = recommendedEvents.some(re => re.id === event.id);
+                  const isRecommended = false;
                   const isRegistered = myRegistrationEventIds.includes(event.id!);
                   const date = new Date(event.date);
                   const isUpcoming = eventTab === 'upcoming';

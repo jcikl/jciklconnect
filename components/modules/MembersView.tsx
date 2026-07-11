@@ -87,8 +87,6 @@ import { MemberTable } from './Members/MemberTable';
 import { MyProfileSelfView } from './Members/MyProfileSelfView';
 import { MemberDetail } from './Members/MemberDetail';
 import { MentorMatchingModal } from './Members/MentorMatchingModal';
-import { ChurnPredictionModal } from './Members/ChurnPredictionModal';
-
 const HOBBY_OPTIONS = [
   "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
   "Cigar", "Cooking", "Cycling", "Dancing", "Diving",

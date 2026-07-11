@@ -1,14 +1,10 @@
 // AI Insights View - Unified AI predictions, recommendations, and analytics
 import React, { useState, useEffect } from 'react';
-import { Sparkles, TrendingDown, TrendingUp, Users, Calendar, Target, Heart, AlertTriangle, Lightbulb, BarChart3, RefreshCw, BookOpen } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, ProgressBar, StatCardsContainer } from '../ui/Common';
+import { TrendingUp, Users, Calendar, Target, AlertTriangle, Lightbulb, RefreshCw, BookOpen } from 'lucide-react';
+import { Card, Button, Badge, useToast, ProgressBar } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
-import { useAuth } from '../../hooks/useAuth';
-import { useMembers } from '../../hooks/useMembers';
 import { useEvents } from '../../hooks/useEvents';
 import { useProjects } from '../../hooks/useProjects';
-import { ChurnPredictionService, ChurnRiskFactors } from '../../services/churnPredictionService';
-import { AIRecommendationService, Recommendation } from '../../services/aiRecommendationService';
 import { AIPredictionService, EventDemandPrediction, ProjectSuccessPrediction } from '../../services/aiPredictionService';
 import { formatDate } from '../../utils/dateUtils';
 
@@ -18,74 +14,16 @@ interface AIInsightsViewProps {
 }
 
 export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate, searchQuery }) => {
-    const [activeTab, setActiveTab] = useState<'churn' | 'recommendations' | 'predictions'>('churn');
-    const [churnData, setChurnData] = useState<Array<{ member: any; risk: ChurnRiskFactors }>>([]);
-    const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [eventPredictions, setEventPredictions] = useState<EventDemandPrediction[]>([]);
     const [projectPredictions, setProjectPredictions] = useState<ProjectSuccessPrediction[]>([]);
     const [loading, setLoading] = useState(false);
-    const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-    const { member: currentMember } = useAuth();
-    const { members } = useMembers();
     const { events } = useEvents();
     const { projects } = useProjects();
     const { showToast } = useToast();
 
     useEffect(() => {
-        if (activeTab === 'churn') {
-            loadChurnPredictions();
-        } else if (activeTab === 'recommendations' && currentMember) {
-            loadRecommendations();
-        } else if (activeTab === 'predictions') {
-            loadPredictions();
-        }
-    }, [activeTab, currentMember]);
-
-    const loadChurnPredictions = async () => {
-        setLoading(true);
-        try {
-            const membersAtRisk = await ChurnPredictionService.getMembersAtRisk('Medium');
-            setChurnData(membersAtRisk.map(m => ({ member: m, risk: m.churnRisk })));
-        } catch (err) {
-            showToast('Failed to load churn predictions', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadRecommendations = async () => {
-        if (!currentMember) return;
-        setLoading(true);
-        try {
-            // Use AIPredictionService for personalized recommendations (more comprehensive)
-            const personalizedRecs = await AIPredictionService.getPersonalizedRecommendations(currentMember.id, 10);
-            // Convert to Recommendation format for compatibility
-            const recs: Recommendation[] = personalizedRecs
-                .filter(rec => rec.type !== 'business_opportunity') // Filter out unsupported types
-                .map(rec => ({
-                    type: rec.type === 'hobby_club' ? 'club' : rec.type === 'mentorship' ? 'mentor' :
-                        rec.type === 'project' ? 'project' : rec.type === 'event' ? 'event' :
-                            rec.type === 'training' ? 'training' : rec.type === 'role' ? 'role' : 'club',
-                    id: rec.itemId,
-                    title: rec.itemName,
-                    description: rec.reasons.join('. '),
-                    reason: rec.reasons.join('. '),
-                    score: rec.matchScore,
-                    metadata: rec.metadata,
-                }));
-            setRecommendations(recs);
-        } catch (err) {
-            // Fallback to AIRecommendationService if AIPredictionService fails
-            try {
-                const recs = await AIRecommendationService.getRecommendations(currentMember.id);
-                setRecommendations(recs);
-            } catch (fallbackErr) {
-                showToast('Failed to load recommendations', 'error');
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
+        loadPredictions();
+    }, []);
 
     const loadPredictions = async () => {
         setLoading(true);
@@ -117,314 +55,28 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate, sear
         }
     };
 
-    const getRiskColor = (riskLevel: string) => {
-        switch (riskLevel) {
-            case 'High': return 'text-red-600 bg-red-50 border-red-200';
-            case 'Medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-            case 'Low': return 'text-green-600 bg-green-50 border-green-200';
-            default: return 'text-slate-600 bg-slate-50 border-slate-200';
-        }
-    };
-
-    const getRecommendationIcon = (type: Recommendation['type']) => {
-        switch (type) {
-            case 'project': return <Target size={20} />;
-            case 'event': return <Calendar size={20} />;
-            case 'training': return <BookOpen size={20} />;
-            case 'mentor': return <Users size={20} />;
-            case 'club': return <Heart size={20} />;
-            case 'role': return <TrendingUp size={20} />;
-            default: return <Lightbulb size={20} />;
-        }
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900">AI Insights & Predictions</h2>
-                    <p className="text-slate-500">Intelligent analytics, predictions, and personalized recommendations.</p>
+                    <p className="text-slate-500">Intelligent analytics and event & project predictions.</p>
                 </div>
-                <Button variant="outline" onClick={() => {
-                    if (activeTab === 'churn') loadChurnPredictions();
-                    else if (activeTab === 'recommendations') loadRecommendations();
-                    else loadPredictions();
-                }}>
+                <Button variant="outline" onClick={loadPredictions}>
                     <RefreshCw size={16} className="mr-2" /> Refresh
                 </Button>
             </div>
 
-            <Card noPadding>
-                <div className="px-4 md:px-6 pt-4">
-                    <Tabs
-                        tabs={['Churn Prediction', 'Personalized Recommendations', 'Event & Project Predictions']}
-                        activeTab={
-                            activeTab === 'churn' ? 'Churn Prediction' :
-                                activeTab === 'recommendations' ? 'Personalized Recommendations' :
-                                    'Event & Project Predictions'
-                        }
-                        onTabChange={(tab) => {
-                            if (tab === 'Churn Prediction') setActiveTab('churn');
-                            else if (tab === 'Personalized Recommendations') setActiveTab('recommendations');
-                            else setActiveTab('predictions');
-                        }}
-                    />
-                </div>
-                <div className="p-4">
-                    {activeTab === 'churn' && (
-                        <ChurnPredictionView
-                            churnData={churnData}
-                            loading={loading}
-                            onSelectMember={setSelectedMemberId}
-                            searchQuery={searchQuery}
-                        />
-                    )}
-                    {activeTab === 'recommendations' && (
-                        <RecommendationsView
-                            recommendations={recommendations}
-                            loading={loading}
-                            currentMember={currentMember}
-                            onNavigate={onNavigate}
-                            searchQuery={searchQuery}
-                        />
-                    )}
-                    {activeTab === 'predictions' && (
-                        <PredictionsView
-                            eventPredictions={eventPredictions}
-                            projectPredictions={projectPredictions}
-                            loading={loading}
-                            projects={projects}
-                            events={events}
-                            onNavigate={onNavigate}
-                            searchQuery={searchQuery}
-                        />
-                    )}
-                </div>
-            </Card>
-
-            {selectedMemberId && (
-                <MemberChurnDetailModal
-                    memberId={selectedMemberId}
-                    onClose={() => setSelectedMemberId(null)}
-                    drawerOnMobile
-                />
-            )}
+            <PredictionsView
+                eventPredictions={eventPredictions}
+                projectPredictions={projectPredictions}
+                loading={loading}
+                projects={projects}
+                events={events}
+                onNavigate={onNavigate}
+                searchQuery={searchQuery}
+            />
         </div>
-    );
-};
-
-// Churn Prediction View Component
-const ChurnPredictionView: React.FC<{
-    churnData: Array<{ member: any; risk: ChurnRiskFactors }>;
-    loading: boolean;
-    onSelectMember: (memberId: string) => void;
-    searchQuery?: string;
-}> = ({ churnData, loading, onSelectMember, searchQuery }) => {
-    const term = (searchQuery || '').toLowerCase();
-    const filteredChurnData = term
-        ? churnData.filter(d =>
-            (d.member?.name ?? '').toLowerCase().includes(term) ||
-            (d.member?.email ?? '').toLowerCase().includes(term)
-        )
-        : churnData;
-
-    const highRisk = filteredChurnData.filter(d => d.risk.riskLevel === 'High');
-    const mediumRisk = filteredChurnData.filter(d => d.risk.riskLevel === 'Medium');
-    const lowRisk = filteredChurnData.filter(d => d.risk.riskLevel === 'Low');
-
-    return (
-        <LoadingState loading={loading} error={null} empty={filteredChurnData.length === 0} emptyMessage="No members at risk identified">
-            <div className="space-y-6">
-                {/* Risk Summary */}
-                <StatCardsContainer>
-                    <Card>
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-red-600">{highRisk.length}</div>
-                            <div className="text-sm text-slate-500">High Risk</div>
-                        </div>
-                    </Card>
-                    <Card>
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-yellow-600">{mediumRisk.length}</div>
-                            <div className="text-sm text-slate-500">Medium Risk</div>
-                        </div>
-                    </Card>
-                    <Card>
-                        <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">{lowRisk.length}</div>
-                            <div className="text-sm text-slate-500">Low Risk</div>
-                        </div>
-                    </Card>
-                </StatCardsContainer>
-
-                {/* Members at Risk */}
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Members at Risk</h3>
-                    <div className="space-y-3">
-                        {filteredChurnData.map(({ member, risk }) => (
-                            <Card
-                                key={member.id}
-                                className="hover:shadow-md transition-shadow cursor-pointer"
-                                onClick={() => onSelectMember(member.id)}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <img src={member.avatar} alt={member.name} className="w-12 h-12 rounded-full" />
-                                        <div>
-                                            <h4 className="font-bold text-slate-900">{member.name}</h4>
-                                            <p className="text-sm text-slate-500">{member.email}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
-                                            <div className="text-sm text-slate-500">Risk Score</div>
-                                            <div className="text-lg font-bold text-slate-900">{risk.riskScore}</div>
-                                        </div>
-                                        <Badge variant={risk.riskLevel === 'High' ? 'error' : risk.riskLevel === 'Medium' ? 'warning' : 'success'}>
-                                            {risk.riskLevel} Risk
-                                        </Badge>
-                                    </div>
-                                </div>
-                                <div className="mt-4 pt-4 border-t">
-                                    <div className="grid grid-cols-4 gap-4 text-sm">
-                                        <div>
-                                            <span className="text-slate-500">Attendance:</span>
-                                            <span className="ml-2 font-medium">{risk.attendanceRate}%</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-slate-500">Days Since Last Event:</span>
-                                            <span className="ml-2 font-medium">{risk.daysSinceLastEvent}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-slate-500">Dues Status:</span>
-                                            <span className="ml-2 font-medium">{risk.duesStatus}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-slate-500">Engagement Score:</span>
-                                            <span className="ml-2 font-medium">{risk.engagementScore}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </LoadingState>
-    );
-};
-
-// Recommendations View Component
-const RecommendationsView: React.FC<{
-    recommendations: Recommendation[];
-    loading: boolean;
-    currentMember: any;
-    onNavigate?: (view: string) => void;
-    searchQuery?: string;
-}> = ({ recommendations, loading, currentMember, onNavigate, searchQuery }) => {
-    if (!currentMember) {
-        return (
-            <div className="text-center py-10 text-slate-400">
-                <Users className="mx-auto mb-4 text-slate-300" size={48} />
-                <p>Please log in to view personalized recommendations</p>
-            </div>
-        );
-    }
-
-    const getRecommendationIcon = (type: Recommendation['type']) => {
-        switch (type) {
-            case 'project': return <Target size={20} />;
-            case 'event': return <Calendar size={20} />;
-            case 'training': return <BookOpen size={20} />;
-            case 'mentor': return <Users size={20} />;
-            case 'club': return <Heart size={20} />;
-            case 'role': return <TrendingUp size={20} />;
-            default: return <Lightbulb size={20} />;
-        }
-    };
-
-    const term = (searchQuery || '').toLowerCase();
-    const filteredRecs = term
-        ? recommendations.filter(rec =>
-            (rec.title ?? '').toLowerCase().includes(term) ||
-            (rec.description ?? '').toLowerCase().includes(term) ||
-            (rec.reason ?? '').toLowerCase().includes(term)
-        )
-        : recommendations;
-
-    const groupedRecs = filteredRecs.reduce((acc, rec) => {
-        if (!acc[rec.type]) acc[rec.type] = [];
-        acc[rec.type].push(rec);
-        return acc;
-    }, {} as Record<string, Recommendation[]>);
-
-    return (
-        <LoadingState loading={loading} error={null} empty={filteredRecs.length === 0} emptyMessage="No recommendations available at this time">
-            <div className="space-y-6">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
-                    <div className="flex items-center gap-3 mb-2">
-                        <Sparkles className="text-blue-600" size={24} />
-                        <h3 className="text-lg font-bold text-slate-900">Personalized for {currentMember.name}</h3>
-                    </div>
-                    <p className="text-sm text-slate-600">
-                        Based on your profile, engagement history, and preferences, here are recommendations tailored for you.
-                    </p>
-                </div>
-
-                {Object.entries(groupedRecs).map(([type, recs]) => (
-                    <div key={type}>
-                        <h4 className="text-md font-bold text-slate-900 mb-3 capitalize">{type} Recommendations</h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                            {recs.map(rec => (
-                                <Card key={rec.id} className="hover:shadow-md transition-shadow">
-                                    <div className="flex items-start gap-3">
-                                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                                            {getRecommendationIcon(rec.type)}
-                                        </div>
-                                        <div className="flex-1">
-                                            <h5 className="font-bold text-slate-900 mb-1">{rec.title}</h5>
-                                            <p className="text-sm text-slate-600 mb-2">{rec.description}</p>
-                                            <p className="text-xs text-blue-600 mb-3">{rec.reason}</p>
-                                            <div className="flex items-center justify-between">
-                                                <Badge variant="info">Score: {rec.score}</Badge>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        if (onNavigate) {
-                                                            switch (rec.type) {
-                                                                case 'project':
-                                                                    onNavigate('PROJECTS');
-                                                                    break;
-                                                                case 'event':
-                                                                    onNavigate('EVENTS');
-                                                                    break;
-                                                                case 'training':
-                                                                case 'mentor':
-                                                                    onNavigate('KNOWLEDGE');
-                                                                    break;
-                                                                case 'club':
-                                                                    onNavigate('CLUBS');
-                                                                    break;
-                                                                case 'role':
-                                                                    onNavigate('MEMBERS');
-                                                                    break;
-                                                            }
-                                                        }
-                                                    }}
-                                                >
-                                                    View Details
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </LoadingState>
     );
 };
 
@@ -601,99 +253,5 @@ const PredictionsView: React.FC<{
     );
 };
 
-const MemberChurnDetailModal: React.FC<{
-    memberId: string;
-    onClose: () => void;
-    drawerOnMobile?: boolean;
-}> = ({ memberId, onClose, drawerOnMobile }) => {
-    const [risk, setRisk] = useState<ChurnRiskFactors | null>(null);
-    const [loading, setLoading] = useState(true);
-    const { members } = useMembers();
-    const member = members.find(m => m.id === memberId);
 
-    useEffect(() => {
-        if (memberId) {
-            loadRiskDetails();
-        }
-    }, [memberId]);
-
-    const loadRiskDetails = async () => {
-        setLoading(true);
-        try {
-            const riskData = await ChurnPredictionService.predictChurnRisk(memberId);
-            setRisk(riskData);
-        } catch (err) {
-            console.error('Failed to load risk details:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (!member) return null;
-
-    return (
-        <Modal isOpen={true} onClose={onClose} title={`Churn Risk Analysis: ${member.name}`} size="lg" drawerOnMobile={drawerOnMobile}>
-            {loading ? (
-                <div className="text-center py-10">Loading risk analysis...</div>
-            ) : risk ? (
-                <div className="space-y-6">
-                    {/* Risk Summary */}
-                    <div className="bg-gradient-to-r from-red-50 to-yellow-50 rounded-lg p-6 border-2 border-red-200">
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <div className="text-sm text-slate-500 mb-1">Risk Level</div>
-                                <div className="text-2xl font-bold text-slate-900">{risk.riskLevel} Risk</div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-sm text-slate-500 mb-1">Risk Score</div>
-                                <div className="text-3xl font-bold text-red-600">{risk.riskScore}</div>
-                            </div>
-                        </div>
-                        <ProgressBar progress={risk.riskScore} color="bg-red-500" />
-                    </div>
-
-                    {/* Risk Factors */}
-                    <div>
-                        <h4 className="font-bold text-slate-900 mb-4">Risk Factors</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <Card>
-                                <div className="text-sm text-slate-500 mb-1">Attendance Rate</div>
-                                <div className="text-xl font-bold text-slate-900">{risk.attendanceRate}%</div>
-                            </Card>
-                            <Card>
-                                <div className="text-sm text-slate-500 mb-1">Days Since Last Event</div>
-                                <div className="text-xl font-bold text-slate-900">{risk.daysSinceLastEvent}</div>
-                            </Card>
-                            <Card>
-                                <div className="text-sm text-slate-500 mb-1">Dues Status</div>
-                                <div className="text-xl font-bold text-slate-900">{risk.duesStatus}</div>
-                            </Card>
-                            <Card>
-                                <div className="text-sm text-slate-500 mb-1">Engagement Score</div>
-                                <div className="text-xl font-bold text-slate-900">{risk.engagementScore}</div>
-                            </Card>
-                        </div>
-                    </div>
-
-                    {/* Recommendations */}
-                    {risk.recommendations.length > 0 && (
-                        <div>
-                            <h4 className="font-bold text-slate-900 mb-4">Recommended Actions</h4>
-                            <div className="space-y-2">
-                                {risk.recommendations.map((rec, idx) => (
-                                    <div key={idx} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                                        <Lightbulb size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
-                                        <p className="text-sm text-slate-700">{rec}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="text-center py-10 text-slate-400">Failed to load risk analysis</div>
-            )}
-        </Modal>
-    );
-};
 

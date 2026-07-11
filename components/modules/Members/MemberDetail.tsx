@@ -26,7 +26,6 @@ import { MembersService } from '../../../services/membersService';
 import { HobbyClubsService } from '../../../services/hobbyClubsService';
 import { deleteFromCloudinary, uploadMemberAvatarToCloudinary } from '../../../services/cloudinaryService';
 import { BoardManagementService } from '../../../services/boardManagementService';
-import { AIPredictionService, MemberChurnPrediction } from '../../../services/aiPredictionService';
 import { MentorshipService, MentorMatchSuggestion } from '../../../services/mentorshipService';
 import { ProjectsService } from '../../../services/projectsService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -38,7 +37,6 @@ import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
 import { PointsSourceRadarChart } from '../../dashboard/Analytics';
 import { getAttendanceDisplay } from './MemberTable';
 import { MentorMatchingModal } from './MentorMatchingModal';
-import { ChurnPredictionModal } from './ChurnPredictionModal';
 import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailProfessionalTab } from './MemberDetailProfessionalTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
@@ -61,9 +59,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const [showMentorMatchModal, setShowMentorMatchModal] = useState(false);
   const [potentialMentors, setPotentialMentors] = useState<MentorMatchSuggestion[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
-  const [churnPrediction, setChurnPrediction] = useState<MemberChurnPrediction | null>(null);
-  const [loadingChurnPrediction, setLoadingChurnPrediction] = useState(false);
-  const [showChurnModal, setShowChurnModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -593,19 +588,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       showToast('Failed to assign mentor', 'error');
     }
   };
-
-  const handleAnalyzeChurn = useCallback(async () => {
-    setLoadingChurnPrediction(true);
-    try {
-      const prediction = await AIPredictionService.predictMemberChurn(member.id);
-      setChurnPrediction(prediction);
-      setShowChurnModal(true);
-    } catch (err) {
-      showToast('Failed to analyze churn risk', 'error');
-    } finally {
-      setLoadingChurnPrediction(false);
-    }
-  }, [member.id, showToast]);
 
   const handleEditProfile = async (updates: Partial<Member>) => {
     try {
@@ -1168,8 +1150,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             setInlineValues={setInlineValues}
             isAdmin={isAdmin}
             isDeveloper={isDeveloper}
-            loadingChurnPrediction={loadingChurnPrediction}
-            handleAnalyzeChurn={handleAnalyzeChurn}
             loadingClubs={loadingClubs}
             memberClubs={memberClubs}
             members={members}
@@ -1470,15 +1450,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           onClose={() => setShowMentorMatchModal(false)}
         />
       )}
-
-      {showChurnModal && churnPrediction && (
-        <ChurnPredictionModal
-          member={member}
-          prediction={churnPrediction}
-          onClose={() => setShowChurnModal(false)}
-        />
-      )}
-
 
       {showDeleteConfirm && (
         <Modal
