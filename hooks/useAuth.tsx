@@ -394,8 +394,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ...(existingProfile || {})
     };
 
+    // Strip undefined fields — Firestore rejects them
+    const cleanMember = Object.fromEntries(
+      Object.entries(newMember).filter(([, v]) => v !== undefined)
+    );
+
     // Save to the new UID (this links the Firebase Auth user to the profile data)
-    await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), newMember);
+    await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);
     isSigningUpRef.current = false;
 
     // 4. Notify admins & board members about the new self-registration
