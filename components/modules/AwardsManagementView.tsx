@@ -1,43 +1,29 @@
-// Awards Management View - Unified Management for Recognition (Awards)
+// Awards Management View
 import React, { useState, useMemo } from 'react';
 import {
     Trophy,
     Award as AwardIcon,
     Plus,
-    Search,
-    Filter,
     CheckCircle,
-    Clock,
     Target,
-    Users,
     Star,
     Zap,
     Edit,
     Trash2,
-    Settings,
-    Layout
 } from 'lucide-react';
 import { AwardDefinition } from '../../types';
 import {
-    Card,
     Button,
     Badge,
     Modal,
     useToast,
-    Tabs,
-    ProgressBar
 } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
-import { useGamification, EnrichedAward } from '../../hooks/useGamification';
-import { useMembers } from '../../hooks/useMembers';
-import { usePermissions } from '../../hooks/usePermissions';
+import { useGamification } from '../../hooks/useGamification';
 import { formatDate } from '../../utils/dateUtils';
-import { AchievementProgressVisualizer } from './AchievementProgressVisualizer';
 
 export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
-    const [activeTab, setActiveTab] = useState('All Awards');
-
     const {
         awards,
         memberAwards,
@@ -63,11 +49,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
         active: true
     });
 
-    const { members } = useMembers();
-    const { isAdmin, isBoard } = usePermissions();
     const { showToast } = useToast();
-
-    const canManage = isAdmin || isBoard;
 
     const handleOpenModal = (award?: AwardDefinition) => {
         if (award) {
@@ -131,168 +113,117 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
         }
     };
 
-    // Unified Search and Filter
     const filteredAwards = useMemo(() => {
         const term = (searchQuery || '').toLowerCase();
-        let result = awards;
-
-        if (term) {
-            result = result.filter(item =>
-                item.name.toLowerCase().includes(term) ||
-                item.description.toLowerCase().includes(term) ||
-                item.category.toLowerCase().includes(term) ||
-                item.tier.toLowerCase().includes(term)
-            );
-        }
-
-        return result;
+        if (!term) return awards;
+        return awards.filter(item =>
+            item.name.toLowerCase().includes(term) ||
+            item.description.toLowerCase().includes(term) ||
+            item.category.toLowerCase().includes(term) ||
+            item.tier.toLowerCase().includes(term)
+        );
     }, [awards, searchQuery]);
 
     const earnedAwardsCount = memberAwards.filter(a => a.isEarned).length;
 
     return (
-        <div className="space-y-6">
-            {/* Header Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="bg-gradient-to-br from-jci-blue/10 to-transparent border-jci-blue/20">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-jci-blue/20 rounded-xl text-jci-blue">
-                            <Trophy size={24} />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-900">{awards.length}</p>
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Awards</p>
-                        </div>
+        <div className="space-y-4 sm:space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                <div className="flex items-center gap-2.5 bg-gradient-to-br from-jci-blue/10 to-white border border-jci-blue/20 rounded-xl px-3 py-2.5">
+                    <div className="p-1.5 bg-jci-blue/20 rounded-lg text-jci-blue shrink-0"><Trophy size={16} /></div>
+                    <div className="min-w-0">
+                        <p className="text-lg font-bold text-slate-900 tabular-nums leading-none">{awards.length}</p>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Total</p>
                     </div>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-purple-50 to-transparent border-purple-100">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-purple-100 rounded-xl text-purple-600">
-                            <AwardIcon size={24} />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-900">{awards.filter(a => a.rarity === 'Legendary' || a.rarity === 'Epic').length}</p>
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Rare Honors</p>
-                        </div>
+                </div>
+                <div className="flex items-center gap-2.5 bg-gradient-to-br from-purple-50 to-white border border-purple-100 rounded-xl px-3 py-2.5">
+                    <div className="p-1.5 bg-purple-100 rounded-lg text-purple-600 shrink-0"><AwardIcon size={16} /></div>
+                    <div className="min-w-0">
+                        <p className="text-lg font-bold text-slate-900 tabular-nums leading-none">{awards.filter(a => a.rarity === 'Legendary' || a.rarity === 'Epic').length}</p>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Rare</p>
                     </div>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-green-50 to-transparent border-green-100">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-green-100 rounded-xl text-green-600">
-                            <CheckCircle size={24} />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-900">{earnedAwardsCount}</p>
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Earned Awards</p>
-                        </div>
+                </div>
+                <div className="flex items-center gap-2.5 bg-gradient-to-br from-green-50 to-white border border-green-100 rounded-xl px-3 py-2.5">
+                    <div className="p-1.5 bg-green-100 rounded-lg text-green-600 shrink-0"><CheckCircle size={16} /></div>
+                    <div className="min-w-0">
+                        <p className="text-lg font-bold text-slate-900 tabular-nums leading-none">{earnedAwardsCount}</p>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Earned</p>
                     </div>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-yellow-50 to-transparent border-yellow-100">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-yellow-100 rounded-xl text-yellow-600">
-                            <Zap size={24} />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-900">{awards.filter(a => a.active).length}</p>
-                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Active Challenges</p>
-                        </div>
+                </div>
+                <div className="flex items-center gap-2.5 bg-gradient-to-br from-yellow-50 to-white border border-yellow-100 rounded-xl px-3 py-2.5">
+                    <div className="p-1.5 bg-yellow-100 rounded-lg text-yellow-600 shrink-0"><Zap size={16} /></div>
+                    <div className="min-w-0">
+                        <p className="text-lg font-bold text-slate-900 tabular-nums leading-none">{awards.filter(a => a.active).length}</p>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Active</p>
                     </div>
-                </Card>
+                </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 bg-white px-4 rounded-xl shadow-sm border border-slate-100">
-                <Tabs
-                    tabs={['All Awards', 'Management']}
-                    activeTab={activeTab}
-                    onTabChange={setActiveTab}
-                    className="border-b-0"
-                />
-
-                {canManage && activeTab === 'Management' && (
-                    <Button size="sm" variant="primary" onClick={() => handleOpenModal()} className="mb-0">
-                        <Plus size={14} className="mr-1" />
-                        New Award
-                    </Button>
-                )}
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-800">Award Definitions</h3>
+                    <span className="text-xs bg-slate-100 text-slate-500 font-medium px-2 py-0.5 rounded-full tabular-nums">{filteredAwards.length}</span>
+                </div>
+                <Button size="sm" variant="primary" onClick={() => handleOpenModal()}>
+                    <Plus size={14} className="mr-1" /> New Award
+                </Button>
             </div>
 
-            <LoadingState loading={loading} error={error} empty={filteredAwards.length === 0} emptyMessage="No awards found matching your criteria">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Awards Grid */}
+            <LoadingState loading={loading} error={error} empty={filteredAwards.length === 0} emptyMessage="No awards found">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {filteredAwards.map((award: AwardDefinition) => {
-                        const userAward = memberAwards.find(ma => ma.id === award.id);
-                        const isEarned = userAward?.isEarned || false;
-                        const progress = userAward?.progress || 0;
+                        const tierColors: Record<string, string> = {
+                            Bronze: 'border-l-amber-600',
+                            Silver: 'border-l-slate-400',
+                            Gold: 'border-l-yellow-400',
+                            Platinum: 'border-l-cyan-400',
+                            Legendary: 'border-l-purple-500',
+                        };
+                        const tierBorder = tierColors[award.tier] ?? 'border-l-slate-200';
 
                         return (
-                            <Card key={award.id} className={`group hover:border-jci-blue/30 transition-all hover:shadow-md h-full flex flex-col ${!isEarned && activeTab !== 'Management' ? 'opacity-60 saturate-50' : 'ring-1 ring-jci-blue/20'}`}>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className={`text-5xl group-hover:scale-110 transition-transform duration-300 filter drop-shadow-sm ${!isEarned && activeTab !== 'Management' ? 'grayscale' : ''}`}>
-                                        {award.icon}
-                                    </div>
-                                    <div className="flex flex-col items-end gap-1">
-                                        <Badge variant="jci" className="text-[10px] uppercase font-bold tracking-tighter">
-                                            {award.category}
-                                        </Badge>
-                                        <Badge variant="neutral" className="text-[10px] lowercase italic bg-slate-50 text-slate-400">
-                                            {award.tier}
-                                        </Badge>
+                            <div key={award.id} className={`group bg-white border border-slate-200 border-l-4 ${tierBorder} rounded-xl p-4 hover:shadow-md transition-all flex flex-col gap-3`}>
+                                {/* Top row: icon + badges */}
+                                <div className="flex items-start justify-between gap-2">
+                                    <span className="text-3xl group-hover:scale-110 transition-transform duration-200 leading-none">{award.icon}</span>
+                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                        <Badge variant="jci" className="text-[10px] uppercase tracking-tight">{award.category}</Badge>
+                                        <span className="text-[10px] text-slate-400 italic">{award.tier} · {award.rarity}</span>
                                     </div>
                                 </div>
 
+                                {/* Name + description */}
                                 <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-jci-blue transition-colors mb-1">
-                                        {award.name}
-                                        {isEarned && (
-                                            <CheckCircle size={14} className="inline-block ml-2 text-green-500" />
-                                        )}
-                                    </h3>
-                                    <p className="text-sm text-slate-500 line-clamp-2 mb-4 leading-relaxed">{award.description}</p>
-
-                                    {award.milestones && award.milestones.length > 0 && (
-                                        <div className="space-y-3 mb-4">
-                                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                                                <span>Progression</span>
-                                                <span className="text-jci-blue">{progress}%</span>
-                                            </div>
-                                            <div className="flex gap-1.5">
-                                                {award.milestones.map((m: any, i: number) => {
-                                                    const mCompleted = userAward?.completedMilestones?.includes(m.level);
-                                                    return (
-                                                        <div key={i} className={`flex-1 h-1.5 rounded-full ${mCompleted ? 'bg-jci-blue' : 'bg-slate-100'}`} />
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
+                                    <p className="text-sm font-bold text-slate-900 group-hover:text-jci-blue transition-colors leading-snug mb-1">{award.name}</p>
+                                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{award.description}</p>
                                 </div>
 
-                                <div className="pt-4 mt-4 border-t border-slate-50 flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-                                        <Star size={12} className="text-yellow-400" />
-                                        {award.pointsReward || 0} pts
+                                {/* Footer */}
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                    <div className="flex items-center gap-1 text-xs text-slate-500 font-medium">
+                                        <Star size={11} className="text-yellow-400" />
+                                        <span className="tabular-nums">{award.pointsReward || 0} pts</span>
+                                        {!award.active && <span className="ml-1 text-[10px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded">Inactive</span>}
                                     </div>
-
-                                    {canManage && activeTab === 'Management' && (
-                                        <div className="flex gap-1">
-                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full hover:bg-slate-100" onClick={() => handleOpenModal(award)}>
-                                                <Edit size={12} className="text-slate-400" />
-                                            </Button>
-                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full hover:bg-red-50 hover:text-red-500" onClick={() => handleDelete(award.id!)}>
-                                                <Trash2 size={12} className="text-slate-400" />
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {isEarned && userAward?.earnedAt && (
-                                        <span className="text-[10px] text-slate-400 italic">
-                                            Earned {formatDate(userAward.earnedAt)}
-                                        </span>
-                                    )}
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => handleOpenModal(award)}
+                                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-jci-blue px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors"
+                                        >
+                                            <Edit size={11} /> Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(award.id!)}
+                                            className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                                        >
+                                            <Trash2 size={11} /> Delete
+                                        </button>
+                                    </div>
                                 </div>
-                            </Card>
+                            </div>
                         );
                     })}
                 </div>
@@ -383,17 +314,13 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
                             />
                             <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                                 <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                    <Target size={14} />
-                                    Earning Criteria
+                                    <Target size={14} /> Earning Criteria
                                 </h4>
                                 <div className="space-y-3">
                                     <Select
                                         label="Criteria Type"
                                         value={formData.criteria.type}
-                                        onChange={(e) => setFormData({
-                                            ...formData,
-                                            criteria: { ...formData.criteria, type: e.target.value as any }
-                                        })}
+                                        onChange={(e) => setFormData({ ...formData, criteria: { ...formData.criteria, type: e.target.value as any } })}
                                         options={[
                                             { label: 'Event Count', value: 'event_count' },
                                             { label: 'Project Count', value: 'project_count' },
@@ -405,10 +332,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
                                         label="Target Value"
                                         type="number"
                                         value={formData.criteria.value}
-                                        onChange={(e) => setFormData({
-                                            ...formData,
-                                            criteria: { ...formData.criteria, value: parseInt(e.target.value) }
-                                        })}
+                                        onChange={(e) => setFormData({ ...formData, criteria: { ...formData.criteria, value: parseInt(e.target.value) } })}
                                         required
                                     />
                                 </div>
@@ -417,9 +341,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                        <Button variant="ghost" onClick={handleCloseModal} type="button">
-                            Cancel
-                        </Button>
+                        <Button variant="ghost" onClick={handleCloseModal} type="button">Cancel</Button>
                         <Button variant="primary" type="submit">
                             {editingAward ? 'Update Award' : 'Create Award'}
                         </Button>

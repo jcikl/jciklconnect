@@ -243,173 +243,151 @@ export const PublicationsView: React.FC = () => {
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5">
 
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Publications</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage E-Newsletter issues displayed on the public Guest page.
-          </p>
-        </div>
-        <Button onClick={openCreate} className="flex items-center gap-2 self-start sm:self-auto">
-          <Plus size={16} />
-          Add New Issue
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-slate-900 tracking-tight">Publications</h1>
+        <Button size="sm" onClick={openCreate} className="flex items-center gap-1.5 shrink-0">
+          <Plus size={14} />
+          Add Issue
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-0" style={{ minWidth: '140px' }}>
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search publications…"
-            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
+            placeholder="Search…"
+            className="w-full pl-7 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
           />
         </div>
-
-        <div className="flex items-center gap-1.5 text-sm">
-          <Filter size={14} className="text-slate-400" />
-          <select
-            value={filterYear}
-            onChange={e => setFilterYear(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
-          >
-            {years.map(y => <option key={y}>{y}</option>)}
-          </select>
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
-          >
-            <option>All</option>
-            <option>Published</option>
-            <option>Draft</option>
-          </select>
-        </div>
-
-        <span className="text-xs text-slate-400 ml-auto">
-          {filtered.length} publication{filtered.length !== 1 ? 's' : ''}
+        <select
+          value={filterYear}
+          onChange={e => setFilterYear(e.target.value)}
+          className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
+        >
+          {years.map(y => <option key={y}>{y}</option>)}
+        </select>
+        <select
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value)}
+          className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
+        >
+          <option>All</option>
+          <option>Published</option>
+          <option>Draft</option>
+        </select>
+        <span className="text-xs text-slate-400 tabular-nums">
+          {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 text-slate-400">
-          <Loader size={32} className="animate-spin mb-4 opacity-50" />
-          <p className="text-sm font-medium">Loading publications…</p>
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+          <Loader size={28} className="animate-spin mb-3 opacity-50" />
+          <p className="text-sm font-medium">Loading…</p>
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
-          <div className="flex flex-col items-center justify-center py-24 text-slate-400">
-            <FileText size={48} className="mb-4 opacity-20" />
-            <p className="font-semibold text-slate-600">No publications found</p>
-            <p className="text-sm mt-1">
-              {publications.length === 0
-                ? 'Click "Add New Issue" to create your first publication.'
-                : 'Try adjusting the filters.'}
-            </p>
-          </div>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white border border-slate-200 rounded-xl">
+          <FileText size={36} className="mb-3 opacity-20" />
+          <p className="font-semibold text-slate-600 text-sm">No publications found</p>
+          <p className="text-xs mt-1 text-slate-400">
+            {publications.length === 0 ? 'Click "Add Issue" to get started.' : 'Try adjusting the filters.'}
+          </p>
+        </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-6 sm:space-y-8">
           {sortedYears.map(year => (
             <div key={year}>
               {/* Year heading */}
-              <div className="flex items-center gap-3 mb-4 pb-2 border-b border-slate-200">
-                <h2 className="text-xl font-extrabold text-slate-900">{year}</h2>
-                <span className="text-xs bg-sky-100 text-jci-blue font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              <div className="flex items-center gap-2.5 mb-3 pb-2 border-b border-slate-200">
+                <h2 className="text-base font-extrabold text-slate-800">{year}</h2>
+                <span className="text-[10px] bg-sky-100 text-jci-blue font-bold px-2 py-0.5 rounded-full uppercase tracking-wider tabular-nums">
                   {grouped[year].length} {grouped[year].length === 1 ? 'issue' : 'issues'}
                 </span>
               </div>
 
               {/* Issues grid */}
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {grouped[year].map(pub => (
-                  <Card
+                  <div
                     key={pub.id}
-                    className="group hover:shadow-lg transition-all duration-200 border border-slate-200 hover:border-slate-300 overflow-hidden"
+                    className="group bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200 rounded-xl overflow-hidden flex flex-col"
                   >
                     {/* Card top bar */}
-                    <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="jci">{pub.issue}</Badge>
-                        <Badge variant={pub.status === 'Published' ? 'success' : 'neutral'}>
-                          {pub.status}
-                        </Badge>
-                      </div>
+                    <div className="flex items-center gap-2 flex-wrap px-3 pt-3 pb-2 border-b border-slate-100">
+                      <Badge variant="jci" className="text-[10px]">{pub.issue}</Badge>
+                      <Badge variant={pub.status === 'Published' ? 'success' : 'neutral'} className="text-[10px]">
+                        {pub.status}
+                      </Badge>
                     </div>
 
                     {/* Card body */}
-                    <div className="px-4 pt-3 pb-4 space-y-2">
-                      <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2">
+                    <div className="px-3 py-2.5 flex-1">
+                      <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-2">
                         {pub.title}
                       </h3>
-
-                      {/* PDF URL indicator */}
-                      <div className="pt-1">
-                        {pub.pdfUrl && isValidGoogleDriveUrl(pub.pdfUrl) ? (
-                          <a
-                            href={toGoogleDrivePreviewUrl(pub.pdfUrl)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-jci-blue text-xs font-semibold hover:underline"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <ExternalLink size={12} />
-                            Preview PDF
-                          </a>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold">
-                            <AlertCircle size={12} />
-                            No valid PDF URL
-                          </span>
-                        )}
-                      </div>
+                      {pub.pdfUrl && isValidGoogleDriveUrl(pub.pdfUrl) ? (
+                        <a
+                          href={toGoogleDrivePreviewUrl(pub.pdfUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-jci-blue text-xs font-semibold hover:underline"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <ExternalLink size={11} />
+                          Preview PDF
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold">
+                          <AlertCircle size={11} />
+                          No valid PDF URL
+                        </span>
+                      )}
                     </div>
 
                     {/* Actions footer */}
-                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
+                    <div className="px-2.5 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-1.5">
+                      <button
                         onClick={() => openEdit(pub)}
-                        className="flex-1 flex items-center justify-center gap-1.5 text-xs"
+                        className="flex-1 flex items-center justify-center gap-1 text-xs font-medium text-slate-600 hover:text-jci-blue bg-white hover:bg-jci-blue/5 border border-slate-200 hover:border-jci-blue/30 rounded-lg py-1.5 transition-colors"
                       >
-                        <Edit2 size={13} />
+                        <Edit2 size={12} />
                         Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={pub.status === 'Published' ? 'ghost' : 'outline'}
+                      </button>
+                      <button
                         onClick={() => toggleStatus(pub)}
-                        className="flex-1 flex items-center justify-center gap-1.5 text-xs"
+                        className={`flex-1 flex items-center justify-center gap-1 text-xs font-medium rounded-lg py-1.5 border transition-colors ${
+                          pub.status === 'Published'
+                            ? 'text-slate-500 hover:text-slate-700 bg-white hover:bg-slate-100 border-slate-200'
+                            : 'text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border-green-200'
+                        }`}
                         title={pub.status === 'Published' ? 'Set to Draft' : 'Publish'}
                       >
                         {pub.status === 'Published'
-                          ? <><EyeOff size={13} />Unpublish</>
-                          : <><Eye size={13} />Publish</>
+                          ? <><EyeOff size={12} />Unpublish</>
+                          : <><Eye size={12} />Publish</>
                         }
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
+                      </button>
+                      <button
                         onClick={() => pub.id && handleDelete(pub.id)}
                         disabled={deleting === pub.id}
-                        className="px-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                        className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
                         title="Delete"
                       >
                         {deleting === pub.id
-                          ? <Loader size={14} className="animate-spin" />
-                          : <Trash2 size={14} />
+                          ? <Loader size={13} className="animate-spin" />
+                          : <Trash2 size={13} />
                         }
-                      </Button>
+                      </button>
                     </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
             </div>
