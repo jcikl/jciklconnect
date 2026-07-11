@@ -38,35 +38,10 @@ interface RadioGroupProps {
   error?: string;
 }
 
-// For date inputs, clamp the year portion to the last 4 digits when user types more.
-// e.g. "20256-06-29" → "0256-06-29", "2025629" → year "5629"
-const clampDateYear = (value: string): string => {
-  const dashIdx = value.indexOf('-');
-  if (dashIdx === -1) {
-    // pure year number input
-    return value.length > 4 ? value.slice(-4) : value;
-  }
-  const year = value.slice(0, dashIdx);
-  const rest = value.slice(dashIdx);
-  return year.length > 4 ? year.slice(-4) + rest : value;
-};
-
-export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, className = '', type, onChange, ...props }) => {
+export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, className = '', type, ...props }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
   const inputType = isPassword && showPassword ? 'text' : type;
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (type === 'date' && e.target.value) {
-      const clamped = clampDateYear(e.target.value);
-      if (clamped !== e.target.value) {
-        e.target.value = clamped;
-        // Reconstruct synthetic event with corrected value
-        Object.defineProperty(e, 'target', { writable: false, value: { ...e.target, value: clamped } });
-      }
-    }
-    onChange?.(e);
-  };
 
   return (
     <div className="w-full">
