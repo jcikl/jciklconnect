@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown, Leaf } from 'lucide-react';
+import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown, Leaf, QrCode } from 'lucide-react';
 import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useEvents } from '../../hooks/useEvents';
@@ -25,9 +25,11 @@ import { formatDate } from '../../utils/dateUtils';
 import { EventRow } from './Events/EventRow';
 import { EventStatsTab } from './Events/EventStatsTab';
 import { EventBudgetTab } from './Events/EventBudgetTab';
+import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { EventBudgetEditModal } from './Events/EventBudgetEditModal';
 import { EventFeedbackTab } from './Events/EventFeedbackTab';
 import { EventFeedbackModal } from './Events/EventFeedbackModal';
+import { EventQRCheckIn } from './Events/EventQRCheckIn';
 
 type ViewMode = 'list' | 'calendar';
 
@@ -241,6 +243,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [descExpanded, setDescExpanded] = useState(false);
   const [myRegistration, setMyRegistration] = useState<EventRegistration | null | undefined>(undefined);
   const [localRegistered, setLocalRegistered] = useState<boolean | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [addMemberId, setAddMemberId] = useState('');
   const [addingParticipant, setAddingParticipant] = useState(false);
@@ -752,6 +755,13 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     ];
                     return (
                       <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1 scrollbar-none">
+                        <button
+                          onClick={() => setShowQrModal(true)}
+                          className="flex items-center gap-1 shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors bg-slate-100 text-slate-500 hover:bg-slate-200 ml-auto"
+                          title="Show QR Check-In"
+                        >
+                          <QrCode size={12} /> QR
+                        </button>
                         {subTabs.map(t => (
                           <button
                             key={t.key}
@@ -1105,18 +1115,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               )}
 
               {activeTab === 'stats' && (
-                <EventStatsTab participations={participations} members={members} showToast={showToast} />
+                <AsyncErrorBoundary>
+                  <EventStatsTab participations={participations} members={members} showToast={showToast} />
+                </AsyncErrorBoundary>
               )}
 
               {activeTab === 'feedback' && (
                 <div className="animate-fade-in">
-                  <EventFeedbackTab
-                    event={event}
-                    feedback={eventFeedback}
-                    loading={loadingFeedback}
-                    onRefresh={loadEventFeedback}
-                    onSubmitFeedback={() => setIsFeedbackModalOpen(true)}
-                  />
+                  <AsyncErrorBoundary>
+                    <EventFeedbackTab
+                      event={event}
+                      feedback={eventFeedback}
+                      loading={loadingFeedback}
+                      onRefresh={loadEventFeedback}
+                      onSubmitFeedback={() => setIsFeedbackModalOpen(true)}
+                    />
+                  </AsyncErrorBoundary>
                 </div>
               )}
             </div>
@@ -1201,6 +1215,16 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           </div>
         </div>
       </Modal>
+
+      {showQrModal && (
+        <Modal isOpen onClose={() => setShowQrModal(false)} title="Check-In QR Code" size="sm">
+          <EventQRCheckIn
+            eventId={event.id}
+            eventName={event.title}
+            checkedInCount={participations.filter(r => r.status === 'checked_in').length}
+          />
+        </Modal>
+      )}
 
       {isFeedbackModalOpen && (
         <EventFeedbackModal

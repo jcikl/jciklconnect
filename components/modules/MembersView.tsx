@@ -81,6 +81,7 @@ import { MembershipTypeDisplay } from '../shared/MembershipTypeDisplay';
 import { ColumnFilterHeader } from '../ui/ColumnFilterHeader';
 import { GuestManagementView } from './Members/GuestManagementView';
 import { MemberStatisticsView } from './Members/MemberStatisticsView';
+import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { BatchActionBar } from './Members/BatchActionBar';
 import { MemberTable } from './Members/MemberTable';
 import { MyProfileSelfView } from './Members/MyProfileSelfView';
@@ -704,11 +705,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             )}
 
             {activeTab === 'guest' && (
-              <GuestManagementView searchQuery={searchQuery} onSelect={setSelectedMemberId} />
+              <AsyncErrorBoundary>
+                <GuestManagementView searchQuery={searchQuery} onSelect={setSelectedMemberId} />
+              </AsyncErrorBoundary>
             )}
 
             {activeTab === 'statistics' && (
-              <MemberStatisticsView statistics={statistics} loading={loadingStats} members={members} />
+              <AsyncErrorBoundary>
+                <MemberStatisticsView statistics={statistics} loading={loadingStats} members={members} />
+              </AsyncErrorBoundary>
             )}
 
             {activeTab === 'board-of-directors' && (

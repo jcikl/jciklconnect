@@ -80,6 +80,11 @@ export const ReportsView: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Annual report PDF state
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [exporting, setExporting] = useState(false);
+
   // MYKD report state
   const [mykdLoading, setMykdLoading] = useState(false);
   const [mykdRows, setMykdRows] = useState<MykdRow[] | null>(null);
@@ -99,7 +104,6 @@ export const ReportsView: React.FC = () => {
   }, []);
 
   const stats = useMemo(() => {
-    const currentYear = new Date().getFullYear();
     const ys = new Date(currentYear, 0, 1);
     const ye = new Date(currentYear, 11, 31, 23, 59, 59);
     const yearEvents = events.filter(e => { const d = new Date(e.date); return d >= ys && d <= ye; });
@@ -176,6 +180,188 @@ export const ReportsView: React.FC = () => {
     showToast('Exported as CSV', 'success');
   };
 
+  const handleExportAnnualReport = async () => {
+    setExporting(true);
+    try {
+      const ys = new Date(selectedYear, 0, 1);
+      const ye = new Date(selectedYear, 11, 31, 23, 59, 59);
+
+      const yearMembers = members;
+      const newMembers = members.filter(m => {
+        const d = new Date((m as any).joinDate || (m as any).joinedDate || '');
+        return d >= ys && d <= ye;
+      });
+      const yearEvents = events.filter(e => {
+        const d = new Date(e.date);
+        return d >= ys && d <= ye;
+      });
+      const yearProjects = (projects as any[]).filter(p => {
+        if (!p.startDate) return false;
+        const d = new Date(p.startDate);
+        return d >= ys && d <= ye;
+      });
+      const yearTx = transactions.filter(t => {
+        const d = new Date(t.date);
+        return d >= ys && d <= ye;
+      });
+      const totalIncome   = yearTx.filter(t => t.type === 'Income').reduce((s: number, t: any) => s + t.amount, 0);
+      const totalExpenses = yearTx.filter(t => t.type === 'Expense').reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
+      const netBalance    = totalIncome - totalExpenses;
+      const completedProjects = yearProjects.filter(p => p.status === 'Completed').length;
+      const totalAttendance   = yearEvents.reduce((s: number, e: any) => s + (e.attendees || 0), 0);
+      const avgAttendance     = yearEvents.length > 0 ? Math.round(totalAttendance / yearEvents.length) : 0;
+
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const W = 210;
+      const margin = 20;
+
+      // ── Cover page ──
+      doc.setFillColor(0, 71, 133);
+      doc.rect(0, 0, W, 60, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(26);
+      doc.setFont('helvetica', 'bold');
+      doc.text('JCI Kuala Lumpur', W / 2, 28, { align: 'center' });
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${selectedYear} Annual Report`, W / 2, 42, { align: 'center' });
+      doc.setFontSize(10);
+      doc.text(`Generated on ${new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'long', year: 'numeric' })}`, W / 2, 54, { align: 'center' });
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Executive Summary', margin, 80);
+      doc.setDrawColor(0, 71, 133);
+      doc.setLineWidth(0.5);
+      doc.line(margin, 83, W - margin, 83);
+
+      const summaryItems = [
+        ['Total Members',    String(yearMembers.length)],
+        ['New Members',      String(newMembers.length)],
+        ['Events Held',      String(yearEvents.length)],
+        ['Avg Attendance',   String(avgAttendance)],
+        ['Active Projects',  String(yearProjects.filter((p: any) => p.status === 'Active').length)],
+        ['Projects Done',    String(completedProjects)],
+      ];
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      summaryItems.forEach(([label, value], i) => {
+        const col = i % 2 === 0 ? margin : W / 2 + 5;
+        const row = 92 + Math.floor(i / 2) * 12;
+        doc.setFont('helvetica', 'bold');
+        doc.text(value, col, row);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, col + 18, row);
+        doc.setTextColor(30, 41, 59);
+      });
+
+      // ── Page 2 — Finance ──
+      doc.addPage();
+      doc.setFillColor(0, 71, 133);
+      doc.rect(0, 0, W, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Financial Summary', margin, 12);
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(12);
+      const finRows: [string, string, string][] = [
+        ['Total Income',   `RM ${totalIncome.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`, '10b981'],
+        ['Total Expenses', `RM ${totalExpenses.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`, 'ef4444'],
+        ['Net Balance',    `RM ${netBalance.toLocaleString('en-MY', { minimumFractionDigits: 2 })}`,   netBalance >= 0 ? '10b981' : 'ef4444'],
+        ['Transactions',   String(yearTx.length), '64748b'],
+      ];
+
+      finRows.forEach(([label, value], i) => {
+        const y = 30 + i * 14;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(margin, y - 7, W - 2 * margin, 12, 2, 2, 'F');
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, margin + 4, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59);
+        doc.text(value, W - margin - 4, y, { align: 'right' });
+      });
+
+      // ── Page 3 — Events & Projects ──
+      doc.addPage();
+      doc.setFillColor(0, 71, 133);
+      doc.rect(0, 0, W, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Events & Projects', margin, 12);
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(12);
+
+      const eventRows: [string, string][] = [
+        ['Total Events',        String(yearEvents.length)],
+        ['Avg Attendance',      String(avgAttendance)],
+        ['Total Attendance',    String(totalAttendance)],
+      ];
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Events', margin, 28);
+      doc.setFont('helvetica', 'normal');
+      eventRows.forEach(([label, value], i) => {
+        const y = 36 + i * 10;
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, margin + 4, y);
+        doc.setTextColor(30, 41, 59);
+        doc.text(value, W - margin - 4, y, { align: 'right' });
+      });
+
+      const projRows: [string, string][] = [
+        ['Total Projects',      String(yearProjects.length)],
+        ['Active',              String(yearProjects.filter((p: any) => p.status === 'Active').length)],
+        ['Completed',           String(completedProjects)],
+        ['Avg Completion',      yearProjects.length > 0
+          ? `${Math.round(yearProjects.reduce((s: number, p: any) => s + (p.completion || 0), 0) / yearProjects.length)}%`
+          : '—'],
+      ];
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Projects', margin, 72);
+      doc.setFont('helvetica', 'normal');
+      projRows.forEach(([label, value], i) => {
+        const y = 80 + i * 10;
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, margin + 4, y);
+        doc.setTextColor(30, 41, 59);
+        doc.text(value, W - margin - 4, y, { align: 'right' });
+      });
+
+      // ── Footer on all pages ──
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.3);
+        doc.line(margin, 285, W - margin, 285);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`JCI Kuala Lumpur · ${selectedYear} Annual Report`, margin, 290);
+        doc.text(`Page ${p} of ${pageCount}`, W - margin, 290, { align: 'right' });
+      }
+
+      doc.save(`JCI-KL-Annual-Report-${selectedYear}.pdf`);
+      showToast('Annual report exported successfully', 'success');
+    } catch (err) {
+      console.error('Annual report export error:', err);
+      showToast('Failed to export annual report', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // ── Dashboard tab ──
   const renderDashboard = () => {
     const attendanceData = events.slice(0, 8).map(e => ({
@@ -242,6 +428,34 @@ export const ReportsView: React.FC = () => {
             <span className="w-9 h-9 rounded-full flex items-center justify-center bg-blue-50 text-blue-600"><Users size={18} /></span>
             <span className="text-xs font-semibold text-slate-700 group-hover:text-jci-blue leading-tight">Membership</span>
           </button>
+        </div>
+
+        {/* Annual Report PDF export */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-jci-blue/10 flex items-center justify-center shrink-0">
+              <FileText size={18} className="text-jci-blue" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-900 text-sm">Annual Report PDF</p>
+              <p className="text-xs text-slate-500">Export a full-year summary with member, event, project, and finance data.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
+            >
+              {[0, 1, 2, 3].map(offset => {
+                const y = currentYear - offset;
+                return <option key={y} value={y}>{y}</option>;
+              })}
+            </select>
+            <Button size="sm" onClick={handleExportAnnualReport} isLoading={exporting} className="flex items-center gap-1.5">
+              <Download size={13} />Export PDF
+            </Button>
+          </div>
         </div>
       </div>
     );

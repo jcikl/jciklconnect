@@ -30,6 +30,7 @@ import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentReques
 import { PENDING_USE_TEMPLATE_KEY, fetchRoadmapEventDetails } from '../../utils/roadmapUtils';
 import { ProjectGrid } from './Projects/ProjectGrid';
 import { ProjectDetailTabs } from './Projects/ProjectDetailTabs';
+import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { TemplatePreviewModal } from './Projects/TemplatePreviewModal';
 
 // fetchRoadmapEventDetails, RoadmapEventDetails, PENDING_USE_TEMPLATE_KEY extracted to utils/roadmapUtils.ts
@@ -586,27 +587,29 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           {/* Mobile: content without card wrapper */}
           <div className="md:hidden">
             {(activeTab === 'projects' || activeTab === 'past-projects') ? (
-              <ProjectGrid
-                projects={displayedProjects}
-                loading={loading}
-                error={error}
-                onSelect={setSelectedProjectId}
-                onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
-                onImport={() => setImportModalOpen(true)}
-                isAdminOrBoard={isBoard || isAdmin}
-                selectedIds={selectedProjectIds}
-                onToggleSelection={(id) => {
-                  setSelectedProjectIds(prev => {
-                    const next = new Set(prev);
-                    if (next.has(id)) next.delete(id);
-                    else next.add(id);
-                    return next;
-                  });
-                }}
-                onSelectAll={handleSelectAll}
-                projectAccounts={projectAccounts}
-                projectTrackerTransactions={projectTrackerTransactions}
-              />
+              <AsyncErrorBoundary>
+                <ProjectGrid
+                  projects={displayedProjects}
+                  loading={loading}
+                  error={error}
+                  onSelect={setSelectedProjectId}
+                  onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
+                  onImport={() => setImportModalOpen(true)}
+                  isAdminOrBoard={isBoard || isAdmin}
+                  selectedIds={selectedProjectIds}
+                  onToggleSelection={(id) => {
+                    setSelectedProjectIds(prev => {
+                      const next = new Set(prev);
+                      if (next.has(id)) next.delete(id);
+                      else next.add(id);
+                      return next;
+                    });
+                  }}
+                  onSelectAll={handleSelectAll}
+                  projectAccounts={projectAccounts}
+                  projectTrackerTransactions={projectTrackerTransactions}
+                />
+              </AsyncErrorBoundary>
             ) : (
               <div className="space-y-2">
                 <div className="flex gap-3">
@@ -714,27 +717,29 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             </div>
             <div className="p-6">
               {(activeTab === 'projects' || activeTab === 'past-projects') ? (
-                <ProjectGrid
-                  projects={displayedProjects}
-                  loading={loading}
-                  error={error}
-                  onSelect={setSelectedProjectId}
-                  onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
-                  onImport={() => setImportModalOpen(true)}
-                  isAdminOrBoard={isBoard || isAdmin}
-                  selectedIds={selectedProjectIds}
-                  onToggleSelection={(id) => {
-                    setSelectedProjectIds(prev => {
-                      const next = new Set(prev);
-                      if (next.has(id)) next.delete(id);
-                      else next.add(id);
-                      return next;
-                    });
-                  }}
-                  onSelectAll={handleSelectAll}
-                  projectAccounts={projectAccounts}
-                  projectTrackerTransactions={projectTrackerTransactions}
-                />
+                <AsyncErrorBoundary>
+                  <ProjectGrid
+                    projects={displayedProjects}
+                    loading={loading}
+                    error={error}
+                    onSelect={setSelectedProjectId}
+                    onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
+                    onImport={() => setImportModalOpen(true)}
+                    isAdminOrBoard={isBoard || isAdmin}
+                    selectedIds={selectedProjectIds}
+                    onToggleSelection={(id) => {
+                      setSelectedProjectIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      });
+                    }}
+                    onSelectAll={handleSelectAll}
+                    projectAccounts={projectAccounts}
+                    projectTrackerTransactions={projectTrackerTransactions}
+                  />
+                </AsyncErrorBoundary>
               ) : (
                 <div className="space-y-2">
                   <div className="flex gap-3">

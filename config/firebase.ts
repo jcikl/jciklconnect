@@ -1,7 +1,7 @@
 // Firebase Configuration
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, getFirestore, Firestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
 import { isDevMode } from '../utils/devMode';
@@ -65,7 +65,11 @@ if (typeof window !== 'undefined') {
   // persistentLocalCache only in production — HMR in dev causes re-init errors
   if (import.meta.env.PROD) {
     try {
-      db = initializeFirestore(app, { localCache: persistentLocalCache() });
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      });
     } catch {
       db = getFirestore(app);
     }

@@ -42,6 +42,7 @@ import { useFinanceData, UNASSIGNED_PROJECT_ID } from '../../hooks/useFinanceDat
 import { AdministrativeTab } from './Finance/AdministrativeTab';
 import { ProjectAccountTab } from './Finance/ProjectAccountTab';
 import { TransactionsTab } from './Finance/TransactionsTab';
+import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 
 
 export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
@@ -534,22 +535,24 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
 
       {moduleTab === 'Administrative' && hasPermission('canViewFinance') && (
-        <AdministrativeTab
-          transactions={transactions}
-          isTransactionInCategory={isTransactionInCategory}
-          adminAccountYearFilter={adminAccountYearFilter}
-          dynamicAdministrativeProjectIds={dynamicAdministrativeProjectIds}
-          adminProjectIdFilter={adminProjectIdFilter}
-          setAdminProjectIdFilter={setAdminProjectIdFilter}
-          loading={loading}
-          error={error}
-          getTransactionAccountLabel={getTransactionAccountLabel}
-          hasPermission={hasPermission}
-          handleEditTransaction={handleEditTransaction}
-          handleDeleteTransaction={handleDeleteTransaction}
-          setIsAddAdministrativeProjectOpen={setIsAddAdministrativeProjectOpen}
-          projects={projects}
-        />
+        <AsyncErrorBoundary>
+          <AdministrativeTab
+            transactions={transactions}
+            isTransactionInCategory={isTransactionInCategory}
+            adminAccountYearFilter={adminAccountYearFilter}
+            dynamicAdministrativeProjectIds={dynamicAdministrativeProjectIds}
+            adminProjectIdFilter={adminProjectIdFilter}
+            setAdminProjectIdFilter={setAdminProjectIdFilter}
+            loading={loading}
+            error={error}
+            getTransactionAccountLabel={getTransactionAccountLabel}
+            hasPermission={hasPermission}
+            handleEditTransaction={handleEditTransaction}
+            handleDeleteTransaction={handleDeleteTransaction}
+            setIsAddAdministrativeProjectOpen={setIsAddAdministrativeProjectOpen}
+            projects={projects}
+          />
+        </AsyncErrorBoundary>
       )}
 
       {moduleTab === 'Reconciliation' && hasPermission('canViewFinance') && (
@@ -785,68 +788,72 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
 
       {moduleTab === 'Project Account' && (
-        <ProjectAccountTab
-          loadingProjectAccounts={loadingProjectAccounts}
-          filteredProjectAccounts={filteredProjectAccounts}
-          uncategorizedProjectTxCount={uncategorizedProjectTxCount}
-          selectedProjectFilter={selectedProjectFilter}
-          setSelectedProjectFilter={setSelectedProjectFilter}
-          projectTrackerSummary={projectTrackerSummary}
-          selectedProjectTransactions={selectedProjectTransactions}
-          loadingSelectedProjectTransactions={loadingSelectedProjectTransactions}
-          projectTransactions={projectTransactions}
-          projectAccounts={projectAccounts}
-          selectedProjectInfo={selectedProjectInfo}
-          loading={loading}
-          error={error}
-          getTransactionAccountLabel={getTransactionAccountLabel}
-          hasPermission={hasPermission}
-          handleEditTransaction={handleEditTransaction}
-          handleDeleteTransaction={handleDeleteTransaction}
-          loadProjectTrxList={loadProjectTrxList}
-          setIsProjectTrxModalOpen={setIsProjectTrxModalOpen}
-          projects={projects}
-        />
+        <AsyncErrorBoundary>
+          <ProjectAccountTab
+            loadingProjectAccounts={loadingProjectAccounts}
+            filteredProjectAccounts={filteredProjectAccounts}
+            uncategorizedProjectTxCount={uncategorizedProjectTxCount}
+            selectedProjectFilter={selectedProjectFilter}
+            setSelectedProjectFilter={setSelectedProjectFilter}
+            projectTrackerSummary={projectTrackerSummary}
+            selectedProjectTransactions={selectedProjectTransactions}
+            loadingSelectedProjectTransactions={loadingSelectedProjectTransactions}
+            projectTransactions={projectTransactions}
+            projectAccounts={projectAccounts}
+            selectedProjectInfo={selectedProjectInfo}
+            loading={loading}
+            error={error}
+            getTransactionAccountLabel={getTransactionAccountLabel}
+            hasPermission={hasPermission}
+            handleEditTransaction={handleEditTransaction}
+            handleDeleteTransaction={handleDeleteTransaction}
+            loadProjectTrxList={loadProjectTrxList}
+            setIsProjectTrxModalOpen={setIsProjectTrxModalOpen}
+            projects={projects}
+          />
+        </AsyncErrorBoundary>
       )}
       {moduleTab === 'Transactions' && (
-        <TransactionsTab
-          txSearchTerm={txSearchTerm}
-          setTxSearchTerm={setTxSearchTerm}
-          txCategoryFilter={txCategoryFilter}
-          setTxCategoryFilter={setTxCategoryFilter}
-          bankAccountFilter={bankAccountFilter}
-          setBankAccountFilter={setBankAccountFilter}
-          txTypeFilter={txTypeFilter}
-          setTxTypeFilter={setTxTypeFilter}
-          txStatusFilter={txStatusFilter}
-          setTxStatusFilter={setTxStatusFilter}
-          reportYear={reportYear}
-          setReportYear={setReportYear}
-          accounts={accounts}
-          loading={loading}
-          error={error}
-          transactions={transactions}
-          visibleTransactions={visibleTransactions}
-          groupedTransactions={groupedTransactions}
-          transactionSplits={transactionSplits}
-          selectedTxIds={selectedTxIds}
-          setSelectedTxIds={setSelectedTxIds}
-          selectedSplitIds={selectedSplitIds}
-          setSelectedSplitIds={setSelectedSplitIds}
-          handleSelectAllTransactions={handleSelectAllTransactions}
-          handleEditTransaction={handleEditTransaction}
-          handleDeleteTransaction={handleDeleteTransaction}
-          setSelectedTransaction={setSelectedTransaction}
-          setIsSplitModalOpen={setIsSplitModalOpen}
-          members={members}
-          loadMembers={loadMembers}
-          projects={projects}
-          loadProjects={loadProjects}
-          setProjectPurposes={setProjectPurposes}
-          getTransactionAccountLabel={getTransactionAccountLabel}
-          hasMoreTransactions={hasMoreTransactions}
-          setTransactionLimit={setTransactionLimit}
-        />
+        <AsyncErrorBoundary>
+          <TransactionsTab
+            txSearchTerm={txSearchTerm}
+            setTxSearchTerm={setTxSearchTerm}
+            txCategoryFilter={txCategoryFilter}
+            setTxCategoryFilter={setTxCategoryFilter}
+            bankAccountFilter={bankAccountFilter}
+            setBankAccountFilter={setBankAccountFilter}
+            txTypeFilter={txTypeFilter}
+            setTxTypeFilter={setTxTypeFilter}
+            txStatusFilter={txStatusFilter}
+            setTxStatusFilter={setTxStatusFilter}
+            reportYear={reportYear}
+            setReportYear={setReportYear}
+            accounts={accounts}
+            loading={loading}
+            error={error}
+            transactions={transactions}
+            visibleTransactions={visibleTransactions}
+            groupedTransactions={groupedTransactions}
+            transactionSplits={transactionSplits}
+            selectedTxIds={selectedTxIds}
+            setSelectedTxIds={setSelectedTxIds}
+            selectedSplitIds={selectedSplitIds}
+            setSelectedSplitIds={setSelectedSplitIds}
+            handleSelectAllTransactions={handleSelectAllTransactions}
+            handleEditTransaction={handleEditTransaction}
+            handleDeleteTransaction={handleDeleteTransaction}
+            setSelectedTransaction={setSelectedTransaction}
+            setIsSplitModalOpen={setIsSplitModalOpen}
+            members={members}
+            loadMembers={loadMembers}
+            projects={projects}
+            loadProjects={loadProjects}
+            setProjectPurposes={setProjectPurposes}
+            getTransactionAccountLabel={getTransactionAccountLabel}
+            hasMoreTransactions={hasMoreTransactions}
+            setTransactionLimit={setTransactionLimit}
+          />
+        </AsyncErrorBoundary>
       )}
 
       <Modal
@@ -1295,19 +1302,21 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       )}
 
       {/* Financial Reports Modal */}
-      <FinancialReportsModal
-        isOpen={isReportsModalOpen}
-        onClose={() => setIsReportsModalOpen(false)}
-        transactions={transactions}
-        accounts={accounts}
-        summary={summary}
-        reportYear={reportYear}
-        reportMonth={reportMonth}
-        fiscalYearStart={fiscalYearStart}
-        onYearChange={setReportYear}
-        onMonthChange={setReportMonth}
-        onFiscalYearStartChange={setFiscalYearStart}
-      />
+      <AsyncErrorBoundary>
+        <FinancialReportsModal
+          isOpen={isReportsModalOpen}
+          onClose={() => setIsReportsModalOpen(false)}
+          transactions={transactions}
+          accounts={accounts}
+          summary={summary}
+          reportYear={reportYear}
+          reportMonth={reportMonth}
+          fiscalYearStart={fiscalYearStart}
+          onYearChange={setReportYear}
+          onMonthChange={setReportMonth}
+          onFiscalYearStartChange={setFiscalYearStart}
+        />
+      </AsyncErrorBoundary>
 
 
 

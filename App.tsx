@@ -8,7 +8,7 @@ import {
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
   ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw, ArrowLeft,
-  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock, SlidersHorizontal
+  Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock, SlidersHorizontal, Handshake
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
 import * as Forms from './components/ui/Form';
@@ -75,6 +75,7 @@ const AccessConfigView = lazy(() => import('./components/modules/AccessConfigVie
 const SystemConfigView = lazy(() => import('./components/modules/SystemConfigView').then(m => ({ default: m.SystemConfigView })));
 const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
 const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
+const SponsorshipView = lazy(() => import('./components/modules/SponsorshipView').then(m => ({ default: m.SponsorshipView })));
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 import { PartnershipsService } from './services/partnershipsService';
@@ -132,6 +133,7 @@ export const JCIKLApp: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMenuDrawerOpen, setIsMenuDrawerOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false);
   const [isNotificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
@@ -293,6 +295,17 @@ export const JCIKLApp: React.FC = () => {
   }, [members, events, projects]);
 
   // FCM push notification registration
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   React.useEffect(() => {
     if (!user?.uid) return;
     registerPushNotifications(user.uid);
@@ -707,6 +720,7 @@ export const JCIKLApp: React.FC = () => {
       case 'ACCESS_CONFIG': return <SystemConfigView />;
       case 'SYSTEM_CONFIG': return <SystemConfigView />;
       case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
+      case 'SPONSORSHIPS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SponsorshipView searchQuery={searchQuery} />;
       default:
         if ((isBoard || isAdmin) && showBoardDashboard) {
           return <BoardDashboard
@@ -911,6 +925,13 @@ export const JCIKLApp: React.FC = () => {
                         onClick={() => { handleViewChange('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
+                      <SidebarItem
+                        icon={<Handshake size={18} />}
+                        label="Sponsorships"
+                        isActive={view === 'SPONSORSHIPS'}
+                        onClick={() => { handleViewChange('SPONSORSHIPS'); setIsSidebarOpen(false); }}
+                        isCollapsed={isSidebarCollapsed}
+                      />
 
                     </>
                   )}
@@ -1017,6 +1038,11 @@ export const JCIKLApp: React.FC = () => {
 
         {/* Main Content */}
         <main id="main-content" className="flex-1 flex flex-col min-w-0 h-full overflow-hidden" tabIndex={-1} role="main">
+          {!isOnline && (
+            <div role="status" aria-live="polite" className="shrink-0 bg-yellow-500 text-white text-xs text-center py-1 px-4 z-[100]">
+              离线模式 — 显示缓存数据，操作将在恢复连接后同步
+            </div>
+          )}
           <h1 className="sr-only">
             {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>

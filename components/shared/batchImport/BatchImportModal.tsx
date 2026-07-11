@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle, Download, Upload, FileSpreadsheet, ChevronDown, ChevronUp, Trash2, X } from 'lucide-react';
-import { Modal, Button, useToast } from '../../ui/Common';
+import { Modal, Button, useToast, ProgressBar } from '../../ui/Common';
 import { Input } from '../../ui/Form';
 import { BatchImportConfig, ImportRow, ColumnMapping, ImportContext } from './batchImportTypes';
 import { autoMapColumns, validateColumnMapping } from './stringMatching';
@@ -44,7 +44,8 @@ export const BatchImportModal: React.FC<Props> = ({
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [expandedErrors, setExpandedErrors] = useState<Set<number>>(new Set());
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; errors: number; done: boolean } | null>(null);
+  const [failedImportRows, setFailedImportRows] = useState<Set<number>>(new Set());
 
   // Custom column-header dropdown
   const [openDropdownCol, setOpenDropdownCol] = useState<number | null>(null);
@@ -272,7 +273,8 @@ export const BatchImportModal: React.FC<Props> = ({
     }
 
     setImporting(true);
-    setImportProgress({ current: 0, total: validRows.length });
+    setFailedImportRows(new Set());
+    setImportProgress({ current: 0, total: validRows.length, errors: 0, done: false });
     let successCount = 0;
     let failureCount = 0;
 
@@ -281,13 +283,13 @@ export const BatchImportModal: React.FC<Props> = ({
         await config.batchImporter(
           validRows.map(r => r.parsed),
           context,
-          (current, total) => setImportProgress({ current, total })
+          (current, total) => setImportProgress(prev => ({ ...(prev ?? { errors: 0, done: false }), current, total }))
         );
         successCount = validRows.length;
       } else {
         // Process in chunks of 10 for better performance and stability
         const CHUNK_SIZE = 10;
-        const results: { success: boolean }[] = [];
+        const newFailedRows = new Set<number>();
 
         for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
           const chunk = validRows.slice(i, i + CHUNK_SIZE);
@@ -295,19 +297,24 @@ export const BatchImportModal: React.FC<Props> = ({
             chunk.map(async (row) => {
               try {
                 await config.importer(row.parsed, context);
-                return { success: true };
+                return { success: true, rowIndex: row.index };
               } catch (err) {
                 console.error(`Failed to import row ${row.index}:`, err);
-                return { success: false };
+                return { success: false, rowIndex: row.index };
               }
             })
           );
-          results.push(...chunkResults);
-          setImportProgress(prev => prev ? { ...prev, current: Math.min(prev.current + chunk.length, prev.total) } : null);
+          chunkResults.forEach(r => { if (!r.success) newFailedRows.add(r.rowIndex); });
+          const chunkErrors = chunkResults.filter(r => !r.success).length;
+          setImportProgress(prev => prev
+            ? { ...prev, current: Math.min(prev.current + chunk.length, prev.total), errors: prev.errors + chunkErrors }
+            : null
+          );
         }
 
-        successCount = results.filter(r => r.success).length;
-        failureCount = results.filter(r => !r.success).length;
+        successCount = validRows.length - newFailedRows.size;
+        failureCount = newFailedRows.size;
+        setFailedImportRows(newFailedRows);
       }
 
       showToast(
@@ -315,14 +322,21 @@ export const BatchImportModal: React.FC<Props> = ({
         failureCount === 0 ? 'success' : 'warning'
       );
 
-      // Reset form
-      setPastedText('');
-      setHeaderRowDetected(false);
-      setAutoMatchInfo(null);
-      setNumExtraCols(0);
-      setImportProgress(null);
+      setImportProgress(prev => prev ? { ...prev, done: true, errors: failureCount } : null);
       onImported();
-      onClose();
+
+      if (failureCount === 0) {
+        // No failures — reset and close
+        setPastedText('');
+        setHeaderRowDetected(false);
+        setAutoMatchInfo(null);
+        setNumExtraCols(0);
+        setImportProgress(null);
+        onClose();
+      } else {
+        // Keep modal open so user can review failed rows in preview tab
+        setActiveTab('preview');
+      }
     } catch (err) {
       showToast('Import failed', 'error');
       setImportProgress(null);
@@ -582,15 +596,54 @@ export const BatchImportModal: React.FC<Props> = ({
 
       {/* Import progress overlay */}
       {importProgress && (
-        <div className="absolute inset-0 z-[100] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 rounded-xl">
-          <div className="w-56 h-2 bg-slate-100 rounded-full overflow-hidden mb-4">
-            <div
-              className="h-full bg-blue-600 transition-all duration-300 ease-out rounded-full"
-              style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-            />
-          </div>
-          <p className="text-base font-bold text-slate-900 mb-1">Importing…</p>
-          <p className="text-sm text-slate-500">{importProgress.current} / {importProgress.total} rows</p>
+        <div className="absolute inset-0 z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 rounded-xl">
+          {importProgress.done ? (
+            /* ── Done summary ── */
+            <div className="flex flex-col items-center gap-4 w-64 text-center">
+              <div className="flex flex-col gap-2 w-full">
+                <span className="flex items-center justify-center gap-2 text-sm font-semibold text-green-700 dark:text-green-400">
+                  <CheckCircle size={16} />
+                  成功 {importProgress.total - importProgress.errors} 条
+                </span>
+                {importProgress.errors > 0 && (
+                  <span className="flex items-center justify-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
+                    <AlertCircle size={16} />
+                    失败 {importProgress.errors} 条
+                  </span>
+                )}
+              </div>
+              {importProgress.errors > 0 && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  失败的行已在预览表格中以红色高亮显示
+                </p>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => setImportProgress(null)}
+                className="mt-1 w-full"
+              >
+                关闭
+              </Button>
+            </div>
+          ) : (
+            /* ── In-progress ── */
+            <div className="flex flex-col items-center gap-3 w-64">
+              <p className="text-base font-bold text-slate-900 dark:text-slate-100">
+                正在导入 {importProgress.current}/{importProgress.total} 条…
+              </p>
+              <div className="w-full">
+                <ProgressBar
+                  progress={(importProgress.current / importProgress.total) * 100}
+                  color="bg-blue-600"
+                />
+              </div>
+              {importProgress.errors > 0 && (
+                <p className="text-xs text-red-500 dark:text-red-400">
+                  已失败 {importProgress.errors} 条
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -990,12 +1043,16 @@ export const BatchImportModal: React.FC<Props> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {tableDisplayRows.map(row => (
+                    {tableDisplayRows.map(row => {
+                      const importFailed = failedImportRows.has(row.index);
+                      return (
                       <React.Fragment key={row.index}>
                         <tr
                           onClick={() => handleRowClick(row.index)}
                           className={`border-b border-slate-100 cursor-pointer transition-colors ${
-                            row.valid ? 'bg-white hover:bg-green-50' : 'bg-red-50/60 hover:bg-red-100/60'
+                            importFailed
+                              ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100/80 dark:hover:bg-red-900/30'
+                              : row.valid ? 'bg-white hover:bg-green-50' : 'bg-red-50/60 hover:bg-red-100/60'
                           } ${selectedRowIndex === row.index ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
                         >
                           <td className="px-2 py-1.5 border-r border-slate-100 w-8 text-center" onClick={e => e.stopPropagation()}>
@@ -1020,7 +1077,11 @@ export const BatchImportModal: React.FC<Props> = ({
                               title={String(row.parsed[col.key] || '—')}
                             >
                               {col.key === 'valid' ? (
-                                row.valid ? (
+                                importFailed ? (
+                                  <span className="inline-flex items-center gap-1 text-red-600 font-semibold">
+                                    <AlertCircle size={11} />导入失败
+                                  </span>
+                                ) : row.valid ? (
                                   row.isUpdate ? (
                                     <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
                                       <CheckCircle size={11} />Update
@@ -1044,6 +1105,12 @@ export const BatchImportModal: React.FC<Props> = ({
                               })()}
                             </td>
                           ))}
+                          {/* Import-failure dot indicator at end of row */}
+                          {importFailed && (
+                            <td className="px-2 py-1.5 w-6 text-center" title="导入时出错">
+                              <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+                            </td>
+                          )}
                         </tr>
                         {!row.valid && row.errors.length > 0 && (
                           <tr className="bg-red-50 border-b border-red-100">
@@ -1068,8 +1135,16 @@ export const BatchImportModal: React.FC<Props> = ({
                             </td>
                           </tr>
                         )}
+                        {importFailed && (
+                          <tr className="bg-red-50 dark:bg-red-900/20 border-b border-red-100">
+                            <td colSpan={config.tableColumns.length + 3} className="px-3 py-1 text-xs text-red-600 font-medium">
+                              ❌ 此行在导入时发生错误，请检查数据后重试
+                            </td>
+                          </tr>
+                        )}
                       </React.Fragment>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

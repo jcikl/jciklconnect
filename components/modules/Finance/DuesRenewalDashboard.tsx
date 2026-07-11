@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Download,
   Plus,
-  Edit
+  Edit,
+  MessageCircle
 } from 'lucide-react';
 import { DuesRenewalService } from '../../../services/duesRenewalService';
 import { FinanceService } from '../../../services/financeService';
@@ -68,6 +69,30 @@ const findMatchingMember = (
   return null;
 };
 
+/**
+ * Open a WhatsApp chat link pre-filled with a dues reminder message.
+ * Works for both individual and bulk sends (caller delays between opens).
+ */
+const sendWhatsAppDuesReminder = (
+  memberName: string,
+  phone: string | undefined,
+  year: number,
+  outstanding: number
+) => {
+  const cleaned = (phone || '').replace(/\D/g, '');
+  if (!cleaned) return false;
+  // Normalize Malaysian numbers: strip leading 0, prefix country code
+  const normalized = cleaned.startsWith('60') ? cleaned : `60${cleaned.replace(/^0/, '')}`;
+  const message = encodeURIComponent(
+    `Hi ${memberName}! 😊 这里是 JCI 吉隆坡秘书处。\n\n` +
+    `温馨提醒：您 ${year} 年度的会费 RM${outstanding} 尚未缴清。` +
+    `请尽快完成缴费以维持您的会籍权益。\n\n` +
+    `如有任何疑问，欢迎回复此消息。谢谢！🙏\n\nJCI Kuala Lumpur`
+  );
+  window.open(`https://wa.me/${normalized}?text=${message}`, '_blank');
+  return true;
+};
+
 interface DuesRenewalDashboardProps {
   year?: number;
   /** 会费流水（category=Membership 的交易） */
@@ -84,6 +109,7 @@ interface DuesRenewalDashboardProps {
     id: string;
     name: string;
     fullName?: string;
+    phone?: string;
     membershipType?: MembershipType;
     introducer?: string;
     tshirtSize?: string;
@@ -323,6 +349,39 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     } finally {
       setSendingReminders(false);
     }
+  };
+
+  /** Bulk WhatsApp: open wa.me links for all overdue/pending members in current view */
+  const handleBulkWhatsApp = async () => {
+    // We need displayRenewals — computed below, so we derive it inline here too
+    const targets = renewals.filter(r =>
+      (r.status === 'overdue' || r.status === 'pending' || r.status === 'partial') &&
+      (filterType === 'all' || r.membershipType === filterType)
+    );
+    if (targets.length === 0) {
+      alert('没有符合条件的待提醒会员（overdue / pending / partial）。');
+      return;
+    }
+    const confirmed = window.confirm(
+      `将为 ${targets.length} 位会员逐一打开 WhatsApp 提醒。\n浏览器可能拦截弹出窗口，请确保已允许此页面弹窗。\n\n继续？`
+    );
+    if (!confirmed) return;
+
+    let sent = 0;
+    for (const renewal of targets) {
+      const m = members.find(mem => mem.id === renewal.memberId);
+      if (!m?.phone) continue;
+      const targetDues = (renewal as any).targetDues ?? renewal.amount ?? 0;
+      const paidAmt = renewal.amount ?? 0;
+      const outstanding = Math.max(0, targetDues - paidAmt);
+      const ok = sendWhatsAppDuesReminder(m.name, m.phone, selectedYear, outstanding);
+      if (ok) {
+        sent++;
+        // Small delay so browser doesn't block rapid popup opens
+        await new Promise(r => setTimeout(r, 600));
+      }
+    }
+    alert(`已打开 ${sent} 个 WhatsApp 会话。${targets.length - sent > 0 ? `\n⚠️ ${targets.length - sent} 位会员没有电话号码，已跳过。` : ''}`);
   };
 
   const mergedRenewals = React.useMemo((): RenewalWithTargetDues[] => {
@@ -759,6 +818,15 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 <option value="pending">Pending</option>
                 <option value="overdue">Overdue</option>
               </select>
+              <button
+                type="button"
+                onClick={handleBulkWhatsApp}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors shrink-0"
+                title="向所有 overdue / pending 会员发送 WhatsApp 会费催缴提醒"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </button>
             </div>
           </div>
 
@@ -780,6 +848,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                     <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                     <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Due Date</th>
                     <th className="py-2.5 px-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid Date</th>
+                    <th className="py-2.5 px-3 w-8"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -793,6 +862,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       renewal.status === 'overdue' ? 'border-l-red-400' :
                       renewal.status === 'partial' ? 'border-l-orange-400' :
                       'border-l-amber-400';
+                    const canWhatsApp = m?.phone && (renewal.status === 'overdue' || renewal.status === 'pending' || renewal.status === 'partial');
                     return (
                       <tr key={renewal.id} className={`border-l-2 ${statusBarColor} hover:bg-slate-50/80 transition-colors`}>
                         <td className="py-2.5 px-3 text-xs text-slate-400 font-mono">{index + 1}</td>
@@ -818,6 +888,18 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                         <td className="py-2.5 px-3 text-xs text-slate-600">{fmtDate(renewal.dueDate)}</td>
                         <td className="py-2.5 px-3 text-xs text-slate-500">
                           {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {canWhatsApp && (
+                            <button
+                              type="button"
+                              onClick={() => sendWhatsAppDuesReminder(m!.name, m!.phone, selectedYear, Math.max(0, outstanding))}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors"
+                              title={`WhatsApp 提醒 ${m?.name}`}
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -867,9 +949,21 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
                       <span>Due: <span className="font-medium text-slate-700">{fmtDate(renewal.dueDate)}</span></span>
-                      {renewal.status === 'paid' && renewal.paidDate && (
-                        <span className="text-green-600 font-medium">Paid: {fmtDate(renewal.paidDate)}</span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {renewal.status === 'paid' && renewal.paidDate && (
+                          <span className="text-green-600 font-medium">Paid: {fmtDate(renewal.paidDate)}</span>
+                        )}
+                        {m?.phone && (renewal.status === 'overdue' || renewal.status === 'pending' || renewal.status === 'partial') && (
+                          <button
+                            type="button"
+                            onClick={() => sendWhatsAppDuesReminder(m.name, m.phone, selectedYear, Math.max(0, outstanding))}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors text-[10px] font-semibold"
+                            title={`WhatsApp 提醒 ${m.name}`}
+                          >
+                            <MessageCircle className="w-3 h-3" /> WA
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -69,5 +69,11 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    test: {
+      environment: 'node',
+      globals: true,
+      include: ['**/*.test.ts', '**/*.test.tsx'],
+      exclude: ['node_modules/**', 'functions/**', '.netlify/**', '.claude/**'],
+    },
   };
 });

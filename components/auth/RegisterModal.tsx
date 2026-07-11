@@ -209,7 +209,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           agreementSignatures,
         }
       );
-      showToast('Welcome to JCI Kuala Lumpur! 🎉 Your membership has been created successfully!', 'success');
+      showToast('Application submitted! 🎉 Our team will review your membership request within 3–5 business days.', 'success');
       onClose();
       // Reset form
       setCurrentStep(1);

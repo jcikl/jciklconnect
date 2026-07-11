@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { CalendarCheck, UserCog } from 'lucide-react';
+import { CalendarCheck, UserCog, Bell } from 'lucide-react';
 import { Button, Card, Badge, useToast } from '../../ui/Common';
+import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { Input, Textarea } from '../../ui/Form';
 import type { Member } from '../../../types';
 import type { EventRegistration } from '../../../types';
@@ -18,6 +19,7 @@ const DUES_STATUS_LABEL: Record<string, string> = { Paid: 'Paid', Pending: 'Pend
 export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Partial<Member>) => Promise<void> }> = ({ member, onSave }) => {
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
+  const { permission, loading: notifLoading, requestPermission } = usePushNotifications();
   const [participations, setParticipations] = useState<EventRegistration[]>([]);
   const [organizerEvents, setOrganizerEvents] = useState<Event[]>([]);
   const [eventsById, setEventsById] = useState<Record<string, Event>>({});
@@ -105,6 +107,33 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
           ))}
           <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </form>
+      </Card>
+
+      {/* Push Notifications */}
+      <Card className="p-4">
+        <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Bell size={16} /> Notifications</h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-slate-700">Push Notifications</p>
+            <p className="text-xs text-slate-400">Receive alerts for events, points, and announcements</p>
+          </div>
+          {permission === 'granted' ? (
+            <Badge variant="success">Enabled</Badge>
+          ) : permission === 'denied' ? (
+            <Badge variant="error">Blocked</Badge>
+          ) : (
+            <Button size="sm" variant="secondary" disabled={notifLoading} onClick={async () => {
+              const tok = await requestPermission();
+              if (tok) showToast('Push notifications enabled', 'success');
+              else showToast('Could not enable notifications', 'error');
+            }}>
+              {notifLoading ? 'Enabling...' : 'Enable'}
+            </Button>
+          )}
+        </div>
+        {permission === 'denied' && (
+          <p className="text-xs text-slate-400 mt-2">Notifications are blocked. Please allow them in your browser settings.</p>
+        )}
       </Card>
 
       {/* Story 8.1：会费状态与活动参与、筹委经历 */}

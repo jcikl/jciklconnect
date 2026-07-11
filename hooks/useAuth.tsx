@@ -1,5 +1,5 @@
 // Authentication Hook
-import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import {
   User,
   signInWithEmailAndPassword,
@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Member, UserRole, MemberTier } from '../types';
@@ -23,6 +23,7 @@ import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
 import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored } from '../utils/authStorage';
 import { MembersService } from '../services/membersService';
 import { BoardManagementService } from '../services/boardManagementService';
+import { CommunicationService } from '../services/communicationService';
 
 interface AuthContextType {
   user: User | null;
@@ -55,6 +56,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [simulatedMemberId, setSimulatedMemberId] = useState<string | null>(null);
   const [originalMember, setOriginalMember] = useState<Member | null>(null);
   const [originalRole, setOriginalRole] = useState<UserRole | null>(null);
+  // Prevents onAuthStateChanged from signing out a user whose member doc hasn't been written yet
+  const isSigningUpRef = useRef(false);
 
   // Load persisted auth state on mount (runs first, before Firebase listener)
   useEffect(() => {
@@ -172,10 +175,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setUser(firebaseUser);
               setMember(memberData);
             } else if (!memberData && isMounted && !checkDevMode()) {
-              // Still no member record for this account — sign out so they cannot use the app
-              await firebaseSignOut(auth);
-              setUser(null);
-              setMember(null);
+              // Still no member record — sign out, unless we're mid-signup (doc not written yet)
+              if (!isSigningUpRef.current) {
+                await firebaseSignOut(auth);
+                setUser(null);
+                setMember(null);
+              }
             }
           } catch (error) {
             // Only log error if not in dev mode
@@ -346,21 +351,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.warn('Could not check for existing profile during signup:', e);
     }
 
-    // 2. Create Firebase Auth user
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, { displayName: name });
+    // 2. Create Firebase Auth user — set flag so onAuthStateChanged doesn't sign out
+    //    before the member document is written (race condition)
+    isSigningUpRef.current = true;
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      isSigningUpRef.current = false;
+      throw err;
+    }
+    await updateProfile(userCredential!.user, { displayName: name });
 
     // 3. Create or Update member document
+    // Self-registrations (no pre-imported profile) start at PROBATION pending admin review
+    const isNewSelfRegistration = !existingProfile;
     const newMember: Partial<Member> = {
       name,
       email,
-      role: existingProfile?.role || UserRole.GUEST,
+      role: existingProfile?.role || UserRole.PROBATION,
       tier: existingProfile?.tier || ('Bronze' as any),
       points: existingProfile?.points || 0,
       joinDate: existingProfile?.joinDate || new Date().toISOString().split('T')[0],
       avatar: existingProfile?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`,
       skills: existingProfile?.skills || additionalData?.skills || [],
-      hobbies: existingProfile?.hobbies || (Array.isArray(additionalData?.hobbies) ? additionalData.hobbies : []),
+      hobbies: existingProfile?.hobbies || (Array.isArray(additionalData?.selectedHobbies) ? additionalData.selectedHobbies : (Array.isArray(additionalData?.hobbies) ? additionalData.hobbies : [])),
       churnRisk: existingProfile?.churnRisk || 'Low',
       attendanceRate: existingProfile?.attendanceRate || 100,
       duesStatus: existingProfile?.duesStatus || 'Pending',
@@ -371,16 +386,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       gender: existingProfile?.gender || additionalData?.gender,
       dateOfBirth: existingProfile?.dateOfBirth || additionalData?.dateOfBirth,
       nationality: existingProfile?.nationality || additionalData?.nationality || 'Malaysia',
+      // Persona & survey data from registration form
+      ...(additionalData?.surveyAnswers ? { surveyAnswers: additionalData.surveyAnswers } : {}),
+      ...(additionalData?.personaType ? { personaType: additionalData.personaType } : {}),
+      ...(additionalData?.tendencyTags ? { tendencyTags: additionalData.tendencyTags } : {}),
       // Carry over any other imported data if matched
       ...(existingProfile || {})
     };
 
     // Save to the new UID (this links the Firebase Auth user to the profile data)
-    await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential.user.uid), newMember);
+    await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), newMember);
+    isSigningUpRef.current = false;
 
-    // If we matched an existing profile that had a different ID (imported random ID), 
+    // 4. Notify admins & board members about the new self-registration
+    if (isNewSelfRegistration) {
+      try {
+        const adminRoles = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BOARD];
+        const membersColl = collection(db, COLLECTIONS.MEMBERS);
+        const adminSnap = await getDocs(
+          query(membersColl, where('role', 'in', adminRoles))
+        );
+        const notifyAll = adminSnap.docs.map(d =>
+          CommunicationService.createNotification({
+            memberId: d.id,
+            title: 'New Member Registration — Pending Review',
+            message: `${additionalData?.fullName || name} (${email}) has submitted a membership application and is awaiting approval.`,
+            type: 'info',
+          }).catch(() => { /* don't block signup on notification failure */ })
+        );
+        await Promise.allSettled(notifyAll);
+      } catch {
+        // Notification failure must not break the registration flow
+      }
+    }
+
+    // If we matched an existing profile that had a different ID (imported random ID),
     // we might want to delete the old document to avoid duplicates.
-    if (existingProfile && existingProfile.id !== userCredential.user.uid) {
+    if (existingProfile && existingProfile.id !== userCredential!.user.uid) {
       try {
         const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(doc(db, COLLECTIONS.MEMBERS, existingProfile.id));
@@ -390,8 +432,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Update local state
-    setUser(userCredential.user);
-    setMember({ id: userCredential.user.uid, ...newMember } as Member);
+    setUser(userCredential!.user);
+    setMember({ id: userCredential!.user.uid, ...newMember } as Member);
   };
 
   const signInWithGoogle = async () => {

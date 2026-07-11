@@ -8,6 +8,7 @@ import { ProjectKanban } from './ProjectKanban';
 import { ProjectFinancialAccount } from './ProjectFinancialAccount';
 import { ProjectActivityPlanTab } from './ProjectActivityPlanTab';
 import { ProjectCommitteeTab } from './ProjectCommitteeTab';
+import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 import { ProjectTrainerTab } from './ProjectTrainerTab';
 import { ProjectReportsTab } from './ProjectReportsTab';
 import { ProjectAIPredictions } from './ProjectAIPredictions';
@@ -131,10 +132,12 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
         </div>
         <div className="p-4">
           {activeTab === 'committee' && (
-            <ProjectCommitteeTab
-              project={project}
-              onSave={(updates) => onUpdateProject(projectId, updates)}
-            />
+            <AsyncErrorBoundary>
+              <ProjectCommitteeTab
+                project={project}
+                onSave={(updates) => onUpdateProject(projectId, updates)}
+              />
+            </AsyncErrorBoundary>
           )}
           {activeTab === 'trainers' && (
             <ProjectTrainerTab
@@ -179,11 +182,13 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
             <ProjectAIPredictions projectId={projectId} />
           )}
           {activeTab === 'activity-plan' && (
-            <ProjectActivityPlanTab
-              project={project}
-              onSave={(updates) => onUpdateProject(projectId, updates)}
-              onDelete={handleDeleteProject}
-            />
+            <AsyncErrorBoundary>
+              <ProjectActivityPlanTab
+                project={project}
+                onSave={(updates) => onUpdateProject(projectId, updates)}
+                onDelete={handleDeleteProject}
+              />
+            </AsyncErrorBoundary>
           )}
         </div>
       </Card>

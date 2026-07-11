@@ -43,6 +43,7 @@ import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailProfessionalTab } from './MemberDetailProfessionalTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
+import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
   const { resetPassword, member: currentAuthMember } = useAuth();
@@ -1159,60 +1160,68 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       </div>
 
       {activeDetailTab === 'basic' && (
-        <MemberDetailBasicTab
-          member={member}
-          isEditMode={isEditMode}
-          inlineValues={inlineValues}
-          setInlineValues={setInlineValues}
-          isAdmin={isAdmin}
-          isDeveloper={isDeveloper}
-          loadingChurnPrediction={loadingChurnPrediction}
-          handleAnalyzeChurn={handleAnalyzeChurn}
-          loadingClubs={loadingClubs}
-          memberClubs={memberClubs}
-          members={members}
-          allProjects={allProjects}
-          avatarUploading={avatarUploading}
-          avatarUploadProgress={avatarUploadProgress}
-          handleInlineAvatarUpload={handleInlineAvatarUpload}
-          resolveIntroducerDisplay={resolveIntroducerDisplay}
-        />
+        <AsyncErrorBoundary>
+          <MemberDetailBasicTab
+            member={member}
+            isEditMode={isEditMode}
+            inlineValues={inlineValues}
+            setInlineValues={setInlineValues}
+            isAdmin={isAdmin}
+            isDeveloper={isDeveloper}
+            loadingChurnPrediction={loadingChurnPrediction}
+            handleAnalyzeChurn={handleAnalyzeChurn}
+            loadingClubs={loadingClubs}
+            memberClubs={memberClubs}
+            members={members}
+            allProjects={allProjects}
+            avatarUploading={avatarUploading}
+            avatarUploadProgress={avatarUploadProgress}
+            handleInlineAvatarUpload={handleInlineAvatarUpload}
+            resolveIntroducerDisplay={resolveIntroducerDisplay}
+          />
+        </AsyncErrorBoundary>
       )}
       {activeDetailTab === 'professional' && (
-        <MemberDetailProfessionalTab
-          member={member}
-          isEditMode={isEditMode}
-          inlineValues={inlineValues}
-          setInlineValues={setInlineValues}
-          activeInlineEditCard={activeInlineEditCard}
-        />
+        <AsyncErrorBoundary>
+          <MemberDetailProfessionalTab
+            member={member}
+            isEditMode={isEditMode}
+            inlineValues={inlineValues}
+            setInlineValues={setInlineValues}
+            activeInlineEditCard={activeInlineEditCard}
+          />
+        </AsyncErrorBoundary>
       )}
       {activeDetailTab === 'career' && (
-        <MemberDetailCareerTab
-          member={member}
-          isEditMode={isEditMode}
-          inlineValues={inlineValues}
-          setInlineValues={setInlineValues}
-          boardPositions={boardPositions}
-          commissionDirectorPositions={commissionDirectorPositions}
-          mentor={mentor}
-          mentees={mentees}
-          handleFindMentors={handleFindMentors}
-          loadingMatches={loadingMatches}
-          setShowPaymentHistoryModal={setShowPaymentHistoryModal}
-        />
+        <AsyncErrorBoundary>
+          <MemberDetailCareerTab
+            member={member}
+            isEditMode={isEditMode}
+            inlineValues={inlineValues}
+            setInlineValues={setInlineValues}
+            boardPositions={boardPositions}
+            commissionDirectorPositions={commissionDirectorPositions}
+            mentor={mentor}
+            mentees={mentees}
+            handleFindMentors={handleFindMentors}
+            loadingMatches={loadingMatches}
+            setShowPaymentHistoryModal={setShowPaymentHistoryModal}
+          />
+        </AsyncErrorBoundary>
       )}
       {activeDetailTab === 'activities' && (
-        <MemberDetailActivitiesTab
-          member={member}
-          activitiesLoading={activitiesLoading}
-          radarContributions={radarContributions}
-          groupedRadarContributions={groupedRadarContributions}
-          sponsorshipRecords={sponsorshipRecords}
-          projectRoles={projectRoles}
-          recruitedMembers={recruitedMembers}
-          isPresident={isPresident}
-        />
+        <AsyncErrorBoundary>
+          <MemberDetailActivitiesTab
+            member={member}
+            activitiesLoading={activitiesLoading}
+            radarContributions={radarContributions}
+            groupedRadarContributions={groupedRadarContributions}
+            sponsorshipRecords={sponsorshipRecords}
+            projectRoles={projectRoles}
+            recruitedMembers={recruitedMembers}
+            isPresident={isPresident}
+          />
+        </AsyncErrorBoundary>
       )}
       {showAssessmentModal && (
         <Modal
