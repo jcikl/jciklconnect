@@ -18,7 +18,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
 import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress, RadarPointsConfig } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 
 export interface PointTransaction {

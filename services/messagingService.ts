@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
 
 export interface Message {
   id?: string;
@@ -62,45 +62,47 @@ export class MessagingService {
     name?: string,
     projectId?: string
   ): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would create conversation:', { type, participants, name, projectId });
-      return 'mock-conversation-id';
-    }
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Would create conversation:', { type, participants, name, projectId });
+        return 'mock-conversation-id';
+      },
+      async () => {
+        try {
+          // For direct messages, check if conversation already exists
+          if (type === 'direct' && participants.length === 2) {
+            const existing = await this.findDirectConversation(participants[0], participants[1]);
+            if (existing) {
+              return existing.id!;
+            }
+          }
 
-    try {
-      // For direct messages, check if conversation already exists
-      if (type === 'direct' && participants.length === 2) {
-        const existing = await this.findDirectConversation(participants[0], participants[1]);
-        if (existing) {
-          return existing.id!;
+          const conversationData: Omit<Conversation, 'id'> = {
+            type,
+            name,
+            participants,
+            projectId,
+            createdBy,
+            lastActivity: Timestamp.now(),
+            createdAt: Timestamp.now(),
+            unreadCount: {},
+          };
+
+          const docRef = await addDoc(collection(db, COLLECTIONS.CONVERSATIONS || 'conversations'), conversationData);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating conversation:', error);
+          throw error;
         }
       }
-
-      const conversationData: Omit<Conversation, 'id'> = {
-        type,
-        name,
-        participants,
-        projectId,
-        createdBy,
-        lastActivity: Timestamp.now(),
-        createdAt: Timestamp.now(),
-        unreadCount: {},
-      };
-
-      const docRef = await addDoc(collection(db, COLLECTIONS.CONVERSATIONS || 'conversations'), conversationData);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      throw error;
-    }
+    );
   }
 
   // Find existing direct conversation between two members
   static async findDirectConversation(memberId1: string, memberId2: string): Promise<Conversation | null> {
-    if (isDevMode()) {
-      return null;
-    }
-
+    return withDevMode(
+      () => null,
+      async () => {
     try {
       const snapshot = await getDocs(
         query(
@@ -123,67 +125,70 @@ export class MessagingService {
       console.error('Error finding direct conversation:', error);
       return null;
     }
+  });
   }
 
   // Get all conversations for a member
   static async getConversations(memberId: string): Promise<Conversation[]> {
-    if (isDevMode()) {
-      return [];
-    }
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.CONVERSATIONS || 'conversations'),
+              where('participants', 'array-contains', memberId),
+              orderBy('lastActivity', 'desc')
+            )
+          );
 
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.CONVERSATIONS || 'conversations'),
-          where('participants', 'array-contains', memberId),
-          orderBy('lastActivity', 'desc')
-        )
-      );
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        lastActivity: doc.data().lastActivity?.toDate?.() || doc.data().lastActivity,
-        createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-        lastMessage: doc.data().lastMessage ? {
-          ...doc.data().lastMessage,
-          timestamp: doc.data().lastMessage.timestamp?.toDate?.() || doc.data().lastMessage.timestamp,
-        } : undefined,
-      } as Conversation));
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
-      throw error;
-    }
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            lastActivity: doc.data().lastActivity?.toDate?.() || doc.data().lastActivity,
+            createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
+            lastMessage: doc.data().lastMessage ? {
+              ...doc.data().lastMessage,
+              timestamp: doc.data().lastMessage.timestamp?.toDate?.() || doc.data().lastMessage.timestamp,
+            } : undefined,
+          } as Conversation));
+        } catch (error) {
+          console.error('Error fetching conversations:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get messages for a conversation
   static async getMessages(conversationId: string, limitCount: number = 50): Promise<Message[]> {
-    if (isDevMode()) {
-      return [];
-    }
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.MESSAGES || 'messages'),
+              where('conversationId', '==', conversationId),
+              orderBy('createdAt', 'desc'),
+              limit(limitCount)
+            )
+          );
 
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.MESSAGES || 'messages'),
-          where('conversationId', '==', conversationId),
-          orderBy('createdAt', 'desc'),
-          limit(limitCount)
-        )
-      );
-
-      return snapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-          editedAt: doc.data().editedAt?.toDate?.() || doc.data().editedAt,
-        } as Message))
-        .reverse(); // Reverse to show oldest first
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      throw error;
-    }
+          return snapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
+              editedAt: doc.data().editedAt?.toDate?.() || doc.data().editedAt,
+            } as Message))
+            .reverse(); // Reverse to show oldest first
+        } catch (error) {
+          console.error('Error fetching messages:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Send a message
@@ -196,11 +201,12 @@ export class MessagingService {
     type: 'text' | 'image' | 'file' = 'text',
     attachments?: Message['attachments']
   ): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would send message:', { conversationId, senderId, content });
-      return 'mock-message-id';
-    }
-
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Would send message:', { conversationId, senderId, content });
+        return 'mock-message-id';
+      },
+      async () => {
     try {
       const messageData: Omit<Message, 'id'> = {
         conversationId,
@@ -248,14 +254,14 @@ export class MessagingService {
       console.error('Error sending message:', error);
       throw error;
     }
+  });
   }
 
   // Mark messages as read
   static async markAsRead(conversationId: string, memberId: string): Promise<void> {
-    if (isDevMode()) {
-      return;
-    }
-
+    return withDevMode(
+      () => {},
+      async () => {
     try {
       // Get unread messages
       const messages = await this.getMessages(conversationId, 100);
@@ -286,6 +292,7 @@ export class MessagingService {
       console.error('Error marking messages as read:', error);
       throw error;
     }
+  });
   }
 
   // Subscribe to real-time messages for a conversation

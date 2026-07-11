@@ -16,7 +16,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { InventoryItem, MaintenanceSchedule, InventoryAlert, StockMovement } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_INVENTORY } from './mockData';
 import { removeUndefined } from '../utils/dataUtils';
 

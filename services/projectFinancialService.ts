@@ -26,7 +26,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { FinanceService } from './financeService';
-import { isDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
 import { MOCK_PROJECT_FINANCIAL_ACCOUNTS, MOCK_PROJECT_TRANSACTIONS } from './mockData';
 
 export interface CreateProjectAccountData {

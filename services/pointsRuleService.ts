@@ -24,15 +24,14 @@ import {
   PointsRuleAnalytics,
   Member 
 } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
 
 export class PointsRuleService {
   // Get all points rules
   static async getAllPointsRules(): Promise<PointsRule[]> {
-    if (isDevMode()) {
-      return this.getDefaultPointsRules();
-    }
-
+    return withDevMode(
+      () => this.getDefaultPointsRules(),
+      async () => {
     try {
       const snapshot = await getDocs(
         query(
@@ -51,6 +50,7 @@ export class PointsRuleService {
       console.error('Error fetching points rules:', error);
       throw error;
     }
+  });
   }
 
   // Get enabled points rules
@@ -61,11 +61,12 @@ export class PointsRuleService {
 
   // Get points rule by ID
   static async getPointsRuleById(ruleId: string): Promise<PointsRule | null> {
-    if (isDevMode()) {
-      const defaultRules = this.getDefaultPointsRules();
-      return defaultRules.find(rule => rule.id === ruleId) || null;
-    }
-
+    return withDevMode(
+      () => {
+        const defaultRules = this.getDefaultPointsRules();
+        return defaultRules.find(rule => rule.id === ruleId) || null;
+      },
+      async () => {
     try {
       const docRef = doc(db, COLLECTIONS.POINTS_RULES, ruleId);
       const docSnap = await getDoc(docRef);
@@ -84,55 +85,59 @@ export class PointsRuleService {
       console.error('Error fetching points rule:', error);
       throw error;
     }
+  });
   }
 
   // Create or update points rule
   static async savePointsRule(rule: Partial<PointsRule>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Would save points rule:', rule);
-      return `rule-${Date.now()}`;
-    }
-
-    try {
-      if (rule.id) {
-        // Update existing
-        const docRef = doc(db, COLLECTIONS.POINTS_RULES, rule.id);
-        await updateDoc(docRef, {
-          ...rule,
-          updatedAt: Timestamp.now(),
-        });
-        return rule.id;
-      } else {
-        // Create new
-        const newRule = {
-          ...rule,
-          enabled: rule.enabled ?? true,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        };
-        const docRef = await addDoc(collection(db, COLLECTIONS.POINTS_RULES), newRule);
-        return docRef.id;
+    return withDevMode(
+      () => {
+        console.log('[DEV MODE] Would save points rule:', rule);
+        return `rule-${Date.now()}`;
+      },
+      async () => {
+        try {
+          if (rule.id) {
+            // Update existing
+            const docRef = doc(db, COLLECTIONS.POINTS_RULES, rule.id);
+            await updateDoc(docRef, {
+              ...rule,
+              updatedAt: Timestamp.now(),
+            });
+            return rule.id;
+          } else {
+            // Create new
+            const newRule = {
+              ...rule,
+              enabled: rule.enabled ?? true,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            };
+            const docRef = await addDoc(collection(db, COLLECTIONS.POINTS_RULES), newRule);
+            return docRef.id;
+          }
+        } catch (error) {
+          console.error('Error saving points rule:', error);
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Error saving points rule:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete points rule
   static async deletePointsRule(ruleId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Would delete points rule:', ruleId);
-      return;
-    }
-
-    try {
-      const docRef = doc(db, COLLECTIONS.POINTS_RULES, ruleId);
-      await deleteDoc(docRef);
-    } catch (error) {
-      console.error('Error deleting points rule:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log('[DEV MODE] Would delete points rule:', ruleId); },
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.POINTS_RULES, ruleId);
+          await deleteDoc(docRef);
+        } catch (error) {
+          console.error('Error deleting points rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Validate rule conditions
@@ -376,8 +381,8 @@ export class PointsRuleService {
 
   // Get rule analytics
   static async getRuleAnalytics(ruleId: string): Promise<PointsRuleAnalytics | null> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         ruleId,
         ruleName: 'Sample Rule',
         executionCount: 42,
@@ -388,9 +393,8 @@ export class PointsRuleService {
           { trigger: 'event_attendance', count: 25 },
           { trigger: 'task_completion', count: 17 },
         ],
-      };
-    }
-
+      }),
+      async () => {
     try {
       const rule = await this.getPointsRuleById(ruleId);
       if (!rule) return null;
@@ -432,6 +436,7 @@ export class PointsRuleService {
       console.error('Error getting rule analytics:', error);
       throw error;
     }
+  });
   }
 
   // Get default points rules for dev mode

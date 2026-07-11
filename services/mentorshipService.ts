@@ -14,7 +14,7 @@ import { db } from '../config/firebase';
 import { MembersService } from './membersService';
 import { CommunicationService } from './communicationService';
 import { Member, MentorMatch, UserRole } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
 
 export interface MentorMatchSuggestion {
   mentor: Member;
@@ -196,78 +196,81 @@ export class MentorshipService {
     matchingFactors: string[],
     createdBy: string
   ): Promise<MentorMatch> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would create mentor match: ${mentorId} -> ${menteeId}`);
-      return {
-        id: 'match1',
-        mentorId,
-        menteeId,
-        compatibilityScore,
-        matchingFactors,
-        status: 'suggested',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    }
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Would create mentor match: ${mentorId} -> ${menteeId}`);
+        return {
+          id: 'match1',
+          mentorId,
+          menteeId,
+          compatibilityScore,
+          matchingFactors,
+          status: 'suggested' as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      },
+      async () => {
+        try {
+          const matchData: Omit<MentorMatch, 'id'> = {
+            mentorId,
+            menteeId,
+            compatibilityScore,
+            matchingFactors,
+            status: 'suggested',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
 
-    try {
-      const matchData: Omit<MentorMatch, 'id'> = {
-        mentorId,
-        menteeId,
-        compatibilityScore,
-        matchingFactors,
-        status: 'suggested',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+          const mentorMatchesRef = collection(db, 'mentorMatches');
+          const docRef = await addDoc(mentorMatchesRef, matchData);
 
-      const mentorMatchesRef = collection(db, 'mentorMatches');
-      const docRef = await addDoc(mentorMatchesRef, matchData);
-      
-      return {
-        id: docRef.id,
-        ...matchData,
-      };
-    } catch (error) {
-      console.error('Error creating mentor match:', error);
-      throw error;
-    }
+          return {
+            id: docRef.id,
+            ...matchData,
+          };
+        } catch (error) {
+          console.error('Error creating mentor match:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Approve a mentor match and make it active
   static async approveMentorMatch(matchId: string, approvedBy: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would approve mentor match: ${matchId}`);
-      return;
-    }
+    return withDevMode(
+      () => { console.log(`[Dev Mode] Would approve mentor match: ${matchId}`); },
+      async () => {
+        try {
+          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchDoc = await getDoc(matchRef);
 
-    try {
-      const matchRef = doc(db, 'mentorMatches', matchId);
-      const matchDoc = await getDoc(matchRef);
-      
-      if (!matchDoc.exists()) {
-        throw new Error('Mentor match not found');
+          if (!matchDoc.exists()) {
+            throw new Error('Mentor match not found');
+          }
+
+          const match = { id: matchDoc.id, ...matchDoc.data() } as MentorMatch;
+
+          // Update match status
+          await updateDoc(matchRef, {
+            status: 'active',
+            startDate: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+          // Update member records
+          await MembersService.assignMentor(match.menteeId, match.mentorId);
+
+          // Send notifications
+          await this.sendMatchNotifications(match, approvedBy);
+
+        } catch (error) {
+          console.error('Error approving mentor match:', error);
+          throw error;
+        }
       }
-
-      const match = { id: matchDoc.id, ...matchDoc.data() } as MentorMatch;
-
-      // Update match status
-      await updateDoc(matchRef, {
-        status: 'active',
-        startDate: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Update member records
-      await MembersService.assignMentor(match.menteeId, match.mentorId);
-
-      // Send notifications
-      await this.sendMatchNotifications(match, approvedBy);
-
-    } catch (error) {
-      console.error('Error approving mentor match:', error);
-      throw error;
-    }
+    );
   }
 
   // Send notifications for mentor match
@@ -327,72 +330,74 @@ export class MentorshipService {
 
   // Get mentor matches for a member
   static async getMentorMatches(memberId: string): Promise<MentorMatch[]> {
-    if (isDevMode()) {
-      return [];
-    }
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          const mentorMatchesRef = collection(db, 'mentorMatches');
+          const q = query(
+            mentorMatchesRef,
+            where('mentorId', '==', memberId),
+            orderBy('createdAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
 
-    try {
-      const mentorMatchesRef = collection(db, 'mentorMatches');
-      const q = query(
-        mentorMatchesRef,
-        where('mentorId', '==', memberId),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as MentorMatch[];
-    } catch (error) {
-      console.error('Error getting mentor matches:', error);
-      throw error;
-    }
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as MentorMatch[];
+        } catch (error) {
+          console.error('Error getting mentor matches:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get mentee matches for a member
   static async getMenteeMatches(memberId: string): Promise<MentorMatch[]> {
-    if (isDevMode()) {
-      return [];
-    }
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          const mentorMatchesRef = collection(db, 'mentorMatches');
+          const q = query(
+            mentorMatchesRef,
+            where('menteeId', '==', memberId),
+            orderBy('createdAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
 
-    try {
-      const mentorMatchesRef = collection(db, 'mentorMatches');
-      const q = query(
-        mentorMatchesRef,
-        where('menteeId', '==', memberId),
-        orderBy('createdAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as MentorMatch[];
-    } catch (error) {
-      console.error('Error getting mentee matches:', error);
-      throw error;
-    }
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as MentorMatch[];
+        } catch (error) {
+          console.error('Error getting mentee matches:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Complete a mentorship relationship
   static async completeMentorship(matchId: string, completedBy: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would complete mentorship: ${matchId}`);
-      return;
-    }
-
-    try {
-      const matchRef = doc(db, 'mentorMatches', matchId);
-      await updateDoc(matchRef, {
-        status: 'completed',
-        endDate: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error('Error completing mentorship:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log(`[Dev Mode] Would complete mentorship: ${matchId}`); },
+      async () => {
+        try {
+          const matchRef = doc(db, 'mentorMatches', matchId);
+          await updateDoc(matchRef, {
+            status: 'completed',
+            endDate: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error('Error completing mentorship:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get enhanced mentorship statistics
@@ -449,26 +454,26 @@ export class MentorshipService {
     rating: number,
     feedback: string
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would collect feedback for match: ${matchId}`);
-      return;
-    }
+    return withDevMode(
+      () => { console.log(`[Dev Mode] Would collect feedback for match: ${matchId}`); },
+      async () => {
+        try {
+          const feedbackData = {
+            matchId,
+            fromMemberId,
+            rating,
+            feedback,
+            createdAt: new Date().toISOString(),
+          };
 
-    try {
-      const feedbackData = {
-        matchId,
-        fromMemberId,
-        rating,
-        feedback,
-        createdAt: new Date().toISOString(),
-      };
-
-      const feedbackRef = collection(db, 'mentorshipFeedback');
-      await addDoc(feedbackRef, feedbackData);
-    } catch (error) {
-      console.error('Error collecting mentorship feedback:', error);
-      throw error;
-    }
+          const feedbackRef = collection(db, 'mentorshipFeedback');
+          await addDoc(feedbackRef, feedbackData);
+        } catch (error) {
+          console.error('Error collecting mentorship feedback:', error);
+          throw error;
+        }
+      }
+    );
   }
 }
 

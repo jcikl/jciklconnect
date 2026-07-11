@@ -1,52 +1,26 @@
 // Projects Data Hook
-import { useState, useEffect } from 'react';
 import { ProjectsService } from '../services/projectsService';
 import { Project, Task } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
+import { useFirestoreCollection } from './useFirestoreCollection';
 
 export const useProjects = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
 
-  const loadProjects = async () => {
-    const inDevMode = isDevMode() || isDevModeFromAuth;
-    if (!member && !inDevMode) {
-      setProjects([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await ProjectsService.getAllProjects();
-      setProjects(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load projects';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const inDevMode = isDevMode() || isDevModeFromAuth;
+  const enabled = !authLoading && (!!member || inDevMode);
 
-  useEffect(() => {
-    if (authLoading) return;
-    const inDevMode = isDevMode() || isDevModeFromAuth;
-    if (!member && !inDevMode) {
-      setProjects([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    loadProjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [member, authLoading, isDevModeFromAuth]);
+  const { data: projects, loading: loading1, error, reload: loadProjects } = useFirestoreCollection<Project>({
+    loader: () => ProjectsService.getAllProjects(),
+    enabled,
+    deps: [enabled],
+  });
+
+  // Keep auth spinner going while auth is still resolving
+  const loading = authLoading || loading1;
 
   const createProject = async (projectData: Omit<Project, 'id'>) => {
     try {
@@ -144,4 +118,3 @@ export const useProjects = () => {
     getTaskById,
   };
 };
-

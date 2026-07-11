@@ -2,7 +2,7 @@
 import { Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { addDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 
 export interface EmailConfig {
@@ -101,79 +101,82 @@ export class EmailService {
 
   // Send email
   static async sendEmail(message: EmailMessage): Promise<string> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Would send email:', {
-        to: message.to,
-        subject: message.subject,
-        provider: this.config?.provider || 'none',
-      });
-      
-      // Log email in dev mode
-      await this.logEmail({
-        to: message.to,
-        subject: message.subject,
-        status: 'sent',
-        provider: this.config?.provider || 'dev',
-        metadata: { devMode: true },
-      });
-      
-      return `dev-email-${Date.now()}`;
-    }
+    return withDevMode(
+      async () => {
+        console.log('[DEV MODE] Would send email:', {
+          to: message.to,
+          subject: message.subject,
+          provider: this.config?.provider || 'none',
+        });
 
-    if (!this.config) {
-      throw new Error('Email service not initialized. Call EmailService.initialize() first.');
-    }
+        // Log email in dev mode
+        await this.logEmail({
+          to: message.to,
+          subject: message.subject,
+          status: 'sent',
+          provider: this.config?.provider || 'dev',
+          metadata: { devMode: true },
+        });
 
-    try {
-      let messageId: string;
+        return `dev-email-${Date.now()}`;
+      },
+      async () => {
+        if (!this.config) {
+          throw new Error('Email service not initialized. Call EmailService.initialize() first.');
+        }
 
-      switch (this.config.provider) {
-        case 'sendgrid':
-          messageId = await this.sendViaSendGrid(message);
-          break;
-        case 'mailgun':
-          messageId = await this.sendViaMailgun(message);
-          break;
-        case 'smtp':
-          messageId = await this.sendViaSMTP(message);
-          break;
-        case 'ses':
-          messageId = await this.sendViaSES(message);
-          break;
-        case 'resend':
-          messageId = await this.sendViaResend(message);
-          break;
-        default:
-          throw new Error(`Unsupported email provider: ${this.config.provider}`);
+        try {
+          let messageId: string;
+
+          switch (this.config.provider) {
+            case 'sendgrid':
+              messageId = await this.sendViaSendGrid(message);
+              break;
+            case 'mailgun':
+              messageId = await this.sendViaMailgun(message);
+              break;
+            case 'smtp':
+              messageId = await this.sendViaSMTP(message);
+              break;
+            case 'ses':
+              messageId = await this.sendViaSES(message);
+              break;
+            case 'resend':
+              messageId = await this.sendViaResend(message);
+              break;
+            default:
+              throw new Error(`Unsupported email provider: ${this.config.provider}`);
+          }
+
+          // Log successful email
+          await this.logEmail({
+            messageId,
+            to: message.to,
+            subject: message.subject,
+            status: 'sent',
+            provider: this.config.provider,
+            sentAt: new Date().toISOString(),
+            metadata: message.metadata,
+          });
+
+          return messageId;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+          // Log failed email
+          await this.logEmail({
+            to: message.to,
+            subject: message.subject,
+            status: 'failed',
+            provider: this.config.provider,
+            error: errorMessage,
+            metadata: message.metadata,
+          });
+
+          throw error;
+        }
       }
-
-      // Log successful email
-      await this.logEmail({
-        messageId,
-        to: message.to,
-        subject: message.subject,
-        status: 'sent',
-        provider: this.config.provider,
-        sentAt: new Date().toISOString(),
-        metadata: message.metadata,
-      });
-
-      return messageId;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      // Log failed email
-      await this.logEmail({
-        to: message.to,
-        subject: message.subject,
-        status: 'failed',
-        provider: this.config.provider,
-        error: errorMessage,
-        metadata: message.metadata,
-      });
-
-      throw error;
-    }
+    );
   }
 
   // Send email via SendGrid
@@ -363,40 +366,41 @@ export class EmailService {
       limit?: number;
     }
   ): Promise<EmailLog[]> {
-    if (isDevMode()) {
-      return [];
-    }
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          let q = query(collection(db, COLLECTIONS.EMAIL_LOGS || 'emailLogs'), orderBy('createdAt', 'desc'));
 
-    try {
-      let q = query(collection(db, COLLECTIONS.EMAIL_LOGS || 'emailLogs'), orderBy('createdAt', 'desc'));
+          if (filters?.to) {
+            q = query(q, where('to', '==', filters.to));
+          }
+          if (filters?.status) {
+            q = query(q, where('status', '==', filters.status));
+          }
+          if (filters?.provider) {
+            q = query(q, where('provider', '==', filters.provider));
+          }
+          if (filters?.limit) {
+            q = query(q, limit(filters.limit));
+          }
 
-      if (filters?.to) {
-        q = query(q, where('to', '==', filters.to));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            sentAt: doc.data().sentAt,
+            deliveredAt: doc.data().deliveredAt,
+            openedAt: doc.data().openedAt,
+            clickedAt: doc.data().clickedAt,
+            createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+          } as EmailLog));
+        } catch (error) {
+          console.error('Error fetching email logs:', error);
+          throw error;
+        }
       }
-      if (filters?.status) {
-        q = query(q, where('status', '==', filters.status));
-      }
-      if (filters?.provider) {
-        q = query(q, where('provider', '==', filters.provider));
-      }
-      if (filters?.limit) {
-        q = query(q, limit(filters.limit));
-      }
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        sentAt: doc.data().sentAt,
-        deliveredAt: doc.data().deliveredAt,
-        openedAt: doc.data().openedAt,
-        clickedAt: doc.data().clickedAt,
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-      } as EmailLog));
-    } catch (error) {
-      console.error('Error fetching email logs:', error);
-      throw error;
-    }
+    );
   }
 
   // Send bulk emails

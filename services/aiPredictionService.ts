@@ -3,7 +3,7 @@ import { Event, Project, Member } from '../types';
 import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { MembersService } from './membersService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface EventDemandPrediction {
   eventId?: string;
@@ -110,12 +110,11 @@ export class AIPredictionService {
     proposedDate?: string,
     location?: string
   ): Promise<EventDemandPrediction> {
-    if (isDevMode()) {
-      return this.getMockEventDemand(eventType);
-    }
-
-    try {
-      const allEvents = await EventsService.getAllEvents();
+    return withDevMode(
+      () => this.getMockEventDemand(eventType),
+      async () => {
+        try {
+          const allEvents = await EventsService.getAllEvents();
       const allMembers = await MembersService.getAllMembers();
 
       // Calculate historical average for this event type
@@ -177,33 +176,34 @@ export class AIPredictionService {
         recommendations.push('High demand expected - ensure adequate venue capacity and resources');
       }
 
-      return {
-        eventType,
-        predictedAttendance,
-        confidence,
-        factors: {
-          historicalAverage: Math.round(historicalAverage),
-          memberInterest: Math.round(memberInterest),
-          timeOfYear: timeOfYearFactor,
-          competingEvents,
-        },
-        recommendations,
-        optimalDate: proposedDate,
-      };
-    } catch (error) {
-      console.error('Error predicting event demand:', error);
-      throw error;
-    }
+          return {
+            eventType,
+            predictedAttendance,
+            confidence,
+            factors: {
+              historicalAverage: Math.round(historicalAverage),
+              memberInterest: Math.round(memberInterest),
+              timeOfYear: timeOfYearFactor,
+              competingEvents,
+            },
+            recommendations,
+            optimalDate: proposedDate,
+          };
+        } catch (error) {
+          console.error('Error predicting event demand:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Predict project success
   static async predictProjectSuccess(projectId: string): Promise<ProjectSuccessPrediction> {
-    if (isDevMode()) {
-      return this.getMockProjectSuccess(projectId);
-    }
-
-    try {
-      const project = await ProjectsService.getProjectById(projectId);
+    return withDevMode(
+      () => this.getMockProjectSuccess(projectId),
+      async () => {
+        try {
+          const project = await ProjectsService.getProjectById(projectId);
       if (!project) {
         throw new Error('Project not found');
       }
@@ -298,34 +298,35 @@ export class AIPredictionService {
         recommendations.push('Focus on improving team engagement through regular communication');
       }
 
-      return {
-        projectId,
-        successProbability,
-        riskLevel,
-        factors: {
-          teamExperience: Math.round(experienceScore),
-          budgetAdequacy: Math.round(budgetAdequacy),
-          timelineRealism,
-          resourceAvailability,
-          memberEngagement: Math.round(memberEngagement),
-        },
-        risks,
-        recommendations,
-      };
-    } catch (error) {
-      console.error('Error predicting project success:', error);
-      throw error;
-    }
+          return {
+            projectId,
+            successProbability,
+            riskLevel,
+            factors: {
+              teamExperience: Math.round(experienceScore),
+              budgetAdequacy: Math.round(budgetAdequacy),
+              timelineRealism,
+              resourceAvailability,
+              memberEngagement: Math.round(memberEngagement),
+            },
+            risks,
+            recommendations,
+          };
+        } catch (error) {
+          console.error('Error predicting project success:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Match sponsors to projects
   static async matchSponsors(projectId?: string, projectName?: string): Promise<SponsorMatch[]> {
-    if (isDevMode()) {
-      return this.getMockSponsorMatches(projectId);
-    }
-
-    try {
-      // This would typically query a sponsors database
+    return withDevMode(
+      () => this.getMockSponsorMatches(projectId),
+      async () => {
+        try {
+          // This would typically query a sponsors database
       // For now, we'll use business profiles as potential sponsors
       const { BusinessDirectoryService } = await import('./businessDirectoryService');
       const businesses = await BusinessDirectoryService.getAllBusinesses();
@@ -379,12 +380,14 @@ export class AIPredictionService {
         };
       });
 
-      // Sort by match score (highest first)
-      return matches.sort((a, b) => b.matchScore - a.matchScore);
-    } catch (error) {
-      console.error('Error matching sponsors:', error);
-      throw error;
-    }
+          // Sort by match score (highest first)
+          return matches.sort((a, b) => b.matchScore - a.matchScore);
+        } catch (error) {
+          console.error('Error matching sponsors:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Analyze sentiment from text
@@ -393,12 +396,11 @@ export class AIPredictionService {
     source: SentimentAnalysis['source'],
     sourceId: string
   ): Promise<SentimentAnalysis> {
-    if (isDevMode()) {
-      return this.getMockSentiment(text, source, sourceId);
-    }
-
-    try {
-      // Simple sentiment analysis based on keywords
+    return withDevMode(
+      () => this.getMockSentiment(text, source, sourceId),
+      async () => {
+        try {
+          // Simple sentiment analysis based on keywords
       // In production, this would use a proper NLP service
       const lowerText = text.toLowerCase();
 
@@ -461,19 +463,21 @@ export class AIPredictionService {
         surprise: (positiveCount + negativeCount) > 0 ? 30 : 0,
       };
 
-      return {
-        source,
-        sourceId,
-        overallSentiment,
-        sentimentScore,
-        emotions,
-        keyTopics,
-        actionableInsights,
-      };
-    } catch (error) {
-      console.error('Error analyzing sentiment:', error);
-      throw error;
-    }
+          return {
+            source,
+            sourceId,
+            overallSentiment,
+            sentimentScore,
+            emotions,
+            keyTopics,
+            actionableInsights,
+          };
+        } catch (error) {
+          console.error('Error analyzing sentiment:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Mock functions for dev mode
@@ -551,12 +555,11 @@ export class AIPredictionService {
 
   // Predict member churn risk
   static async predictMemberChurn(memberId: string): Promise<MemberChurnPrediction> {
-    if (isDevMode()) {
-      return this.getMockChurnPrediction(memberId);
-    }
-
-    try {
-      const member = await MembersService.getMemberById(memberId);
+    return withDevMode(
+      () => this.getMockChurnPrediction(memberId),
+      async () => {
+        try {
+          const member = await MembersService.getMemberById(memberId);
       if (!member) {
         throw new Error('Member not found');
       }
@@ -666,29 +669,30 @@ export class AIPredictionService {
         recommendations.push('Member shows good engagement - maintain regular communication');
       }
 
-      return {
-        memberId,
-        churnRisk,
-        churnProbability: Math.min(100, churnScore),
-        riskFactors,
-        daysSinceLastActivity: 0, // Would calculate from actual last activity
-        recommendations,
-        interventionPriority,
-      };
-    } catch (error) {
-      console.error('Error predicting member churn:', error);
-      throw error;
-    }
+          return {
+            memberId,
+            churnRisk,
+            churnProbability: Math.min(100, churnScore),
+            riskFactors,
+            daysSinceLastActivity: 0, // Would calculate from actual last activity
+            recommendations,
+            interventionPriority,
+          };
+        } catch (error) {
+          console.error('Error predicting member churn:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get personalized recommendations for a member
   static async getPersonalizedRecommendations(memberId: string, limit: number = 10): Promise<PersonalizedRecommendation[]> {
-    if (isDevMode()) {
-      return this.getMockRecommendations(memberId, limit);
-    }
-
-    try {
-      const member = await MembersService.getMemberById(memberId);
+    return withDevMode(
+      () => this.getMockRecommendations(memberId, limit),
+      async () => {
+        try {
+          const member = await MembersService.getMemberById(memberId);
       if (!member) {
         throw new Error('Member not found');
       }
@@ -888,11 +892,13 @@ export class AIPredictionService {
         return b.matchScore - a.matchScore;
       });
 
-      return recommendations.slice(0, limit);
-    } catch (error) {
-      console.error('Error getting personalized recommendations:', error);
-      throw error;
-    }
+          return recommendations.slice(0, limit);
+        } catch (error) {
+          console.error('Error getting personalized recommendations:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Mock functions

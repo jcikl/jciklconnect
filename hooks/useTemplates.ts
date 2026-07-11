@@ -1,42 +1,35 @@
 // Templates Data Hook
-import { useState, useEffect, useCallback } from 'react';
 import { TemplatesService, EventTemplate, ActivityPlanTemplate, EventBudgetTemplate } from '../services/templatesService';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
+import { useFirestoreCollection } from './useFirestoreCollection';
 
 export const useTemplates = () => {
-  const [eventTemplates, setEventTemplates] = useState<EventTemplate[]>([]);
-  const [activityPlanTemplates, setActivityPlanTemplates] = useState<ActivityPlanTemplate[]>([]);
-  const [eventBudgetTemplates, setEventBudgetTemplates] = useState<EventBudgetTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { member } = useAuth();
   const { showToast } = useToast();
 
-  const loadAllTemplates = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [events, activityPlans, budgets] = await Promise.all([
-        TemplatesService.getAllEventTemplates(),
-        TemplatesService.getAllActivityPlanTemplates(),
-        TemplatesService.getAllEventBudgetTemplates(),
-      ]);
-      setEventTemplates(events);
-      setActivityPlanTemplates(activityPlans);
-      setEventBudgetTemplates(budgets);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load templates';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
+  const { data: eventTemplates, loading: loading1, error: error1, reload: reloadEventTemplates } = useFirestoreCollection<EventTemplate>({
+    loader: () => TemplatesService.getAllEventTemplates(),
+  });
 
-  useEffect(() => {
-    loadAllTemplates();
-  }, [loadAllTemplates]);
+  const { data: activityPlanTemplates, loading: loading2, error: error2, reload: reloadActivityPlanTemplates } = useFirestoreCollection<ActivityPlanTemplate>({
+    loader: () => TemplatesService.getAllActivityPlanTemplates(),
+  });
+
+  const { data: eventBudgetTemplates, loading: loading3, error: error3, reload: reloadEventBudgetTemplates } = useFirestoreCollection<EventBudgetTemplate>({
+    loader: () => TemplatesService.getAllEventBudgetTemplates(),
+  });
+
+  const loading = loading1 || loading2 || loading3;
+  const error = error1 || error2 || error3;
+
+  const loadAllTemplates = async () => {
+    await Promise.all([
+      reloadEventTemplates(),
+      reloadActivityPlanTemplates(),
+      reloadEventBudgetTemplates(),
+    ]);
+  };
 
   // Event Templates
   const createEventTemplate = async (templateData: Omit<EventTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -45,7 +38,7 @@ export const useTemplates = () => {
         ...templateData,
         createdBy: member?.name,
       });
-      await loadAllTemplates();
+      await reloadEventTemplates();
       showToast('Event template created successfully', 'success');
       return id;
     } catch (err) {
@@ -58,7 +51,7 @@ export const useTemplates = () => {
   const updateEventTemplate = async (templateId: string, updates: Partial<EventTemplate>) => {
     try {
       await TemplatesService.updateEventTemplate(templateId, updates);
-      await loadAllTemplates();
+      await reloadEventTemplates();
       showToast('Event template updated successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update event template';
@@ -70,7 +63,7 @@ export const useTemplates = () => {
   const deleteEventTemplate = async (templateId: string) => {
     try {
       await TemplatesService.deleteEventTemplate(templateId);
-      await loadAllTemplates();
+      await reloadEventTemplates();
       showToast('Event template deleted successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete event template';
@@ -86,7 +79,7 @@ export const useTemplates = () => {
         ...templateData,
         createdBy: member?.name,
       });
-      await loadAllTemplates();
+      await reloadActivityPlanTemplates();
       showToast('Activity plan template created successfully', 'success');
       return id;
     } catch (err) {
@@ -99,7 +92,7 @@ export const useTemplates = () => {
   const updateActivityPlanTemplate = async (templateId: string, updates: Partial<ActivityPlanTemplate>) => {
     try {
       await TemplatesService.updateActivityPlanTemplate(templateId, updates);
-      await loadAllTemplates();
+      await reloadActivityPlanTemplates();
       showToast('Activity plan template updated successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update activity plan template';
@@ -111,7 +104,7 @@ export const useTemplates = () => {
   const deleteActivityPlanTemplate = async (templateId: string) => {
     try {
       await TemplatesService.deleteActivityPlanTemplate(templateId);
-      await loadAllTemplates();
+      await reloadActivityPlanTemplates();
       showToast('Activity plan template deleted successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete activity plan template';
@@ -127,7 +120,7 @@ export const useTemplates = () => {
         ...templateData,
         createdBy: member?.name,
       });
-      await loadAllTemplates();
+      await reloadEventBudgetTemplates();
       showToast('Event budget template created successfully', 'success');
       return id;
     } catch (err) {
@@ -140,7 +133,7 @@ export const useTemplates = () => {
   const updateEventBudgetTemplate = async (templateId: string, updates: Partial<EventBudgetTemplate>) => {
     try {
       await TemplatesService.updateEventBudgetTemplate(templateId, updates);
-      await loadAllTemplates();
+      await reloadEventBudgetTemplates();
       showToast('Event budget template updated successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update event budget template';
@@ -152,7 +145,7 @@ export const useTemplates = () => {
   const deleteEventBudgetTemplate = async (templateId: string) => {
     try {
       await TemplatesService.deleteEventBudgetTemplate(templateId);
-      await loadAllTemplates();
+      await reloadEventBudgetTemplates();
       showToast('Event budget template deleted successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete event budget template';

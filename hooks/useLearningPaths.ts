@@ -1,44 +1,23 @@
 // Learning Paths Data Hook
-import { useState, useEffect, useCallback } from 'react';
-import { LearningPathsService, LearningPath, LearningProgress, Certificate } from '../services/learningPathsService';
+import { LearningPathsService, LearningPath } from '../services/learningPathsService';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
+import { useFirestoreCollection } from './useFirestoreCollection';
 
 export const useLearningPaths = () => {
-  const [paths, setPaths] = useState<LearningPath[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  const loadPaths = useCallback(async () => {
-    if (!user && !isDevMode()) {
-      setPaths([]);
-      setLoading(false);
-      return;
-    }
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await LearningPathsService.getAllLearningPaths();
-      setPaths(data);
-    } catch (err) {
-      if (isDevMode()) {
-        setPaths([]);
-      } else {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load learning paths';
-        setError(errorMessage);
-        showToast(errorMessage, 'error');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast, user]);
-
-  useEffect(() => {
-    loadPaths();
-  }, [loadPaths]);
+  const { data: paths, loading, error, reload: loadPaths } = useFirestoreCollection<LearningPath>({
+    loader: () =>
+      LearningPathsService.getAllLearningPaths().catch(err => {
+        if (isDevMode()) return [];
+        throw err;
+      }),
+    enabled: !!user || isDevMode(),
+    deps: [!!user],
+  });
 
   const createPath = async (pathData: Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -87,4 +66,3 @@ export const useLearningPaths = () => {
     deletePath,
   };
 };
-

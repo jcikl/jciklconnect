@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { FinanceService } from './financeService';
 import { Transaction } from '../types';
 
@@ -48,8 +48,8 @@ export interface BudgetItem {
 export class EventBudgetService {
   // Get budget for an event
   static async getEventBudget(eventId: string): Promise<EventBudget | null> {
-    if (isDevMode()) {
-      return {
+    return withDevMode<EventBudget | null>(
+      () => ({
         id: 'eb1',
         eventId,
         eventTitle: 'Sample Event',
@@ -64,7 +64,7 @@ export class EventBudgetService {
             description: 'Event venue rental',
             estimatedAmount: 2000,
             actualAmount: 2000,
-            status: 'Spent',
+            status: 'Spent' as const,
           },
           {
             id: 'bi2',
@@ -72,84 +72,88 @@ export class EventBudgetService {
             description: 'Food and beverages',
             estimatedAmount: 1500,
             actualAmount: 1200,
-            status: 'Spent',
+            status: 'Spent' as const,
           },
           {
             id: 'bi3',
             category: 'Marketing',
             description: 'Promotional materials',
             estimatedAmount: 500,
-            status: 'Planned',
+            status: 'Planned' as const,
           },
         ],
-        status: 'Active',
+        status: 'Active' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-    }
+      }),
+      async () => {
+        try {
+          const budgetQuery = query(
+            collection(db, COLLECTIONS.EVENTS || 'eventBudgets'),
+            where('eventId', '==', eventId),
+            limit(1)
+          );
+          const snapshot = await getDocs(budgetQuery);
 
-    try {
-      const budgetQuery = query(
-        collection(db, COLLECTIONS.EVENTS || 'eventBudgets'),
-        where('eventId', '==', eventId),
-        limit(1)
-      );
-      const snapshot = await getDocs(budgetQuery);
-      
-      if (snapshot.empty) {
-        return null;
+          if (snapshot.empty) {
+            return null;
+          }
+
+          const doc = snapshot.docs[0];
+          return {
+            id: doc.id,
+            ...doc.data(),
+            approvedAt: doc.data().approvedAt?.toDate(),
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+          } as EventBudget;
+        } catch (error) {
+          console.error('Error fetching event budget:', error);
+          throw error;
+        }
       }
-
-      const doc = snapshot.docs[0];
-      return {
-        id: doc.id,
-        ...doc.data(),
-        approvedAt: doc.data().approvedAt?.toDate(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      } as EventBudget;
-    } catch (error) {
-      console.error('Error fetching event budget:', error);
-      throw error;
-    }
+    );
   }
 
   // Create or update event budget
   static async saveEventBudget(budgetData: Omit<EventBudget, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    if (isDevMode()) {
-      const newId = `mock-budget-${Date.now()}`;
-      console.log(`[DEV MODE] Simulating creation of event budget with ID: ${newId}`);
-      return newId;
-    }
+    return withDevMode(
+      () => {
+        const newId = `mock-budget-${Date.now()}`;
+        console.log(`[DEV MODE] Simulating creation of event budget with ID: ${newId}`);
+        return newId;
+      },
+      async () => {
+        try {
+          const existingBudget = await this.getEventBudget(budgetData.eventId);
 
-    try {
-      const existingBudget = await this.getEventBudget(budgetData.eventId);
-      
-      if (existingBudget && existingBudget.id) {
-        // Update existing budget
-        await updateDoc(doc(db, COLLECTIONS.EVENTS || 'eventBudgets', existingBudget.id), {
-          ...budgetData,
-          updatedAt: Timestamp.now(),
-        });
-        return existingBudget.id;
-      } else {
-        // Create new budget
-        const newBudget: any = {
-          ...budgetData,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        };
-        if (budgetData.approvedAt) {
-          newBudget.approvedAt = Timestamp.fromDate(budgetData.approvedAt as Date);
+          if (existingBudget && existingBudget.id) {
+            // Update existing budget
+            await updateDoc(doc(db, COLLECTIONS.EVENTS || 'eventBudgets', existingBudget.id), {
+              ...budgetData,
+              updatedAt: Timestamp.now(),
+            });
+            return existingBudget.id;
+          } else {
+            // Create new budget
+            const newBudget: any = {
+              ...budgetData,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            };
+            if (budgetData.approvedAt) {
+              newBudget.approvedAt = Timestamp.fromDate(budgetData.approvedAt as Date);
+            }
+
+            const docRef = await addDoc(collection(db, COLLECTIONS.EVENTS || 'eventBudgets'), newBudget);
+            return docRef.id;
+          }
+        } catch (error) {
+          console.error('Error saving event budget:', error);
+          throw error;
         }
-        
-        const docRef = await addDoc(collection(db, COLLECTIONS.EVENTS || 'eventBudgets'), newBudget);
-        return docRef.id;
       }
-    } catch (error) {
-      console.error('Error saving event budget:', error);
-      throw error;
-    }
+    );
   }
 
   // Add budget item

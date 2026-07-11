@@ -3,7 +3,7 @@ import { Member, Event, Project } from '../types';
 import { MembersService } from './membersService';
 import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface MemberStatistics {
   totalMembers: number;
@@ -48,10 +48,9 @@ export interface MemberReport {
 export class MemberStatsService {
   // Generate comprehensive member statistics
   static async generateStatistics(year?: number): Promise<MemberStatistics> {
-    if (isDevMode()) {
-      return this.getMockStatistics();
-    }
-
+    return withDevMode(
+      () => this.getMockStatistics(),
+      async () => {
     try {
       const allMembers = await MembersService.getAllMembers();
       const now = new Date();
@@ -172,6 +171,7 @@ export class MemberStatsService {
       console.error('Error generating member statistics:', error);
       throw error;
     }
+  });
   }
 
   // Generate comprehensive member report with insights

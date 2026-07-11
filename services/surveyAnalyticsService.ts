@@ -1,6 +1,6 @@
 // Survey Analytics Service - Analyzes survey responses and generates statistics
 import { SurveysService, Survey, SurveyResponse, SurveyQuestion } from './surveysService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface QuestionAnalytics {
   questionId: string;
@@ -45,10 +45,9 @@ export class SurveyAnalyticsService {
     surveyId: string,
     totalEligibleMembers: number = 100
   ): Promise<SurveyAnalytics> {
-    if (isDevMode()) {
-      return this.getMockAnalytics(surveyId, totalEligibleMembers);
-    }
-
+    return withDevMode(
+      () => this.getMockAnalytics(surveyId, totalEligibleMembers),
+      async () => {
     try {
       const survey = await SurveysService.getSurveyById(surveyId);
       if (!survey) {
@@ -172,6 +171,7 @@ export class SurveyAnalyticsService {
       console.error('Error generating survey analytics:', error);
       throw error;
     }
+  });
   }
 
   // Export analytics as CSV

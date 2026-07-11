@@ -1,5 +1,5 @@
 import { ErrorInfo } from 'react';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface ErrorLogEntry {
   id: string;
@@ -189,23 +189,24 @@ class ErrorLoggingService {
 
   // Upload crash reports to Firestore `errorLogs` so APK/web errors are visible remotely
   private async reportToExternalService(logEntry: ErrorLogEntry): Promise<void> {
-    if (isDevMode()) return;
-    try {
-      // Dynamic import avoids a circular dependency at module-load time
-      const [{ collection, addDoc }, { db }] = await Promise.all([
-        import('firebase/firestore'),
-        import('../config/firebase'),
-      ]);
-      const isNative = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
-      // Firestore rejects undefined values — strip them
-      const payload = JSON.parse(JSON.stringify({
-        ...logEntry,
-        platform: isNative ? 'apk' : 'web',
-      }));
-      await addDoc(collection(db, 'errorLogs'), payload);
-    } catch (error) {
-      console.warn('Failed to report error to Firestore:', error);
-    }
+    return withDevMode(() => {}, async () => {
+      try {
+        // Dynamic import avoids a circular dependency at module-load time
+        const [{ collection, addDoc }, { db }] = await Promise.all([
+          import('firebase/firestore'),
+          import('../config/firebase'),
+        ]);
+        const isNative = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
+        // Firestore rejects undefined values — strip them
+        const payload = JSON.parse(JSON.stringify({
+          ...logEntry,
+          platform: isNative ? 'apk' : 'web',
+        }));
+        await addDoc(collection(db, 'errorLogs'), payload);
+      } catch (error) {
+        console.warn('Failed to report error to Firestore:', error);
+      }
+    });
   }
 
   /**

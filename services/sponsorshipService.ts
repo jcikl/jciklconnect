@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { SponsorshipRecord } from '../types';
 import { PointsService } from './pointsService';
 
@@ -24,9 +24,9 @@ const MOCK_SPONSORSHIPS: SponsorshipRecord[] = [
 
 export class SponsorshipsService {
   static async getAllSponsorships(): Promise<SponsorshipRecord[]> {
-    if (isDevMode()) {
-      return [...MOCK_SPONSORSHIPS];
-    }
+    return withDevMode(
+      () => [...MOCK_SPONSORSHIPS],
+      async () => {
     try {
       const q = query(
         collection(db, COLLECTIONS.SPONSORSHIPS),
@@ -51,12 +51,13 @@ export class SponsorshipsService {
       console.error('Error fetching sponsorships:', error);
       return [];
     }
+});
   }
 
   static async getSponsorshipsByMember(memberId: string): Promise<SponsorshipRecord[]> {
-    if (isDevMode()) {
-      return MOCK_SPONSORSHIPS.filter(s => s.memberId === memberId);
-    }
+    return withDevMode(
+      () => MOCK_SPONSORSHIPS.filter(s => s.memberId === memberId),
+      async () => {
     try {
       const q = query(
         collection(db, COLLECTIONS.SPONSORSHIPS),
@@ -81,16 +82,19 @@ export class SponsorshipsService {
       console.error('Error fetching sponsorships by member:', error);
       return [];
     }
+});
   }
 
   static async createSponsorship(data: Omit<SponsorshipRecord, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      const mockId = `mock-sponsorship-${Date.now()}`;
-      console.log(`[DEV MODE] Created mock sponsorship:`, data);
-      // Trigger dynamic recalculate (mock console log)
-      await PointsService.recalculateMemberRadarStats(data.memberId);
-      return mockId;
-    }
+    return withDevMode(
+      async () => {
+        const mockId = `mock-sponsorship-${Date.now()}`;
+        console.log(`[DEV MODE] Created mock sponsorship:`, data);
+        // Trigger dynamic recalculate (mock console log)
+        await PointsService.recalculateMemberRadarStats(data.memberId);
+        return mockId;
+      },
+      async () => {
     try {
       const docRef = await addDoc(collection(db, COLLECTIONS.SPONSORSHIPS), {
         ...data,
@@ -104,19 +108,21 @@ export class SponsorshipsService {
       console.error('Error creating sponsorship:', error);
       throw error;
     }
+});
   }
 
   static async updateSponsorship(id: string, updates: Partial<SponsorshipRecord>, previousMemberId?: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Updated mock sponsorship ${id}:`, updates);
-      if (updates.memberId) {
-        await PointsService.recalculateMemberRadarStats(updates.memberId);
-      }
-      if (previousMemberId && previousMemberId !== updates.memberId) {
-        await PointsService.recalculateMemberRadarStats(previousMemberId);
-      }
-      return;
-    }
+    return withDevMode(
+      async () => {
+        console.log(`[DEV MODE] Updated mock sponsorship ${id}:`, updates);
+        if (updates.memberId) {
+          await PointsService.recalculateMemberRadarStats(updates.memberId);
+        }
+        if (previousMemberId && previousMemberId !== updates.memberId) {
+          await PointsService.recalculateMemberRadarStats(previousMemberId);
+        }
+      },
+      async () => {
     try {
       const docRef = doc(db, COLLECTIONS.SPONSORSHIPS, id);
       await updateDoc(docRef, {
@@ -134,14 +140,16 @@ export class SponsorshipsService {
       console.error('Error updating sponsorship:', error);
       throw error;
     }
+});
   }
 
   static async deleteSponsorship(id: string, memberId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Deleted mock sponsorship ${id}`);
-      await PointsService.recalculateMemberRadarStats(memberId);
-      return;
-    }
+    return withDevMode(
+      async () => {
+        console.log(`[DEV MODE] Deleted mock sponsorship ${id}`);
+        await PointsService.recalculateMemberRadarStats(memberId);
+      },
+      async () => {
     try {
       const docRef = doc(db, COLLECTIONS.SPONSORSHIPS, id);
       await deleteDoc(docRef);
@@ -151,5 +159,6 @@ export class SponsorshipsService {
       console.error('Error deleting sponsorship:', error);
       throw error;
     }
+});
   }
 }

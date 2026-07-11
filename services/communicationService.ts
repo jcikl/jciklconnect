@@ -15,61 +15,59 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { NewsPost, Notification, UserRole } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
 import { MOCK_POSTS, MOCK_NOTIFICATIONS } from './mockData';
 import { EmailService, EmailMessage } from './emailService';
 
 export class CommunicationService {
   // Get all posts
   static async getAllPosts(): Promise<NewsPost[]> {
-    // Check dev mode first - if enabled, return mock data immediately
-    if (isDevMode()) {
-      console.log('[DEV MODE] getAllPosts: Returning mock posts');
-      return MOCK_POSTS;
-    }
-    
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.COMMUNICATION), orderBy('timestamp', 'desc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
-      } as NewsPost));
-    } catch (error) {
-      // If error occurs and we're in dev mode, return mock data instead
-      if (isDevMode()) {
-        console.log('[DEV MODE] getAllPosts: Error occurred, returning mock posts');
-        return MOCK_POSTS;
+    return withDevMode(
+      () => { console.log('[DEV MODE] getAllPosts: Returning mock posts'); return MOCK_POSTS; },
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.COMMUNICATION), orderBy('timestamp', 'desc'))
+          );
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
+          } as NewsPost));
+        } catch (error) {
+          // If error occurs and we're in dev mode, return mock data instead
+          if (isDevMode()) {
+            console.log('[DEV MODE] getAllPosts: Error occurred, returning mock posts');
+            return MOCK_POSTS;
+          }
+          console.error('Error fetching posts:', error);
+          throw error;
+        }
       }
-      console.error('Error fetching posts:', error);
-      throw error;
-    }
+    );
   }
 
   // Create post
   static async createPost(postData: Omit<NewsPost, 'id' | 'timestamp'>): Promise<string> {
-    if (isDevMode()) {
-      // In dev mode, return a mock ID
-      const mockId = `mock-post-${Date.now()}`;
-      return mockId;
-    }
-    
-    try {
-      const newPost = {
-        ...postData,
-        timestamp: Timestamp.now(),
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-      
-      const docRef = await addDoc(collection(db, COLLECTIONS.COMMUNICATION), newPost);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating post:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => `mock-post-${Date.now()}`,
+      async () => {
+        try {
+          const newPost = {
+            ...postData,
+            timestamp: Timestamp.now(),
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+
+          const docRef = await addDoc(collection(db, COLLECTIONS.COMMUNICATION), newPost);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating post:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update post
@@ -98,71 +96,72 @@ export class CommunicationService {
 
   // Like post
   static async likePost(postId: string, memberId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating like on post ${postId} by member ${memberId}`);
-      return;
-    }
-    
-    try {
-      const postRef = doc(db, COLLECTIONS.COMMUNICATION, postId);
-      const postSnap = await getDoc(postRef);
-      
-      if (postSnap.exists()) {
-        const currentLikes = postSnap.data().likes || 0;
-        await updateDoc(postRef, {
-          likes: currentLikes + 1,
-          likedBy: [...(postSnap.data().likedBy || []), memberId],
-        });
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Simulating like on post ${postId} by member ${memberId}`); },
+      async () => {
+        try {
+          const postRef = doc(db, COLLECTIONS.COMMUNICATION, postId);
+          const postSnap = await getDoc(postRef);
+
+          if (postSnap.exists()) {
+            const currentLikes = postSnap.data().likes || 0;
+            await updateDoc(postRef, {
+              likes: currentLikes + 1,
+              likedBy: [...(postSnap.data().likedBy || []), memberId],
+            });
+          }
+        } catch (error) {
+          console.error('Error liking post:', error);
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Error liking post:', error);
-      throw error;
-    }
+    );
   }
 
   // Get notifications
   static async getNotifications(memberId: string): Promise<Notification[]> {
-    if (isDevMode()) {
-      return MOCK_NOTIFICATIONS;
-    }
-    
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.NOTIFICATIONS),
-        where('memberId', '==', memberId),
-        orderBy('timestamp', 'desc'),
-        orderBy('read', 'asc')
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
-      } as Notification));
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => MOCK_NOTIFICATIONS,
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.NOTIFICATIONS),
+            where('memberId', '==', memberId),
+            orderBy('timestamp', 'desc'),
+            orderBy('read', 'asc')
+          );
+
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
+          } as Notification));
+        } catch (error) {
+          console.error('Error fetching notifications:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Mark notification as read
   static async markNotificationAsRead(notificationId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating marking notification ${notificationId} as read`);
-      return;
-    }
-    
-    try {
-      const notifRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
-      await updateDoc(notifRef, {
-        read: true,
-        readAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Simulating marking notification ${notificationId} as read`); },
+      async () => {
+        try {
+          const notifRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
+          await updateDoc(notifRef, {
+            read: true,
+            readAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error marking notification as read:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Create notification
@@ -294,17 +293,18 @@ export class CommunicationService {
     },
     authorId: string
   ): Promise<{ postId: string; emailsSent: number; notificationsSent: number }> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Would create announcement:', announcementData);
-      return {
-        postId: `mock-announcement-${Date.now()}`,
-        emailsSent: 0,
-        notificationsSent: 0,
-      };
-    }
-
-    try {
-      const { MembersService } = await import('./membersService');
+    return withDevMode(
+      () => {
+        console.log('[DEV MODE] Would create announcement:', announcementData);
+        return {
+          postId: `mock-announcement-${Date.now()}`,
+          emailsSent: 0,
+          notificationsSent: 0,
+        };
+      },
+      async () => {
+        try {
+          const { MembersService } = await import('./membersService');
       const { EmailService } = await import('./emailService');
 
       // Get target members
@@ -397,15 +397,17 @@ export class CommunicationService {
         }
       }
 
-      return {
-        postId,
-        emailsSent,
-        notificationsSent,
-      };
-    } catch (error) {
-      console.error('Error creating announcement:', error);
-      throw error;
-    }
+          return {
+            postId,
+            emailsSent,
+            notificationsSent,
+          };
+        } catch (error) {
+          console.error('Error creating announcement:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   /**

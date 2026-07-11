@@ -5,7 +5,7 @@ import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { KnowledgeService } from './knowledgeService';
 import { HobbyClubsService } from './hobbyClubsService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface Recommendation {
   type: 'project' | 'event' | 'training' | 'mentor' | 'club' | 'role';
@@ -20,39 +20,40 @@ export interface Recommendation {
 export class AIRecommendationService {
   // Get personalized recommendations for a member
   static async getRecommendations(memberId: string): Promise<Recommendation[]> {
-    if (isDevMode()) {
-      return this.getMockRecommendations(memberId);
-    }
+    return withDevMode(
+      () => this.getMockRecommendations(memberId),
+      async () => {
+        try {
+          const member = await MembersService.getMemberById(memberId);
+          if (!member) return [];
 
-    try {
-      const member = await MembersService.getMemberById(memberId);
-      if (!member) return [];
+          const recommendations: Recommendation[] = [];
 
-      const recommendations: Recommendation[] = [];
+          // Get recommendations from different categories
+          const projectRecs = await this.recommendProjects(member);
+          const eventRecs = await this.recommendEvents(member);
+          const trainingRecs = await this.recommendTraining(member);
+          const mentorRecs = await this.recommendMentors(member);
+          const clubRecs = await this.recommendClubs(member);
+          const roleRecs = await this.recommendRoles(member);
 
-      // Get recommendations from different categories
-      const projectRecs = await this.recommendProjects(member);
-      const eventRecs = await this.recommendEvents(member);
-      const trainingRecs = await this.recommendTraining(member);
-      const mentorRecs = await this.recommendMentors(member);
-      const clubRecs = await this.recommendClubs(member);
-      const roleRecs = await this.recommendRoles(member);
+          recommendations.push(...projectRecs);
+          recommendations.push(...eventRecs);
+          recommendations.push(...trainingRecs);
+          recommendations.push(...mentorRecs);
+          recommendations.push(...clubRecs);
+          recommendations.push(...roleRecs);
 
-      recommendations.push(...projectRecs);
-      recommendations.push(...eventRecs);
-      recommendations.push(...trainingRecs);
-      recommendations.push(...mentorRecs);
-      recommendations.push(...clubRecs);
-      recommendations.push(...roleRecs);
-
-      // Sort by score (highest first) and return top 10
-      return recommendations
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10);
-    } catch (error) {
-      console.error('Error getting recommendations:', error);
-      return [];
-    }
+          // Sort by score (highest first) and return top 10
+          return recommendations
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
+        } catch (error) {
+          console.error('Error getting recommendations:', error);
+          return [];
+        }
+      }
+    );
   }
 
   // Recommend projects based on skills, interests, and past participation

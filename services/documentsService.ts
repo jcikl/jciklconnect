@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { Document } from '../types';
 
 export interface DocumentVersion {
@@ -40,8 +40,8 @@ export interface DocumentWithVersions extends Document {
 export class DocumentsService {
   // Get all documents
   static async getAllDocuments(): Promise<DocumentWithVersions[]> {
-    if (isDevMode()) {
-      return [
+    return withDevMode(
+      () => [
         {
           id: 'd1',
           name: 'JCI Constitution 2024',
@@ -52,36 +52,37 @@ export class DocumentsService {
           versions: [],
           versionCount: 1,
         },
-      ];
-    }
+      ],
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.DOCUMENTS), orderBy('uploadedDate', 'desc'))
+          );
 
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.DOCUMENTS), orderBy('uploadedDate', 'desc'))
-      );
-      
-      const documents = await Promise.all(
-        snapshot.docs.map(async (docSnap) => {
-          const docData = docSnap.data();
-          const versions = await this.getDocumentVersions(docSnap.id);
-          const currentVersion = versions.find(v => v.isCurrent) || versions[0];
-          
-          return {
-            id: docSnap.id,
-            ...docData,
-            uploadedDate: docData.uploadedDate?.toDate?.()?.toISOString() || docData.uploadedDate,
-            versions,
-            currentVersion,
-            versionCount: versions.length,
-          } as DocumentWithVersions;
-        })
-      );
-      
-      return documents;
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-      throw error;
-    }
+          const documents = await Promise.all(
+            snapshot.docs.map(async (docSnap) => {
+              const docData = docSnap.data();
+              const versions = await this.getDocumentVersions(docSnap.id);
+              const currentVersion = versions.find(v => v.isCurrent) || versions[0];
+
+              return {
+                id: docSnap.id,
+                ...docData,
+                uploadedDate: docData.uploadedDate?.toDate?.()?.toISOString() || docData.uploadedDate,
+                versions,
+                currentVersion,
+                versionCount: versions.length,
+              } as DocumentWithVersions;
+            })
+          );
+
+          return documents;
+        } catch (error) {
+          console.error('Error fetching documents:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get document by ID

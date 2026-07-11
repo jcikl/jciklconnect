@@ -4,7 +4,7 @@ import { ProjectsService } from './projectsService';
 import { MembersService } from './membersService';
 import { EventsService } from './eventsService';
 import { projectFinancialService } from './projectFinancialService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { formatDate } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/formatUtils';
 
@@ -128,13 +128,12 @@ export class ProjectReportService {
 
   // Generate project report with specified type
   static async generateReport(
-    projectId: string, 
+    projectId: string,
     reportType: 'status' | 'progress' | 'financial' | 'comprehensive' = 'comprehensive'
   ): Promise<ProjectReport> {
-    if (isDevMode()) {
-      return this.getMockReport(projectId);
-    }
-
+    return withDevMode(
+      () => this.getMockReport(projectId),
+      async () => {
     try {
       const project = await ProjectsService.getProjectById(projectId);
       if (!project) {
@@ -333,6 +332,7 @@ export class ProjectReportService {
       console.error('Error generating project report:', error);
       throw error;
     }
+  });
   }
 
   // Export report as JSON

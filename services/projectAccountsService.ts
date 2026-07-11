@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { FinanceService } from './financeService';
 import { Project } from '../types';
 
@@ -37,8 +37,8 @@ export interface ProjectAccount {
 export class ProjectAccountsService {
   // Get all project accounts
   static async getAllProjectAccounts(): Promise<ProjectAccount[]> {
-    if (isDevMode()) {
-      return [
+    return withDevMode(
+      () => [
         {
           id: 'pa1',
           projectId: 'p1',
@@ -53,9 +53,8 @@ export class ProjectAccountsService {
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-15'),
         },
-      ];
-    }
-
+      ],
+      async () => {
     try {
       const snapshot = await getDocs(
         query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
@@ -98,15 +97,17 @@ export class ProjectAccountsService {
       console.error('Error fetching project accounts:', error);
       throw error;
     }
+  });
   }
 
   // Get project account by project ID
   static async getProjectAccountByProjectId(projectId: string): Promise<ProjectAccount | null> {
-    if (isDevMode()) {
-      const accounts = await this.getAllProjectAccounts();
-      return accounts.find(acc => acc.projectId === projectId) || null;
-    }
-
+    return withDevMode(
+      async () => {
+        const accounts = await this.getAllProjectAccounts();
+        return accounts.find(acc => acc.projectId === projectId) || null;
+      },
+      async () => {
     try {
       const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
       const projectSnap = await getDoc(projectRef);
@@ -146,6 +147,7 @@ export class ProjectAccountsService {
       console.error('Error fetching project account:', error);
       throw error;
     }
+  });
   }
 
   // Reconcile project account with main LO financial accounts

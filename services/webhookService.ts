@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface Webhook {
   id?: string;
@@ -54,115 +54,122 @@ export interface WebhookLog {
 export class WebhookService {
   // Get all webhooks
   static async getAllWebhooks(): Promise<Webhook[]> {
-    if (isDevMode()) {
-      return this.getMockWebhooks();
-    }
+    return withDevMode(
+      () => this.getMockWebhooks(),
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.WEBHOOKS || 'webhooks'),
+            orderBy('createdAt', 'desc')
+          );
 
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.WEBHOOKS || 'webhooks'),
-        orderBy('createdAt', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: (doc.data().createdAt as Timestamp)?.toDate() || new Date(),
-        updatedAt: (doc.data().updatedAt as Timestamp)?.toDate() || new Date(),
-        lastTriggered: doc.data().lastTriggered ? (doc.data().lastTriggered as Timestamp)?.toDate() : undefined,
-      } as Webhook));
-    } catch (error) {
-      console.error('Error fetching webhooks:', error);
-      throw error;
-    }
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: (doc.data().createdAt as Timestamp)?.toDate() || new Date(),
+            updatedAt: (doc.data().updatedAt as Timestamp)?.toDate() || new Date(),
+            lastTriggered: doc.data().lastTriggered ? (doc.data().lastTriggered as Timestamp)?.toDate() : undefined,
+          } as Webhook));
+        } catch (error) {
+          console.error('Error fetching webhooks:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get webhook by ID
   static async getWebhookById(webhookId: string): Promise<Webhook | null> {
-    if (isDevMode()) {
-      const webhooks = this.getMockWebhooks();
-      return webhooks.find(w => w.id === webhookId) || null;
-    }
+    return withDevMode(
+      () => {
+        const webhooks = this.getMockWebhooks();
+        return webhooks.find(w => w.id === webhookId) || null;
+      },
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
+          const docSnap = await getDoc(docRef);
 
-    try {
-      const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
-      const docSnap = await getDoc(docRef);
+          if (!docSnap.exists()) {
+            return null;
+          }
 
-      if (!docSnap.exists()) {
-        return null;
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            ...data,
+            createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+            updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(),
+            lastTriggered: data.lastTriggered ? (data.lastTriggered as Timestamp)?.toDate() : undefined,
+          } as Webhook;
+        } catch (error) {
+          console.error('Error fetching webhook:', error);
+          throw error;
+        }
       }
-
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        ...data,
-        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-        updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(),
-        lastTriggered: data.lastTriggered ? (data.lastTriggered as Timestamp)?.toDate() : undefined,
-      } as Webhook;
-    } catch (error) {
-      console.error('Error fetching webhook:', error);
-      throw error;
-    }
+    );
   }
 
   // Create webhook
   static async createWebhook(webhook: Omit<Webhook, 'id' | 'createdAt' | 'updatedAt' | 'successCount' | 'failureCount'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would create webhook:', webhook);
-      return `webhook-${Date.now()}`;
-    }
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Would create webhook:', webhook);
+        return `webhook-${Date.now()}`;
+      },
+      async () => {
+        try {
+          const docRef = await addDoc(collection(db, COLLECTIONS.WEBHOOKS || 'webhooks'), {
+            ...webhook,
+            successCount: 0,
+            failureCount: 0,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
 
-    try {
-      const docRef = await addDoc(collection(db, COLLECTIONS.WEBHOOKS || 'webhooks'), {
-        ...webhook,
-        successCount: 0,
-        failureCount: 0,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
-
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating webhook:', error);
-      throw error;
-    }
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating webhook:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update webhook
   static async updateWebhook(webhookId: string, updates: Partial<Webhook>): Promise<void> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would update webhook:', webhookId, updates);
-      return;
-    }
-
-    try {
-      const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
-      await updateDoc(docRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating webhook:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log('[Dev Mode] Would update webhook:', webhookId, updates); },
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
+          await updateDoc(docRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error updating webhook:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Delete webhook
   static async deleteWebhook(webhookId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would delete webhook:', webhookId);
-      return;
-    }
-
-    try {
-      const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
-      await deleteDoc(docRef);
-    } catch (error) {
-      console.error('Error deleting webhook:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log('[Dev Mode] Would delete webhook:', webhookId); },
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
+          await deleteDoc(docRef);
+        } catch (error) {
+          console.error('Error deleting webhook:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Trigger webhook
@@ -242,31 +249,32 @@ export class WebhookService {
 
   // Log webhook execution
   static async logWebhookExecution(log: Omit<WebhookLog, 'id' | 'triggeredAt'> & { triggeredAt?: Date }): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would log webhook execution:', log);
-      return `log-${Date.now()}`;
-    }
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Would log webhook execution:', log);
+        return `log-${Date.now()}`;
+      },
+      async () => {
+        try {
+          const docRef = await addDoc(collection(db, COLLECTIONS.WEBHOOK_LOGS || 'webhook_logs'), {
+            ...log,
+            triggeredAt: log.triggeredAt ? Timestamp.fromDate(log.triggeredAt) : Timestamp.now(),
+          });
 
-    try {
-      const docRef = await addDoc(collection(db, COLLECTIONS.WEBHOOK_LOGS || 'webhook_logs'), {
-        ...log,
-        triggeredAt: log.triggeredAt ? Timestamp.fromDate(log.triggeredAt) : Timestamp.now(),
-      });
-
-      return docRef.id;
-    } catch (error) {
-      console.error('Error logging webhook execution:', error);
-      throw error;
-    }
+          return docRef.id;
+        } catch (error) {
+          console.error('Error logging webhook execution:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get webhook logs
   static async getWebhookLogs(webhookId?: string, limitCount: number = 50): Promise<WebhookLog[]> {
-    if (isDevMode()) {
-      return this.getMockWebhookLogs(webhookId);
-    }
-
-    try {
+    return withDevMode(
+      () => this.getMockWebhookLogs(webhookId),
+      async () => { try {
       let q;
       if (webhookId) {
         q = query(
@@ -302,6 +310,7 @@ export class WebhookService {
       console.error('Error fetching webhook logs:', error);
       throw error;
     }
+  });
   }
 
   // Test webhook

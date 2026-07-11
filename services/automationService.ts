@@ -16,7 +16,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES } from '../config/constants';
 import { AutomationRule, WorkflowExecution, WorkflowExecutionStep } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_AUTOMATION_RULES } from './mockData';
 import { PointsService } from './pointsService';
 import { CommunicationService } from './communicationService';
@@ -48,9 +48,8 @@ export interface WorkflowStep {
 export class AutomationService {
   // Get all workflows
   static async getAllWorkflows(): Promise<Workflow[]> {
-    if (isDevMode()) {
-      // Return mock workflows based on automation rules
-      return MOCK_AUTOMATION_RULES.map((rule, index) => ({
+    return withDevMode(
+      () => MOCK_AUTOMATION_RULES.map((rule, index) => ({
         id: `wf${index + 1}`,
         name: rule.name,
         description: `Automated workflow: ${rule.trigger} → ${rule.action}`,
@@ -70,116 +69,123 @@ export class AutomationService {
         executions: rule.executions,
         createdAt: new Date(),
         updatedAt: new Date(),
-      }));
-    }
-
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.WORKFLOWS), orderBy('createdAt', 'desc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        lastExecuted: doc.data().lastExecuted?.toDate(),
-      } as Workflow));
-    } catch (error) {
-      console.error('Error fetching workflows:', error);
-      throw error;
-    }
+      })),
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.WORKFLOWS), orderBy('createdAt', 'desc'))
+          );
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+            lastExecuted: doc.data().lastExecuted?.toDate(),
+          } as Workflow));
+        } catch (error) {
+          console.error('Error fetching workflows:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get workflow by ID
   static async getWorkflowById(workflowId: string): Promise<Workflow | null> {
-    if (isDevMode()) {
-      const mockWorkflows = await this.getAllWorkflows();
-      return mockWorkflows.find(w => w.id === workflowId) || null;
-    }
+    return withDevMode(
+      async () => {
+        const mockWorkflows = await this.getAllWorkflows();
+        return mockWorkflows.find(w => w.id === workflowId) || null;
+      },
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.WORKFLOWS, workflowId);
+          const docSnap = await getDoc(docRef);
 
-    try {
-      const docRef = doc(db, COLLECTIONS.WORKFLOWS, workflowId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-          lastExecuted: data.lastExecuted?.toDate(),
-        } as Workflow;
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              ...data,
+              createdAt: data.createdAt?.toDate() || new Date(),
+              updatedAt: data.updatedAt?.toDate() || new Date(),
+              lastExecuted: data.lastExecuted?.toDate(),
+            } as Workflow;
+          }
+          return null;
+        } catch (error) {
+          console.error('Error fetching workflow:', error);
+          throw error;
+        }
       }
-      return null;
-    } catch (error) {
-      console.error('Error fetching workflow:', error);
-      throw error;
-    }
+    );
   }
 
   // Create workflow
   static async createWorkflow(workflowData: Omit<Workflow, 'id' | 'executions' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    if (isDevMode()) {
-      const newId = `mock-workflow-${Date.now()}`;
-      console.log(`[DEV MODE] Simulating creation of workflow with ID: ${newId}`);
-      return newId;
-    }
+    return withDevMode(
+      () => {
+        const newId = `mock-workflow-${Date.now()}`;
+        console.log(`[DEV MODE] Simulating creation of workflow with ID: ${newId}`);
+        return newId;
+      },
+      async () => {
+        try {
+          // Filter out undefined values
+          const newWorkflow: any = {
+            name: workflowData.name,
+            trigger: workflowData.trigger,
+            steps: workflowData.steps,
+            active: workflowData.active ?? true,
+            executions: 0,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
 
-    try {
-      // Filter out undefined values
-      const newWorkflow: any = {
-        name: workflowData.name,
-        trigger: workflowData.trigger,
-        steps: workflowData.steps,
-        active: workflowData.active ?? true,
-        executions: 0,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
+          if (workflowData.description !== undefined) newWorkflow.description = workflowData.description;
 
-      if (workflowData.description !== undefined) newWorkflow.description = workflowData.description;
-
-      const docRef = await addDoc(collection(db, COLLECTIONS.WORKFLOWS), newWorkflow);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating workflow:', error);
-      throw error;
-    }
+          const docRef = await addDoc(collection(db, COLLECTIONS.WORKFLOWS), newWorkflow);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating workflow:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update workflow
   static async updateWorkflow(workflowId: string, updates: Partial<Workflow>): Promise<void> {
-    if (isDevMode()) {
-      // In dev mode, just return without doing anything
-      return;
-    }
-
-    try {
-      const workflowRef = doc(db, COLLECTIONS.WORKFLOWS, workflowId);
-      await updateDoc(workflowRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating workflow:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const workflowRef = doc(db, COLLECTIONS.WORKFLOWS, workflowId);
+          await updateDoc(workflowRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error updating workflow:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Delete workflow
   static async deleteWorkflow(workflowId: string): Promise<void> {
-    if (isDevMode()) {
-      // In dev mode, just return without doing anything
-      return;
-    }
-
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.WORKFLOWS, workflowId));
-    } catch (error) {
-      console.error('Error deleting workflow:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.WORKFLOWS, workflowId));
+        } catch (error) {
+          console.error('Error deleting workflow:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Execute workflow
@@ -191,47 +197,46 @@ export class AutomationService {
     const executionStartTime = Date.now();
     const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    if (isDevMode()) {
-      // In dev mode, return mock execution
-      const mockSteps: WorkflowExecutionStep[] = [
-        {
-          stepId: 'step1',
-          stepType: 'create_notification',
-          stepOrder: 1,
-          status: 'success',
-          startedAt: new Date().toISOString(),
+    return withDevMode(
+      () => {
+        const mockSteps: WorkflowExecutionStep[] = [
+          {
+            stepId: 'step1',
+            stepType: 'create_notification',
+            stepOrder: 1,
+            status: 'success',
+            startedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            duration: 45,
+            output: { message: 'Automation triggered successfully' }
+          },
+          {
+            stepId: 'step2',
+            stepType: 'send_email',
+            stepOrder: 2,
+            status: 'success',
+            startedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            duration: 120,
+            output: { recipient: 'member@example.com', subject: 'Workflow Notification' }
+          }
+        ];
+        return {
+          id: executionId,
+          workflowId,
+          workflowName: 'Mock Dev Workflow',
+          status: 'success' as const,
+          startedAt: new Date(executionStartTime).toISOString(),
           completedAt: new Date().toISOString(),
-          duration: 45,
-          output: { message: 'Automation triggered successfully' }
-        },
-        {
-          stepId: 'step2',
-          stepType: 'send_email',
-          stepOrder: 2,
-          status: 'success',
-          startedAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-          duration: 120,
-          output: { recipient: 'member@example.com', subject: 'Workflow Notification' }
-        }
-      ];
-
-      return {
-        id: executionId,
-        workflowId,
-        workflowName: 'Mock Dev Workflow',
-        status: 'success',
-        startedAt: new Date(executionStartTime).toISOString(),
-        completedAt: new Date().toISOString(),
-        duration: Date.now() - executionStartTime,
-        triggeredBy,
-        executedSteps: mockSteps,
-        nodeExecutions: [],
-      };
-    }
-
-    try {
-      const workflow = await this.getWorkflowById(workflowId);
+          duration: Date.now() - executionStartTime,
+          triggeredBy,
+          executedSteps: mockSteps,
+          nodeExecutions: [],
+        };
+      },
+      async () => {
+        try {
+          const workflow = await this.getWorkflowById(workflowId);
       if (!workflow || !workflow.active) {
         throw new Error('Workflow not found or inactive');
       }
@@ -336,10 +341,12 @@ export class AutomationService {
 
         throw error;
       }
-    } catch (error) {
-      console.error('Error executing workflow:', error);
-      throw error;
-    }
+        } catch (error) {
+          console.error('Error executing workflow:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Execute a single workflow step
@@ -555,75 +562,74 @@ export class AutomationService {
 
   // Get automation rules
   static async getAllRules(): Promise<AutomationRule[]> {
-    if (isDevMode()) {
-      return MOCK_AUTOMATION_RULES;
-    }
-
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.AUTOMATION_RULES), orderBy('name'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as AutomationRule));
-    } catch (error) {
-      console.error('Error fetching automation rules:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => MOCK_AUTOMATION_RULES,
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.AUTOMATION_RULES), orderBy('name'))
+          );
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          } as AutomationRule));
+        } catch (error) {
+          console.error('Error fetching automation rules:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Create automation rule
   static async createRule(ruleData: Omit<AutomationRule, 'id' | 'executions'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Mocking automation rule creation');
-      return `mock-rule-${Date.now()}`;
-    }
+    return withDevMode(
+      () => { console.log('[Dev Mode] Mocking automation rule creation'); return `mock-rule-${Date.now()}`; },
+      async () => {
+        try {
+          const newRule = {
+            ...ruleData,
+            executions: 0,
+          };
 
-    try {
-      const newRule = {
-        ...ruleData,
-        executions: 0,
-      };
-
-      const docRef = await addDoc(collection(db, COLLECTIONS.AUTOMATION_RULES), newRule);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating automation rule:', error);
-      throw error;
-    }
+          const docRef = await addDoc(collection(db, COLLECTIONS.AUTOMATION_RULES), newRule);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating automation rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update automation rule
   static async updateRule(ruleId: string, updates: Partial<AutomationRule>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating update of automation rule ${ruleId} with updates:`, updates);
-      return;
-    }
-
-    try {
-      await updateDoc(doc(db, COLLECTIONS.AUTOMATION_RULES, ruleId), updates);
-    } catch (error) {
-      console.error('Error updating automation rule:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Simulating update of automation rule ${ruleId} with updates:`, updates); },
+      async () => {
+        try {
+          await updateDoc(doc(db, COLLECTIONS.AUTOMATION_RULES, ruleId), updates);
+        } catch (error) {
+          console.error('Error updating automation rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get execution logs for a workflow or all workflows
   static async getExecutionLogs(workflowId?: string, limitCount: number = 50): Promise<WorkflowExecution[]> {
-    if (isDevMode()) {
-      // Return mock execution logs
-      return [
+    return withDevMode(
+      () => [
         {
           id: 'exec1',
           workflowId: 'wf1',
           workflowName: 'New Member Onboarding',
-          status: 'success',
+          status: 'success' as const,
           startedAt: new Date(Date.now() - 3600000).toISOString(),
           completedAt: new Date(Date.now() - 3590000).toISOString(),
           duration: 1000,
-          triggeredBy: 'event',
-
+          triggeredBy: 'event' as const,
           context: {},
           nodeExecutions: [],
           executedSteps: [
@@ -631,7 +637,7 @@ export class AutomationService {
               stepId: 'step1',
               stepType: 'send_email',
               stepOrder: 1,
-              status: 'success',
+              status: 'success' as const,
               startedAt: new Date(Date.now() - 3600000).toISOString(),
               completedAt: new Date(Date.now() - 3595000).toISOString(),
               duration: 500,
@@ -640,69 +646,71 @@ export class AutomationService {
               stepId: 'step2',
               stepType: 'award_points',
               stepOrder: 2,
-              status: 'success',
+              status: 'success' as const,
               startedAt: new Date(Date.now() - 3595000).toISOString(),
               completedAt: new Date(Date.now() - 3590000).toISOString(),
               duration: 500,
             },
           ],
         },
-      ];
-    }
+      ],
+      async () => {
+        try {
+          let q = query(
+            collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS || 'workflowExecutions'),
+            orderBy('startedAt', 'desc'),
+            limit(limitCount)
+          );
 
-    try {
-      let q = query(
-        collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS || 'workflowExecutions'),
-        orderBy('startedAt', 'desc'),
-        limit(limitCount)
-      );
+          if (workflowId) {
+            q = query(
+              collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS || 'workflowExecutions'),
+              where('workflowId', '==', workflowId),
+              orderBy('startedAt', 'desc'),
+              limit(limitCount)
+            );
+          }
 
-      if (workflowId) {
-        q = query(
-          collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS || 'workflowExecutions'),
-          where('workflowId', '==', workflowId),
-          orderBy('startedAt', 'desc'),
-          limit(limitCount)
-        );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            startedAt: doc.data().startedAt?.toDate?.()?.toISOString() || doc.data().startedAt,
+            completedAt: doc.data().completedAt?.toDate?.()?.toISOString() || doc.data().completedAt,
+          } as WorkflowExecution));
+        } catch (error) {
+          console.error('Error fetching execution logs:', error);
+          throw error;
+        }
       }
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        startedAt: doc.data().startedAt?.toDate?.()?.toISOString() || doc.data().startedAt,
-        completedAt: doc.data().completedAt?.toDate?.()?.toISOString() || doc.data().completedAt,
-      } as WorkflowExecution));
-    } catch (error) {
-      console.error('Error fetching execution logs:', error);
-      throw error;
-    }
+    );
   }
 
   // Get execution by ID
   static async getExecutionById(executionId: string): Promise<WorkflowExecution | null> {
-    if (isDevMode()) {
-      return null;
-    }
+    return withDevMode(
+      () => null,
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.WORKFLOW_EXECUTIONS || 'workflowExecutions', executionId);
+          const docSnap = await getDoc(docRef);
 
-    try {
-      const docRef = doc(db, COLLECTIONS.WORKFLOW_EXECUTIONS || 'workflowExecutions', executionId);
-      const docSnap = await getDoc(docRef);
+          if (!docSnap.exists()) {
+            return null;
+          }
 
-      if (!docSnap.exists()) {
-        return null;
+          return {
+            id: docSnap.id,
+            ...docSnap.data(),
+            startedAt: docSnap.data().startedAt?.toDate?.()?.toISOString() || docSnap.data().startedAt,
+            completedAt: docSnap.data().completedAt?.toDate?.()?.toISOString() || docSnap.data().completedAt,
+          } as WorkflowExecution;
+        } catch (error) {
+          console.error('Error fetching execution:', error);
+          throw error;
+        }
       }
-
-      return {
-        id: docSnap.id,
-        ...docSnap.data(),
-        startedAt: docSnap.data().startedAt?.toDate?.()?.toISOString() || docSnap.data().startedAt,
-        completedAt: docSnap.data().completedAt?.toDate?.()?.toISOString() || docSnap.data().completedAt,
-      } as WorkflowExecution;
-    } catch (error) {
-      console.error('Error fetching execution:', error);
-      throw error;
-    }
+    );
   }
 }
 

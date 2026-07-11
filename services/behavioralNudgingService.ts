@@ -1,6 +1,6 @@
 // Behavioral Nudging Service - Positive reinforcement and inactivity warnings
 import { Member } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
@@ -39,13 +39,12 @@ export interface NudgeRule {
 export class BehavioralNudgingService {
   // Check and generate nudges for a member
   static async checkAndGenerateNudges(memberId: string): Promise<Nudge[]> {
-    if (isDevMode()) {
-      return this.getMockNudges(memberId);
-    }
-
-    try {
-      const member = await MembersService.getMemberById(memberId);
-      if (!member) return [];
+    return withDevMode(
+      () => this.getMockNudges(memberId),
+      async () => {
+        try {
+          const member = await MembersService.getMemberById(memberId);
+          if (!member) return [];
 
       const nudges: Nudge[] = [];
 
@@ -138,56 +137,60 @@ export class BehavioralNudgingService {
         });
       }
 
-      return nudges;
-    } catch (error) {
-      console.error('Error generating nudges:', error);
-      return [];
-    }
+          return nudges;
+        } catch (error) {
+          console.error('Error generating nudges:', error);
+          return [];
+        }
+      }
+    );
   }
 
   // Get all active nudges for a member
   static async getMemberNudges(memberId: string): Promise<Nudge[]> {
-    if (isDevMode()) {
-      return this.getMockNudges(memberId);
-    }
-
-    // In production, this would fetch from a 'nudges' collection
-    // For now, we generate them on-the-fly
-    return this.checkAndGenerateNudges(memberId);
+    return withDevMode(
+      () => this.getMockNudges(memberId),
+      async () => {
+        // In production, this would fetch from a 'nudges' collection
+        // For now, we generate them on-the-fly
+        return this.checkAndGenerateNudges(memberId);
+      }
+    );
   }
 
   // Dismiss a nudge
   static async dismissNudge(nudgeId: string, memberId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would dismiss nudge:', nudgeId);
-      return;
-    }
-
-    // In production, update the nudge in Firestore
-    // For now, this is handled client-side
+    return withDevMode(
+      () => { console.log('[Dev Mode] Would dismiss nudge:', nudgeId); },
+      async () => {
+        // In production, update the nudge in Firestore
+        // For now, this is handled client-side
+      }
+    );
   }
 
   // Send nudges as notifications
   static async sendNudgesAsNotifications(memberId: string): Promise<void> {
-    if (isDevMode()) {
-      return;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const nudges = await this.checkAndGenerateNudges(memberId);
+          const undismissedNudges = nudges.filter(n => !n.dismissed);
 
-    try {
-      const nudges = await this.checkAndGenerateNudges(memberId);
-      const undismissedNudges = nudges.filter(n => !n.dismissed);
-
-      for (const nudge of undismissedNudges) {
-        await CommunicationService.createNotification({
-          memberId,
-          title: nudge.title,
-          message: nudge.message,
-          type: nudge.priority === 'high' ? 'warning' : 'info',
-        });
+          for (const nudge of undismissedNudges) {
+            await CommunicationService.createNotification({
+              memberId,
+              title: nudge.title,
+              message: nudge.message,
+              type: nudge.priority === 'high' ? 'warning' : 'info',
+            });
+          }
+        } catch (error) {
+          console.error('Error sending nudges as notifications:', error);
+        }
       }
-    } catch (error) {
-      console.error('Error sending nudges as notifications:', error);
-    }
+    );
   }
 
   // Helper: Get next tier
@@ -224,106 +227,107 @@ export class BehavioralNudgingService {
 
   // CRUD operations for Nudge Rules
   static async createNudgeRule(rule: Omit<NudgeRule, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would create nudge rule:', rule);
-      return 'mock-nudge-rule-id';
-    }
+    return withDevMode(
+      () => { console.log('[Dev Mode] Would create nudge rule:', rule); return 'mock-nudge-rule-id'; },
+      async () => {
+        try {
+          const { collection, addDoc, Timestamp } = await import('firebase/firestore');
+          const { db } = await import('../config/firebase');
+          const { COLLECTIONS } = await import('../config/constants');
 
-    try {
-      const { collection, addDoc, Timestamp } = await import('firebase/firestore');
-      const { db } = await import('../config/firebase');
-      const { COLLECTIONS } = await import('../config/constants');
+          const docRef = await addDoc(collection(db, COLLECTIONS.NUDGE_RULES), {
+            ...rule,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
 
-      const docRef = await addDoc(collection(db, COLLECTIONS.NUDGE_RULES), {
-        ...rule,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
-
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating nudge rule:', error);
-      throw error;
-    }
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating nudge rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   static async getAllNudgeRules(): Promise<NudgeRule[]> {
-    if (isDevMode()) {
-      return [
+    return withDevMode(
+      () => [
         {
           id: 'rule-1',
           name: 'Low Attendance Warning',
           description: 'Warn members with attendance rate below 50%',
           condition: {
-            type: 'attendance_rate',
+            type: 'attendance_rate' as const,
             value: 50,
-            operator: 'less_than',
+            operator: 'less_than' as const,
           },
-          nudgeType: 'inactivity_warning',
+          nudgeType: 'inactivity_warning' as const,
           title: '📅 We miss you at events!',
           message: 'Your attendance rate is below average. Consider joining upcoming events.',
-          priority: 'high',
+          priority: 'high' as const,
           isActive: true,
         },
-      ];
-    }
+      ],
+      async () => {
+        try {
+          const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
+          const { db } = await import('../config/firebase');
+          const { COLLECTIONS } = await import('../config/constants');
 
-    try {
-      const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
-      const { db } = await import('../config/firebase');
-      const { COLLECTIONS } = await import('../config/constants');
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.NUDGE_RULES), orderBy('createdAt', 'desc'))
+          );
 
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.NUDGE_RULES), orderBy('createdAt', 'desc'))
-      );
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as NudgeRule[];
-    } catch (error) {
-      console.error('Error getting nudge rules:', error);
-      throw error;
-    }
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as NudgeRule[];
+        } catch (error) {
+          console.error('Error getting nudge rules:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   static async updateNudgeRule(ruleId: string, updates: Partial<NudgeRule>): Promise<void> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would update nudge rule:', ruleId, updates);
-      return;
-    }
+    return withDevMode(
+      () => { console.log('[Dev Mode] Would update nudge rule:', ruleId, updates); },
+      async () => {
+        try {
+          const { doc, updateDoc, Timestamp } = await import('firebase/firestore');
+          const { db } = await import('../config/firebase');
+          const { COLLECTIONS } = await import('../config/constants');
 
-    try {
-      const { doc, updateDoc, Timestamp } = await import('firebase/firestore');
-      const { db } = await import('../config/firebase');
-      const { COLLECTIONS } = await import('../config/constants');
-
-      await updateDoc(doc(db, COLLECTIONS.NUDGE_RULES, ruleId), {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating nudge rule:', error);
-      throw error;
-    }
+          await updateDoc(doc(db, COLLECTIONS.NUDGE_RULES, ruleId), {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error updating nudge rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   static async deleteNudgeRule(ruleId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would delete nudge rule:', ruleId);
-      return;
-    }
+    return withDevMode(
+      () => { console.log('[Dev Mode] Would delete nudge rule:', ruleId); },
+      async () => {
+        try {
+          const { doc, deleteDoc } = await import('firebase/firestore');
+          const { db } = await import('../config/firebase');
+          const { COLLECTIONS } = await import('../config/constants');
 
-    try {
-      const { doc, deleteDoc } = await import('firebase/firestore');
-      const { db } = await import('../config/firebase');
-      const { COLLECTIONS } = await import('../config/constants');
-
-      await deleteDoc(doc(db, COLLECTIONS.NUDGE_RULES, ruleId));
-    } catch (error) {
-      console.error('Error deleting nudge rule:', error);
-      throw error;
-    }
+          await deleteDoc(doc(db, COLLECTIONS.NUDGE_RULES, ruleId));
+        } catch (error) {
+          console.error('Error deleting nudge rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 }
 

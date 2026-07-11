@@ -14,7 +14,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { BusinessProfile } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_BUSINESSES } from './mockData';
 
 export function mapMemberToBusinessProfile(id: string, data: Record<string, unknown>): BusinessProfile | null {
@@ -89,8 +89,9 @@ function mapListingDoc(id: string, data: Record<string, unknown>): BusinessProfi
 
 export class BusinessDirectoryService {
   static async syncPublicListing(memberId: string, data: Record<string, unknown>): Promise<void> {
-    if (isDevMode()) return;
-
+    return withDevMode(
+      () => {},
+      async () => {
     const profile = mapMemberToBusinessProfile(memberId, data);
     const listingRef = doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, memberId);
 
@@ -104,61 +105,65 @@ export class BusinessDirectoryService {
     }
 
     await setDoc(listingRef, { ...profile, memberId, updatedAt: Timestamp.now() }, { merge: true });
+      }
+    );
   }
 
   static async getAllBusinesses(publicOnly = false): Promise<BusinessProfile[]> {
-    if (isDevMode()) {
-      return MOCK_BUSINESSES;
-    }
+    return withDevMode(
+      () => MOCK_BUSINESSES,
+      async () => {
+        if (publicOnly) {
+          // Unauthenticated path: read from the public denormalised collection.
+          try {
+            const snapshot = await getDocs(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS));
+            return snapshot.docs
+              .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data() as Record<string, unknown>))
+              .filter((p) => p.companyName?.trim())
+              .sort((a, b) => a.companyName.localeCompare(b.companyName));
+          } catch (error) {
+            console.error('Error fetching public business listings:', error);
+            throw error;
+          }
+        }
 
-    if (publicOnly) {
-      // Unauthenticated path: read from the public denormalised collection.
-      try {
-        const snapshot = await getDocs(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS));
-        return snapshot.docs
-          .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data() as Record<string, unknown>))
-          .filter((p) => p.companyName?.trim())
-          .sort((a, b) => a.companyName.localeCompare(b.companyName));
-      } catch (error) {
-        console.error('Error fetching public business listings:', error);
-        throw error;
+        try {
+          // Authenticated path: read directly from members so all members with a
+          // companyName are included — not just those synced to the public cache.
+          const snapshot = await getDocs(collection(db, COLLECTIONS.MEMBERS));
+          return snapshot.docs
+            .map((docSnap) => mapMemberToBusinessProfile(docSnap.id, docSnap.data() as Record<string, unknown>))
+            .filter((profile): profile is BusinessProfile => profile !== null)
+            .sort((a, b) => a.companyName.localeCompare(b.companyName));
+        } catch (error) {
+          console.error('Error fetching business profiles:', error);
+          throw error;
+        }
       }
-    }
-
-    try {
-      // Authenticated path: read directly from members so all members with a
-      // companyName are included — not just those synced to the public cache.
-      const snapshot = await getDocs(collection(db, COLLECTIONS.MEMBERS));
-      return snapshot.docs
-        .map((docSnap) => mapMemberToBusinessProfile(docSnap.id, docSnap.data() as Record<string, unknown>))
-        .filter((profile): profile is BusinessProfile => profile !== null)
-        .sort((a, b) => a.companyName.localeCompare(b.companyName));
-    } catch (error) {
-      console.error('Error fetching business profiles:', error);
-      throw error;
-    }
+    );
   }
 
   static async getBusinessById(businessId: string): Promise<BusinessProfile | null> {
-    if (isDevMode()) {
-      return MOCK_BUSINESSES.find((b) => b.id === businessId) || null;
-    }
+    return withDevMode(
+      () => MOCK_BUSINESSES.find((b) => b.id === businessId) || null,
+      async () => {
+        try {
+          const listingSnap = await getDoc(doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, businessId));
+          if (listingSnap.exists()) {
+            return mapListingDoc(listingSnap.id, listingSnap.data());
+          }
 
-    try {
-      const listingSnap = await getDoc(doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, businessId));
-      if (listingSnap.exists()) {
-        return mapListingDoc(listingSnap.id, listingSnap.data());
+          const memberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, businessId));
+          if (memberSnap.exists()) {
+            return mapMemberToBusinessProfile(memberSnap.id, memberSnap.data());
+          }
+          return null;
+        } catch (error) {
+          console.error('Error fetching business profile:', error);
+          throw error;
+        }
       }
-
-      const memberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, businessId));
-      if (memberSnap.exists()) {
-        return mapMemberToBusinessProfile(memberSnap.id, memberSnap.data());
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching business profile:', error);
-      throw error;
-    }
+    );
   }
 
   static async searchBusinesses(searchTerm: string): Promise<BusinessProfile[]> {

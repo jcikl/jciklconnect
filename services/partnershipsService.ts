@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { Partnership } from '../types';
 
 /**
@@ -77,10 +77,9 @@ export class PartnershipsService {
    * falls back to in-memory mock data.
    */
   static async getAllPartnerships(): Promise<Partnership[]> {
-    if (isDevMode()) {
-      return [...MOCK_PARTNERSHIPS];
-    }
-
+    return withDevMode(
+      () => [...MOCK_PARTNERSHIPS],
+      async () => {
     try {
       // Read from the advertisements collection — the actual source of partnership data
       const snapshot = await getDocs(
@@ -121,58 +120,65 @@ export class PartnershipsService {
       console.warn('[PartnershipsService] Cannot read advertisements (falling back to mock data):', error);
       return [...MOCK_PARTNERSHIPS];
     }
+  });
   }
 
   // Create a new partnership
   static async createPartnership(data: Omit<Partnership, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      const mockId = `mock-partnership-${Date.now()}`;
-      console.log(`[DEV MODE] Simulating creation of partnership with ID: ${mockId}`);
-      return mockId;
-    }
-    try {
-      const docRef = await addDoc(collection(db, COLLECTIONS.PARTNERSHIPS || 'partnerships'), {
-        ...data,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating partnership:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {
+        const mockId = `mock-partnership-${Date.now()}`;
+        console.log(`[DEV MODE] Simulating creation of partnership with ID: ${mockId}`);
+        return mockId;
+      },
+      async () => {
+        try {
+          const docRef = await addDoc(collection(db, COLLECTIONS.PARTNERSHIPS || 'partnerships'), {
+            ...data,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating partnership:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update partnership
   static async updatePartnership(id: string, updates: Partial<Partnership>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating update of partnership ${id}`);
-      return;
-    }
-    try {
-      const docRef = doc(db, COLLECTIONS.PARTNERSHIPS || 'partnerships', id);
-      await updateDoc(docRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating partnership:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Simulating update of partnership ${id}`); },
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.PARTNERSHIPS || 'partnerships', id);
+          await updateDoc(docRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error updating partnership:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Delete partnership
   static async deletePartnership(id: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating deletion of partnership ${id}`);
-      return;
-    }
-    try {
-      const docRef = doc(db, COLLECTIONS.PARTNERSHIPS || 'partnerships', id);
-      await deleteDoc(docRef);
-    } catch (error) {
-      console.error('Error deleting partnership:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Simulating deletion of partnership ${id}`); },
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.PARTNERSHIPS || 'partnerships', id);
+          await deleteDoc(docRef);
+        } catch (error) {
+          console.error('Error deleting partnership:', error);
+          throw error;
+        }
+      }
+    );
   }
 }

@@ -18,7 +18,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS, MOCK_MEMBERS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
 import { removeUndefined } from '../utils/dataUtils';
@@ -78,242 +78,256 @@ const saveMockTransactions = () => {
 export class FinanceService {
   // Get all transactions
   static async getAllTransactions(year?: number): Promise<Transaction[]> {
-    if (isDevMode()) {
-      if (year) {
-        return localMockTransactions.filter(t => new Date(t.date).getFullYear() === year);
+    return withDevMode(
+      () => {
+        if (year) {
+          return localMockTransactions.filter(t => new Date(t.date).getFullYear() === year);
+        }
+        return localMockTransactions;
+      },
+      async () => {
+        try {
+          let q;
+          if (year) {
+            const { Timestamp } = await import('firebase/firestore');
+            const start = Timestamp.fromDate(new Date(year, 0, 1, 0, 0, 0, 0));
+            const end = Timestamp.fromDate(new Date(year, 11, 31, 23, 59, 59, 999));
+            q = query(
+              collection(db, COLLECTIONS.TRANSACTIONS),
+              where('date', '>=', start),
+              where('date', '<=', end),
+              orderBy('date', 'desc')
+            );
+          } else {
+            q = query(
+              collection(db, COLLECTIONS.TRANSACTIONS),
+              orderBy('date', 'desc')
+            );
+          }
+
+          const snapshot = await getDocs(q);
+          let transactions = snapshot.docs.map(doc => {
+            const data = doc.data() as any;
+            return {
+              id: doc.id,
+              ...data,
+              date: data.date?.toDate?.()?.toISOString() || data.date,
+            } as Transaction;
+          });
+
+          if (year) {
+            transactions = transactions.filter(t => new Date(t.date).getFullYear() === year);
+          }
+
+          return transactions;
+        } catch (error) {
+          console.error('Error fetching transactions:', error);
+          throw error;
+        }
       }
-      return localMockTransactions;
-    }
-
-    try {
-      let q;
-      if (year) {
-        const { Timestamp } = await import('firebase/firestore');
-        const start = Timestamp.fromDate(new Date(year, 0, 1, 0, 0, 0, 0));
-        const end = Timestamp.fromDate(new Date(year, 11, 31, 23, 59, 59, 999));
-        q = query(
-          collection(db, COLLECTIONS.TRANSACTIONS),
-          where('date', '>=', start),
-          where('date', '<=', end),
-          orderBy('date', 'desc')
-        );
-      } else {
-        q = query(
-          collection(db, COLLECTIONS.TRANSACTIONS),
-          orderBy('date', 'desc')
-        );
-      }
-
-      const snapshot = await getDocs(q);
-      let transactions = snapshot.docs.map(doc => {
-        const data = doc.data() as any;
-        return {
-          id: doc.id,
-          ...data,
-          date: data.date?.toDate?.()?.toISOString() || data.date,
-        } as Transaction;
-      });
-
-      if (year) {
-        transactions = transactions.filter(t => new Date(t.date).getFullYear() === year);
-      }
-
-      return transactions;
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      throw error;
-    }
+    );
   }
 
   // Get cumulative net flow of bank accounts before a specific year
   static async getHistoricalNetFlowBeforeYear(year: number): Promise<Record<string, number>> {
-    if (isDevMode()) {
-      const netFlows: Record<string, number> = {};
-      localMockTransactions.forEach(t => {
-        const tYear = new Date(t.date).getFullYear();
-        if (tYear < year) {
-          const change = t.type === 'Income' ? t.amount : -t.amount;
-          netFlows[t.bankAccountId] = (netFlows[t.bankAccountId] || 0) + change;
+    return withDevMode(
+      () => {
+        const netFlows: Record<string, number> = {};
+        localMockTransactions.forEach(t => {
+          const tYear = new Date(t.date).getFullYear();
+          if (tYear < year) {
+            const change = t.type === 'Income' ? t.amount : -t.amount;
+            netFlows[t.bankAccountId] = (netFlows[t.bankAccountId] || 0) + change;
+          }
+        });
+        return netFlows;
+      },
+      async () => {
+        try {
+          const { Timestamp } = await import('firebase/firestore');
+          const boundaryDate = new Date(year, 0, 1, 0, 0, 0, 0);
+          const boundaryTimestamp = Timestamp.fromDate(boundaryDate);
+
+          const q = query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('date', '<', boundaryTimestamp)
+          );
+
+          const snapshot = await getDocs(q);
+          const netFlows: Record<string, number> = {};
+
+          snapshot.docs.forEach(doc => {
+            const data = doc.data() as any;
+            const type = data.type;
+            const amount = data.amount || 0;
+            const bankAccountId = data.bankAccountId;
+            if (!bankAccountId) return;
+
+            const change = type === 'Income' ? amount : -amount;
+            netFlows[bankAccountId] = (netFlows[bankAccountId] || 0) + change;
+          });
+
+          return netFlows;
+        } catch (error) {
+          console.error('Error calculating historical net flows:', error);
+          return {};
         }
-      });
-      return netFlows;
-    }
-
-    try {
-      const { Timestamp } = await import('firebase/firestore');
-      const boundaryDate = new Date(year, 0, 1, 0, 0, 0, 0);
-      const boundaryTimestamp = Timestamp.fromDate(boundaryDate);
-
-      const q = query(
-        collection(db, COLLECTIONS.TRANSACTIONS),
-        where('date', '<', boundaryTimestamp)
-      );
-
-      const snapshot = await getDocs(q);
-      const netFlows: Record<string, number> = {};
-
-      snapshot.docs.forEach(doc => {
-        const data = doc.data() as any;
-        const type = data.type;
-        const amount = data.amount || 0;
-        const bankAccountId = data.bankAccountId;
-        if (!bankAccountId) return;
-
-        const change = type === 'Income' ? amount : -amount;
-        netFlows[bankAccountId] = (netFlows[bankAccountId] || 0) + change;
-      });
-
-      return netFlows;
-    } catch (error) {
-      console.error('Error calculating historical net flows:', error);
-      return {};
-    }
+      }
+    );
   }
 
   // Get all transaction years for a specific bank account
   static async getTransactionYearsForAccount(bankAccountId: string): Promise<number[]> {
-    if (isDevMode()) {
-      const years = new Set(localMockTransactions
-        .filter(t => t.bankAccountId === bankAccountId)
-        .map(t => new Date(t.date).getFullYear())
-      );
-      years.add(new Date().getFullYear());
-      return Array.from(years).sort((a, b) => b - a);
-    }
-
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.TRANSACTIONS),
-        where('bankAccountId', '==', bankAccountId)
-      );
-      const snapshot = await getDocs(q);
-      const years = new Set<number>();
-      snapshot.docs.forEach(doc => {
-        const data = doc.data() as any;
-        if (data.date) {
-          const dateVal = data.date.toDate?.() || new Date(data.date);
-          const y = new Date(dateVal).getFullYear();
-          if (!isNaN(y)) {
-            years.add(y);
-          }
+    return withDevMode(
+      () => {
+        const years = new Set(localMockTransactions
+          .filter(t => t.bankAccountId === bankAccountId)
+          .map(t => new Date(t.date).getFullYear())
+        );
+        years.add(new Date().getFullYear());
+        return Array.from(years).sort((a, b) => b - a);
+      },
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('bankAccountId', '==', bankAccountId)
+          );
+          const snapshot = await getDocs(q);
+          const years = new Set<number>();
+          snapshot.docs.forEach(doc => {
+            const data = doc.data() as any;
+            if (data.date) {
+              const dateVal = data.date.toDate?.() || new Date(data.date);
+              const y = new Date(dateVal).getFullYear();
+              if (!isNaN(y)) {
+                years.add(y);
+              }
+            }
+          });
+          years.add(new Date().getFullYear());
+          return Array.from(years).sort((a, b) => b - a);
+        } catch (error) {
+          console.error('Error fetching transaction years for account:', error);
+          return [new Date().getFullYear()];
         }
-      });
-      years.add(new Date().getFullYear());
-      return Array.from(years).sort((a, b) => b - a);
-    } catch (error) {
-      console.error('Error fetching transaction years for account:', error);
-      return [new Date().getFullYear()];
-    }
+      }
+    );
   }
 
   // Get all unique transaction years across all accounts
   static async getAllTransactionYears(): Promise<number[]> {
-    if (isDevMode()) {
-      const years = new Set(localMockTransactions.map(t => new Date(t.date).getFullYear()));
-      years.add(new Date().getFullYear());
-      return Array.from(years).sort((a, b) => b - a);
-    }
-
-    try {
-      const q = query(collection(db, COLLECTIONS.TRANSACTIONS));
-      const snapshot = await getDocs(q);
-      const years = new Set<number>();
-      snapshot.docs.forEach(doc => {
-        const data = doc.data() as any;
-        if (data.date) {
-          const dateVal = data.date.toDate?.() || new Date(data.date);
-          const y = new Date(dateVal).getFullYear();
-          if (!isNaN(y)) {
-            years.add(y);
-          }
+    return withDevMode(
+      () => {
+        const years = new Set(localMockTransactions.map(t => new Date(t.date).getFullYear()));
+        years.add(new Date().getFullYear());
+        return Array.from(years).sort((a, b) => b - a);
+      },
+      async () => {
+        try {
+          const q = query(collection(db, COLLECTIONS.TRANSACTIONS));
+          const snapshot = await getDocs(q);
+          const years = new Set<number>();
+          snapshot.docs.forEach(doc => {
+            const data = doc.data() as any;
+            if (data.date) {
+              const dateVal = data.date.toDate?.() || new Date(data.date);
+              const y = new Date(dateVal).getFullYear();
+              if (!isNaN(y)) {
+                years.add(y);
+              }
+            }
+          });
+          years.add(new Date().getFullYear());
+          return Array.from(years).sort((a, b) => b - a);
+        } catch (error) {
+          console.error('Error fetching all transaction years:', error);
+          return [new Date().getFullYear()];
         }
-      });
-      years.add(new Date().getFullYear());
-      return Array.from(years).sort((a, b) => b - a);
-    } catch (error) {
-      console.error('Error fetching all transaction years:', error);
-      return [new Date().getFullYear()];
-    }
+      }
+    );
   }
 
   // Get project transactions
   static async getProjectTransactions(projectId: string): Promise<Transaction[]> {
-    if (isDevMode()) {
-      return localMockTransactions.filter(t => t.projectId === projectId);
-    }
-
-    try {
-      // First try with orderBy (requires composite index)
-      const projectTrxQuery = query(
-        collection(db, COLLECTIONS.PROJECT_TRANSACTIONS),
-        where('projectId', '==', projectId),
-        orderBy('date', 'desc')
-      );
-      const snapshot = await getDocs(projectTrxQuery);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-      } as Transaction));
-    } catch (indexError: any) {
-      if (indexError?.code === 'failed-precondition') {
-        // Index still building — fall back to unordered query, sort client-side
+    return withDevMode(
+      () => localMockTransactions.filter(t => t.projectId === projectId),
+      async () => {
         try {
-          const fallbackQuery = query(
+          // First try with orderBy (requires composite index)
+          const projectTrxQuery = query(
             collection(db, COLLECTIONS.PROJECT_TRANSACTIONS),
-            where('projectId', '==', projectId)
+            where('projectId', '==', projectId),
+            orderBy('date', 'desc')
           );
-          const snapshot = await getDocs(fallbackQuery);
-          return snapshot.docs
-            .map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-            } as Transaction))
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        } catch (fallbackError) {
-          console.error('Error fetching project transactions (fallback):', fallbackError);
-          throw fallbackError;
+          const snapshot = await getDocs(projectTrxQuery);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
+          } as Transaction));
+        } catch (indexError: any) {
+          if (indexError?.code === 'failed-precondition') {
+            // Index still building — fall back to unordered query, sort client-side
+            try {
+              const fallbackQuery = query(
+                collection(db, COLLECTIONS.PROJECT_TRANSACTIONS),
+                where('projectId', '==', projectId)
+              );
+              const snapshot = await getDocs(fallbackQuery);
+              return snapshot.docs
+                .map(doc => ({
+                  id: doc.id,
+                  ...doc.data(),
+                  date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
+                } as Transaction))
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            } catch (fallbackError) {
+              console.error('Error fetching project transactions (fallback):', fallbackError);
+              throw fallbackError;
+            }
+          }
+          console.error('Error fetching project transactions:', indexError);
+          throw indexError;
         }
       }
-      console.error('Error fetching project transactions:', indexError);
-      throw indexError;
-    }
+    );
   }
 
   // Get bank transactions associated with a project (from transactions collection)
   static async getBankTransactionsByProject(projectId: string): Promise<Transaction[]> {
-    if (isDevMode()) {
-      const direct = localMockTransactions.filter(t => t.projectId === projectId && !t.isSplit);
-      const splitVirtuals = devModeSplits
-        .filter(s => s.projectId === projectId)
-        .map(s => {
-          const parent = localMockTransactions.find(t => t.id === s.parentTransactionId);
-          return {
-            id: s.id,
-            date: parent?.date || new Date().toISOString(),
-            description: s.description || parent?.description || '',
-            purpose: s.purpose || parent?.purpose || '',
-            amount: s.amount,
-            type: s.type || parent?.type || 'Expense',
-            category: s.category || parent?.category || 'Projects & Activities',
-            status: parent?.status || 'Pending',
-            projectId: s.projectId,
-            memberId: s.memberId,
-            bankAccountId: parent?.bankAccountId,
-            reconciledAt: parent?.reconciledAt,
-            reconciledBy: parent?.reconciledBy,
-            referenceNumber: parent?.referenceNumber,
-            paymentRequestId: s.paymentRequestId,
-            projectTransactionId: (s as any).projectTransactionId || null,
-            projectTransactionIds: (s as any).projectTransactionIds || [],
-            isSplitChild: true,
-            parentTransactionId: s.parentTransactionId,
-          } as any;
-        });
-      return [...direct, ...splitVirtuals].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }
-
+    return withDevMode(
+      () => {
+        const direct = localMockTransactions.filter(t => t.projectId === projectId && !t.isSplit);
+        const splitVirtuals = devModeSplits
+          .filter(s => s.projectId === projectId)
+          .map(s => {
+            const parent = localMockTransactions.find(t => t.id === s.parentTransactionId);
+            return {
+              id: s.id,
+              date: parent?.date || new Date().toISOString(),
+              description: s.description || parent?.description || '',
+              purpose: s.purpose || parent?.purpose || '',
+              amount: s.amount,
+              type: s.type || parent?.type || 'Expense',
+              category: s.category || parent?.category || 'Projects & Activities',
+              status: parent?.status || 'Pending',
+              projectId: s.projectId,
+              memberId: s.memberId,
+              bankAccountId: parent?.bankAccountId,
+              reconciledAt: parent?.reconciledAt,
+              reconciledBy: parent?.reconciledBy,
+              referenceNumber: parent?.referenceNumber,
+              paymentRequestId: s.paymentRequestId,
+              projectTransactionId: (s as any).projectTransactionId || null,
+              projectTransactionIds: (s as any).projectTransactionIds || [],
+              isSplitChild: true,
+              parentTransactionId: s.parentTransactionId,
+            } as any;
+          });
+        return [...direct, ...splitVirtuals].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      },
+      async () => {
     try {
       // 1. Get transactions directly assigned to the project (e.g. non-split)
       const q = query(
@@ -385,139 +399,149 @@ export class FinanceService {
         });
       }
 
-      const combined = [...directTransactions, ...virtualTransactionsFromSplits];
-      return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    } catch (error) {
-      console.error('Error fetching bank transactions for project:', error);
-      throw error;
-    }
+        const combined = [...directTransactions, ...virtualTransactionsFromSplits];
+        return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      } catch (error) {
+        console.error('Error fetching bank transactions for project:', error);
+        throw error;
+      }
+      }
+    );
   }
 
   // Create transaction
   static async createTransaction(transactionData: Omit<Transaction, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Mocking transaction creation');
-      const id = `mock-tx-${Date.now()}`;
-      const newTx: Transaction = {
-        id,
-        ...transactionData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      localMockTransactions.push(newTx);
-      saveMockTransactions();
-      return id;
-    }
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Mocking transaction creation');
+        const id = `mock-tx-${Date.now()}`;
+        const newTx: Transaction = {
+          id,
+          ...transactionData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        localMockTransactions.push(newTx);
+        saveMockTransactions();
+        return id;
+      },
+      async () => {
+        try {
+          let purpose = transactionData.purpose;
+          if (transactionData.category === 'Membership') {
+            const year = transactionData.projectId ? parseInt(transactionData.projectId, 10) : new Date(transactionData.date).getFullYear();
+            const rules = await MembershipConfigService.getRules();
+            purpose = resolveMembershipPurpose(transactionData.amount, isNaN(year) ? new Date().getFullYear() : year, rules);
+          }
 
-    try {
-      let purpose = transactionData.purpose;
-      if (transactionData.category === 'Membership') {
-        const year = transactionData.projectId ? parseInt(transactionData.projectId, 10) : new Date(transactionData.date).getFullYear();
-        const rules = await MembershipConfigService.getRules();
-        purpose = resolveMembershipPurpose(transactionData.amount, isNaN(year) ? new Date().getFullYear() : year, rules);
+          const newTransaction = {
+            ...transactionData,
+            purpose,
+            date: Timestamp.fromDate(new Date(transactionData.date)),
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+
+          const cleanTransaction = removeUndefined(newTransaction);
+          const docRef = await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), cleanTransaction);
+
+          // Sync with inventory if linked
+          await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
+
+          // Sync with Member Membership if category is Membership
+          if (transactionData.category === 'Membership' && transactionData.memberId) {
+            await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
+          }
+
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating transaction:', error);
+          throw error;
+        }
       }
-
-      const newTransaction = {
-        ...transactionData,
-        purpose,
-        date: Timestamp.fromDate(new Date(transactionData.date)),
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-
-      const cleanTransaction = removeUndefined(newTransaction);
-      const docRef = await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), cleanTransaction);
-
-      // Sync with inventory if linked
-      await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
-
-      // Sync with Member Membership if category is Membership
-      if (transactionData.category === 'Membership' && transactionData.memberId) {
-        await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
-      }
-
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating transaction:', error);
-      throw error;
-    }
+    );
   }
 
   // Create project transaction
   static async createProjectTransaction(transactionData: Omit<Transaction, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Mocking project transaction creation');
-      const newId = `mock-prj-tx-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const newTx: Transaction = {
-        id: newId,
-        ...transactionData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      localMockTransactions.push(newTx);
-      saveMockTransactions();
-      return newId;
-    }
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Mocking project transaction creation');
+        const newId = `mock-prj-tx-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const newTx: Transaction = {
+          id: newId,
+          ...transactionData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        localMockTransactions.push(newTx);
+        saveMockTransactions();
+        return newId;
+      },
+      async () => {
+        try {
+          const newTransaction: any = {
+            ...transactionData,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
 
-    try {
-      const newTransaction: any = {
-        ...transactionData,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
+          if (transactionData.date) {
+            newTransaction.date = Timestamp.fromDate(new Date(transactionData.date));
+          } else {
+            newTransaction.date = '';
+          }
 
-      if (transactionData.date) {
-        newTransaction.date = Timestamp.fromDate(new Date(transactionData.date));
-      } else {
-        newTransaction.date = '';
+          const cleanTransaction = removeUndefined(newTransaction);
+          const docRef = await addDoc(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), cleanTransaction);
+
+          // Sync with inventory if linked
+          await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
+
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating project transaction:', error);
+          throw error;
+        }
       }
-
-      const cleanTransaction = removeUndefined(newTransaction);
-      const docRef = await addDoc(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), cleanTransaction);
-
-      // Sync with inventory if linked
-      await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
-
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating project transaction:', error);
-      throw error;
-    }
+    );
   }
 
   // Update project transaction
   static async updateProjectTransaction(transactionId: string, updates: Partial<Transaction>): Promise<void> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Mocking project transaction update');
-      const idx = localMockTransactions.findIndex(t => t.id === transactionId);
-      if (idx !== -1) {
-        localMockTransactions[idx] = {
-          ...localMockTransactions[idx],
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        } as Transaction;
-        saveMockTransactions();
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Mocking project transaction update');
+        const idx = localMockTransactions.findIndex(t => t.id === transactionId);
+        if (idx !== -1) {
+          localMockTransactions[idx] = {
+            ...localMockTransactions[idx],
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          } as Transaction;
+          saveMockTransactions();
+        }
+      },
+      async () => {
+        try {
+          const transactionRef = doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId);
+
+          const updateData: any = {
+            ...removeUndefined(updates),
+            updatedAt: Timestamp.now(),
+          };
+
+          if (updates.date !== undefined) {
+            updateData.date = updates.date ? Timestamp.fromDate(new Date(updates.date)) : '';
+          }
+
+          await updateDoc(transactionRef, updateData);
+        } catch (error) {
+          console.error('Error updating project transaction:', error);
+          throw error;
+        }
       }
-      return;
-    }
-
-    try {
-      const transactionRef = doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId);
-
-      const updateData: any = {
-        ...removeUndefined(updates),
-        updatedAt: Timestamp.now(),
-      };
-
-      if (updates.date !== undefined) {
-        updateData.date = updates.date ? Timestamp.fromDate(new Date(updates.date)) : '';
-      }
-
-      await updateDoc(transactionRef, updateData);
-    } catch (error) {
-      console.error('Error updating project transaction:', error);
-      throw error;
-    }
+    );
   }
 
   // Create transaction split (upsert: update existing or create new)
@@ -526,89 +550,90 @@ export class FinanceService {
     splits: Array<{ id?: string; category: 'Projects & Activities' | 'Membership' | 'Administrative'; year?: number; projectId?: string; memberId?: string; purpose?: string; paymentRequestId?: string; amount: number; description: string }>,
     createdBy: string
   ): Promise<string[]> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Creating/updating ${splits.length} splits for transaction ${parentTransactionId}`);
-      // Find parent transaction
-      const parentTransaction = localMockTransactions.find(t => t.id === parentTransactionId);
-      if (!parentTransaction) {
-        throw new Error('Parent transaction not found');
-      }
-
-      // Validate split amounts sum to parent amount
-      const totalSplitAmount = splits.reduce((sum, split) => sum + split.amount, 0);
-      if (Math.abs(totalSplitAmount - parentTransaction.amount) > 0.01) {
-        throw new Error(
-          `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentTransaction.amount})`
-        );
-      }
-
-      // Delete existing splits for this transaction that were removed
-      const newSplitIds = splits.filter(s => s.id).map(s => s.id);
-      devModeSplits = devModeSplits.filter(s => s.parentTransactionId !== parentTransactionId || newSplitIds.includes(s.id));
-
-      const splitIds: string[] = [];
-      splits.forEach((split, index) => {
-        if (split.id && devModeSplits.some(s => s.id === split.id)) {
-          // Update
-          const idx = devModeSplits.findIndex(s => s.id === split.id);
-          devModeSplits[idx] = {
-            ...devModeSplits[idx],
-            category: split.category,
-            projectId: split.projectId,
-            memberId: split.memberId,
-            purpose: split.purpose,
-            paymentRequestId: split.paymentRequestId,
-            amount: split.amount,
-            description: split.description,
-            year: split.year,
-          };
-          splitIds.push(split.id);
-        } else {
-          // Create
-          const newId = split.id || `mock-split-${parentTransactionId}-${index}-${Date.now()}`;
-          const newSplit: TransactionSplit = {
-            id: newId,
-            parentTransactionId,
-            category: split.category,
-            type: parentTransaction.type,
-            projectId: split.projectId || '',
-            memberId: split.memberId || '',
-            purpose: split.purpose || '',
-            paymentRequestId: split.paymentRequestId || '',
-            amount: split.amount,
-            description: split.description,
-            createdAt: new Date().toISOString(),
-            createdBy,
-            year: split.year,
-          };
-          devModeSplits.push(newSplit);
-          splitIds.push(newId);
+    return withDevMode(
+      async () => {
+        console.log(`[Dev Mode] Creating/updating ${splits.length} splits for transaction ${parentTransactionId}`);
+        // Find parent transaction
+        const parentTransaction = localMockTransactions.find(t => t.id === parentTransactionId);
+        if (!parentTransaction) {
+          throw new Error('Parent transaction not found');
         }
-      });
 
-      // Update parent transaction
-      const parentIdx = localMockTransactions.findIndex(t => t.id === parentTransactionId);
-      if (parentIdx !== -1) {
-        localMockTransactions[parentIdx] = {
-          ...localMockTransactions[parentIdx],
-          isSplit: true,
-          splitIds,
-          originalCategory: localMockTransactions[parentIdx].category,
-          category: '' as any,
-          projectId: '',
-          purpose: '',
-          projectTransactionIds: [],
-          projectTransactionId: null,
-          updatedAt: new Date().toISOString(),
-        };
-      }
+        // Validate split amounts sum to parent amount
+        const totalSplitAmount = splits.reduce((sum, split) => sum + split.amount, 0);
+        if (Math.abs(totalSplitAmount - parentTransaction.amount) > 0.01) {
+          throw new Error(
+            `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentTransaction.amount})`
+          );
+        }
 
-      saveDevModeSplits();
-      saveMockTransactions();
+        // Delete existing splits for this transaction that were removed
+        const newSplitIds = splits.filter(s => s.id).map(s => s.id);
+        devModeSplits = devModeSplits.filter(s => s.parentTransactionId !== parentTransactionId || newSplitIds.includes(s.id));
 
-      return splitIds;
-    }
+        const splitIds: string[] = [];
+        splits.forEach((split, index) => {
+          if (split.id && devModeSplits.some(s => s.id === split.id)) {
+            // Update
+            const idx = devModeSplits.findIndex(s => s.id === split.id);
+            devModeSplits[idx] = {
+              ...devModeSplits[idx],
+              category: split.category,
+              projectId: split.projectId,
+              memberId: split.memberId,
+              purpose: split.purpose,
+              paymentRequestId: split.paymentRequestId,
+              amount: split.amount,
+              description: split.description,
+              year: split.year,
+            };
+            splitIds.push(split.id);
+          } else {
+            // Create
+            const newId = split.id || `mock-split-${parentTransactionId}-${index}-${Date.now()}`;
+            const newSplit: TransactionSplit = {
+              id: newId,
+              parentTransactionId,
+              category: split.category,
+              type: parentTransaction.type,
+              projectId: split.projectId || '',
+              memberId: split.memberId || '',
+              purpose: split.purpose || '',
+              paymentRequestId: split.paymentRequestId || '',
+              amount: split.amount,
+              description: split.description,
+              createdAt: new Date().toISOString(),
+              createdBy,
+              year: split.year,
+            };
+            devModeSplits.push(newSplit);
+            splitIds.push(newId);
+          }
+        });
 
+        // Update parent transaction
+        const parentIdx = localMockTransactions.findIndex(t => t.id === parentTransactionId);
+        if (parentIdx !== -1) {
+          localMockTransactions[parentIdx] = {
+            ...localMockTransactions[parentIdx],
+            isSplit: true,
+            splitIds,
+            originalCategory: localMockTransactions[parentIdx].category,
+            category: '' as any,
+            projectId: '',
+            purpose: '',
+            projectTransactionIds: [],
+            projectTransactionId: null,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+
+        saveDevModeSplits();
+        saveMockTransactions();
+
+        return splitIds;
+      },
+      async () => {
     try {
       // Get parent transaction
       const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId));
@@ -726,62 +751,69 @@ export class FinanceService {
       console.error('Error creating transaction splits:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Get transaction splits
   static async getTransactionSplits(transactionId: string): Promise<TransactionSplit[]> {
-    if (isDevMode()) {
-      return devModeSplits.filter(s => s.parentTransactionId === transactionId);
-    }
-
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.TRANSACTION_SPLITS),
-        where('parentTransactionId', '==', transactionId)
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-      } as TransactionSplit));
-    } catch (error) {
-      console.error('Error fetching transaction splits:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => devModeSplits.filter(s => s.parentTransactionId === transactionId),
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+            where('parentTransactionId', '==', transactionId)
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+          } as TransactionSplit));
+        } catch (error) {
+          console.error('Error fetching transaction splits:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get ALL transaction splits in bulk
   static async getAllTransactionSplits(year?: number): Promise<TransactionSplit[]> {
-    if (isDevMode()) {
-      if (year) {
-        return devModeSplits.filter(s => s.year === year);
+    return withDevMode(
+      () => {
+        if (year) {
+          return devModeSplits.filter(s => s.year === year);
+        }
+        return devModeSplits;
+      },
+      async () => {
+        try {
+          let q;
+          if (year) {
+            q = query(
+              collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+              where('year', '==', year)
+            );
+          } else {
+            q = collection(db, COLLECTIONS.TRANSACTION_SPLITS);
+          }
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => {
+            const data = doc.data() as any;
+            return {
+              id: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+            } as TransactionSplit;
+          });
+        } catch (error) {
+          console.error('Error fetching all transaction splits:', error);
+          throw error;
+        }
       }
-      return devModeSplits;
-    }
-    try {
-      let q;
-      if (year) {
-        q = query(
-          collection(db, COLLECTIONS.TRANSACTION_SPLITS),
-          where('year', '==', year)
-        );
-      } else {
-        q = collection(db, COLLECTIONS.TRANSACTION_SPLITS);
-      }
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => {
-        const data = doc.data() as any;
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-        } as TransactionSplit;
-      });
-    } catch (error) {
-      console.error('Error fetching all transaction splits:', error);
-      throw error;
-    }
+    );
   }
 
   // Update transaction split
@@ -789,186 +821,191 @@ export class FinanceService {
     splitId: string,
     updates: Partial<Omit<TransactionSplit, 'id' | 'parentTransactionId' | 'createdAt' | 'createdBy'>>
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Mocking update for split ${splitId}`);
-      const idx = devModeSplits.findIndex(s => s.id === splitId);
-      if (idx !== -1) {
-        devModeSplits[idx] = {
-          ...devModeSplits[idx],
-          ...updates,
-        } as TransactionSplit;
-        saveDevModeSplits();
-      }
-      return;
-    }
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Mocking update for split ${splitId}`);
+        const idx = devModeSplits.findIndex(s => s.id === splitId);
+        if (idx !== -1) {
+          devModeSplits[idx] = {
+            ...devModeSplits[idx],
+            ...updates,
+          } as TransactionSplit;
+          saveDevModeSplits();
+        }
+      },
+      async () => {
+        try {
+          const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
+          await updateDoc(splitRef, {
+            ...removeUndefined(updates),
+            updatedAt: Timestamp.now(),
+          });
 
-    try {
-      const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
-      await updateDoc(splitRef, {
-        ...removeUndefined(updates),
-        updatedAt: Timestamp.now(),
-      });
+          // If amount changed, validate total still equals parent
+          if (updates.amount !== undefined) {
+            const splitDoc = await getDoc(splitRef);
+            if (splitDoc.exists()) {
+              const split = splitDoc.data() as TransactionSplit;
+              const allSplits = await this.getTransactionSplits(split.parentTransactionId);
+              const totalSplitAmount = allSplits.reduce((sum, s) => sum + s.amount, 0);
 
-      // If amount changed, validate total still equals parent
-      if (updates.amount !== undefined) {
-        const splitDoc = await getDoc(splitRef);
-        if (splitDoc.exists()) {
-          const split = splitDoc.data() as TransactionSplit;
-          const allSplits = await this.getTransactionSplits(split.parentTransactionId);
-          const totalSplitAmount = allSplits.reduce((sum, s) => sum + s.amount, 0);
-
-          const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
-          if (parentDoc.exists()) {
-            const parentAmount = parentDoc.data().amount;
-            if (Math.abs(totalSplitAmount - parentAmount) > 0.01) {
-              throw new Error(
-                `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentAmount})`
-              );
+              const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
+              if (parentDoc.exists()) {
+                const parentAmount = parentDoc.data().amount;
+                if (Math.abs(totalSplitAmount - parentAmount) > 0.01) {
+                  throw new Error(
+                    `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentAmount})`
+                  );
+                }
+              }
             }
           }
+        } catch (error) {
+          console.error('Error updating transaction split:', error);
+          throw error;
         }
       }
-    } catch (error) {
-      console.error('Error updating transaction split:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete transaction split
   static async deleteTransactionSplit(splitId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Mocking deletion for split ${splitId}`);
-      const splitIdx = devModeSplits.findIndex(s => s.id === splitId);
-      if (splitIdx === -1) return;
-      const split = devModeSplits[splitIdx];
-      devModeSplits.splice(splitIdx, 1);
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Mocking deletion for split ${splitId}`);
+        const splitIdx = devModeSplits.findIndex(s => s.id === splitId);
+        if (splitIdx === -1) return;
+        const split = devModeSplits[splitIdx];
+        devModeSplits.splice(splitIdx, 1);
 
-      // Update parent transaction splitIds array
-      const remainingSplits = devModeSplits.filter(s => s.parentTransactionId === split.parentTransactionId);
-      const remainingIds = remainingSplits.map(s => s.id);
-      
-      const parentIdx = localMockTransactions.findIndex(t => t.id === split.parentTransactionId);
-      if (parentIdx !== -1) {
-        const parentTx = localMockTransactions[parentIdx];
-        const originalCategory = (parentTx as any).originalCategory || parentTx.category || '';
-        localMockTransactions[parentIdx] = {
-          ...parentTx,
-          splitIds: remainingIds,
-          isSplit: remainingIds.length > 0,
-          category: remainingIds.length === 0 ? originalCategory : '',
-          updatedAt: new Date().toISOString(),
-          ...(remainingIds.length === 0 ? {
-            projectTransactionIds: [],
-            projectTransactionId: null,
-            status: 'Cleared',
-            purpose: '',
-          } : {}),
-        };
+        // Update parent transaction splitIds array
+        const remainingSplits = devModeSplits.filter(s => s.parentTransactionId === split.parentTransactionId);
+        const remainingIds = remainingSplits.map(s => s.id);
+
+        const parentIdx = localMockTransactions.findIndex(t => t.id === split.parentTransactionId);
+        if (parentIdx !== -1) {
+          const parentTx = localMockTransactions[parentIdx];
+          const originalCategory = (parentTx as any).originalCategory || parentTx.category || '';
+          localMockTransactions[parentIdx] = {
+            ...parentTx,
+            splitIds: remainingIds,
+            isSplit: remainingIds.length > 0,
+            category: remainingIds.length === 0 ? originalCategory : '',
+            updatedAt: new Date().toISOString(),
+            ...(remainingIds.length === 0 ? {
+              projectTransactionIds: [],
+              projectTransactionId: null,
+              status: 'Cleared',
+              purpose: '',
+            } : {}),
+          };
+        }
+        saveDevModeSplits();
+        saveMockTransactions();
+      },
+      async () => {
+        try {
+          const splitDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
+          if (!splitDoc.exists()) {
+            throw new Error('Split not found');
+          }
+
+          const split = splitDoc.data() as TransactionSplit;
+          await deleteDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
+
+          // Update parent transaction splitIds array
+          const remainingSplits = await this.getTransactionSplits(split.parentTransactionId);
+          const remainingIds = remainingSplits.map(s => s.id);
+
+          // Get parent transaction to restore category
+          const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
+          const parentTx = parentDoc.exists() ? parentDoc.data() as Transaction : null;
+          const originalCategory = (parentTx as any)?.originalCategory || parentTx?.category || '';
+
+          const updateData: any = {
+            splitIds: remainingIds,
+            isSplit: remainingIds.length > 0,
+            // Restore category if no splits remain
+            category: remainingIds.length === 0 ? originalCategory : '',
+            updatedAt: Timestamp.now(),
+          };
+
+          if (remainingIds.length === 0) {
+            updateData.projectTransactionIds = [];
+            updateData.projectTransactionId = null;
+            updateData.status = 'Cleared';
+            updateData.purpose = '';
+          }
+
+          await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), updateData);
+        } catch (error) {
+          console.error('Error deleting transaction split:', error);
+          throw error;
+        }
       }
-      saveDevModeSplits();
-      saveMockTransactions();
-      return;
-    }
-
-    try {
-      const splitDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
-      if (!splitDoc.exists()) {
-        throw new Error('Split not found');
-      }
-
-      const split = splitDoc.data() as TransactionSplit;
-      await deleteDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
-
-      // Update parent transaction splitIds array
-      const remainingSplits = await this.getTransactionSplits(split.parentTransactionId);
-      const remainingIds = remainingSplits.map(s => s.id);
-
-      // Get parent transaction to restore category
-      const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
-      const parentTx = parentDoc.exists() ? parentDoc.data() as Transaction : null;
-      const originalCategory = (parentTx as any)?.originalCategory || parentTx?.category || '';
-
-      const updateData: any = {
-        splitIds: remainingIds,
-        isSplit: remainingIds.length > 0,
-        // Restore category if no splits remain
-        category: remainingIds.length === 0 ? originalCategory : '',
-        updatedAt: Timestamp.now(),
-      };
-
-      if (remainingIds.length === 0) {
-        updateData.projectTransactionIds = [];
-        updateData.projectTransactionId = null;
-        updateData.status = 'Cleared';
-        updateData.purpose = '';
-      }
-
-      await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), updateData);
-    } catch (error) {
-      console.error('Error deleting transaction split:', error);
-      throw error;
-    }
+    );
   }
 
   // Get transactions by type (including splits)
   static async getTransactionsByType(filter: TransactionType | 'Projects & Activities' | 'Membership' | 'Administrative'): Promise<Transaction[]> {
-    if (isDevMode()) {
-      return localMockTransactions.filter(t => t.transactionType === filter);
-    }
+    return withDevMode(
+      () => localMockTransactions.filter(t => t.transactionType === filter),
+      async () => {
+        try {
+          // Get transactions with matching primary type
+          const q = query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('category', '==', filter),
+            orderBy('date', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          const transactions = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
+          } as Transaction));
 
-    try {
-      // Get transactions with matching primary type
-      const q = query(
-        collection(db, COLLECTIONS.TRANSACTIONS),
-        where('category', '==', filter),
-        orderBy('date', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const transactions = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-      } as Transaction));
+          // Also get transactions that have splits of this type
+          const [allTransactions, allSplits] = await Promise.all([
+            this.getAllTransactions(),
+            this.getAllTransactionSplits()
+          ]);
 
-      // Also get transactions that have splits of this type
-      const [allTransactions, allSplits] = await Promise.all([
-        this.getAllTransactions(),
-        this.getAllTransactionSplits()
-      ]);
+          const parentIdsWithMatchingSplits = new Set(
+            allSplits.filter(split => split.category === filter).map(s => s.parentTransactionId)
+          );
 
-      const parentIdsWithMatchingSplits = new Set(
-        allSplits.filter(split => split.category === filter).map(s => s.parentTransactionId)
-      );
+          const transactionsWithSplits = allTransactions.filter(t => parentIdsWithMatchingSplits.has(t.id));
 
-      const transactionsWithSplits = allTransactions.filter(t => parentIdsWithMatchingSplits.has(t.id));
+          // Combine and deduplicate
+          const combined = [...transactions, ...transactionsWithSplits];
+          const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
 
-      // Combine and deduplicate
-      const combined = [...transactions, ...transactionsWithSplits];
-      const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
-
-      return unique.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    } catch (error) {
-      console.error('Error fetching transactions by type:', error);
-      throw error;
-    }
+          return unique.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        } catch (error) {
+          console.error('Error fetching transactions by type:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update transaction
   static async updateTransaction(transactionId: string, updates: Partial<Transaction>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Mocking update for transaction ${transactionId}`);
-      const idx = localMockTransactions.findIndex(t => t.id === transactionId);
-      if (idx !== -1) {
-        localMockTransactions[idx] = {
-          ...localMockTransactions[idx],
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        } as Transaction;
-        saveMockTransactions();
-      }
-      return;
-    }
-
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Mocking update for transaction ${transactionId}`);
+        const idx = localMockTransactions.findIndex(t => t.id === transactionId);
+        if (idx !== -1) {
+          localMockTransactions[idx] = {
+            ...localMockTransactions[idx],
+            ...updates,
+            updatedAt: new Date().toISOString(),
+          } as Transaction;
+          saveMockTransactions();
+        }
+      },
+      async () => {
     try {
       const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
 
@@ -1116,6 +1153,8 @@ export class FinanceService {
       console.error('Error updating transaction:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Batch update Transaction Category fields for multiple transactions
@@ -1130,7 +1169,8 @@ export class FinanceService {
       paymentRequestId?: string;
     }
   ): Promise<{ updated: number; errors: string[] }> {
-    if (isDevMode()) {
+    return withDevMode(
+      async () => {
       console.log(`[Dev Mode] Batch updating category for ${transactionIds.length} transactions`);
       let updatedCount = 0;
       for (const txId of transactionIds) {
@@ -1203,8 +1243,8 @@ export class FinanceService {
       }
       saveMockTransactions();
       return { updated: updatedCount, errors: [] };
-    }
-
+    },
+    async () => {
     const results = await Promise.all(
       transactionIds.map(async (txId) => {
         try {
@@ -1304,6 +1344,8 @@ export class FinanceService {
     });
 
     return { updated, errors };
+      }
+    );
   }
 
   // Batch update Transaction Category fields for multiple split records

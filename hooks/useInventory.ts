@@ -1,33 +1,16 @@
 // Inventory Data Hook
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { InventoryService } from '../services/inventoryService';
 import { InventoryItem, MaintenanceSchedule, InventoryAlert } from '../types';
 import { useToast } from '../components/ui/Common';
+import { useFirestoreCollection } from './useFirestoreCollection';
 
 export const useInventory = () => {
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const loadItems = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await InventoryService.getAllItems();
-      setItems(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load inventory items';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadItems();
-  }, []);
+  const { data: items, loading, error, reload: loadItems } = useFirestoreCollection<InventoryItem>({
+    loader: () => InventoryService.getAllItems(),
+  });
 
   const createItem = async (itemData: Omit<InventoryItem, 'id'>) => {
     try {
@@ -90,6 +73,7 @@ export const useInventory = () => {
     }
   };
 
+  // Maintenance schedules and alerts are loaded on-demand (not in initial useEffect)
   const [maintenanceSchedules, setMaintenanceSchedules] = useState<MaintenanceSchedule[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
 
@@ -195,4 +179,3 @@ export const useInventory = () => {
     checkAndGenerateAlerts,
   };
 };
-

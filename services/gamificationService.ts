@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { calculateAwardProgress as calculateAwardProgressUtil } from '../utils/gamificationUtils';
 import {
     AwardDefinition,
@@ -34,52 +34,64 @@ export class GamificationService {
      * Create a new award.
      */
     static async createAward(awardData: Omit<AwardDefinition, 'id'>): Promise<string> {
-        if (isDevMode()) return 'mock-new-award-id';
-        try {
-            const data = {
-                ...awardData,
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now()
-            };
-            const docRef = await addDoc(collection(db, COLLECTIONS.BADGES), data);
-            return docRef.id;
-        } catch (error) {
-            console.error('Error creating award:', error);
-            throw error;
-        }
+        return withDevMode(
+            () => 'mock-new-award-id',
+            async () => {
+                try {
+                    const data = {
+                        ...awardData,
+                        createdAt: Timestamp.now(),
+                        updatedAt: Timestamp.now()
+                    };
+                    const docRef = await addDoc(collection(db, COLLECTIONS.BADGES), data);
+                    return docRef.id;
+                } catch (error) {
+                    console.error('Error creating award:', error);
+                    throw error;
+                }
+            }
+        );
     }
 
     /**
      * Update an existing award definition.
      */
     static async updateAward(awardId: string, awardData: Partial<AwardDefinition>): Promise<void> {
-        if (isDevMode()) return;
-        try {
-            const data = {
-                ...awardData,
-                updatedAt: Timestamp.now()
-            };
-            await updateDoc(doc(db, COLLECTIONS.BADGES, awardId), data);
-        } catch (error) {
-            console.error('Error updating award:', error);
-            throw error;
-        }
+        return withDevMode(
+            () => {},
+            async () => {
+                try {
+                    const data = {
+                        ...awardData,
+                        updatedAt: Timestamp.now()
+                    };
+                    await updateDoc(doc(db, COLLECTIONS.BADGES, awardId), data);
+                } catch (error) {
+                    console.error('Error updating award:', error);
+                    throw error;
+                }
+            }
+        );
     }
 
     /**
      * Delete an award definition (soft delete by setting active to false).
      */
     static async deleteAward(awardId: string): Promise<void> {
-        if (isDevMode()) return;
-        try {
-            await updateDoc(doc(db, COLLECTIONS.BADGES, awardId), {
-                active: false,
-                updatedAt: Timestamp.now()
-            });
-        } catch (error) {
-            console.error('Error deleting award:', error);
-            throw error;
-        }
+        return withDevMode(
+            () => {},
+            async () => {
+                try {
+                    await updateDoc(doc(db, COLLECTIONS.BADGES, awardId), {
+                        active: false,
+                        updatedAt: Timestamp.now()
+                    });
+                } catch (error) {
+                    console.error('Error deleting award:', error);
+                    throw error;
+                }
+            }
+        );
     }
 
     /**
@@ -87,27 +99,31 @@ export class GamificationService {
      * In this unified model, an Award is both the challenge (Achievement) and the reward (Badge).
      */
     static async getAllAwards(): Promise<AwardDefinition[]> {
-        if (isDevMode()) return this.getMockAwards();
-        try {
-            // We'll use the 'badges' collection as the unified source for all Awards
-            const snapshot = await getDocs(
-                query(
-                    collection(db, COLLECTIONS.BADGES),
-                    where('active', '==', true),
-                    orderBy('tier', 'asc'),
-                    orderBy('name', 'asc')
-                )
-            );
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-                updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt,
-            } as AwardDefinition));
-        } catch (error) {
-            console.error('Error fetching awards:', error);
-            throw error;
-        }
+        return withDevMode(
+            () => this.getMockAwards(),
+            async () => {
+                try {
+                    // We'll use the 'badges' collection as the unified source for all Awards
+                    const snapshot = await getDocs(
+                        query(
+                            collection(db, COLLECTIONS.BADGES),
+                            where('active', '==', true),
+                            orderBy('tier', 'asc'),
+                            orderBy('name', 'asc')
+                        )
+                    );
+                    return snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                        createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
+                        updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt,
+                    } as AwardDefinition));
+                } catch (error) {
+                    console.error('Error fetching awards:', error);
+                    throw error;
+                }
+            }
+        );
     }
 
     /**
@@ -121,65 +137,73 @@ export class GamificationService {
         reason?: string,
         metadata?: Record<string, any>
     ): Promise<string> {
-        if (isDevMode()) return 'mock-award-id';
-        try {
-            const award = await this.getAwardById(awardId);
-            if (!award) throw new Error('Award definition not found');
+        return withDevMode(
+            () => 'mock-award-id',
+            async () => {
+                try {
+                    const award = await this.getAwardById(awardId);
+                    if (!award) throw new Error('Award definition not found');
 
-            // 1. Create the award record
-            const awardData: Omit<MemberAward, 'id'> = {
-                awardId,
-                memberId,
-                earnedAt: Timestamp.now(),
-                awardedBy,
-                reason: reason || `Earned award: ${award.name}`,
-                metadata,
-                progress: 100, // Fully earned
-            };
-            const docRef = await addDoc(collection(db, COLLECTIONS.BADGE_AWARDS), awardData);
+                    // 1. Create the award record
+                    const awardData: Omit<MemberAward, 'id'> = {
+                        awardId,
+                        memberId,
+                        earnedAt: Timestamp.now(),
+                        awardedBy,
+                        reason: reason || `Earned award: ${award.name}`,
+                        metadata,
+                        progress: 100, // Fully earned
+                    };
+                    const docRef = await addDoc(collection(db, COLLECTIONS.BADGE_AWARDS), awardData);
 
-            // 2. Award points if configured
-            if (award.pointsReward > 0) {
-                await PointsService.awardPoints(
-                    memberId,
-                    'achievement',
-                    award.pointsReward,
-                    `Award unlocked: ${award.name}`
-                );
-            }
+                    // 2. Award points if configured
+                    if (award.pointsReward > 0) {
+                        await PointsService.awardPoints(
+                            memberId,
+                            'achievement',
+                            award.pointsReward,
+                            `Award unlocked: ${award.name}`
+                        );
+                    }
 
-            // 3. Update member's badge list for visual display
-            const { MembersService } = await import('./membersService');
-            const member = await MembersService.getMemberById(memberId);
-            if (member) {
-                const userBadge: UserBadge = {
-                    id: awardId,
-                    name: award.name,
-                    icon: award.icon,
-                    description: award.description,
-                    earnedDate: new Date().toISOString()
-                };
-                const currentBadges = member.badges || [];
-                // Avoid duplicates
-                if (!currentBadges.find(b => b.id === awardId)) {
-                    await MembersService.updateMember(memberId, {
-                        badges: [...currentBadges, userBadge],
-                    });
+                    // 3. Update member's badge list for visual display
+                    const { MembersService } = await import('./membersService');
+                    const member = await MembersService.getMemberById(memberId);
+                    if (member) {
+                        const userBadge: UserBadge = {
+                            id: awardId,
+                            name: award.name,
+                            icon: award.icon,
+                            description: award.description,
+                            earnedDate: new Date().toISOString()
+                        };
+                        const currentBadges = member.badges || [];
+                        // Avoid duplicates
+                        if (!currentBadges.find(b => b.id === awardId)) {
+                            await MembersService.updateMember(memberId, {
+                                badges: [...currentBadges, userBadge],
+                            });
+                        }
+                    }
+
+                    return docRef.id;
+                } catch (error) {
+                    console.error('Error awarding recognition:', error);
+                    throw error;
                 }
             }
-
-            return docRef.id;
-        } catch (error) {
-            console.error('Error awarding recognition:', error);
-            throw error;
-        }
+        );
     }
 
     static async getAwardById(awardId: string): Promise<AwardDefinition | null> {
-        if (isDevMode()) return this.getMockAwards().find(a => a.id === awardId) || null;
-        const awardDoc = await getDoc(doc(db, COLLECTIONS.BADGES, awardId));
-        if (!awardDoc.exists()) return null;
-        return { id: awardDoc.id, ...awardDoc.data() } as AwardDefinition;
+        return withDevMode(
+            () => this.getMockAwards().find(a => a.id === awardId) || null,
+            async () => {
+                const awardDoc = await getDoc(doc(db, COLLECTIONS.BADGES, awardId));
+                if (!awardDoc.exists()) return null;
+                return { id: awardDoc.id, ...awardDoc.data() } as AwardDefinition;
+            }
+        );
     }
 
     static calculateAwardProgress(award: AwardDefinition, currentProgressValue: number): number {

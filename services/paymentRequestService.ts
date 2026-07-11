@@ -18,7 +18,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID, REFERENCE_NUMBER_PREFIX } from '../config/constants';
 import { PaymentRequest, PaymentRequestStatus } from '../types';
 import { removeUndefined } from '../utils/dataUtils';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_PAYMENT_REQUESTS } from './mockData';
 import { FinanceService } from './financeService';
 
@@ -41,12 +41,14 @@ function filterPaymentRequests(
 export class PaymentRequestService {
   /** Generate unique reference number: PR-{loId}-{YYYYMMDD}-{seq} */
   static async generateReferenceNumber(loId: string): Promise<string> {
-    if (isDevMode()) {
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const sameDay = devPaymentRequests.filter((p) => p.referenceNumber.startsWith(`${REFERENCE_NUMBER_PREFIX}-${loId}-${today}`));
-      const seq = sameDay.length + 1;
-      return `${REFERENCE_NUMBER_PREFIX}-${loId}-${today}-${String(seq).padStart(3, '0')}`;
-    }
+    return withDevMode(
+      () => {
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const sameDay = devPaymentRequests.filter((p) => p.referenceNumber.startsWith(`${REFERENCE_NUMBER_PREFIX}-${loId}-${today}`));
+        const seq = sameDay.length + 1;
+        return `${REFERENCE_NUMBER_PREFIX}-${loId}-${today}-${String(seq).padStart(3, '0')}`;
+      },
+      async () => {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const startOfDay = new Date();
     startOfDay.setUTCHours(0, 0, 0, 0);
@@ -61,6 +63,7 @@ export class PaymentRequestService {
     const seq = snapshot.size + 1;
     const seqStr = String(seq).padStart(3, '0');
     return `${REFERENCE_NUMBER_PREFIX}-${loId}-${today}-${seqStr}`;
+  });
   }
 
   static async create(
@@ -69,42 +72,44 @@ export class PaymentRequestService {
   ): Promise<{ id: string; referenceNumber: string }> {
     const loId = data.loId ?? DEFAULT_LO_ID;
     const referenceNumber = data.referenceNumber ?? (await this.generateReferenceNumber(loId));
-    if (isDevMode()) {
-      const id = `pr-dev-${Date.now()}`;
-      const now = new Date().toISOString();
-      const newPr: PaymentRequest = {
-        id,
-        applicantId: data.applicantId,
-        applicantName: data.applicantName ?? null,
-        applicantEmail: data.applicantEmail ?? null,
-        applicantPosition: data.applicantPosition ?? null,
-        date: data.date ?? now.split('T')[0],
-        time: data.time ?? now.split('T')[1].split('.')[0],
-        category: data.category ?? 'administrative',
-        activityId: data.activityId ?? null,
-        totalAmount: data.totalAmount ?? data.amount,
-        remark: data.remark ?? null,
-        items: data.items ?? [],
-        claimFromBankAccountId: data.claimFromBankAccountId ?? null,
-        bankName: data.bankName ?? null,
-        accountHolder: data.accountHolder ?? null,
-        accountNumber: data.accountNumber ?? null,
-        amount: data.amount,
-        purpose: data.purpose ?? '',
-        activityRef: data.activityRef ?? data.activityId ?? null,
-        attachmentUrls: data.attachmentUrls ?? [],
-        referenceNumber,
-        status: data.status ?? 'submitted',
-        loId,
-        createdAt: now,
-        updatedAt: now,
-        updatedBy: createdBy ?? null,
-        reviewedBy: null,
-        reviewedAt: null,
-      };
-      devPaymentRequests = [newPr, ...devPaymentRequests];
-      return { id, referenceNumber };
-    }
+    return withDevMode(
+      () => {
+        const id = `pr-dev-${Date.now()}`;
+        const now = new Date().toISOString();
+        const newPr: PaymentRequest = {
+          id,
+          applicantId: data.applicantId,
+          applicantName: data.applicantName ?? null,
+          applicantEmail: data.applicantEmail ?? null,
+          applicantPosition: data.applicantPosition ?? null,
+          date: data.date ?? now.split('T')[0],
+          time: data.time ?? now.split('T')[1].split('.')[0],
+          category: data.category ?? 'administrative',
+          activityId: data.activityId ?? null,
+          totalAmount: data.totalAmount ?? data.amount,
+          remark: data.remark ?? null,
+          items: data.items ?? [],
+          claimFromBankAccountId: data.claimFromBankAccountId ?? null,
+          bankName: data.bankName ?? null,
+          accountHolder: data.accountHolder ?? null,
+          accountNumber: data.accountNumber ?? null,
+          amount: data.amount,
+          purpose: data.purpose ?? '',
+          activityRef: data.activityRef ?? data.activityId ?? null,
+          attachmentUrls: data.attachmentUrls ?? [],
+          referenceNumber,
+          status: data.status ?? 'submitted',
+          loId,
+          createdAt: now,
+          updatedAt: now,
+          updatedBy: createdBy ?? null,
+          reviewedBy: null,
+          reviewedAt: null,
+        };
+        devPaymentRequests = [newPr, ...devPaymentRequests];
+        return { id, referenceNumber };
+      },
+      async () => {
     const now = Timestamp.now();
     const payload = removeUndefined({
       applicantId: data.applicantId,
@@ -137,12 +142,13 @@ export class PaymentRequestService {
     });
     const ref = await addDoc(collection(db, COLLECTIONS.PAYMENT_REQUESTS), payload);
     return { id: ref.id, referenceNumber };
+  });
   }
 
   static async getById(id: string): Promise<PaymentRequest | null> {
-    if (isDevMode()) {
-      return devPaymentRequests.find((p) => p.id === id) ?? null;
-    }
+    return withDevMode(
+      () => devPaymentRequests.find((p) => p.id === id) ?? null,
+      async () => {
     const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
     if (!snap.exists()) return null;
     const d = snap.data();
@@ -153,6 +159,7 @@ export class PaymentRequestService {
       updatedAt: (d.updatedAt as Timestamp)?.toDate?.()?.toISOString?.() ?? d.updatedAt,
       reviewedAt: d.reviewedAt != null ? (d.reviewedAt as Timestamp)?.toDate?.()?.toISOString?.() ?? d.reviewedAt : null,
     } as PaymentRequest;
+  });
   }
 
   /** List with optional filters; pagination via lastDoc. */
@@ -166,11 +173,13 @@ export class PaymentRequestService {
     lastDoc?: DocumentSnapshot | null;
   }): Promise<{ items: PaymentRequest[]; lastDoc: DocumentSnapshot | null }> {
     const { loId, activityRef, applicantId, status, referenceNumber, pageSize = 50, lastDoc } = params;
-    if (isDevMode()) {
-      const filtered = filterPaymentRequests(devPaymentRequests, { loId, activityRef, applicantId, status, referenceNumber });
-      const items = filtered.slice(0, pageSize);
-      return { items, lastDoc: null };
-    }
+    return withDevMode(
+      () => {
+        const filtered = filterPaymentRequests(devPaymentRequests, { loId, activityRef, applicantId, status, referenceNumber });
+        const items = filtered.slice(0, pageSize);
+        return { items, lastDoc: null };
+      },
+      async () => {
     const constraints = [];
     if (loId != null && loId !== '') constraints.push(where('loId', '==', loId));
     if (activityRef != null && activityRef !== '') constraints.push(where('activityRef', '==', activityRef));
@@ -197,6 +206,7 @@ export class PaymentRequestService {
     });
     const nextLast = snapshot.docs.length === pageSize ? snapshot.docs[snapshot.docs.length - 1] : null;
     return { items, lastDoc: nextLast ?? null };
+  });
   }
 
   static async updateStatus(
@@ -204,19 +214,20 @@ export class PaymentRequestService {
     status: 'approved' | 'rejected',
     reviewedBy: string
   ): Promise<void> {
-    if (isDevMode()) {
-      const now = new Date().toISOString();
-      const idx = devPaymentRequests.findIndex((p) => p.id === id);
-      if (idx >= 0) {
-        devPaymentRequests = [...devPaymentRequests];
-        devPaymentRequests[idx] = { ...devPaymentRequests[idx], status, reviewedBy, reviewedAt: now, updatedAt: now };
-      }
-      if (status === 'approved') {
-        const pr = devPaymentRequests.find((p) => p.id === id);
-        if (pr) await this._createExpenseTransaction(pr, reviewedBy);
-      }
-      return;
-    }
+    return withDevMode(
+      async () => {
+        const now = new Date().toISOString();
+        const idx = devPaymentRequests.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          devPaymentRequests = [...devPaymentRequests];
+          devPaymentRequests[idx] = { ...devPaymentRequests[idx], status, reviewedBy, reviewedAt: now, updatedAt: now };
+        }
+        if (status === 'approved') {
+          const pr = devPaymentRequests.find((p) => p.id === id);
+          if (pr) await this._createExpenseTransaction(pr, reviewedBy);
+        }
+      },
+      async () => {
     const now = Timestamp.now();
     await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
       status,
@@ -231,6 +242,7 @@ export class PaymentRequestService {
         await this._createExpenseTransaction(pr, reviewedBy);
       }
     }
+  });
   }
 
   // Auto-create a Pending expense transaction when a PR is approved.
@@ -266,38 +278,43 @@ export class PaymentRequestService {
   }
 
   static async update(id: string, updates: Partial<Pick<PaymentRequest, 'purpose' | 'amount' | 'activityRef' | 'status'>>, updatedBy?: string | null): Promise<void> {
-    if (isDevMode()) {
-      const idx = devPaymentRequests.findIndex((p) => p.id === id);
-      if (idx >= 0) {
-        const now = new Date().toISOString();
-        devPaymentRequests = [...devPaymentRequests];
-        devPaymentRequests[idx] = { ...devPaymentRequests[idx], ...updates, updatedAt: now, updatedBy: updatedBy ?? null };
-      }
-      return;
-    }
+    return withDevMode(
+      () => {
+        const idx = devPaymentRequests.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          const now = new Date().toISOString();
+          devPaymentRequests = [...devPaymentRequests];
+          devPaymentRequests[idx] = { ...devPaymentRequests[idx], ...updates, updatedAt: now, updatedBy: updatedBy ?? null };
+        }
+      },
+      async () => {
     const payload = removeUndefined({
       ...updates,
       updatedAt: Timestamp.now(),
       updatedBy: updatedBy ?? null,
     });
     await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
+  });
   }
 
   static async cancel(id: string, userId: string): Promise<void> {
-    if (isDevMode()) {
-      const now = new Date().toISOString();
-      const idx = devPaymentRequests.findIndex((p) => p.id === id);
-      if (idx >= 0) {
-        devPaymentRequests = [...devPaymentRequests];
-        devPaymentRequests[idx] = { ...devPaymentRequests[idx], status: 'cancelled', updatedAt: now, updatedBy: userId };
+    return withDevMode(
+      () => {
+        const now = new Date().toISOString();
+        const idx = devPaymentRequests.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          devPaymentRequests = [...devPaymentRequests];
+          devPaymentRequests[idx] = { ...devPaymentRequests[idx], status: 'cancelled', updatedAt: now, updatedBy: userId };
+        }
+      },
+      async () => {
+        const now = Timestamp.now();
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
+          status: 'cancelled',
+          updatedAt: now,
+          updatedBy: userId,
+        });
       }
-      return;
-    }
-    const now = Timestamp.now();
-    await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
-      status: 'cancelled',
-      updatedAt: now,
-      updatedBy: userId,
-    });
+    );
   }
 }

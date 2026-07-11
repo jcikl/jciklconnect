@@ -9,7 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
@@ -63,10 +63,10 @@ export const MYKD_COLUMNS: { key: keyof MykdRow; label: string }[] = [
 export class ReportService {
   // Generate financial report
   static async generateFinancialReport(options: ReportOptions): Promise<ReportData> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         title: 'Financial Report',
-        period: options.startDate && options.endDate 
+        period: options.startDate && options.endDate
           ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
           : 'All Time',
         generatedAt: new Date(),
@@ -75,62 +75,63 @@ export class ReportService {
           expenses: 30000,
           netBalance: 20000,
         },
-      };
-    }
+      }),
+      async () => {
+        try {
+          const summary = await FinanceService.getFinancialSummary();
+          const transactions = await FinanceService.getAllTransactions();
 
-    try {
-      const summary = await FinanceService.getFinancialSummary();
-      const transactions = await FinanceService.getAllTransactions();
+          // Filter transactions by date range if provided
+          let filteredTransactions = transactions;
+          if (options.startDate && options.endDate) {
+            filteredTransactions = transactions.filter(t => {
+              const transactionDate = new Date(t.date);
+              return transactionDate >= options.startDate! && transactionDate <= options.endDate!;
+            });
+          }
 
-      // Filter transactions by date range if provided
-      let filteredTransactions = transactions;
-      if (options.startDate && options.endDate) {
-        filteredTransactions = transactions.filter(t => {
-          const transactionDate = new Date(t.date);
-          return transactionDate >= options.startDate! && transactionDate <= options.endDate!;
-        });
+          // Calculate filtered summary
+          const filteredIncome = filteredTransactions
+            .filter(t => t.type === 'Income')
+            .reduce((sum, t) => sum + t.amount, 0);
+          const filteredExpenses = filteredTransactions
+            .filter(t => t.type === 'Expense')
+            .reduce((sum, t) => sum + t.amount, 0);
+
+          return {
+            title: 'Financial Report',
+            period: options.startDate && options.endDate
+              ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
+              : 'All Time',
+            generatedAt: new Date(),
+            data: {
+              transactions: filteredTransactions,
+              income: filteredIncome,
+              expenses: filteredExpenses,
+              netBalance: filteredIncome - filteredExpenses,
+              categoryBreakdown: this.calculateCategoryBreakdown(filteredTransactions),
+            },
+            summary: {
+              totalIncome: filteredIncome,
+              totalExpenses: filteredExpenses,
+              netBalance: filteredIncome - filteredExpenses,
+              transactionCount: filteredTransactions.length,
+            },
+          };
+        } catch (error) {
+          console.error('Error generating financial report:', error);
+          throw error;
+        }
       }
-
-      // Calculate filtered summary
-      const filteredIncome = filteredTransactions
-        .filter(t => t.type === 'Income')
-        .reduce((sum, t) => sum + t.amount, 0);
-      const filteredExpenses = filteredTransactions
-        .filter(t => t.type === 'Expense')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      return {
-        title: 'Financial Report',
-        period: options.startDate && options.endDate 
-          ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
-          : 'All Time',
-        generatedAt: new Date(),
-        data: {
-          transactions: filteredTransactions,
-          income: filteredIncome,
-          expenses: filteredExpenses,
-          netBalance: filteredIncome - filteredExpenses,
-          categoryBreakdown: this.calculateCategoryBreakdown(filteredTransactions),
-        },
-        summary: {
-          totalIncome: filteredIncome,
-          totalExpenses: filteredExpenses,
-          netBalance: filteredIncome - filteredExpenses,
-          transactionCount: filteredTransactions.length,
-        },
-      };
-    } catch (error) {
-      console.error('Error generating financial report:', error);
-      throw error;
-    }
+    );
   }
 
   // Generate membership report
   static async generateMembershipReport(options: ReportOptions): Promise<ReportData> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         title: 'Membership Report',
-        period: options.startDate && options.endDate 
+        period: options.startDate && options.endDate
           ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
           : 'All Time',
         generatedAt: new Date(),
@@ -139,58 +140,59 @@ export class ReportService {
           newMembers: 10,
           activeMembers: 80,
         },
-      };
-    }
+      }),
+      async () => {
+        try {
+          const members = await MembersService.getAllMembers();
 
-    try {
-      const members = await MembersService.getAllMembers();
+          // Filter members by join date if provided
+          let filteredMembers = members;
+          if (options.startDate && options.endDate) {
+            filteredMembers = members.filter(m => {
+              const joinDate = new Date(m.joinDate);
+              return joinDate >= options.startDate! && joinDate <= options.endDate!;
+            });
+          }
 
-      // Filter members by join date if provided
-      let filteredMembers = members;
-      if (options.startDate && options.endDate) {
-        filteredMembers = members.filter(m => {
-          const joinDate = new Date(m.joinDate);
-          return joinDate >= options.startDate! && joinDate <= options.endDate!;
-        });
+          // Calculate statistics
+          const roleDistribution = this.calculateRoleDistribution(filteredMembers);
+          const tierDistribution = this.calculateTierDistribution(filteredMembers);
+          const churnRiskDistribution = this.calculateChurnRiskDistribution(filteredMembers);
+
+          return {
+            title: 'Membership Report',
+            period: options.startDate && options.endDate
+              ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
+              : 'All Time',
+            generatedAt: new Date(),
+            data: {
+              members: filteredMembers,
+              totalMembers: filteredMembers.length,
+              activeMembers: filteredMembers.filter(m => m.duesStatus === 'Paid').length,
+              newMembers: filteredMembers.filter(m => {
+                const joinDate = new Date(m.joinDate);
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                return joinDate >= thirtyDaysAgo;
+              }).length,
+              roleDistribution,
+              tierDistribution,
+              churnRiskDistribution,
+            },
+            summary: {
+              totalMembers: filteredMembers.length,
+              activeMembers: filteredMembers.filter(m => m.duesStatus === 'Paid').length,
+              engagementRate: filteredMembers.length > 0
+                ? Math.round((filteredMembers.filter(m => m.duesStatus === 'Paid').length / filteredMembers.length) * 100)
+                : 0,
+            },
+          };
+        } catch (error) {
+          console.error('Error generating membership report:', error);
+          throw error;
+        }
       }
-
-      // Calculate statistics
-      const roleDistribution = this.calculateRoleDistribution(filteredMembers);
-      const tierDistribution = this.calculateTierDistribution(filteredMembers);
-      const churnRiskDistribution = this.calculateChurnRiskDistribution(filteredMembers);
-
-      return {
-        title: 'Membership Report',
-        period: options.startDate && options.endDate 
-          ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
-          : 'All Time',
-        generatedAt: new Date(),
-        data: {
-          members: filteredMembers,
-          totalMembers: filteredMembers.length,
-          activeMembers: filteredMembers.filter(m => m.duesStatus === 'Paid').length,
-          newMembers: filteredMembers.filter(m => {
-            const joinDate = new Date(m.joinDate);
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            return joinDate >= thirtyDaysAgo;
-          }).length,
-          roleDistribution,
-          tierDistribution,
-          churnRiskDistribution,
-        },
-        summary: {
-          totalMembers: filteredMembers.length,
-          activeMembers: filteredMembers.filter(m => m.duesStatus === 'Paid').length,
-          engagementRate: filteredMembers.length > 0
-            ? Math.round((filteredMembers.filter(m => m.duesStatus === 'Paid').length / filteredMembers.length) * 100)
-            : 0,
-        },
-      };
-    } catch (error) {
-      console.error('Error generating membership report:', error);
-      throw error;
-    }
+    );
   }
 
   // Generate engagement report

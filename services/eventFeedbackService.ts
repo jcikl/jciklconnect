@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface EventFeedback {
   id?: string;
@@ -45,48 +45,52 @@ export interface EventFeedbackSummary {
 export class EventFeedbackService {
   // Submit feedback for an event
   static async submitFeedback(feedback: Omit<EventFeedback, 'id' | 'submittedAt'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Would submit feedback:', feedback);
-      return 'mock-feedback-id';
-    }
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Would submit feedback:', feedback);
+        return 'mock-feedback-id';
+      },
+      async () => {
+        try {
+          const feedbackData = {
+            ...feedback,
+            submittedAt: Timestamp.now(),
+          };
 
-    try {
-      const feedbackData = {
-        ...feedback,
-        submittedAt: Timestamp.now(),
-      };
-
-      const docRef = await addDoc(collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'), feedbackData);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      throw error;
-    }
+          const docRef = await addDoc(collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'), feedbackData);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error submitting feedback:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get feedback for a specific event
   static async getEventFeedback(eventId: string): Promise<EventFeedback[]> {
-    if (isDevMode()) {
-      return [];
-    }
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'),
+              where('eventId', '==', eventId)
+            )
+          );
 
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'),
-          where('eventId', '==', eventId)
-        )
-      );
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        submittedAt: doc.data().submittedAt?.toDate?.() || doc.data().submittedAt,
-      } as EventFeedback));
-    } catch (error) {
-      console.error('Error fetching event feedback:', error);
-      throw error;
-    }
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            submittedAt: doc.data().submittedAt?.toDate?.() || doc.data().submittedAt,
+          } as EventFeedback));
+        } catch (error) {
+          console.error('Error fetching event feedback:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get feedback summary for an event
@@ -162,24 +166,25 @@ export class EventFeedbackService {
 
   // Check if member has already submitted feedback
   static async hasMemberSubmittedFeedback(eventId: string, memberId: string): Promise<boolean> {
-    if (isDevMode()) {
-      return false;
-    }
+    return withDevMode(
+      () => false,
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'),
+              where('eventId', '==', eventId),
+              where('memberId', '==', memberId)
+            )
+          );
 
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'),
-          where('eventId', '==', eventId),
-          where('memberId', '==', memberId)
-        )
-      );
-
-      return !snapshot.empty;
-    } catch (error) {
-      console.error('Error checking feedback submission:', error);
-      return false;
-    }
+          return !snapshot.empty;
+        } catch (error) {
+          console.error('Error checking feedback submission:', error);
+          return false;
+        }
+      }
+    );
   }
 }
 

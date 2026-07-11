@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { TrainingModule } from '../types';
 
 export interface LearningPath {
@@ -62,39 +62,40 @@ export interface Certificate {
 export class LearningPathsService {
   // Get all learning paths
   static async getAllLearningPaths(): Promise<LearningPath[]> {
-    if (isDevMode()) {
-      return [
+    return withDevMode(
+      () => [
         {
           id: 'lp1',
           name: 'JCI Leadership Development',
           description: 'Comprehensive leadership training program',
-          category: 'JCI Official',
+          category: 'JCI Official' as const,
           modules: ['tm1', 'tm2', 'tm3'],
           estimatedDuration: 40,
-          difficulty: 'Intermediate',
+          difficulty: 'Intermediate' as const,
           pointsReward: 500,
           certificateIssued: true,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
-      ];
-    }
-
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.LEARNING_PATHS || 'learningPaths'), orderBy('createdAt', 'desc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      })) as LearningPath[];
-    } catch (error) {
-      console.error('Error fetching learning paths:', error);
-      throw error;
-    }
+      ],
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.LEARNING_PATHS || 'learningPaths'), orderBy('createdAt', 'desc'))
+          );
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+          })) as LearningPath[];
+        } catch (error) {
+          console.error('Error fetching learning paths:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get learning path by ID
