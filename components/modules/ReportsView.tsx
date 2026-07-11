@@ -325,7 +325,7 @@ export const ReportsView: React.FC = () => {
       <div className="space-y-4">
         <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-start gap-4">
           <span className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${card.color}`}>
-            {React.cloneElement(card.icon as React.ReactElement, { size: 22 })}
+            {React.cloneElement(card.icon as React.ReactElement<{ size?: number }>, { size: 22 })}
           </span>
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-slate-900 text-base">{card.title}</h3>

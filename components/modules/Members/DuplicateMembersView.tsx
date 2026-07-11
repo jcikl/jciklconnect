@@ -230,7 +230,7 @@ function MemberCard({ member, isKeep, onDelete, deleting }: {
         </div>
         <div className="flex gap-1">
           <span className="text-slate-400 w-16 shrink-0">状态</span>
-          <span>{member.status || <span className="text-slate-300">—</span>}</span>
+          <span>{member.membershipStatus || <span className="text-slate-300">—</span>}</span>
         </div>
       </div>
       {!isKeep && (
