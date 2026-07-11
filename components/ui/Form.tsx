@@ -59,7 +59,6 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
         )}
         <input
           type={inputType}
-          onChange={handleChange}
           className={`
             block w-full rounded-lg border-slate-300 shadow-sm py-2
             focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 sm:text-sm
