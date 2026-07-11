@@ -40,7 +40,7 @@ export interface DocumentWithVersions extends Document {
 export class DocumentsService {
   // Get all documents
   static async getAllDocuments(): Promise<DocumentWithVersions[]> {
-    return withDevMode(
+    return withDevMode<DocumentWithVersions[]>(
       () => [
         {
           id: 'd1',

@@ -23,10 +23,9 @@ import { removeUndefined } from '../utils/dataUtils';
 export class InventoryService {
   // Get all inventory items
   static async getAllItems(): Promise<InventoryItem[]> {
-    if (isDevMode()) {
-      return MOCK_INVENTORY;
-    }
-
+    return withDevMode(
+      () => MOCK_INVENTORY,
+      async () => {
     try {
       const snapshot = await getDocs(
         query(collection(db, COLLECTIONS.INVENTORY), orderBy('name', 'asc'))
@@ -39,14 +38,14 @@ export class InventoryService {
       console.error('Error fetching inventory items:', error);
       throw error;
     }
+});
   }
 
   // Get item by ID
   static async getItemById(itemId: string): Promise<InventoryItem | null> {
-    if (isDevMode()) {
-      return MOCK_INVENTORY.find(item => item.id === itemId) || null;
-    }
-
+    return withDevMode(
+      () => MOCK_INVENTORY.find(item => item.id === itemId) || null,
+      async () => {
     try {
       const docRef = doc(db, COLLECTIONS.INVENTORY, itemId);
       const docSnap = await getDoc(docRef);
@@ -59,14 +58,14 @@ export class InventoryService {
       console.error('Error fetching inventory item:', error);
       throw error;
     }
+});
   }
 
   // Get items by category
   static async getItemsByCategory(category: string): Promise<InventoryItem[]> {
-    if (isDevMode()) {
-      return MOCK_INVENTORY.filter(item => item.category === category);
-    }
-
+    return withDevMode(
+      () => MOCK_INVENTORY.filter(item => item.category === category),
+      async () => {
     try {
       const snapshot = await getDocs(
         query(
@@ -83,15 +82,14 @@ export class InventoryService {
       console.error('Error fetching items by category:', error);
       throw error;
     }
+});
   }
 
   // Add new item
   static async addItem(item: Omit<InventoryItem, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Adding inventory item:', item);
-      return `mock_item_${Date.now()}`;
-    }
-
+    return withDevMode(
+      () => { console.log('[DEV MODE] Adding inventory item:', item); return `mock_item_${Date.now()}`; },
+      async () => {
     try {
       const newItem = {
         ...item,
@@ -105,15 +103,14 @@ export class InventoryService {
       console.error('Error adding inventory item:', error);
       throw error;
     }
+});
   }
 
   // Update item
   static async updateItem(itemId: string, updates: Partial<InventoryItem>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Updating inventory item ${itemId}:`, updates);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Updating inventory item ${itemId}:`, updates); },
+      async () => {
     try {
       const docRef = doc(db, COLLECTIONS.INVENTORY, itemId);
       const updatesData = {
@@ -126,31 +123,28 @@ export class InventoryService {
       console.error('Error updating inventory item:', error);
       throw error;
     }
+});
   }
 
   // Delete item
   static async deleteItem(itemId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Deleting inventory item ${itemId}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Deleting inventory item ${itemId}`); },
+      async () => {
     try {
       await deleteDoc(doc(db, COLLECTIONS.INVENTORY, itemId));
     } catch (error) {
       console.error('Error deleting inventory item:', error);
       throw error;
     }
+});
   }
 
   // Get low stock items
   static async getLowStockItems(): Promise<InventoryItem[]> {
-    if (isDevMode()) {
-      return MOCK_INVENTORY.filter(item =>
-        item.quantity <= (item.minQuantity || 0)
-      );
-    }
-
+    return withDevMode(
+      () => MOCK_INVENTORY.filter(item => item.quantity <= (item.minQuantity || 0)),
+      async () => {
     try {
       const allItems = await this.getAllItems();
       return allItems.filter(item =>
@@ -160,44 +154,46 @@ export class InventoryService {
       console.error('Error fetching low stock items:', error);
       throw error;
     }
+});
   }
 
   // Get maintenance schedules
   static async getMaintenanceSchedules(): Promise<MaintenanceSchedule[]> {
-    if (isDevMode()) {
-      const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      return [
-        {
-          id: 'maint_1',
-          itemId: 'i1',
-          type: 'Preventive',
-          frequency: 'Monthly',
-          description: 'Regular maintenance check',
-          scheduledDate: in7Days,
-          nextMaintenanceDate: in7Days,
-          status: 'Scheduled',
-          assignedTo: 'u1',
-          estimatedDuration: 120,
-          priority: 'Medium',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'maint_2',
-          itemId: 'i2',
-          type: 'Inspection',
-          frequency: 'Quarterly',
-          description: 'Calibration and lens check',
-          scheduledDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          nextMaintenanceDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'Scheduled',
-          assignedTo: 'u2',
-          estimatedDuration: 60,
-          priority: 'High',
-          createdAt: new Date().toISOString(),
-        },
-      ];
-    }
-
+    return withDevMode<MaintenanceSchedule[]>(
+      () => {
+        const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        return [
+          {
+            id: 'maint_1',
+            itemId: 'i1',
+            type: 'Preventive',
+            frequency: 'Monthly',
+            description: 'Regular maintenance check',
+            scheduledDate: in7Days,
+            nextMaintenanceDate: in7Days,
+            status: 'Scheduled',
+            assignedTo: 'u1',
+            estimatedDuration: 120,
+            priority: 'Medium',
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 'maint_2',
+            itemId: 'i2',
+            type: 'Inspection',
+            frequency: 'Quarterly',
+            description: 'Calibration and lens check',
+            scheduledDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            nextMaintenanceDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            status: 'Scheduled',
+            assignedTo: 'u2',
+            estimatedDuration: 60,
+            priority: 'High',
+            createdAt: new Date().toISOString(),
+          },
+        ];
+      },
+      async () => {
     try {
       const snapshot = await getDocs(
         query(collection(db, COLLECTIONS.MAINTENANCE_SCHEDULES), orderBy('scheduledDate', 'asc'))
@@ -212,37 +208,39 @@ export class InventoryService {
       console.error('Error fetching maintenance schedules:', error);
       throw error;
     }
+});
   }
 
   // Get inventory alerts
   static async getInventoryAlerts(itemId?: string, acknowledged?: boolean): Promise<InventoryAlert[]> {
-    if (isDevMode()) {
-      const list: InventoryAlert[] = [
-        {
-          id: 'alert_1',
-          itemId: 'i2',
-          type: 'Out of Stock',
-          severity: 'High',
-          message: 'Projector 4K is out of stock.',
-          acknowledged: false,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'alert_2',
-          itemId: 'i3',
-          type: 'Low Stock',
-          severity: 'Medium',
-          message: 'Event T-Shirts (L) quantity is below recommended level.',
-          acknowledged: false,
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      if (acknowledged !== undefined) {
-        return list.filter((a) => a.acknowledged === acknowledged);
-      }
-      return list;
-    }
-
+    return withDevMode(
+      () => {
+        const list: InventoryAlert[] = [
+          {
+            id: 'alert_1',
+            itemId: 'i2',
+            type: 'Out of Stock',
+            severity: 'High',
+            message: 'Projector 4K is out of stock.',
+            acknowledged: false,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 'alert_2',
+            itemId: 'i3',
+            type: 'Low Stock',
+            severity: 'Medium',
+            message: 'Event T-Shirts (L) quantity is below recommended level.',
+            acknowledged: false,
+            createdAt: new Date().toISOString(),
+          },
+        ];
+        if (acknowledged !== undefined) {
+          return list.filter((a) => a.acknowledged === acknowledged);
+        }
+        return list;
+      },
+      async () => {
     try {
       let q = query(collection(db, COLLECTIONS.INVENTORY_ALERTS), orderBy('createdAt', 'desc'));
 
@@ -265,15 +263,14 @@ export class InventoryService {
       console.error('Error fetching inventory alerts:', error);
       throw error;
     }
+});
   }
 
   // Create inventory alert
   static async createAlert(alert: Omit<InventoryAlert, 'id' | 'createdAt' | 'acknowledged'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Creating inventory alert:', alert);
-      return `mock_alert_${Date.now()}`;
-    }
-
+    return withDevMode(
+      () => { console.log('[DEV MODE] Creating inventory alert:', alert); return `mock_alert_${Date.now()}`; },
+      async () => {
     try {
       const docRef = await addDoc(collection(db, COLLECTIONS.INVENTORY_ALERTS), {
         ...alert,
@@ -285,15 +282,14 @@ export class InventoryService {
       console.error('Error creating inventory alert:', error);
       throw error;
     }
+});
   }
 
   // Generate alerts for low stock and maintenance
   static async generateAlerts(): Promise<void> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Generating inventory alerts');
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log('[DEV MODE] Generating inventory alerts'); },
+      async () => {
     try {
       const items = await this.getAllItems();
       const maintenanceSchedules = await this.getMaintenanceSchedules();
@@ -343,6 +339,7 @@ export class InventoryService {
       console.error('Error generating alerts:', error);
       throw error;
     }
+});
   }
 
   /**
@@ -355,11 +352,9 @@ export class InventoryService {
     quantity: number,
     unitPrice: number
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Linking transaction ${transactionId} to inventory item ${itemId}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Linking transaction ${transactionId} to inventory item ${itemId}`); },
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) {
@@ -379,6 +374,7 @@ export class InventoryService {
       console.error('Error linking transaction to inventory:', error);
       throw error;
     }
+});
   }
 
   /**
@@ -390,11 +386,9 @@ export class InventoryService {
     transactionId: string,
     unitCost: number
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Recording purchase of ${quantity} units for item ${itemId}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Recording purchase of ${quantity} units for item ${itemId}`); },
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) {
@@ -426,6 +420,7 @@ export class InventoryService {
       console.error('Error recording merchandise purchase:', error);
       throw error;
     }
+});
   }
 
   /**
@@ -437,11 +432,9 @@ export class InventoryService {
     transactionId: string,
     unitPrice: number
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Recording sale of ${quantity} units for item ${itemId}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Recording sale of ${quantity} units for item ${itemId}`); },
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) {
@@ -476,6 +469,7 @@ export class InventoryService {
       console.error('Error recording merchandise sale:', error);
       throw error;
     }
+});
   }
 
   /**
@@ -490,15 +484,14 @@ export class InventoryService {
     inventoryValue: number;
     transactionValue: number;
   }> {
-    if (isDevMode()) {
-      return {
+    return withDevMode<{ consistent: boolean; issues: string[]; inventoryValue: number; transactionValue: number }>(
+      () => ({
         consistent: true,
         issues: [],
         inventoryValue: 100,
         transactionValue: 100,
-      };
-    }
-
+      }),
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) {
@@ -543,6 +536,7 @@ export class InventoryService {
       console.error('Error verifying inventory-finance consistency:', error);
       throw error;
     }
+});
   }
 
   /**
@@ -573,8 +567,8 @@ export class InventoryService {
       transactionValue: number;
     }>;
   }> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         totalItems: 5,
         consistentItems: 4,
         inconsistentItems: 1,
@@ -587,9 +581,8 @@ export class InventoryService {
             transactionValue: 95,
           }
         ],
-      };
-    }
-
+      }),
+      async () => {
     try {
       const merchandiseItems = await this.getMerchandiseItems();
       const discrepancies: Array<{
@@ -634,6 +627,7 @@ export class InventoryService {
       console.error('Error reconciling merchandise inventory:', error);
       throw error;
     }
+});
   }
 
   // Get items with depreciation calculations
@@ -692,11 +686,9 @@ export class InventoryService {
 
   // Check out item
   static async checkOutItem(itemId: string, memberId: string, expectedReturnDate?: Date): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Checking out item ${itemId} to member ${memberId}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Checking out item ${itemId} to member ${memberId}`); },
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) {
@@ -717,15 +709,14 @@ export class InventoryService {
       console.error('Error checking out item:', error);
       throw error;
     }
+});
   }
 
   // Check in item
   static async checkInItem(itemId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Checking in item ${itemId}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Checking in item ${itemId}`); },
+      async () => {
     try {
       await this.updateItem(itemId, {
         status: 'Available',
@@ -738,6 +729,7 @@ export class InventoryService {
       console.error('Error checking in item:', error);
       throw error;
     }
+});
   }
 
   // Get alerts with filtering
@@ -747,11 +739,9 @@ export class InventoryService {
 
   // Create maintenance schedule
   static async createMaintenanceSchedule(schedule: Omit<MaintenanceSchedule, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Creating maintenance schedule:', schedule);
-      return `schedule_${Date.now()}`;
-    }
-
+    return withDevMode(
+      () => { console.log('[DEV MODE] Creating maintenance schedule:', schedule); return `schedule_${Date.now()}`; },
+      async () => {
     try {
       const docRef = await addDoc(collection(db, COLLECTIONS.MAINTENANCE_SCHEDULES), {
         ...schedule,
@@ -763,15 +753,14 @@ export class InventoryService {
       console.error('Error creating maintenance schedule:', error);
       throw error;
     }
+});
   }
 
   // Update maintenance schedule
   static async updateMaintenanceSchedule(scheduleId: string, updates: Partial<MaintenanceSchedule>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Updating maintenance schedule ${scheduleId}:`, updates);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Updating maintenance schedule ${scheduleId}:`, updates); },
+      async () => {
     try {
       const docRef = doc(db, COLLECTIONS.MAINTENANCE_SCHEDULES, scheduleId);
       await updateDoc(docRef, {
@@ -782,15 +771,14 @@ export class InventoryService {
       console.error('Error updating maintenance schedule:', error);
       throw error;
     }
+});
   }
 
   // Complete maintenance
   static async completeMaintenance(scheduleId: string, notes?: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Completing maintenance ${scheduleId} with notes:`, notes);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Completing maintenance ${scheduleId} with notes:`, notes); },
+      async () => {
     try {
       await this.updateMaintenanceSchedule(scheduleId, {
         status: 'Completed',
@@ -801,15 +789,14 @@ export class InventoryService {
       console.error('Error completing maintenance:', error);
       throw error;
     }
+});
   }
 
   // Acknowledge alert
   static async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Acknowledging alert ${alertId} by ${acknowledgedBy}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Acknowledging alert ${alertId} by ${acknowledgedBy}`); },
+      async () => {
     try {
       const docRef = doc(db, COLLECTIONS.INVENTORY_ALERTS, alertId);
       await updateDoc(docRef, {
@@ -821,6 +808,7 @@ export class InventoryService {
       console.error('Error acknowledging alert:', error);
       throw error;
     }
+});
   }
 
   // Check and generate alerts
@@ -830,11 +818,9 @@ export class InventoryService {
 
   // Update item depreciation
   static async updateItemDepreciation(itemId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Updating depreciation for item ${itemId}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Updating depreciation for item ${itemId}`); },
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) {
@@ -850,6 +836,7 @@ export class InventoryService {
       console.error('Error updating item depreciation:', error);
       throw error;
     }
+});
   }
 
   /**
@@ -863,11 +850,9 @@ export class InventoryService {
     operation: 'increment' | 'decrement',
     referenceId?: string
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Updating variant ${variantSize} quantity for item ${itemId} by ${quantity} (${operation})`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Updating variant ${variantSize} quantity for item ${itemId} by ${quantity} (${operation})`); },
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) throw new Error(`Inventory item ${itemId} not found`);
@@ -913,11 +898,14 @@ export class InventoryService {
       console.error('Error updating variant quantity:', error);
       throw error;
     }
+});
   }
 
   // Check if a stock movement exists for a given reference ID (e.g. transaction ID)
   static async hasStockMovementForRef(referenceId: string): Promise<boolean> {
-    if (isDevMode()) return false;
+    return withDevMode(
+      () => false,
+      async () => {
     try {
       const q = query(
         collection(db, COLLECTIONS.STOCK_MOVEMENTS),
@@ -930,6 +918,7 @@ export class InventoryService {
       console.error('Error checking stock movement existence:', error);
       return false;
     }
+});
   }
 
   // Update an existing stock movement for a reference ID
@@ -942,7 +931,9 @@ export class InventoryService {
       operation: 'increment' | 'decrement';
     }
   ): Promise<void> {
-    if (isDevMode()) return;
+    return withDevMode(
+      () => {},
+      async () => {
     try {
       // 1. Find the existing movement
       const q = query(
@@ -1009,6 +1000,7 @@ export class InventoryService {
       console.error('Error updating stock movement:', error);
       // Don't throw if just a sync issue, but log it
     }
+});
   }
 
   // Helper to adjust quantity without creating a movement record
@@ -1045,7 +1037,9 @@ export class InventoryService {
 
   // Delete stock movement for a reference (reverting inventory)
   static async deleteStockMovementForRef(referenceId: string): Promise<void> {
-    if (isDevMode()) return;
+    return withDevMode(
+      () => {},
+      async () => {
     try {
       const q = query(
         collection(db, COLLECTIONS.STOCK_MOVEMENTS),
@@ -1068,15 +1062,14 @@ export class InventoryService {
       console.error('Error deleting stock movement:', error);
       throw error;
     }
+});
   }
 
   // Record a stock movement
   static async recordStockMovement(movement: Omit<StockMovement, 'id' | 'date'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Recording stock movement:', movement);
-      return `mock_mov_${Date.now()}`;
-    }
-
+    return withDevMode(
+      () => { console.log('[DEV MODE] Recording stock movement:', movement); return `mock_mov_${Date.now()}`; },
+      async () => {
     try {
       const cleanMovement = removeUndefined(movement);
       const docRef = await addDoc(collection(db, COLLECTIONS.STOCK_MOVEMENTS), {
@@ -1088,14 +1081,14 @@ export class InventoryService {
       console.error('Error recording stock movement:', error);
       throw error;
     }
+});
   }
 
   // Get stock card (movements) for an item
   static async getStockCard(itemId: string): Promise<StockMovement[]> {
-    if (isDevMode()) {
-      return []; // Implement mock data if needed
-    }
-
+    return withDevMode(
+      () => [],
+      async () => {
     try {
       const q = query(
         collection(db, COLLECTIONS.STOCK_MOVEMENTS),
@@ -1112,6 +1105,7 @@ export class InventoryService {
       console.error('Error getting stock card:', error);
       throw error;
     }
+});
   }
 
   // Manual stock adjustment
@@ -1122,11 +1116,9 @@ export class InventoryService {
     reason: string,
     performedBy: string
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Adjusting stock for ${itemId} (${variantSize || 'base'}): ${adjustmentQuantity} Reason: ${reason}`);
-      return;
-    }
-
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Adjusting stock for ${itemId} (${variantSize || 'base'}): ${adjustmentQuantity} Reason: ${reason}`); },
+      async () => {
     try {
       const item = await this.getItemById(itemId);
       if (!item) throw new Error('Item not found');
@@ -1168,5 +1160,6 @@ export class InventoryService {
       console.error('Error adjusting stock:', error);
       throw error;
     }
+});
   }
 }

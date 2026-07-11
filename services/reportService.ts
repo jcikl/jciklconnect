@@ -197,10 +197,10 @@ export class ReportService {
 
   // Generate engagement report
   static async generateEngagementReport(options: ReportOptions): Promise<ReportData> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         title: 'Engagement Report',
-        period: options.startDate && options.endDate 
+        period: options.startDate && options.endDate
           ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
           : 'All Time',
         generatedAt: new Date(),
@@ -209,9 +209,8 @@ export class ReportService {
           averagePoints: 500,
           topPerformers: [],
         },
-      };
-    }
-
+      }),
+      async () => {
     try {
       const members = await MembersService.getAllMembers();
       const events = await EventsService.getAllEvents();
@@ -267,14 +266,15 @@ export class ReportService {
       console.error('Error generating engagement report:', error);
       throw error;
     }
+});
   }
 
   // Generate project report
   static async generateProjectReport(options: ReportOptions): Promise<ReportData> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         title: 'Project Report',
-        period: options.startDate && options.endDate 
+        period: options.startDate && options.endDate
           ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
           : 'All Time',
         generatedAt: new Date(),
@@ -283,9 +283,8 @@ export class ReportService {
           activeProjects: 10,
           completedProjects: 10,
         },
-      };
-    }
-
+      }),
+      async () => {
     try {
       const projects = await ProjectsService.getAllProjects();
 
@@ -330,6 +329,7 @@ export class ReportService {
       console.error('Error generating project report:', error);
       throw error;
     }
+});
   }
 
   // Generate MYKD (ROY) member report
@@ -346,29 +346,30 @@ export class ReportService {
       return age;
     };
 
-    if (isDevMode()) {
-      const mockRows: MykdRow[] = Array.from({ length: 5 }, (_, i) => ({
-        no: i + 1,
-        fullName: `Member ${i + 1}`,
-        nationalId: `000000-00-000${i}`,
-        age: 25 + i,
-        ethnicity: ['Malay', 'Chinese', 'Indian', 'Others'][i % 4],
-        birthDate: `199${i}-01-01`,
-        birthPlace: 'Kuala Lumpur',
-        occupation: 'Business Owner',
-        homeAddress: `No. ${i + 1}, Jalan Test, KL`,
-        contactNumber: `+6011-0000000${i}`,
-        email: `member${i + 1}@example.com`,
-      }));
-      return {
-        title: 'MYKD (ROY) Member Report',
-        period: 'All Time',
-        generatedAt: new Date(),
-        data: { rows: mockRows },
-        rows: mockRows,
-      };
-    }
-
+    return withDevMode(
+      () => {
+        const mockRows: MykdRow[] = Array.from({ length: 5 }, (_, i) => ({
+          no: i + 1,
+          fullName: `Member ${i + 1}`,
+          nationalId: `000000-00-000${i}`,
+          age: 25 + i,
+          ethnicity: ['Malay', 'Chinese', 'Indian', 'Others'][i % 4],
+          birthDate: `199${i}-01-01`,
+          birthPlace: 'Kuala Lumpur',
+          occupation: 'Business Owner',
+          homeAddress: `No. ${i + 1}, Jalan Test, KL`,
+          contactNumber: `+6011-0000000${i}`,
+          email: `member${i + 1}@example.com`,
+        }));
+        return {
+          title: 'MYKD (ROY) Member Report',
+          period: 'All Time',
+          generatedAt: new Date(),
+          data: { rows: mockRows },
+          rows: mockRows,
+        };
+      },
+      async () => {
     const members = await MembersService.getAllMembers();
     let filtered = members;
     if (options.startDate && options.endDate) {
@@ -405,6 +406,7 @@ export class ReportService {
       data: { rows },
       rows,
     };
+});
   }
 
   // Export MYKD rows to CSV
@@ -531,10 +533,10 @@ export class ReportService {
 
   // Generate inventory report
   static async generateInventoryReport(options: ReportOptions): Promise<ReportData> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         title: 'Inventory Report',
-        period: options.startDate && options.endDate 
+        period: options.startDate && options.endDate
           ? `${options.startDate.toLocaleDateString()} - ${options.endDate.toLocaleDateString()}`
           : 'All Time',
         generatedAt: new Date(),
@@ -543,9 +545,8 @@ export class ReportService {
           availableItems: 30,
           checkedOutItems: 20,
         },
-      };
-    }
-
+      }),
+      async () => {
     try {
       const { InventoryService } = await import('./inventoryService');
       const items = await InventoryService.getAllItems();
@@ -596,6 +597,7 @@ export class ReportService {
       console.error('Error generating inventory report:', error);
       throw error;
     }
+});
   }
 
   // Convert report to CSV format

@@ -37,7 +37,7 @@ export interface ProjectAccount {
 export class ProjectAccountsService {
   // Get all project accounts
   static async getAllProjectAccounts(): Promise<ProjectAccount[]> {
-    return withDevMode(
+    return withDevMode<ProjectAccount[]>(
       () => [
         {
           id: 'pa1',

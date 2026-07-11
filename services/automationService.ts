@@ -48,7 +48,7 @@ export interface WorkflowStep {
 export class AutomationService {
   // Get all workflows
   static async getAllWorkflows(): Promise<Workflow[]> {
-    return withDevMode(
+    return withDevMode<Workflow[]>(
       () => MOCK_AUTOMATION_RULES.map((rule, index) => ({
         id: `wf${index + 1}`,
         name: rule.name,
@@ -197,7 +197,7 @@ export class AutomationService {
     const executionStartTime = Date.now();
     const executionId = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    return withDevMode(
+    return withDevMode<WorkflowExecution>(
       () => {
         const mockSteps: WorkflowExecutionStep[] = [
           {
@@ -619,7 +619,7 @@ export class AutomationService {
 
   // Get execution logs for a workflow or all workflows
   static async getExecutionLogs(workflowId?: string, limitCount: number = 50): Promise<WorkflowExecution[]> {
-    return withDevMode(
+    return withDevMode<WorkflowExecution[]>(
       () => [
         {
           id: 'exec1',

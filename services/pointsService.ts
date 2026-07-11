@@ -84,44 +84,47 @@ export class PointsService {
       relatedEntityType = sourceTypeOrRelatedEntityType;
     }
 
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Awarding ${points} points to member ${memberId} for ${category}`);
-      return `mock-point-transaction-${Date.now()}`;
-    }
+    return withDevMode(
+      () => {
+        console.log(`[DEV MODE] Awarding ${points} points to member ${memberId} for ${category}`);
+        return `mock-point-transaction-${Date.now()}`;
+      },
+      async () => {
+        try {
+          // Create point transaction - filter out undefined values
+          const transaction: Omit<PointTransaction, 'id'> = {
+            memberId,
+            points, // For backward compatibility
+            amount: points, // Preferred field
+            category,
+            description: desc,
+            ...(relatedEntityId && {
+              sourceId: relatedEntityId, // Backward compatibility
+              relatedEntityId
+            }),
+            ...(relatedEntityType && {
+              sourceType: relatedEntityType, // Backward compatibility
+              relatedEntityType
+            }),
+            ...(metadata && { metadata }),
+            createdAt: Timestamp.now(),
+          };
 
-    try {
-      // Create point transaction - filter out undefined values
-      const transaction: Omit<PointTransaction, 'id'> = {
-        memberId,
-        points, // For backward compatibility
-        amount: points, // Preferred field
-        category,
-        description: desc,
-        ...(relatedEntityId && {
-          sourceId: relatedEntityId, // Backward compatibility
-          relatedEntityId
-        }),
-        ...(relatedEntityType && {
-          sourceType: relatedEntityType, // Backward compatibility
-          relatedEntityType
-        }),
-        ...(metadata && { metadata }),
-        createdAt: Timestamp.now(),
-      };
+          const transactionRef = await addDoc(
+            collection(db, COLLECTIONS.POINTS),
+            transaction
+          );
 
-      const transactionRef = await addDoc(
-        collection(db, COLLECTIONS.POINTS),
-        transaction
-      );
+          // Update member's total points
+          await this.updateMemberPoints(memberId, points);
 
-      // Update member's total points
-      await this.updateMemberPoints(memberId, points);
-
-      return transactionRef.id;
-    } catch (error) {
-      console.error('Error awarding points:', error);
-      throw error;
-    }
+          return transactionRef.id;
+        } catch (error) {
+          console.error('Error awarding points:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Award points for event attendance
@@ -237,9 +240,8 @@ export class PointsService {
     daysOrLimit?: number,
     limitCount?: number
   ): Promise<PointTransaction[]> {
-    if (isDevMode()) {
-      // Return mock data
-      return [
+    return withDevMode<PointTransaction[]>(
+      () => [
         {
           id: 'mock-1',
           memberId,
@@ -253,64 +255,65 @@ export class PointsService {
           relatedEntityType: 'event',
           createdAt: new Date().toISOString(),
         },
-      ];
-    }
+      ],
+      async () => {
+        try {
+          // Support both days (old) and limit (new) parameters
+          const limitValue = limitCount || (daysOrLimit && daysOrLimit > 100 ? daysOrLimit : undefined);
+          const days = daysOrLimit && daysOrLimit <= 100 ? daysOrLimit : undefined;
 
-    try {
-      // Support both days (old) and limit (new) parameters
-      const limitValue = limitCount || (daysOrLimit && daysOrLimit > 100 ? daysOrLimit : undefined);
-      const days = daysOrLimit && daysOrLimit <= 100 ? daysOrLimit : undefined;
+          let q;
+          if (days) {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
+            q = query(
+              collection(db, COLLECTIONS.POINTS),
+              where('memberId', '==', memberId),
+              where('createdAt', '>=', Timestamp.fromDate(cutoffDate)),
+              orderBy('createdAt', 'desc')
+            );
+            if (limitValue) {
+              q = query(q, limit(limitValue));
+            }
+          } else {
+            q = query(
+              collection(db, COLLECTIONS.POINTS),
+              where('memberId', '==', memberId),
+              orderBy('createdAt', 'desc')
+            );
+            if (limitValue) {
+              q = query(q, limit(limitValue));
+            }
+          }
 
-      let q;
-      if (days) {
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - days);
-        q = query(
-          collection(db, COLLECTIONS.POINTS),
-          where('memberId', '==', memberId),
-          where('createdAt', '>=', Timestamp.fromDate(cutoffDate)),
-          orderBy('createdAt', 'desc')
-        );
-        if (limitValue) {
-          q = query(q, limit(limitValue));
-        }
-      } else {
-        q = query(
-          collection(db, COLLECTIONS.POINTS),
-          where('memberId', '==', memberId),
-          orderBy('createdAt', 'desc')
-        );
-        if (limitValue) {
-          q = query(q, limit(limitValue));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => {
+            const data = doc.data() as any;
+            const createdAt = data.createdAt?.toDate?.() || data.createdAt;
+            const expiresAt = data.expiresAt?.toDate?.();
+
+            return {
+              id: doc.id,
+              memberId: data.memberId,
+              category: data.category,
+              description: data.description,
+              points: data.points || data.amount || 0, // Support both field names
+              amount: data.amount || data.points || 0,
+              sourceId: data.sourceId || data.relatedEntityId,
+              relatedEntityId: data.relatedEntityId || data.sourceId,
+              sourceType: data.sourceType || data.relatedEntityType,
+              relatedEntityType: data.relatedEntityType || data.sourceType,
+              createdAt: createdAt instanceof Date ? createdAt.toISOString() : (typeof createdAt === 'string' ? createdAt : new Date().toISOString()),
+              expiresAt,
+              metadata: data.metadata,
+            } as PointTransaction;
+          });
+        } catch (error) {
+          console.error('Error fetching point history:', error);
+          throw error;
         }
       }
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => {
-        const data = doc.data() as any;
-        const createdAt = data.createdAt?.toDate?.() || data.createdAt;
-        const expiresAt = data.expiresAt?.toDate?.();
-
-        return {
-          id: doc.id,
-          memberId: data.memberId,
-          category: data.category,
-          description: data.description,
-          points: data.points || data.amount || 0, // Support both field names
-          amount: data.amount || data.points || 0,
-          sourceId: data.sourceId || data.relatedEntityId,
-          relatedEntityId: data.relatedEntityId || data.sourceId,
-          sourceType: data.sourceType || data.relatedEntityType,
-          relatedEntityType: data.relatedEntityType || data.sourceType,
-          createdAt: createdAt instanceof Date ? createdAt.toISOString() : (typeof createdAt === 'string' ? createdAt : new Date().toISOString()),
-          expiresAt,
-          metadata: data.metadata,
-        } as PointTransaction;
-      });
-    } catch (error) {
-      console.error('Error fetching point history:', error);
-      throw error;
-    }
+    );
   }
 
   // Get member's total points
@@ -410,34 +413,36 @@ export class PointsService {
 
   // Update member's total points
   static async updateMemberPoints(memberId: string, pointsDelta: number): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Updating points for member ${memberId} by ${pointsDelta}`);
-      return;
-    }
+    return withDevMode(
+      () => {
+        console.log(`[DEV MODE] Updating points for member ${memberId} by ${pointsDelta}`);
+      },
+      async () => {
+        try {
+          const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+          const memberDoc = await getDoc(memberRef);
 
-    try {
-      const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-      const memberDoc = await getDoc(memberRef);
+          if (!memberDoc.exists()) {
+            throw new Error('Member not found');
+          }
 
-      if (!memberDoc.exists()) {
-        throw new Error('Member not found');
+          const currentPoints = memberDoc.data().points || 0;
+          const newPoints = currentPoints + pointsDelta;
+
+          // Update points and tier
+          const tier = this.calculateTier(newPoints);
+
+          await updateDoc(memberRef, {
+            points: newPoints,
+            tier,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error updating member points:', error);
+          throw error;
+        }
       }
-
-      const currentPoints = memberDoc.data().points || 0;
-      const newPoints = currentPoints + pointsDelta;
-
-      // Update points and tier
-      const tier = this.calculateTier(newPoints);
-
-      await updateDoc(memberRef, {
-        points: newPoints,
-        tier,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating member points:', error);
-      throw error;
-    }
+    );
   }
 
   // Calculate member tier based on points
@@ -458,28 +463,30 @@ export class PointsService {
     memberId: string,
     visibility: 'public' | 'members_only' | 'private'
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Updating leaderboard visibility for member ${memberId} to ${visibility}`);
-      return;
-    }
-
-    try {
-      const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-      await updateDoc(memberRef, {
-        'jciCareer.leaderboardVisibility': visibility,
-        leaderboardVisibility: visibility, // backward compat during migration
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating leaderboard visibility:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {
+        console.log(`[DEV MODE] Updating leaderboard visibility for member ${memberId} to ${visibility}`);
+      },
+      async () => {
+        try {
+          const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+          await updateDoc(memberRef, {
+            'jciCareer.leaderboardVisibility': visibility,
+            leaderboardVisibility: visibility, // backward compat during migration
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error updating leaderboard visibility:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get point rule for a specific category
   static async getPointRule(category: string): Promise<PointRule | null> {
-    if (isDevMode()) {
-      return {
+    return withDevMode<PointRule | null>(
+      () => ({
         id: 'rule-1',
         category: POINT_CATEGORIES.EVENT_ATTENDANCE,
         name: 'Event Attendance',
@@ -488,38 +495,39 @@ export class PointsService {
         priority: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-    }
+      }),
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.POINT_RULES),
+            where('category', '==', category),
+            where('active', '==', true),
+            limit(1)
+          );
 
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.POINT_RULES),
-        where('category', '==', category),
-        where('active', '==', true),
-        limit(1)
-      );
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) return null;
 
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return null;
-
-      const doc = snapshot.docs[0];
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
-        updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
-      } as PointRule;
-    } catch (error) {
-      console.error('Error fetching point rule:', error);
-      throw error;
-    }
+          const doc = snapshot.docs[0];
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
+          } as PointRule;
+        } catch (error) {
+          console.error('Error fetching point rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get all point rules
   static async getPointRules(includeInactive: boolean = false): Promise<PointRule[]> {
-    if (isDevMode()) {
-      return [
+    return withDevMode<PointRule[]>(
+      () => [
         {
           id: 'rule-1',
           category: POINT_CATEGORIES.EVENT_ATTENDANCE,
@@ -530,44 +538,45 @@ export class PointsService {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ];
-    }
+      ],
+      async () => {
+        try {
+          let q;
+          if (includeInactive) {
+            q = query(
+              collection(db, COLLECTIONS.POINT_RULES),
+              orderBy('category')
+            );
+          } else {
+            q = query(
+              collection(db, COLLECTIONS.POINT_RULES),
+              where('active', '==', true),
+              orderBy('category')
+            );
+          }
 
-    try {
-      let q;
-      if (includeInactive) {
-        q = query(
-          collection(db, COLLECTIONS.POINT_RULES),
-          orderBy('category')
-        );
-      } else {
-        q = query(
-          collection(db, COLLECTIONS.POINT_RULES),
-          where('active', '==', true),
-          orderBy('category')
-        );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => {
+            const data = doc.data() as any;
+            return {
+              id: doc.id,
+              category: data.category,
+              name: data.name,
+              basePoints: data.basePoints,
+              multiplier: data.multiplier,
+              conditions: data.conditions,
+              active: data.active,
+              priority: data.priority,
+              createdAt: (data.createdAt as Timestamp)?.toDate?.() || data.createdAt || new Date(),
+              updatedAt: (data.updatedAt as Timestamp)?.toDate?.() || data.updatedAt || new Date(),
+            } as PointRule;
+          });
+        } catch (error) {
+          console.error('Error fetching all point rules:', error);
+          throw error;
+        }
       }
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => {
-        const data = doc.data() as any;
-        return {
-          id: doc.id,
-          category: data.category,
-          name: data.name,
-          basePoints: data.basePoints,
-          multiplier: data.multiplier,
-          conditions: data.conditions,
-          active: data.active,
-          priority: data.priority,
-          createdAt: (data.createdAt as Timestamp)?.toDate?.() || data.createdAt || new Date(),
-          updatedAt: (data.updatedAt as Timestamp)?.toDate?.() || data.updatedAt || new Date(),
-        } as PointRule;
-      });
-    } catch (error) {
-      console.error('Error fetching all point rules:', error);
-      throw error;
-    }
+    );
   }
 
   // Alias for backward compatibility
@@ -577,55 +586,60 @@ export class PointsService {
 
   // Create or update point rule
   static async savePointRule(rule: Partial<PointRule> | Omit<PointRule, 'id'> | PointRule): Promise<string> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Saving point rule:', rule);
-      return `mock-rule-${Date.now()}`;
-    }
-
-    try {
-      const ruleId = 'id' in rule ? rule.id : undefined;
-      if (ruleId) {
-        // Update existing rule
-        const ruleRef = doc(db, COLLECTIONS.POINT_RULES, ruleId);
-        await updateDoc(ruleRef, {
-          ...rule,
-          updatedAt: Timestamp.now(),
-        });
-        return ruleId;
-      } else {
-        // Create new rule
-        const newRule = {
-          ...rule,
-          active: rule.active ?? true,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        };
-        const docRef = await addDoc(collection(db, COLLECTIONS.POINT_RULES), newRule);
-        return docRef.id;
+    return withDevMode(
+      () => {
+        console.log('[DEV MODE] Saving point rule:', rule);
+        return `mock-rule-${Date.now()}`;
+      },
+      async () => {
+        try {
+          const ruleId = 'id' in rule ? rule.id : undefined;
+          if (ruleId) {
+            // Update existing rule
+            const ruleRef = doc(db, COLLECTIONS.POINT_RULES, ruleId);
+            await updateDoc(ruleRef, {
+              ...rule,
+              updatedAt: Timestamp.now(),
+            });
+            return ruleId;
+          } else {
+            // Create new rule
+            const newRule = {
+              ...rule,
+              active: rule.active ?? true,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            };
+            const docRef = await addDoc(collection(db, COLLECTIONS.POINT_RULES), newRule);
+            return docRef.id;
+          }
+        } catch (error) {
+          console.error('Error saving point rule:', error);
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Error saving point rule:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete point rule
   static async deletePointRule(ruleId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Deleting point rule ${ruleId}`);
-      return;
-    }
-
-    try {
-      const ruleRef = doc(db, COLLECTIONS.POINT_RULES, ruleId);
-      await updateDoc(ruleRef, {
-        active: false,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error deleting point rule:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {
+        console.log(`[DEV MODE] Deleting point rule ${ruleId}`);
+      },
+      async () => {
+        try {
+          const ruleRef = doc(db, COLLECTIONS.POINT_RULES, ruleId);
+          await updateDoc(ruleRef, {
+            active: false,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error deleting point rule:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get points summary for a member
@@ -667,67 +681,69 @@ export class PointsService {
     metadata?: Record<string, any>
   ): Promise<void> {
     if (amount <= 0) throw new Error('Transfer amount must be positive');
-    
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Transferring ${amount} from ${senderId} to ${receiverId}`);
-      return;
-    }
 
-    try {
-      await runTransaction(db, async (transaction) => {
-        const senderRef = doc(db, COLLECTIONS.MEMBERS, senderId);
-        const receiverRef = doc(db, COLLECTIONS.MEMBERS, receiverId);
-        
-        const senderDoc = await transaction.get(senderRef);
-        const receiverDoc = await transaction.get(receiverRef);
+    return withDevMode(
+      () => {
+        console.log(`[DEV MODE] Transferring ${amount} from ${senderId} to ${receiverId}`);
+      },
+      async () => {
+        try {
+          await runTransaction(db, async (transaction) => {
+            const senderRef = doc(db, COLLECTIONS.MEMBERS, senderId);
+            const receiverRef = doc(db, COLLECTIONS.MEMBERS, receiverId);
 
-        if (!senderDoc.exists() || !receiverDoc.exists()) {
-          throw new Error('Sender or Receiver not found');
+            const senderDoc = await transaction.get(senderRef);
+            const receiverDoc = await transaction.get(receiverRef);
+
+            if (!senderDoc.exists() || !receiverDoc.exists()) {
+              throw new Error('Sender or Receiver not found');
+            }
+
+            const senderPoints = senderDoc.data().points || 0;
+            if (senderPoints < amount) {
+              throw new Error('Insufficient points for transfer');
+            }
+
+            // Update balances
+            transaction.update(senderRef, {
+              points: senderPoints - amount,
+              updatedAt: Timestamp.now()
+            });
+            transaction.update(receiverRef, {
+              points: (receiverDoc.data().points || 0) + amount,
+              updatedAt: Timestamp.now()
+            });
+
+            // Record transactions
+            const senderTxRef = doc(collection(db, COLLECTIONS.POINTS));
+            const receiverTxRef = doc(collection(db, COLLECTIONS.POINTS));
+
+            transaction.set(senderTxRef, {
+              memberId: senderId,
+              amount: -amount,
+              points: -amount,
+              category: 'Transfer_Out',
+              description: `To ${receiverDoc.data().name}: ${description}`,
+              metadata: { ...metadata, relatedMemberId: receiverId },
+              createdAt: Timestamp.now()
+            });
+
+            transaction.set(receiverTxRef, {
+              memberId: receiverId,
+              amount,
+              points: amount,
+              category: 'Transfer_In',
+              description: `From ${senderDoc.data().name}: ${description}`,
+              metadata: { ...metadata, relatedMemberId: senderId },
+              createdAt: Timestamp.now()
+            });
+          });
+        } catch (error) {
+          console.error('Error during point transfer:', error);
+          throw error;
         }
-
-        const senderPoints = senderDoc.data().points || 0;
-        if (senderPoints < amount) {
-          throw new Error('Insufficient points for transfer');
-        }
-
-        // Update balances
-        transaction.update(senderRef, { 
-          points: senderPoints - amount,
-          updatedAt: Timestamp.now() 
-        });
-        transaction.update(receiverRef, { 
-          points: (receiverDoc.data().points || 0) + amount,
-          updatedAt: Timestamp.now() 
-        });
-
-        // Record transactions
-        const senderTxRef = doc(collection(db, COLLECTIONS.POINTS));
-        const receiverTxRef = doc(collection(db, COLLECTIONS.POINTS));
-
-        transaction.set(senderTxRef, {
-          memberId: senderId,
-          amount: -amount,
-          points: -amount,
-          category: 'Transfer_Out',
-          description: `To ${receiverDoc.data().name}: ${description}`,
-          metadata: { ...metadata, relatedMemberId: receiverId },
-          createdAt: Timestamp.now()
-        });
-
-        transaction.set(receiverTxRef, {
-          memberId: receiverId,
-          amount,
-          points: amount,
-          category: 'Transfer_In',
-          description: `From ${senderDoc.data().name}: ${description}`,
-          metadata: { ...metadata, relatedMemberId: senderId },
-          createdAt: Timestamp.now()
-        });
-      });
-    } catch (error) {
-      console.error('Error during point transfer:', error);
-      throw error;
-    }
+      }
+    );
   }
 
   /**
@@ -741,54 +757,57 @@ export class PointsService {
     relatedEntityId: string,
     description: string
   ): Promise<string> {
-    if (isDevMode()) return `mock-escrow-${Date.now()}`;
+    return withDevMode(
+      () => `mock-escrow-${Date.now()}`,
+      async () => {
+        try {
+          return await runTransaction(db, async (transaction) => {
+            const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+            const memberDoc = await transaction.get(memberRef);
 
-    try {
-      return await runTransaction(db, async (transaction) => {
-        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-        const memberDoc = await transaction.get(memberRef);
+            if (!memberDoc.exists()) throw new Error('Member not found');
 
-        if (!memberDoc.exists()) throw new Error('Member not found');
-        
-        const currentPoints = memberDoc.data().points || 0;
-        if (currentPoints < amount) throw new Error('Insufficient points to lock for escrow');
+            const currentPoints = memberDoc.data().points || 0;
+            if (currentPoints < amount) throw new Error('Insufficient points to lock for escrow');
 
-        // Deduct from member
-        transaction.update(memberRef, { 
-          points: currentPoints - amount,
-          updatedAt: Timestamp.now()
-        });
+            // Deduct from member
+            transaction.update(memberRef, {
+              points: currentPoints - amount,
+              updatedAt: Timestamp.now()
+            });
 
-        // Create Escrow Record
-        const escrowRef = doc(collection(db, COLLECTIONS.POINT_ESCROW));
-        transaction.set(escrowRef, {
-          memberId,
-          amount,
-          purpose,
-          relatedEntityId,
-          status: 'Locked',
-          description,
-          createdAt: Timestamp.now()
-        });
+            // Create Escrow Record
+            const escrowRef = doc(collection(db, COLLECTIONS.POINT_ESCROW));
+            transaction.set(escrowRef, {
+              memberId,
+              amount,
+              purpose,
+              relatedEntityId,
+              status: 'Locked',
+              description,
+              createdAt: Timestamp.now()
+            });
 
-        // Record the transaction as 'Escrow_Locked'
-        const txRef = doc(collection(db, COLLECTIONS.POINTS));
-        transaction.set(txRef, {
-          memberId,
-          amount: -amount,
-          points: -amount,
-          category: 'Escrow_Locked',
-          description: `Locked for ${purpose}: ${description}`,
-          relatedEntityId,
-          createdAt: Timestamp.now()
-        });
+            // Record the transaction as 'Escrow_Locked'
+            const txRef = doc(collection(db, COLLECTIONS.POINTS));
+            transaction.set(txRef, {
+              memberId,
+              amount: -amount,
+              points: -amount,
+              category: 'Escrow_Locked',
+              description: `Locked for ${purpose}: ${description}`,
+              relatedEntityId,
+              createdAt: Timestamp.now()
+            });
 
-        return escrowRef.id;
-      });
-    } catch (error) {
-      console.error('Error locking points:', error);
-      throw error;
-    }
+            return escrowRef.id;
+          });
+        } catch (error) {
+          console.error('Error locking points:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   /**
@@ -799,56 +818,59 @@ export class PointsService {
     targetMemberId: string,
     metadata?: Record<string, any>
   ): Promise<void> {
-    if (isDevMode()) return;
+    return withDevMode(
+      () => { /* no-op in dev mode */ },
+      async () => {
+        try {
+          await runTransaction(db, async (transaction) => {
+            const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, escrowId);
+            const escrowDoc = await transaction.get(escrowRef);
 
-    try {
-      await runTransaction(db, async (transaction) => {
-        const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, escrowId);
-        const escrowDoc = await transaction.get(escrowRef);
+            if (!escrowDoc.exists()) throw new Error('Escrow record not found');
+            if (escrowDoc.data().status !== 'Locked') throw new Error('Escrow is not locked');
 
-        if (!escrowDoc.exists()) throw new Error('Escrow record not found');
-        if (escrowDoc.data().status !== 'Locked') throw new Error('Escrow is not locked');
+            const { amount, purpose, relatedEntityId, description, memberId: originalOwnerId } = escrowDoc.data();
+            const targetRef = doc(db, COLLECTIONS.MEMBERS, targetMemberId);
+            const targetDoc = await transaction.get(targetRef);
 
-        const { amount, purpose, relatedEntityId, description, memberId: originalOwnerId } = escrowDoc.data();
-        const targetRef = doc(db, COLLECTIONS.MEMBERS, targetMemberId);
-        const targetDoc = await transaction.get(targetRef);
+            if (!targetDoc.exists()) throw new Error('Target member not found');
 
-        if (!targetDoc.exists()) throw new Error('Target member not found');
+            // Add to target
+            transaction.update(targetRef, {
+              points: (targetDoc.data().points || 0) + amount,
+              updatedAt: Timestamp.now()
+            });
 
-        // Add to target
-        transaction.update(targetRef, { 
-          points: (targetDoc.data().points || 0) + amount,
-          updatedAt: Timestamp.now()
-        });
+            // Close Escrow
+            transaction.update(escrowRef, {
+              status: 'Released',
+              releasedTo: targetMemberId,
+              releasedAt: Timestamp.now()
+            });
 
-        // Close Escrow
-        transaction.update(escrowRef, { 
-          status: 'Released',
-          releasedTo: targetMemberId,
-          releasedAt: Timestamp.now()
-        });
+            // Record receiving transaction
+            const txRef = doc(collection(db, COLLECTIONS.POINTS));
+            const txDescription = purpose === 'CONTRACT'
+              ? `Contract fulfillment: ${description}`
+              : `Bounty payout for: ${description}`;
 
-        // Record receiving transaction
-        const txRef = doc(collection(db, COLLECTIONS.POINTS));
-        const txDescription = purpose === 'CONTRACT' 
-          ? `Contract fulfillment: ${description}` 
-          : `Bounty payout for: ${description}`;
-
-        transaction.set(txRef, {
-          memberId: targetMemberId,
-          amount,
-          points: amount,
-          category: 'Escrow_Released',
-          description: txDescription,
-          relatedEntityId,
-          metadata: { ...metadata, escrowId, originalOwnerId, purpose },
-          createdAt: Timestamp.now()
-        });
-      });
-    } catch (error) {
-      console.error('Error releasing escrow:', error);
-      throw error;
-    }
+            transaction.set(txRef, {
+              memberId: targetMemberId,
+              amount,
+              points: amount,
+              category: 'Escrow_Released',
+              description: txDescription,
+              relatedEntityId,
+              metadata: { ...metadata, escrowId, originalOwnerId, purpose },
+              createdAt: Timestamp.now()
+            });
+          });
+        } catch (error) {
+          console.error('Error releasing escrow:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // --- End of Competitive Engine Methods ---
@@ -893,24 +915,28 @@ export class PointsService {
 
   // Get active yearly program
   static async getActiveProgram(): Promise<IncentiveProgram | null> {
-    if (isDevMode()) {
-      // Return the active mock program, or the first one, or null
-      const active = this.mockPrograms.find(p => p.isActive);
-      return active || this.mockPrograms[0] || null;
-    }
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.INCENTIVE_PROGRAMS),
-        where('isActive', '==', true),
-        limit(1)
-      );
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return null;
-      return { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as IncentiveProgram;
-    } catch (error) {
-      console.error('Error fetching active program:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {
+        // Return the active mock program, or the first one, or null
+        const active = this.mockPrograms.find(p => p.isActive);
+        return active || this.mockPrograms[0] || null;
+      },
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.INCENTIVE_PROGRAMS),
+            where('isActive', '==', true),
+            limit(1)
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) return null;
+          return { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as IncentiveProgram;
+        } catch (error) {
+          console.error('Error fetching active program:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get all yearly programs

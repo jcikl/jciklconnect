@@ -62,7 +62,7 @@ export interface Certificate {
 export class LearningPathsService {
   // Get all learning paths
   static async getAllLearningPaths(): Promise<LearningPath[]> {
-    return withDevMode(
+    return withDevMode<LearningPath[]>(
       () => [
         {
           id: 'lp1',

@@ -196,7 +196,7 @@ export class MentorshipService {
     matchingFactors: string[],
     createdBy: string
   ): Promise<MentorMatch> {
-    return withDevMode(
+    return withDevMode<MentorMatch>(
       () => {
         console.log(`[Dev Mode] Would create mentor match: ${mentorId} -> ${menteeId}`);
         return {

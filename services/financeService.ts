@@ -1360,7 +1360,8 @@ export class FinanceService {
       paymentRequestId?: string;
     }
   ): Promise<{ updated: number; errors: string[] }> {
-    if (isDevMode()) {
+    return withDevMode(
+      async () => {
       console.log(`[Dev Mode] Batch updating category for ${splitIds.length} splits`);
       let updatedCount = 0;
       for (const splitId of splitIds) {
@@ -1414,8 +1415,8 @@ export class FinanceService {
       }
       saveDevModeSplits();
       return { updated: updatedCount, errors: [] };
-    }
-
+    },
+    async () => {
     const results = await Promise.all(
       splitIds.map(async (splitId) => {
         try {
@@ -1497,126 +1498,131 @@ export class FinanceService {
     });
 
     return { updated, errors };
+      }
+    );
   }
 
   /**
    * Get transaction by ID from either TRANSACTIONS or PROJECT_TRANSACTIONS
    */
   static async getTransactionById(transactionId: string): Promise<Transaction | null> {
-    if (isDevMode()) {
-      return localMockTransactions.find(t => t.id === transactionId) || null;
-    }
+    return withDevMode(
+      () => localMockTransactions.find(t => t.id === transactionId) || null,
+      async () => {
+        try {
+          // Try main transactions collection
+          const txDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+          if (txDoc.exists()) {
+            return {
+              id: txDoc.id,
+              ...txDoc.data(),
+              date: txDoc.data().date?.toDate?.()?.toISOString() || txDoc.data().date,
+            } as Transaction;
+          }
 
-    try {
-      // Try main transactions collection
-      const txDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
-      if (txDoc.exists()) {
-        return {
-          id: txDoc.id,
-          ...txDoc.data(),
-          date: txDoc.data().date?.toDate?.()?.toISOString() || txDoc.data().date,
-        } as Transaction;
+          // Try project transactions collection
+          const pjDoc = await getDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId));
+          if (pjDoc.exists()) {
+            return {
+              id: pjDoc.id,
+              ...pjDoc.data(),
+              date: pjDoc.data().date?.toDate?.()?.toISOString() || pjDoc.data().date,
+            } as Transaction;
+          }
+
+          return null;
+        } catch (error) {
+          console.error('Error fetching transaction by ID:', error);
+          throw error;
+        }
       }
-
-      // Try project transactions collection
-      const pjDoc = await getDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId));
-      if (pjDoc.exists()) {
-        return {
-          id: pjDoc.id,
-          ...pjDoc.data(),
-          date: pjDoc.data().date?.toDate?.()?.toISOString() || pjDoc.data().date,
-        } as Transaction;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error fetching transaction by ID:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete transaction
   static async deleteTransaction(transactionId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Mocking deletion for transaction ${transactionId}`);
-      return;
-    }
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Mocking deletion for transaction ${transactionId}`);
+      },
+      async () => {
+        try {
+          // Fetch transaction first to sync inventory if needed
+          const transaction = await this.getTransactionById(transactionId);
 
-    try {
-      // Fetch transaction first to sync inventory if needed
-      const transaction = await this.getTransactionById(transactionId);
+          if (transaction && transaction.inventoryLinkId && transaction.inventoryQuantity) {
+            // Remove stock movement if exists
+            const { InventoryService } = await import('./inventoryService');
+            await InventoryService.deleteStockMovementForRef(transactionId);
+          } else if (transaction) {
+            // Only call sync if we didn't use the new method, just in case (e.g. legacy check)
+            await this.syncTransactionWithInventory(transaction, true);
+          }
 
-      if (transaction && transaction.inventoryLinkId && transaction.inventoryQuantity) {
-        // Remove stock movement if exists
-        const { InventoryService } = await import('./inventoryService');
-        await InventoryService.deleteStockMovementForRef(transactionId);
-      } else if (transaction) {
-        // Only call sync if we didn't use the new method, just in case (e.g. legacy check)
-        await this.syncTransactionWithInventory(transaction, true);
+          await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+
+          // Sync with Member Membership if category is Membership
+          if (transaction && transaction.category === 'Membership' && transaction.memberId) {
+            await this.syncMemberMembership(transaction.memberId as string, transaction.projectId);
+          }
+        } catch (error) {
+          console.error('Error deleting transaction:', error);
+          throw error;
+        }
       }
-
-      await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
-
-      // Sync with Member Membership if category is Membership
-      if (transaction && transaction.category === 'Membership' && transaction.memberId) {
-        await this.syncMemberMembership(transaction.memberId as string, transaction.projectId);
-      }
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete project transaction
   static async deleteProjectTransaction(transactionId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Mocking deletion for project transaction ${transactionId}`);
-      
-      // Clean up bank transactions in mock mode
-      localMockTransactions.forEach((btx, idx) => {
-        const btxLinkedIds = (btx as any).projectTransactionIds || [];
-        if (btxLinkedIds.includes(transactionId)) {
-          const newLinkedIds = btxLinkedIds.filter((id: string) => id !== transactionId);
-          localMockTransactions[idx] = {
-            ...btx,
-            projectTransactionIds: newLinkedIds,
-            projectTransactionId: newLinkedIds[0] || null,
-            status: newLinkedIds.length > 0 ? 'Reconciled' : 'Cleared',
-            ...(newLinkedIds.length === 0 ? { purpose: '' } : {}),
-          } as Transaction;
-        }
-      });
+    return withDevMode(
+      async () => {
+        console.log(`[Dev Mode] Mocking deletion for project transaction ${transactionId}`);
 
-      // Clean up splits in mock mode
-      const splitsToClean = devModeSplits.filter(s => {
-        const splitLinkedIds = (s as any).projectTransactionIds || [];
-        return splitLinkedIds.includes(transactionId);
-      });
-
-      for (const split of splitsToClean) {
-        const splitLinkedIds = (split as any).projectTransactionIds || [];
-        const newLinkedIds = splitLinkedIds.filter((id: string) => id !== transactionId);
-        if (split.autoGenerated && newLinkedIds.length === 0) {
-          await this.deleteTransactionSplit(split.id);
-        } else {
-          const sIdx = devModeSplits.findIndex(s => s.id === split.id);
-          if (sIdx !== -1) {
-            devModeSplits[sIdx] = {
-              ...devModeSplits[sIdx],
+        // Clean up bank transactions in mock mode
+        localMockTransactions.forEach((btx, idx) => {
+          const btxLinkedIds = (btx as any).projectTransactionIds || [];
+          if (btxLinkedIds.includes(transactionId)) {
+            const newLinkedIds = btxLinkedIds.filter((id: string) => id !== transactionId);
+            localMockTransactions[idx] = {
+              ...btx,
               projectTransactionIds: newLinkedIds,
               projectTransactionId: newLinkedIds[0] || null,
+              status: newLinkedIds.length > 0 ? 'Reconciled' : 'Cleared',
               ...(newLinkedIds.length === 0 ? { purpose: '' } : {}),
-            } as any;
+            } as Transaction;
+          }
+        });
+
+        // Clean up splits in mock mode
+        const splitsToClean = devModeSplits.filter(s => {
+          const splitLinkedIds = (s as any).projectTransactionIds || [];
+          return splitLinkedIds.includes(transactionId);
+        });
+
+        for (const split of splitsToClean) {
+          const splitLinkedIds = (split as any).projectTransactionIds || [];
+          const newLinkedIds = splitLinkedIds.filter((id: string) => id !== transactionId);
+          if (split.autoGenerated && newLinkedIds.length === 0) {
+            await this.deleteTransactionSplit(split.id);
+          } else {
+            const sIdx = devModeSplits.findIndex(s => s.id === split.id);
+            if (sIdx !== -1) {
+              devModeSplits[sIdx] = {
+                ...devModeSplits[sIdx],
+                projectTransactionIds: newLinkedIds,
+                projectTransactionId: newLinkedIds[0] || null,
+                ...(newLinkedIds.length === 0 ? { purpose: '' } : {}),
+              } as any;
+            }
           }
         }
-      }
 
-      // Delete the project transaction itself
-      localMockTransactions = localMockTransactions.filter(t => t.id !== transactionId);
-      saveMockTransactions();
-      return;
-    }
-
+        // Delete the project transaction itself
+        localMockTransactions = localMockTransactions.filter(t => t.id !== transactionId);
+        saveMockTransactions();
+      },
+      async () => {
     try {
       // Fetch transaction first to sync inventory if needed
       // Note: project transactions might be in either collection
@@ -1682,6 +1688,8 @@ export class FinanceService {
         throw error;
       }
     }
+      }
+    );
   }
 
   // Synchronize transaction with inventory
@@ -1730,8 +1738,9 @@ export class FinanceService {
     projectId?: string,
     options?: { includeTransactions?: Transaction[] }
   ): Promise<void> {
-    if (isDevMode()) return;
-
+    return withDevMode(
+      () => {},
+      async () => {
     try {
       // 1. Parse year from projectId (e.g., "2026 membership")
       const yearMatch = projectId?.match(/^(\d+)/);
@@ -1898,6 +1907,8 @@ export class FinanceService {
     } catch (error) {
       console.error('Error syncing member membership:', error);
     }
+      }
+    );
   }
 
   private static normalizeTransactionDate(date: unknown): string {
@@ -1948,98 +1959,104 @@ export class FinanceService {
 
   // Get all bank accounts with dynamic balance
   static async getAllBankAccounts(includeBalance: boolean = true): Promise<BankAccount[]> {
-    if (isDevMode()) {
-      return MOCK_ACCOUNTS;
-    }
+    return withDevMode(
+      () => MOCK_ACCOUNTS,
+      async () => {
+        try {
+          if (!includeBalance) {
+            const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
+            return accountsSnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
+            } as BankAccount));
+          }
 
-    try {
-      if (!includeBalance) {
-        const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
-        return accountsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
-        } as BankAccount));
+          const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
+            getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
+            getDocs(collection(db, COLLECTIONS.TRANSACTIONS))
+          ]);
+
+          const accounts = accountsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
+          } as BankAccount));
+
+          const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
+
+          // Calculate dynamic balance for each account
+          return accounts.map(account => {
+            const accountTransactions = transactions.filter(t => t.bankAccountId === account.id);
+            const transactionSum = accountTransactions.reduce((sum, t) => {
+              return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
+            }, 0);
+
+            return {
+              ...account,
+              balance: (account.initialBalance || 0) + transactionSum
+            };
+          });
+        } catch (error) {
+          console.error('Error fetching bank accounts:', error);
+          throw error;
+        }
       }
-
-      const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
-        getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
-        getDocs(collection(db, COLLECTIONS.TRANSACTIONS))
-      ]);
-
-      const accounts = accountsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
-      } as BankAccount));
-
-      const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
-
-      // Calculate dynamic balance for each account
-      return accounts.map(account => {
-        const accountTransactions = transactions.filter(t => t.bankAccountId === account.id);
-        const transactionSum = accountTransactions.reduce((sum, t) => {
-          return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
-        }, 0);
-
-        return {
-          ...account,
-          balance: (account.initialBalance || 0) + transactionSum
-        };
-      });
-    } catch (error) {
-      console.error('Error fetching bank accounts:', error);
-      throw error;
-    }
+    );
   }
 
   // Create bank account
   static async createBankAccount(accountData: Omit<BankAccount, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      console.log('[Dev Mode] Mocking bank account creation');
-      return `mock-acc-${Date.now()}`;
-    }
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] Mocking bank account creation');
+        return `mock-acc-${Date.now()}`;
+      },
+      async () => {
+        try {
+          const newAccount = {
+            ...accountData,
+            lastReconciled: Timestamp.fromDate(new Date(accountData.lastReconciled)),
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
 
-    try {
-      const newAccount = {
-        ...accountData,
-        lastReconciled: Timestamp.fromDate(new Date(accountData.lastReconciled)),
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-
-      const cleanAccount = removeUndefined(newAccount);
-      const docRef = await addDoc(collection(db, COLLECTIONS.BANK_ACCOUNTS), cleanAccount);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating bank account:', error);
-      throw error;
-    }
+          const cleanAccount = removeUndefined(newAccount);
+          const docRef = await addDoc(collection(db, COLLECTIONS.BANK_ACCOUNTS), cleanAccount);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating bank account:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update bank account
   static async updateBankAccount(accountId: string, updates: Partial<BankAccount>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Mocking update for bank account ${accountId}`);
-      return;
-    }
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Mocking update for bank account ${accountId}`);
+      },
+      async () => {
+        try {
+          const accountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId);
+          const updateData: any = {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          };
 
-    try {
-      const accountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId);
-      const updateData: any = {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      };
+          if (updates.lastReconciled) {
+            updateData.lastReconciled = Timestamp.fromDate(new Date(updates.lastReconciled));
+          }
 
-      if (updates.lastReconciled) {
-        updateData.lastReconciled = Timestamp.fromDate(new Date(updates.lastReconciled));
+          await updateDoc(accountRef, updateData);
+        } catch (error) {
+          console.error('Error updating bank account:', error);
+          throw error;
+        }
       }
-
-      await updateDoc(accountRef, updateData);
-    } catch (error) {
-      console.error('Error updating bank account:', error);
-      throw error;
-    }
+    );
   }
 
   // Get transactions by category
@@ -2151,16 +2168,17 @@ export class FinanceService {
     notificationsSent: number;
     validationErrors: Array<{ memberId: string; error: string }>;
   }> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would initiate dues renewal for year ${year}`);
-      return {
-        totalMembers: 0,
-        renewalsByType: {},
-        notificationsSent: 0,
-        validationErrors: []
-      };
-    }
-
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Would initiate dues renewal for year ${year}`);
+        return {
+          totalMembers: 0,
+          renewalsByType: {},
+          notificationsSent: 0,
+          validationErrors: []
+        };
+      },
+      async () => {
     try {
       const { MembersService } = await import('./membersService');
       const { CommunicationService } = await import('./communicationService');
@@ -2292,15 +2310,18 @@ export class FinanceService {
       console.error('Error initiating dues renewal:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Send reminder notifications for overdue dues (excludes senators)
   static async sendDuesReminders(year: number, daysOverdue: number = 30): Promise<number> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would send dues reminders for year ${year}`);
-      return 0;
-    }
-
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Would send dues reminders for year ${year}`);
+        return 0;
+      },
+      async () => {
     try {
       const { CommunicationService } = await import('./communicationService');
       const { MembersService } = await import('./membersService');
@@ -2346,6 +2367,8 @@ export class FinanceService {
       console.error('Error sending dues reminders:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Get dues renewal status for a specific year
@@ -2354,8 +2377,8 @@ export class FinanceService {
     byType: Record<string, { total: number; paid: number; pending: number; overdue: number }>;
     byCategory: { renewal: number; new: number };
   }> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         totalMembers: 0,
         byType: {
           Probation: { total: 0, paid: 0, pending: 0, overdue: 0 },
@@ -2365,9 +2388,8 @@ export class FinanceService {
           Visiting: { total: 0, paid: 0, pending: 0, overdue: 0 },
         },
         byCategory: { renewal: 0, new: 0 },
-      };
-    }
-
+      }),
+      async () => {
     try {
       const { MembersService } = await import('./membersService');
       const duesTransactions = await this.getTransactionsByCategory('Membership');
@@ -2432,6 +2454,8 @@ export class FinanceService {
       console.error('Error getting dues renewal status:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Get members sorted by dues year and membership type
@@ -2450,10 +2474,9 @@ export class FinanceService {
     paymentDate?: string;
     isRenewal: boolean;
   }>> {
-    if (isDevMode()) {
-      return [];
-    }
-
+    return withDevMode(
+      () => [] as any[],
+      async () => {
     try {
       const { MembersService } = await import('./membersService');
       const { MembershipDues } = await import('../types');
@@ -2534,6 +2557,8 @@ export class FinanceService {
       console.error('Error getting members dues list:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Process dues payment and update member status
@@ -2543,11 +2568,12 @@ export class FinanceService {
     paymentAmount: number,
     paymentDate: string
   ): Promise<{ success: boolean; error?: string }> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would process dues payment for member ${memberId}`);
-      return { success: true };
-    }
-
+    return withDevMode<{ success: boolean; error?: string }>(
+      () => {
+        console.log(`[Dev Mode] Would process dues payment for member ${memberId}`);
+        return { success: true };
+      },
+      async () => {
     try {
       const { MembersService } = await import('./membersService');
       const { MembershipDues } = await import('../types');
@@ -2598,6 +2624,8 @@ export class FinanceService {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+      }
+    );
   }
 
   // Calculate system balance for reconciliation (includes all transaction types)
@@ -2614,13 +2642,12 @@ export class FinanceService {
       merchandise: number;
     };
   }> {
-    if (isDevMode()) {
-      return {
+    return withDevMode(
+      () => ({
         totalBalance: 10000,
         byType: { project: 2500, operations: 3500, dues: 2000, merchandise: 2000 },
-      };
-    }
-
+      }),
+      async () => {
     try {
       const allTransactions = await this.getAllTransactions();
       const accountDoc = await getDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId));
@@ -2680,6 +2707,8 @@ export class FinanceService {
       console.error('Error calculating system balance:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Detect reconciliation discrepancies
@@ -2688,12 +2717,11 @@ export class FinanceService {
     statementBalance: number,
     reconciliationDate: string
   ): Promise<ReconciliationDiscrepancy[]> {
-    if (isDevMode()) {
-      return [];
-    }
-
-    try {
-      const { totalBalance, byType } = await this.calculateSystemBalance(accountId, reconciliationDate);
+    return withDevMode(
+      () => [] as ReconciliationDiscrepancy[],
+      async () => {
+        try {
+          const { totalBalance, byType } = await this.calculateSystemBalance(accountId, reconciliationDate);
       const discrepancies: ReconciliationDiscrepancy[] = [];
 
       // Check if system balance matches statement balance
@@ -2744,11 +2772,13 @@ export class FinanceService {
         }
       });
 
-      return discrepancies;
-    } catch (error) {
-      console.error('Error detecting discrepancies:', error);
-      throw error;
-    }
+          return discrepancies;
+        } catch (error) {
+          console.error('Error detecting discrepancies:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Reconcile bank account with enhanced transaction type support
@@ -2760,11 +2790,12 @@ export class FinanceService {
     notes?: string,
     transactionTypeFilter?: TransactionType | 'Projects & Activities' | 'Membership' | 'Administrative'
   ): Promise<string> {
-    if (isDevMode()) {
-      console.log(`[Dev Mode] Would reconcile bank account ${accountId}`);
-      return 'mock-reconciliation-id';
-    }
-
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Would reconcile bank account ${accountId}`);
+        return 'mock-reconciliation-id';
+      },
+      async () => {
     try {
       // Calculate system balance with transaction type breakdown
       const { totalBalance, byType } = await this.calculateSystemBalance(
@@ -2855,32 +2886,35 @@ export class FinanceService {
       console.error('Error reconciling bank account:', error);
       throw error;
     }
+      }
+    );
   }
 
   // Get reconciliation history
   static async getReconciliationHistory(accountId: string): Promise<ReconciliationRecord[]> {
-    if (isDevMode()) {
-      return [];
-    }
-
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.RECONCILIATIONS),
-        where('bankAccountId', '==', accountId),
-        orderBy('reconciliationDate', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        reconciliationDate: doc.data().reconciliationDate?.toDate?.()?.toISOString() || doc.data().reconciliationDate,
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
-      } as ReconciliationRecord));
-    } catch (error) {
-      console.error('Error fetching reconciliation history:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => [] as ReconciliationRecord[],
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.RECONCILIATIONS),
+            where('bankAccountId', '==', accountId),
+            orderBy('reconciliationDate', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            reconciliationDate: doc.data().reconciliationDate?.toDate?.()?.toISOString() || doc.data().reconciliationDate,
+            createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+            updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
+          } as ReconciliationRecord));
+        } catch (error) {
+          console.error('Error fetching reconciliation history:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get unmatched transactions for reconciliation matching UI
@@ -2906,93 +2940,100 @@ export class FinanceService {
     manualTxId: string,
     reconciledBy: string
   ): Promise<void> {
-    if (isDevMode()) {
-      localMockTransactions = localMockTransactions.map(t => {
-        if (t.id === bankTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [manualTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
-        if (t.id === manualTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [bankTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
-        return t;
-      });
-      saveMockTransactions();
-      return;
-    }
-    const now = Timestamp.now();
-    await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
-      matchStatus: 'full',
-      matchedBankTxIds: [manualTxId],
-      status: 'Reconciled',
-      reconciledBy,
-      reconciledAt: now,
-    });
-    await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, manualTxId), {
-      matchStatus: 'full',
-      matchedBankTxIds: [bankTxId],
-      status: 'Reconciled',
-      reconciledBy,
-      reconciledAt: now,
-    });
+    return withDevMode(
+      () => {
+        localMockTransactions = localMockTransactions.map(t => {
+          if (t.id === bankTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [manualTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
+          if (t.id === manualTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [bankTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
+          return t;
+        });
+        saveMockTransactions();
+      },
+      async () => {
+        const now = Timestamp.now();
+        await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
+          matchStatus: 'full',
+          matchedBankTxIds: [manualTxId],
+          status: 'Reconciled',
+          reconciledBy,
+          reconciledAt: now,
+        });
+        await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, manualTxId), {
+          matchStatus: 'full',
+          matchedBankTxIds: [bankTxId],
+          status: 'Reconciled',
+          reconciledBy,
+          reconciledAt: now,
+        });
+      }
+    );
   }
 
   // Unmatch a previously matched pair (revert both to Cleared)
   static async unmatchTransactions(txId1: string, txId2: string): Promise<void> {
-    if (isDevMode()) {
-      localMockTransactions = localMockTransactions.map(t => {
-        if (t.id === txId1 || t.id === txId2) {
-          return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: 'Cleared' as const, reconciledBy: undefined, reconciledAt: undefined };
+    return withDevMode(
+      () => {
+        localMockTransactions = localMockTransactions.map(t => {
+          if (t.id === txId1 || t.id === txId2) {
+            return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: 'Cleared' as const, reconciledBy: undefined, reconciledAt: undefined };
+          }
+          return t;
+        });
+        saveMockTransactions();
+      },
+      async () => {
+        for (const id of [txId1, txId2]) {
+          await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, id), {
+            matchStatus: null,
+            matchedBankTxIds: null,
+            status: 'Cleared',
+            reconciledBy: null,
+            reconciledAt: null,
+          });
         }
-        return t;
-      });
-      saveMockTransactions();
-      return;
-    }
-    for (const id of [txId1, txId2]) {
-      await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, id), {
-        matchStatus: null,
-        matchedBankTxIds: null,
-        status: 'Cleared',
-        reconciledBy: null,
-        reconciledAt: null,
-      });
-    }
+      }
+    );
   }
 
   // Get bank account by ID with dynamic balance
   static async getBankAccountById(accountId: string): Promise<BankAccount | null> {
-    if (isDevMode()) {
-      return MOCK_ACCOUNTS.find(a => a.id === accountId) || null;
-    }
+    return withDevMode(
+      () => MOCK_ACCOUNTS.find(a => a.id === accountId) || null,
+      async () => {
+        try {
+          const accountDoc = await getDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId));
+          if (!accountDoc.exists()) {
+            return null;
+          }
 
-    try {
-      const accountDoc = await getDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId));
-      if (!accountDoc.exists()) {
-        return null;
+          const accountData = accountDoc.data();
+          const account = {
+            id: accountDoc.id,
+            ...accountData,
+            lastReconciled: accountData.lastReconciled?.toDate?.()?.toISOString() || accountData.lastReconciled,
+          } as BankAccount;
+
+          // Fetch transactions for this account to calculate balance
+          const transactionsQuery = query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('bankAccountId', '==', accountId)
+          );
+          const transactionsSnapshot = await getDocs(transactionsQuery);
+          const transactionSum = transactionsSnapshot.docs.reduce((sum, doc) => {
+            const t = doc.data();
+            return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
+          }, 0);
+
+          return {
+            ...account,
+            balance: (account.initialBalance || 0) + transactionSum
+          };
+        } catch (error) {
+          console.error('Error fetching bank account:', error);
+          throw error;
+        }
       }
-
-      const accountData = accountDoc.data();
-      const account = {
-        id: accountDoc.id,
-        ...accountData,
-        lastReconciled: accountData.lastReconciled?.toDate?.()?.toISOString() || accountData.lastReconciled,
-      } as BankAccount;
-
-      // Fetch transactions for this account to calculate balance
-      const transactionsQuery = query(
-        collection(db, COLLECTIONS.TRANSACTIONS),
-        where('bankAccountId', '==', accountId)
-      );
-      const transactionsSnapshot = await getDocs(transactionsQuery);
-      const transactionSum = transactionsSnapshot.docs.reduce((sum, doc) => {
-        const t = doc.data();
-        return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
-      }, 0);
-
-      return {
-        ...account,
-        balance: (account.initialBalance || 0) + transactionSum
-      };
-    } catch (error) {
-      console.error('Error fetching bank account:', error);
-      throw error;
-    }
+    );
   }
 
   // Generate financial reports

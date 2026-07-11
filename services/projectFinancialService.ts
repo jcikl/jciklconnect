@@ -203,14 +203,15 @@ class ProjectFinancialService {
     summary: ProjectFinancialSummary;
     transactions: ProjectTransaction[];
   } | null> {
-    if (isDevMode()) {
-      const account = Array.from(this.accounts.values()).find(acc => acc.projectId === project.id) || null;
-      if (!account) return null;
-      const transactions = this.transactions.get(account.id) || [];
-      const summary = await this.getProjectFinancialSummary(project.id);
-      return summary ? { account, summary, transactions } : null;
-    }
-
+    return withDevMode(
+      async () => {
+        const account = Array.from(this.accounts.values()).find(acc => acc.projectId === project.id) || null;
+        if (!account) return null;
+        const transactions = this.transactions.get(account.id) || [];
+        const summary = await this.getProjectFinancialSummary(project.id);
+        return summary ? { account, summary, transactions } : null;
+      },
+      async () => {
     try {
       if (['Draft', 'Submitted', 'Under Review', 'Rejected'].includes(project.status ?? '')) {
         return null;
@@ -283,6 +284,7 @@ class ProjectFinancialService {
       console.error('Error fetching full project financial details:', error);
       return null;
     }
+});
   }
 
   /**
@@ -363,10 +365,9 @@ class ProjectFinancialService {
    * Get project financial account by project ID
    */
   async getProjectFinancialAccount(projectId: string): Promise<ProjectFinancialAccount | null> {
-    if (isDevMode()) {
-      return Array.from(this.accounts.values()).find(acc => acc.projectId === projectId) || null;
-    }
-
+    return withDevMode(
+      () => Array.from(this.accounts.values()).find(acc => acc.projectId === projectId) || null,
+      async () => {
     try {
       const { doc, getDoc } = await import('firebase/firestore');
       const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
@@ -410,6 +411,7 @@ class ProjectFinancialService {
       console.error('Error fetching single project account:', error);
       return null;
     }
+});
   }
 
   /**
@@ -420,13 +422,14 @@ class ProjectFinancialService {
     limit: number = 50,
     offset: number = 0
   ): Promise<ProjectTransaction[]> {
-    if (isDevMode()) {
-      const transactions = this.transactions.get(financialAccountId) || [];
-      return transactions
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(offset, offset + limit);
-    }
-
+    return withDevMode(
+      () => {
+        const transactions = this.transactions.get(financialAccountId) || [];
+        return transactions
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(offset, offset + limit);
+      },
+      async () => {
     // In production, we assume financialAccountId might be proj_acc_{projectId}
     let projectId = financialAccountId;
     if (financialAccountId.startsWith('proj_acc_')) {
@@ -457,6 +460,7 @@ class ProjectFinancialService {
       console.error('Error fetching production project transactions:', error);
       return [];
     }
+});
   }
   /**
    * Update budget category
@@ -718,16 +722,17 @@ class ProjectFinancialService {
    * Get all project financial accounts (for admin/reporting purposes)
    */
   async getAllProjectAccounts(year?: number): Promise<ProjectFinancialAccount[]> {
-    if (isDevMode()) {
-      if (year) {
-        return Array.from(this.accounts.values()).filter(acc => {
-          const pDate = acc.createdAt || new Date().toISOString();
-          return new Date(pDate).getFullYear() === year;
-        });
-      }
-      return Array.from(this.accounts.values());
-    }
-
+    return withDevMode(
+      () => {
+        if (year) {
+          return Array.from(this.accounts.values()).filter(acc => {
+            const pDate = acc.createdAt || new Date().toISOString();
+            return new Date(pDate).getFullYear() === year;
+          });
+        }
+        return Array.from(this.accounts.values());
+      },
+      async () => {
     try {
       // Fetch projects that are not in draft/submitted status
       const projectsSnapshot = await getDocs(
@@ -782,6 +787,7 @@ class ProjectFinancialService {
       console.error('Error fetching production project accounts:', error);
       return [];
     }
+});
   }
 
   /**
@@ -789,12 +795,13 @@ class ProjectFinancialService {
    * Used for comparisons with Bank transactions
    */
   async getAllProjectTrackerTransactions(): Promise<ProjectTransaction[]> {
-    if (isDevMode()) {
-      // Return mock transactions that are simulating project tracker data
-      // For now, we can reuse MOCK_PROJECT_TRANSACTIONS or return a subset
-      return MOCK_PROJECT_TRANSACTIONS;
-    }
-
+    return withDevMode(
+      () => {
+        // Return mock transactions that are simulating project tracker data
+        // For now, we can reuse MOCK_PROJECT_TRANSACTIONS or return a subset
+        return MOCK_PROJECT_TRANSACTIONS;
+      },
+      async () => {
     try {
       const snapshot = await getDocs(
         query(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), orderBy('date', 'desc'))
@@ -809,6 +816,7 @@ class ProjectFinancialService {
       console.error('Error fetching all project tracker transactions:', error);
       return [];
     }
+});
   }
 
   /**

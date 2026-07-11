@@ -29,7 +29,7 @@ import { CommunicationService } from './communicationService';
 export class BoardManagementService {
   // Get current active board members
   static async getCurrentBoardMembers(): Promise<BoardMember[]> {
-    return withDevMode(
+    return withDevMode<BoardMember[]>(
       () => [
         {
           id: 'board1',
@@ -104,7 +104,7 @@ export class BoardManagementService {
     incomingBoard: Partial<BoardMember>[],
     completedBy: string
   ): Promise<BoardTransition> {
-    return withDevMode(
+    return withDevMode<BoardTransition>(
       () => {
         console.log(`[Dev Mode] Would create board transition for year ${year}`);
         return {
