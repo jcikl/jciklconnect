@@ -11,9 +11,11 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   Timestamp,
   writeBatch,
   deleteField,
+  DocumentSnapshot,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
@@ -1302,6 +1304,42 @@ export class MembersService {
     options: Parameters<typeof MembersService.batchSyncMembershipRecords>[0]
   ) {
     return MembersService.batchSyncMembershipRecords(options);
+  }
+
+  /**
+   * Cursor-based paginated member fetch (ordered by name).
+   * Pass `lastDoc` from the previous page's result to advance the cursor.
+   * Falls back to a mock slice in dev mode.
+   */
+  static async getMembersPaginated(
+    pageSize: number = 50,
+    lastDoc?: DocumentSnapshot
+  ): Promise<{ members: Member[]; lastDoc: DocumentSnapshot | null; hasMore: boolean }> {
+    if (isDevMode()) {
+      const slice = MOCK_MEMBERS.slice(0, pageSize);
+      return { members: slice, lastDoc: null, hasMore: false };
+    }
+
+    let q = query(
+      collection(db, COLLECTIONS.MEMBERS),
+      orderBy('name'),
+      limit(pageSize)
+    );
+    if (lastDoc) {
+      q = query(
+        collection(db, COLLECTIONS.MEMBERS),
+        orderBy('name'),
+        startAfter(lastDoc),
+        limit(pageSize)
+      );
+    }
+    const snapshot = await getDocs(q);
+    const members = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as object) } as Member));
+    return {
+      members,
+      lastDoc: snapshot.docs[snapshot.docs.length - 1] ?? null,
+      hasMore: snapshot.docs.length === pageSize,
+    };
   }
 }
 

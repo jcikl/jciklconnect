@@ -11,9 +11,11 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   Timestamp,
   getDoc as getFirestoreDoc,
   documentId,
+  DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -3740,5 +3742,51 @@ export class FinanceService {
       console.error('Error generating income details statement:', error);
       throw error;
     }
+  }
+
+  /**
+   * Cursor-based paginated transaction fetch (ordered by date desc).
+   * Pass `lastDoc` from the previous page's result to advance the cursor.
+   * Falls back to a mock slice in dev mode.
+   */
+  static async getTransactionsPaginated(
+    pageSize: number = 100,
+    lastDoc?: DocumentSnapshot
+  ): Promise<{ transactions: Transaction[]; lastDoc: DocumentSnapshot | null; hasMore: boolean }> {
+    return withDevMode(
+      (): { transactions: Transaction[]; lastDoc: DocumentSnapshot | null; hasMore: boolean } => {
+        const slice = localMockTransactions.slice(0, pageSize);
+        return { transactions: slice, lastDoc: null, hasMore: false };
+      },
+      async () => {
+        let q = query(
+          collection(db, COLLECTIONS.TRANSACTIONS),
+          orderBy('date', 'desc'),
+          limit(pageSize)
+        );
+        if (lastDoc) {
+          q = query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            orderBy('date', 'desc'),
+            startAfter(lastDoc),
+            limit(pageSize)
+          );
+        }
+        const snapshot = await getDocs(q);
+        const transactions = snapshot.docs.map(d => {
+          const data = d.data() as any;
+          return {
+            id: d.id,
+            ...data,
+            date: data.date?.toDate?.()?.toISOString() || data.date,
+          } as Transaction;
+        });
+        return {
+          transactions,
+          lastDoc: snapshot.docs[snapshot.docs.length - 1] ?? null,
+          hasMore: snapshot.docs.length === pageSize,
+        };
+      }
+    );
   }
 }

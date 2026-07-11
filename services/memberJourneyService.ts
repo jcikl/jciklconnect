@@ -2,7 +2,7 @@
 import { Member } from '../types';
 import { BoardManagementService } from './boardManagementService';
 import { ProjectsService } from './projectsService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 
 export interface JourneyStep {
   title: string;
@@ -44,90 +44,105 @@ const NATIONAL_LEVEL_POSITIONS = ['Area Officer', 'National Officer', 'JCI Offic
 export class MemberJourneyService {
   /** Leadership Journey — derived from project committee assignments + Board of Directors records */
   static async getLeadershipJourney(member: Member): Promise<{ steps: JourneyStep[]; currentIndex: number }> {
-    let hasCommittee = false;
-    let hasOC = false;
-    let hasCommissionDirector = false;
-    let hasBoard = false;
-    let hasPresident = false;
-    let hasAreaOfficer = false;
-    let hasNationalOfficer = false;
-    let hasJciOfficer = false;
-    const details: Record<string, string> = {};
-    const multiDetails: Record<string, string[]> = {};
-
-    if (!isDevMode()) {
-      const [boardPositions, commissionPositions, projects] = await Promise.all([
-        BoardManagementService.getMemberBoardPositions(member.id).catch(() => []),
-        BoardManagementService.getMemberCommissionDirectorPositions(member.id).catch(() => []),
-        ProjectsService.getAllProjects().catch(() => []),
-      ]);
-
-      // Project committee / OC (from project committee assignments)
-      for (const proj of projects as any[]) {
-        if (!Array.isArray(proj.committee)) continue;
-        for (const c of proj.committee) {
-          if (c.memberId !== member.id) continue;
-          const role = (c.role || '').toLowerCase();
-          if (role.includes('organising chairman') || role.includes('organizing chairman') || role === 'oc') {
-            hasOC = true;
-            details['Project OC'] = proj.name || proj.title || '';
-          } else {
-            hasCommittee = true;
-            if (!details['Project Committee']) details['Project Committee'] = proj.name || proj.title || '';
-          }
-        }
-      }
-
-      // Board of Directors records
-      const sortByTermDesc = (a: { term: string }, b: { term: string }) =>
-        (parseInt(b.term) || 0) - (parseInt(a.term) || 0);
-
-      hasCommissionDirector = commissionPositions.length > 0;
-      if (hasCommissionDirector) {
-        const sorted = [...commissionPositions].sort(sortByTermDesc);
-        const cdEntries = sorted.map(cp => cp.position ? `${cp.position} · ${cp.term}` : cp.term);
-        details['Commission Director'] = cdEntries[0];
-        if (cdEntries.length > 1) multiDetails['Commission Director'] = cdEntries;
-      }
-      const boardEntriesRaw: { label: string; term: string }[] = [];
-      for (const bp of boardPositions) {
-        if (bp.position === 'President') { hasPresident = true; details['President'] = bp.term; }
-        else if (bp.position === 'Area Officer') { hasAreaOfficer = true; details['Area Officer'] = bp.term; }
-        else if (bp.position === 'National Officer') { hasNationalOfficer = true; details['National Officer'] = bp.term; }
-        else if (bp.position === 'JCI Officer') { hasJciOfficer = true; details['JCI Officer'] = bp.term; }
-        if (!NATIONAL_LEVEL_POSITIONS.includes(bp.position)) {
-          hasBoard = true;
-          boardEntriesRaw.push({ label: `${bp.position} · ${bp.term}`, term: bp.term });
-        }
-      }
-      if (boardEntriesRaw.length > 0) {
-        boardEntriesRaw.sort((a, b) => (parseInt(b.term) || 0) - (parseInt(a.term) || 0));
-        const boardEntries = boardEntriesRaw.map(e => e.label);
-        details['Board of Director'] = boardEntries[0];
-        if (boardEntries.length > 1) multiDetails['Board of Director'] = boardEntries;
-      }
-    }
-
-    const achievedMap: Record<(typeof LEADERSHIP_LADDER)[number], boolean> = {
-      'Member': true,
-      'Project Committee': hasCommittee || hasOC,
-      'Project OC': hasOC,
-      'Commission Director': hasCommissionDirector,
-      'Board of Director': hasBoard,
-      'President': hasPresident,
-      'Area Officer': hasAreaOfficer,
-      'National Officer': hasNationalOfficer,
-      'JCI Officer': hasJciOfficer,
+    const buildResult = (
+      hasCommittee: boolean, hasOC: boolean, hasCommissionDirector: boolean,
+      hasBoard: boolean, hasPresident: boolean, hasAreaOfficer: boolean,
+      hasNationalOfficer: boolean, hasJciOfficer: boolean,
+      details: Record<string, string>, multiDetails: Record<string, string[]>
+    ) => {
+      const achievedMap: Record<(typeof LEADERSHIP_LADDER)[number], boolean> = {
+        'Member': true,
+        'Project Committee': hasCommittee || hasOC,
+        'Project OC': hasOC,
+        'Commission Director': hasCommissionDirector,
+        'Board of Director': hasBoard,
+        'President': hasPresident,
+        'Area Officer': hasAreaOfficer,
+        'National Officer': hasNationalOfficer,
+        'JCI Officer': hasJciOfficer,
+      };
+      const steps: JourneyStep[] = LEADERSHIP_LADDER.map(title => ({
+        title,
+        achieved: achievedMap[title],
+        detail: details[title],
+        details: multiDetails[title],
+      }));
+      const currentIndex = steps.reduce((acc, s, i) => (s.achieved ? i : acc), 0);
+      return { steps, currentIndex };
     };
 
-    const steps: JourneyStep[] = LEADERSHIP_LADDER.map(title => ({
-      title,
-      achieved: achievedMap[title],
-      detail: details[title],
-      details: multiDetails[title],
-    }));
-    const currentIndex = steps.reduce((acc, s, i) => (s.achieved ? i : acc), 0);
-    return { steps, currentIndex };
+    return withDevMode(
+      () => buildResult(false, false, false, false, false, false, false, false, {}, {}),
+      async () => {
+        let hasCommittee = false;
+        let hasOC = false;
+        let hasCommissionDirector = false;
+        let hasBoard = false;
+        let hasPresident = false;
+        let hasAreaOfficer = false;
+        let hasNationalOfficer = false;
+        let hasJciOfficer = false;
+        const details: Record<string, string> = {};
+        const multiDetails: Record<string, string[]> = {};
+
+        const [boardPositions, commissionPositions, projects] = await Promise.all([
+          BoardManagementService.getMemberBoardPositions(member.id).catch(() => []),
+          BoardManagementService.getMemberCommissionDirectorPositions(member.id).catch(() => []),
+          ProjectsService.getAllProjects().catch(() => []),
+        ]);
+
+        // Project committee / OC (from project committee assignments)
+        for (const proj of projects as any[]) {
+          if (!Array.isArray(proj.committee)) continue;
+          for (const c of proj.committee) {
+            if (c.memberId !== member.id) continue;
+            const role = (c.role || '').toLowerCase();
+            if (role.includes('organising chairman') || role.includes('organizing chairman') || role === 'oc') {
+              hasOC = true;
+              details['Project OC'] = proj.name || proj.title || '';
+            } else {
+              hasCommittee = true;
+              if (!details['Project Committee']) details['Project Committee'] = proj.name || proj.title || '';
+            }
+          }
+        }
+
+        // Board of Directors records
+        const sortByTermDesc = (a: { term: string }, b: { term: string }) =>
+          (parseInt(b.term) || 0) - (parseInt(a.term) || 0);
+
+        hasCommissionDirector = commissionPositions.length > 0;
+        if (hasCommissionDirector) {
+          const sorted = [...commissionPositions].sort(sortByTermDesc);
+          const cdEntries = sorted.map(cp => cp.position ? `${cp.position} · ${cp.term}` : cp.term);
+          details['Commission Director'] = cdEntries[0];
+          if (cdEntries.length > 1) multiDetails['Commission Director'] = cdEntries;
+        }
+        const boardEntriesRaw: { label: string; term: string }[] = [];
+        for (const bp of boardPositions) {
+          if (bp.position === 'President') { hasPresident = true; details['President'] = bp.term; }
+          else if (bp.position === 'Area Officer') { hasAreaOfficer = true; details['Area Officer'] = bp.term; }
+          else if (bp.position === 'National Officer') { hasNationalOfficer = true; details['National Officer'] = bp.term; }
+          else if (bp.position === 'JCI Officer') { hasJciOfficer = true; details['JCI Officer'] = bp.term; }
+          if (!NATIONAL_LEVEL_POSITIONS.includes(bp.position)) {
+            hasBoard = true;
+            boardEntriesRaw.push({ label: `${bp.position} · ${bp.term}`, term: bp.term });
+          }
+        }
+        if (boardEntriesRaw.length > 0) {
+          boardEntriesRaw.sort((a, b) => (parseInt(b.term) || 0) - (parseInt(a.term) || 0));
+          const boardEntries = boardEntriesRaw.map(e => e.label);
+          details['Board of Director'] = boardEntries[0];
+          if (boardEntries.length > 1) multiDetails['Board of Director'] = boardEntries;
+        }
+
+        return buildResult(
+          hasCommittee, hasOC, hasCommissionDirector, hasBoard,
+          hasPresident, hasAreaOfficer, hasNationalOfficer, hasJciOfficer,
+          details, multiDetails
+        );
+      }
+    );
   }
 
   /** Trainer Pathway — derived from member skills + points (same criteria as the profile card) */

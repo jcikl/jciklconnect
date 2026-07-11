@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Trash2, Settings, X, ChevronDown, Sparkles, ArrowLeft, Phone, Mail,
   Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users,
@@ -181,7 +181,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     ProjectsService.getAllProjects().then(setAllProjects).catch(err => console.error('Failed to load projects:', err));
   }, []);
 
-  const getMemberDisplayMembershipType = (member: Member): MembershipType =>
+  const getMemberDisplayMembershipType = useCallback((member: Member): MembershipType =>
     computeMembershipTypeFromMember(
       {
         nationality: member.nationality,
@@ -193,7 +193,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         membershipType: member.membershipType,
       },
       membershipRules
-    );
+    ), [membershipRules]);
 
   // Filter members based on search + column filters
   const filteredMembers = useMemo(() => {
@@ -233,22 +233,22 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
 
-  const toggleSelection = (id: string) => {
+  const toggleSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const toggleAll = () => {
+  const toggleAll = useCallback(() => {
     if (selectedIds.size === paginatedMembers.length && paginatedMembers.every(m => selectedIds.has(m.id))) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(paginatedMembers.map(m => m.id)));
     }
-  };
+  }, [selectedIds, paginatedMembers]);
 
   const isAllSelected = paginatedMembers.length > 0 && paginatedMembers.every(m => selectedIds.has(m.id));
 

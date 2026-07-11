@@ -16,8 +16,9 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useMembers } from '../../hooks/useMembers';
 import { DEFAULT_LO_ID } from '../../config/constants';
 import { formatCurrency } from '../../utils/formatUtils';
-import { jsPDF } from 'jspdf';
-import { PDFDocument } from 'pdf-lib';
+// jsPDF and pdf-lib are dynamically imported inside handlePreviewPDF to keep
+// this chunk small — they total ~800 KB and are only needed when the user
+// clicks "View PDF".
 
 const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
   draft: 'Draft',
@@ -282,6 +283,10 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   };
 
   const handlePreviewPDF = async (pr: PaymentRequest) => {
+    const [{ jsPDF }, { PDFDocument }] = await Promise.all([
+      import('jspdf'),
+      import('pdf-lib'),
+    ]);
     const doc = new jsPDF();
     const primaryColor = [0, 151, 215]; // JCI Blue
     const secondaryColor = [243, 156, 18]; // Gold

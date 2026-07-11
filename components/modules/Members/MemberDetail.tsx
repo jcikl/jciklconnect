@@ -1,5 +1,5 @@
 ﻿import * as React from 'react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Settings, X, Sparkles, Phone, Mail,
   Award, Clock, Briefcase, GraduationCap, UserPlus,
@@ -139,7 +139,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
   ];
 
-  const resolveIntroducerDisplay = (introVal?: string) => {
+  const resolveIntroducerDisplay = useCallback((introVal?: string) => {
     if (!introVal) return 'Direct Join';
     const foundMember = members.find(m => m.id === introVal);
     if (foundMember) {
@@ -151,7 +151,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       return `JCI KL Member: ${shortName || fullName || 'Unnamed'}`;
     }
     return introVal;
-  };
+  }, [members]);
 
   const resolveIntroducerShort = (introVal?: string) => {
     if (!introVal) return 'Direct Join';
@@ -219,7 +219,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     setIsEditMode(true);
   };
 
-  const handleInlineAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInlineAvatarUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !inlineValues) return;
@@ -241,7 +241,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       setAvatarUploading(false);
       setAvatarUploadProgress(0);
     }
-  };
+  }, [inlineValues, member, showToast]);
 
   const handleInlineSave = async (card: 'basic' | 'professional' | 'contact' | 'apparel' | 'career', updates: Partial<Member>) => {
     try {
@@ -394,8 +394,14 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   };
   const [commissionDirectorPositions, setCommissionDirectorPositions] = useState<BoardMember[]>([]);
 
-  const mentor = members.find(m => m.id === member.mentorId);
-  const mentees = members.filter(m => member.menteeIds?.includes(m.id));
+  const mentor = useMemo(
+    () => members.find(m => m.id === member.mentorId),
+    [members, member.mentorId]
+  );
+  const mentees = useMemo(
+    () => members.filter(m => member.menteeIds?.includes(m.id)),
+    [members, member.menteeIds]
+  );
 
   // Load member's hobby clubs
   useEffect(() => {
@@ -562,7 +568,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     };
   }, [activeDetailTab, member.id]);
 
-  const handleFindMentors = async () => {
+  const handleFindMentors = useCallback(async () => {
     setLoadingMatches(true);
     try {
       const matches = await MentorshipService.findPotentialMentors(member.id, {
@@ -575,7 +581,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     } finally {
       setLoadingMatches(false);
     }
-  };
+  }, [member.id, member.skills, showToast]);
 
   const handleAssignMentor = async (mentorId: string) => {
     try {
@@ -587,7 +593,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     }
   };
 
-  const handleAnalyzeChurn = async () => {
+  const handleAnalyzeChurn = useCallback(async () => {
     setLoadingChurnPrediction(true);
     try {
       const prediction = await AIPredictionService.predictMemberChurn(member.id);
@@ -598,7 +604,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     } finally {
       setLoadingChurnPrediction(false);
     }
-  };
+  }, [member.id, showToast]);
 
   const handleEditProfile = async (updates: Partial<Member>) => {
     try {

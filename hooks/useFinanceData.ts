@@ -165,7 +165,7 @@ export function useFinanceData(searchQuery?: string) {
     }
   };
 
-  const handleAddProjectTrx = async () => {
+  const handleAddProjectTrx = useCallback(async () => {
     if (!selectedProjectFilter) return;
     const data = projectTrxAddForm;
     if (!data.amount || !data.description || !data.date) {
@@ -186,9 +186,10 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to add transaction', 'error');
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectFilter, projectTrxAddForm, showToast]);
 
-  const handleUpdateProjectTrx = async (id: string) => {
+  const handleUpdateProjectTrx = useCallback(async (id: string) => {
     if (!selectedProjectFilter) return;
     const data = projectTrxEditForm;
     if (!data.amount || !data.description || !data.date) {
@@ -205,9 +206,10 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to update transaction', 'error');
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectFilter, projectTrxEditForm, showToast]);
 
-  const handleDeleteProjectTrx = async (id: string) => {
+  const handleDeleteProjectTrx = useCallback(async (id: string) => {
     if (!selectedProjectFilter) return;
     if (!confirm('Are you sure you want to delete this transaction?')) return;
     try {
@@ -218,9 +220,10 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to delete transaction', 'error');
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectFilter, showToast]);
 
-  const handleProjectTrxPaste = async (pastedText: string) => {
+  const handleProjectTrxPaste = useCallback(async (pastedText: string) => {
     if (!selectedProjectFilter) return;
     if (!pastedText || !pastedText.includes('\t')) {
       showToast('Please copy columns from spreadsheet first.', 'warning');
@@ -307,7 +310,8 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setProjectTrxLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectFilter, showToast]);
 
   // ── useMemos ──────────────────────────────────────────────────────────────
 
@@ -1041,7 +1045,7 @@ export function useFinanceData(searchQuery?: string) {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleAddTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const category = formData.get('category') as Transaction['category'];
@@ -1092,13 +1096,14 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showToast]);
 
-  const handleSendReminders = () => {
+  const handleSendReminders = useCallback(() => {
     showToast('32 Payment reminders sent via Email & Push', 'success');
-  };
+  }, [showToast]);
 
-  const handleEditTransaction = (transaction: Transaction) => {
+  const handleEditTransaction = useCallback((transaction: Transaction) => {
     setEditingTransaction(transaction);
     const txYear = new Date(transaction.date).getFullYear();
     setEditingModalYear(String(txYear));
@@ -1131,9 +1136,10 @@ export function useFinanceData(searchQuery?: string) {
       setEditingAdministrativePurposeBase('');
     }
     setIsEditModalOpen(true);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members.length]);
 
-  const handleDeleteTransaction = async (transactionId: string) => {
+  const handleDeleteTransaction = useCallback(async (transactionId: string) => {
     if (!confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
       return;
     }
@@ -1153,9 +1159,10 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to delete transaction', 'error');
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, showToast]);
 
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = useCallback(async () => {
     const totalCount = selectedTxIds.size + selectedSplitIds.size;
     if (totalCount === 0) return;
 
@@ -1219,9 +1226,10 @@ export function useFinanceData(searchQuery?: string) {
       setLoading(false);
       setBatchOperationProgress(null);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTxIds, selectedSplitIds, transactions, showToast]);
 
-  const handleBatchApprove = async () => {
+  const handleBatchApprove = useCallback(async () => {
     const totalCount = selectedTxIds.size + selectedSplitIds.size;
     if (totalCount === 0) return;
 
@@ -1273,7 +1281,8 @@ export function useFinanceData(searchQuery?: string) {
       setLoading(false);
       setBatchOperationProgress(null);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTxIds, selectedSplitIds, transactions, showToast]);
 
   const loadPrPendingReconciliation = async () => {
     setPrReconcileLoading(true);
@@ -1305,7 +1314,7 @@ export function useFinanceData(searchQuery?: string) {
     }
   };
 
-  const handleLinkPrToBankTx = async (prId: string) => {
+  const handleLinkPrToBankTx = useCallback(async (prId: string) => {
     const bankTxId = prSelectedBankTx[prId];
     if (!bankTxId || !user?.uid) return;
     setPrLinkingId(prId);
@@ -1329,9 +1338,10 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setPrLinkingId(null);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prSelectedBankTx, user, transactions, showToast]);
 
-  const handleReconciliationQuery = async () => {
+  const handleReconciliationQuery = useCallback(async () => {
     const ref = refNumberQuery.trim();
     if (!ref) {
       showToast('Please enter a reference number', 'error');
@@ -1349,9 +1359,9 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setReconciliationLoading(false);
     }
-  };
+  }, [refNumberQuery, transactions, showToast]);
 
-  const handleMarkReconciled = async (transactionId: string) => {
+  const handleMarkReconciled = useCallback(async (transactionId: string) => {
     if (!user?.uid) return;
     setReconcilingId(transactionId);
     try {
@@ -1368,9 +1378,10 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setReconcilingId(null);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, showToast]);
 
-  const handleUpdateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingTransaction) return;
 
@@ -1435,7 +1446,8 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to update transaction', 'error');
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingTransaction, editingMembershipYear, editingAdministrativeYear, editingAdministrativePurposeBase, showToast]);
 
   // ── Return all state + computed + handlers ────────────────────────────────
 

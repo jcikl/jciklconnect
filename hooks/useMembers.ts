@@ -1,4 +1,6 @@
 // Members Data Hook
+import { useState, useEffect, useCallback } from 'react';
+import { DocumentSnapshot } from 'firebase/firestore';
 import { MembersService } from '../services/membersService';
 import { Member, MemberCreateInput } from '../types';
 import { useToast } from '../components/ui/Common';
@@ -106,4 +108,44 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     batchUpdateMembers,
     batchDeleteMembers,
   } satisfies UseMembersResult;
+};
+
+export interface UsePaginatedMembersResult {
+  members: Member[];
+  loadMore: () => Promise<void>;
+  hasMore: boolean;
+  loading: boolean;
+}
+
+/**
+ * Paginated members hook for list views (e.g. MembersView).
+ * Keeps appending pages; call `loadMore()` to fetch the next page.
+ * Distinct from `useMembers` which fetches all members (used for dropdowns etc.).
+ */
+export const usePaginatedMembers = (pageSize = 50): UsePaginatedMembersResult => {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const loadMore = useCallback(async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+    try {
+      const result = await MembersService.getMembersPaginated(pageSize, lastDoc ?? undefined);
+      setMembers(prev => [...prev, ...result.members]);
+      setLastDoc(result.lastDoc);
+      setHasMore(result.hasMore);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading, hasMore, lastDoc, pageSize]);
+
+  // Initial load
+  useEffect(() => {
+    void loadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { members, loadMore, hasMore, loading };
 };
