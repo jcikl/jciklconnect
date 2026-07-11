@@ -1,43 +1,28 @@
-// Knowledge Data Hook
-import { useState, useEffect } from 'react';
+import { useFirestoreCollection } from './useFirestoreCollection';
 import { KnowledgeService } from '../services/knowledgeService';
 import { TrainingModule, Document } from '../types';
 import { useToast } from '../components/ui/Common';
 
 export const useKnowledge = () => {
-  const [trainingModules, setTrainingModules] = useState<TrainingModule[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [modules, docs] = await Promise.all([
-        KnowledgeService.getAllTrainingModules(),
-        KnowledgeService.getAllDocuments(),
-      ]);
-      setTrainingModules(modules);
-      setDocuments(docs);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load knowledge data';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: trainingModules, loading: modulesLoading, error: modulesError, reload: reloadModules } =
+    useFirestoreCollection<TrainingModule>({ loader: () => KnowledgeService.getAllTrainingModules() });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { data: documents, loading: docsLoading, error: docsError, reload: reloadDocs } =
+    useFirestoreCollection<Document>({ loader: () => KnowledgeService.getAllDocuments() });
+
+  const loading = modulesLoading || docsLoading;
+  const error = modulesError || docsError;
+
+  const loadData = async () => {
+    await Promise.all([reloadModules(), reloadDocs()]);
+  };
 
   const createDocument = async (documentData: Omit<Document, 'id'>) => {
     try {
       const id = await KnowledgeService.createDocument(documentData);
-      await loadData();
+      await reloadDocs();
       showToast('Document uploaded successfully', 'success');
       return id;
     } catch (err) {
@@ -50,7 +35,7 @@ export const useKnowledge = () => {
   const deleteDocument = async (documentId: string) => {
     try {
       await KnowledgeService.deleteDocument(documentId);
-      await loadData();
+      await reloadDocs();
       showToast('Document deleted successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete document';
@@ -69,4 +54,3 @@ export const useKnowledge = () => {
     deleteDocument,
   };
 };
-

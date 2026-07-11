@@ -18,7 +18,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Project, Task } from '../types';
 import { PointsService } from './pointsService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { apiCache } from './cacheService';
 import { MOCK_PROJECTS, MOCK_TASKS } from './mockData';
 
@@ -32,29 +32,25 @@ export class ProjectsService {
 
   // Get all projects (includes all statuses - no filtering)
   static async getAllProjects(): Promise<Project[]> {
-    if (isDevMode()) {
-      return MOCK_PROJECTS;
-    }
-
-    return apiCache.getOrSet(CACHE_KEY_ALL_PROJECTS, async () => {
-      try {
-        const snapshot = await getDocs(
-          query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
-        );
-        return snapshot.docs.map(d => ({
-          id: d.id,
-          ...d.data(),
-          createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() ?? d.data().createdAt,
-          updatedAt: d.data().updatedAt?.toDate?.()?.toISOString?.() ?? d.data().updatedAt,
-        } as Project));
-      } catch (error) {
-        if (isDevMode()) {
-          return MOCK_PROJECTS;
+    return withDevMode(
+      () => MOCK_PROJECTS,
+      () => apiCache.getOrSet(CACHE_KEY_ALL_PROJECTS, async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
+          );
+          return snapshot.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+            createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() ?? d.data().createdAt,
+            updatedAt: d.data().updatedAt?.toDate?.()?.toISOString?.() ?? d.data().updatedAt,
+          } as Project));
+        } catch (error) {
+          console.error('Error fetching projects:', error);
+          throw error;
         }
-        console.error('Error fetching projects:', error);
-        throw error;
-      }
-    }, PROJECTS_TTL);
+      }, PROJECTS_TTL)
+    );
   }
 
   // Get project by ID
@@ -124,293 +120,295 @@ export class ProjectsService {
 
   // Update project
   static async updateProject(projectId: string, updates: Partial<Project>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating update of project ${projectId}`);
-      return;
-    }
-    try {
-      const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
-      
-      // Determine members to recalculate if committee or trainers change
-      const memberIdsToRecalculate = new Set<string>();
-      if (updates.committee !== undefined || updates.trainers !== undefined) {
-        const oldSnap = await getDoc(projectRef);
-        if (oldSnap.exists()) {
-          const oldData = oldSnap.data() as Project;
-          if (oldData.committee && Array.isArray(oldData.committee)) {
-            oldData.committee.forEach((c: any) => {
-              if (c.memberId) memberIdsToRecalculate.add(c.memberId);
-            });
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+
+          // Determine members to recalculate if committee or trainers change
+          const memberIdsToRecalculate = new Set<string>();
+          if (updates.committee !== undefined || updates.trainers !== undefined) {
+            const oldSnap = await getDoc(projectRef);
+            if (oldSnap.exists()) {
+              const oldData = oldSnap.data() as Project;
+              if (oldData.committee && Array.isArray(oldData.committee)) {
+                oldData.committee.forEach((c: any) => {
+                  if (c.memberId) memberIdsToRecalculate.add(c.memberId);
+                });
+              }
+              if (oldData.trainers && Array.isArray(oldData.trainers)) {
+                oldData.trainers.forEach((t: any) => {
+                  if (t.memberId) memberIdsToRecalculate.add(t.memberId);
+                });
+              }
+            }
+
+            if (updates.committee && Array.isArray(updates.committee)) {
+              updates.committee.forEach((c: any) => {
+                if (c.memberId) memberIdsToRecalculate.add(c.memberId);
+              });
+            }
+            if (updates.trainers && Array.isArray(updates.trainers)) {
+              updates.trainers.forEach((t: any) => {
+                if (t.memberId) memberIdsToRecalculate.add(t.memberId);
+              });
+            }
           }
-          if (oldData.trainers && Array.isArray(oldData.trainers)) {
-            oldData.trainers.forEach((t: any) => {
-              if (t.memberId) memberIdsToRecalculate.add(t.memberId);
-            });
+
+          // Strip out undefined values to avoid Firestore errors
+          const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() };
+          Object.entries(updates).forEach(([key, value]) => {
+            if (value !== undefined) {
+              updateData[key] = value;
+            }
+          });
+          await updateDoc(projectRef, updateData);
+          this.invalidateProjectsCache();
+
+          // Recalculate radar stats for affected members
+          if (memberIdsToRecalculate.size > 0) {
+            for (const memberId of memberIdsToRecalculate) {
+              await PointsService.recalculateMemberRadarStats(memberId);
+            }
           }
-        }
-        
-        if (updates.committee && Array.isArray(updates.committee)) {
-          updates.committee.forEach((c: any) => {
-            if (c.memberId) memberIdsToRecalculate.add(c.memberId);
-          });
-        }
-        if (updates.trainers && Array.isArray(updates.trainers)) {
-          updates.trainers.forEach((t: any) => {
-            if (t.memberId) memberIdsToRecalculate.add(t.memberId);
-          });
+        } catch (error) {
+          console.error('Error updating project:', error);
+          throw error;
         }
       }
-
-      // Strip out undefined values to avoid Firestore errors
-      const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() };
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value !== undefined) {
-          updateData[key] = value;
-        }
-      });
-      await updateDoc(projectRef, updateData);
-      this.invalidateProjectsCache();
-
-      // Recalculate radar stats for affected members
-      if (memberIdsToRecalculate.size > 0) {
-        for (const memberId of memberIdsToRecalculate) {
-          await PointsService.recalculateMemberRadarStats(memberId);
-        }
-      }
-    } catch (error) {
-      console.error('Error updating project:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete project
   static async deleteProject(projectId: string): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating deletion of project ${projectId}`);
-      return;
-    }
-    try {
-      const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
-      const oldSnap = await getDoc(projectRef);
-      const memberIdsToRecalculate = new Set<string>();
-      if (oldSnap.exists()) {
-        const oldData = oldSnap.data() as Project;
-        if (oldData.committee && Array.isArray(oldData.committee)) {
-          oldData.committee.forEach((c: any) => {
-            if (c.memberId) memberIdsToRecalculate.add(c.memberId);
-          });
-        }
-        if (oldData.trainers && Array.isArray(oldData.trainers)) {
-          oldData.trainers.forEach((t: any) => {
-            if (t.memberId) memberIdsToRecalculate.add(t.memberId);
-          });
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+          const oldSnap = await getDoc(projectRef);
+          const memberIdsToRecalculate = new Set<string>();
+          if (oldSnap.exists()) {
+            const oldData = oldSnap.data() as Project;
+            if (oldData.committee && Array.isArray(oldData.committee)) {
+              oldData.committee.forEach((c: any) => {
+                if (c.memberId) memberIdsToRecalculate.add(c.memberId);
+              });
+            }
+            if (oldData.trainers && Array.isArray(oldData.trainers)) {
+              oldData.trainers.forEach((t: any) => {
+                if (t.memberId) memberIdsToRecalculate.add(t.memberId);
+              });
+            }
+          }
+
+          await deleteDoc(projectRef);
+          this.invalidateProjectsCache();
+
+          // Recalculate radar stats for affected members (revocation)
+          if (memberIdsToRecalculate.size > 0) {
+            for (const memberId of memberIdsToRecalculate) {
+              await PointsService.recalculateMemberRadarStats(memberId);
+            }
+          }
+        } catch (error) {
+          console.error('Error deleting project:', error);
+          throw error;
         }
       }
-
-      await deleteDoc(projectRef);
-      this.invalidateProjectsCache();
-
-      // Recalculate radar stats for affected members (revocation)
-      if (memberIdsToRecalculate.size > 0) {
-        for (const memberId of memberIdsToRecalculate) {
-          await PointsService.recalculateMemberRadarStats(memberId);
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      throw error;
-    }
+    );
   }
 
   // Get tasks for a project
   static async getProjectTasks(projectId: string): Promise<Task[]> {
-    if (isDevMode()) {
-      // Return mock tasks filtered by projectId
-      return MOCK_TASKS.filter(task => task.projectId === projectId);
-    }
+    return withDevMode(
+      () => MOCK_TASKS.filter(task => task.projectId === projectId),
+      async () => {
+        try {
+          const q = query(
+            collection(db, 'tasks'),
+            where('projectId', '==', projectId),
+            orderBy('dueDate', 'asc')
+          );
 
-    try {
-      const q = query(
-        collection(db, 'tasks'),
-        where('projectId', '==', projectId),
-        orderBy('dueDate', 'asc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          status: data.status || 'Todo', // 确保状态字段存在
-          priority: data.priority || 'Medium', // 确保优先级字段存在
-          assignee: data.assignee || '', // 确保 assignee 字段存在
-          dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || new Date().toISOString().split('T')[0],
-        } as Task;
-      });
-    } catch (error) {
-      console.error('Error fetching project tasks:', error);
-      throw error;
-    }
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              status: data.status || 'Todo', // 确保状态字段存在
+              priority: data.priority || 'Medium', // 确保优先级字段存在
+              assignee: data.assignee || '', // 确保 assignee 字段存在
+              dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate || new Date().toISOString().split('T')[0],
+            } as Task;
+          });
+        } catch (error) {
+          console.error('Error fetching project tasks:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get task by ID
   static async getTaskById(taskId: string): Promise<Task | null> {
-    if (isDevMode()) {
-      const mockTask = MOCK_TASKS.find(t => t.id === taskId);
-      return mockTask || null;
-    }
+    return withDevMode(
+      () => MOCK_TASKS.find(t => t.id === taskId) || null,
+      async () => {
+        try {
+          const taskDoc = await getDoc(doc(db, 'tasks', taskId));
+          if (!taskDoc.exists()) {
+            return null;
+          }
 
-    try {
-      const taskDoc = await getDoc(doc(db, 'tasks', taskId));
-      if (!taskDoc.exists()) {
-        return null;
+          const data = taskDoc.data();
+          return {
+            id: taskDoc.id,
+            ...data,
+            dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate,
+          } as Task;
+        } catch (error) {
+          console.error('Error fetching task by ID:', error);
+          throw error;
+        }
       }
-
-      const data = taskDoc.data();
-      return {
-        id: taskDoc.id,
-        ...data,
-        dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate,
-      } as Task;
-    } catch (error) {
-      console.error('Error fetching task by ID:', error);
-      throw error;
-    }
+    );
   }
 
   // Create or update task (if taskId is provided, use it as document ID)
   static async createTask(taskData: Omit<Task, 'id'>, taskId?: string): Promise<string> {
-    if (isDevMode()) {
-      const newId = taskId || `mock-task-${Date.now()}`;
-      console.log(`[DEV MODE] Simulating creation of task with ID: ${newId}`);
-      return newId;
-    }
+    return withDevMode(
+      () => taskId || `mock-task-${Date.now()}`,
+      async () => {
+        try {
+          const now = Timestamp.now();
+          const rawTask = {
+            ...taskData,
+            status: taskData.status || 'Todo' as const,
+            createdAt: now,
+            updatedAt: now,
+            dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
+          };
 
-    try {
-      const now = Timestamp.now();
-      const rawTask = {
-        ...taskData,
-        status: taskData.status || 'Todo' as const,
-        createdAt: now,
-        updatedAt: now,
-        dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
-      };
+          // Strip out undefined values to avoid Firestore errors
+          const newTask: Record<string, unknown> = {};
+          Object.entries(rawTask).forEach(([key, value]) => {
+            if (value !== undefined) {
+              newTask[key] = value;
+            }
+          });
 
-      // Strip out undefined values to avoid Firestore errors
-      const newTask: Record<string, unknown> = {};
-      Object.entries(rawTask).forEach(([key, value]) => {
-        if (value !== undefined) {
-          newTask[key] = value;
-        }
-      });
+          // 如果提供了 taskId，使用 setDoc 创建/更新（使用指定的文档 ID）
+          if (taskId) {
+            const taskRef = doc(db, 'tasks', taskId);
+            const existingTask = await getDoc(taskRef);
 
-      // 如果提供了 taskId，使用 setDoc 创建/更新（使用指定的文档 ID）
-      if (taskId) {
-        const taskRef = doc(db, 'tasks', taskId);
-        const existingTask = await getDoc(taskRef);
+            // 如果 task 已存在，保留原有的 createdAt，只更新其他字段
+            if (existingTask.exists()) {
+              const existingData = existingTask.data();
+              if (existingData.createdAt) {
+                newTask.createdAt = existingData.createdAt;
+              } else {
+                newTask.createdAt = now;
+              }
+            } else {
+              // 新任务，确保 createdAt 已设置
+              newTask.createdAt = now;
+            }
 
-        // 如果 task 已存在，保留原有的 createdAt，只更新其他字段
-        if (existingTask.exists()) {
-          const existingData = existingTask.data();
-          if (existingData.createdAt) {
-            newTask.createdAt = existingData.createdAt;
+            await setDoc(taskRef, newTask, { merge: true });
+            return taskId;
           } else {
-            newTask.createdAt = now;
+            // 否则使用 addDoc 让 Firestore 自动生成 ID
+            const docRef = await addDoc(collection(db, 'tasks'), newTask);
+            return docRef.id;
           }
-        } else {
-          // 新任务，确保 createdAt 已设置
-          newTask.createdAt = now;
+        } catch (error) {
+          console.error('Error creating/updating task:', error);
+          throw error;
         }
-
-        await setDoc(taskRef, newTask, { merge: true });
-        return taskId;
-      } else {
-        // 否则使用 addDoc 让 Firestore 自动生成 ID
-        const docRef = await addDoc(collection(db, 'tasks'), newTask);
-        return docRef.id;
       }
-    } catch (error) {
-      console.error('Error creating/updating task:', error);
-      throw error;
-    }
+    );
   }
 
   // Update task
   static async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating update of task ${taskId} with updates:`, updates);
-      // Simulate awarding points if task is completed
-      if (updates.status === 'Done' && updates.assignee && updates.projectId) {
-        await PointsService.awardTaskCompletionPoints(
-          updates.assignee,
-          updates.projectId,
-          taskId,
-          updates.priority
-        );
-      }
-      return;
-    }
-
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-
-      // 获取现有任务数据以合并 statusHistory 和 remarks
-      const existingTask = await getDoc(taskRef);
-      const existingData = existingTask.exists() ? existingTask.data() : {};
-
-      const updateData: any = {
-        updatedAt: Timestamp.now(),
-      };
-
-      // 处理 status 更新：记录到 statusHistory
-      if (updates.status && updates.status !== existingData.status) {
-        updateData.status = updates.status;
-        const statusHistory = existingData.statusHistory || {};
-        const statusChangeId = `status-${Date.now()}`;
-        statusHistory[statusChangeId] = {
-          status: updates.status,
-          timestamp: new Date().toISOString(),
-        };
-        updateData.statusHistory = statusHistory;
-      }
-
-      // 处理 remarks：如果提供了新的 remark，添加到 remarks map
-      if (updates.remarks) {
-        updateData.remarks = updates.remarks;
-      }
-
-      // 处理其他字段更新
-      Object.keys(updates).forEach(key => {
-        if (key !== 'status' && key !== 'remarks' && key !== 'statusHistory' && key !== 'id') {
-          updateData[key] = updates[key as keyof Task];
-        }
-      });
-
-      if (updates.dueDate) {
-        updateData.dueDate = updates.dueDate;
-      }
-
-      await updateDoc(taskRef, updateData);
-
-      // If task is completed, award points
-      if (updates.status === 'Done') {
-        const taskDoc = await getDoc(taskRef);
-        const task = taskDoc.data() as Task;
-
-        if (task.assignee && task.projectId) {
+    return withDevMode(
+      async () => {
+        // Simulate awarding points if task is completed
+        if (updates.status === 'Done' && updates.assignee && updates.projectId) {
           await PointsService.awardTaskCompletionPoints(
-            task.assignee,
-            task.projectId,
+            updates.assignee,
+            updates.projectId,
             taskId,
-            task.priority
+            updates.priority
           );
         }
+      },
+      async () => {
+        try {
+          const taskRef = doc(db, 'tasks', taskId);
+
+          // 获取现有任务数据以合并 statusHistory 和 remarks
+          const existingTask = await getDoc(taskRef);
+          const existingData = existingTask.exists() ? existingTask.data() : {};
+
+          const updateData: any = {
+            updatedAt: Timestamp.now(),
+          };
+
+          // 处理 status 更新：记录到 statusHistory
+          if (updates.status && updates.status !== existingData.status) {
+            updateData.status = updates.status;
+            const statusHistory = existingData.statusHistory || {};
+            const statusChangeId = `status-${Date.now()}`;
+            statusHistory[statusChangeId] = {
+              status: updates.status,
+              timestamp: new Date().toISOString(),
+            };
+            updateData.statusHistory = statusHistory;
+          }
+
+          // 处理 remarks：如果提供了新的 remark，添加到 remarks map
+          if (updates.remarks) {
+            updateData.remarks = updates.remarks;
+          }
+
+          // 处理其他字段更新
+          Object.keys(updates).forEach(key => {
+            if (key !== 'status' && key !== 'remarks' && key !== 'statusHistory' && key !== 'id') {
+              updateData[key] = updates[key as keyof Task];
+            }
+          });
+
+          if (updates.dueDate) {
+            updateData.dueDate = updates.dueDate;
+          }
+
+          await updateDoc(taskRef, updateData);
+
+          // If task is completed, award points
+          if (updates.status === 'Done') {
+            const taskDoc = await getDoc(taskRef);
+            const task = taskDoc.data() as Task;
+
+            if (task.assignee && task.projectId) {
+              await PointsService.awardTaskCompletionPoints(
+                task.assignee,
+                task.projectId,
+                taskId,
+                task.priority
+              );
+            }
+          }
+        } catch (error) {
+          console.error('Error updating task:', error);
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Error updating task:', error);
-      throw error;
-    }
+    );
   }
 
   // Update project completion percentage
@@ -428,4 +426,3 @@ export class ProjectsService {
     }
   }
 }
-

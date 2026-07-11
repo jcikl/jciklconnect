@@ -15,28 +15,29 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { TrainingModule, Document } from '../types';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { MOCK_TRAININGS, MOCK_DOCUMENTS } from './mockData';
 
 export class KnowledgeService {
   // Get all training modules
   static async getAllTrainingModules(): Promise<TrainingModule[]> {
-    if (isDevMode()) {
-      return MOCK_TRAININGS;
-    }
-
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.TRAINING_MODULES), orderBy('title', 'asc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as TrainingModule));
-    } catch (error) {
-      console.error('Error fetching training modules:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => MOCK_TRAININGS,
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.TRAINING_MODULES), orderBy('title', 'asc'))
+          );
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          } as TrainingModule));
+        } catch (error) {
+          console.error('Error fetching training modules:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get training module by ID
@@ -88,23 +89,24 @@ export class KnowledgeService {
 
   // Get all documents
   static async getAllDocuments(): Promise<Document[]> {
-    if (isDevMode()) {
-      return MOCK_DOCUMENTS;
-    }
-
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.DOCUMENTS), orderBy('uploadedDate', 'desc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        uploadedDate: doc.data().uploadedDate?.toDate?.()?.toISOString() || doc.data().uploadedDate,
-      } as Document));
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => MOCK_DOCUMENTS,
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.DOCUMENTS), orderBy('uploadedDate', 'desc'))
+          );
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            uploadedDate: doc.data().uploadedDate?.toDate?.()?.toISOString() || doc.data().uploadedDate,
+          } as Document));
+        } catch (error) {
+          console.error('Error fetching documents:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Create document
@@ -158,56 +160,62 @@ export class KnowledgeService {
 
   // Search documents
   static async searchDocuments(searchTerm: string): Promise<Document[]> {
-    if (isDevMode()) {
-      const allDocs = await this.getAllDocuments();
-      const term = searchTerm.toLowerCase();
-      return allDocs.filter(doc =>
-        doc.name.toLowerCase().includes(term) ||
-        doc.description?.toLowerCase().includes(term) ||
-        doc.category?.toLowerCase().includes(term)
-      );
-    }
+    return withDevMode(
+      async () => {
+        const allDocs = await this.getAllDocuments();
+        const term = searchTerm.toLowerCase();
+        return allDocs.filter(doc =>
+          doc.name.toLowerCase().includes(term) ||
+          doc.description?.toLowerCase().includes(term) ||
+          doc.category?.toLowerCase().includes(term)
+        );
+      },
+      async () => {
+        try {
+          // Firestore doesn't support full-text search natively
+          // This is a simple implementation - consider using Algolia for production
+          const allDocs = await this.getAllDocuments();
+          const term = searchTerm.toLowerCase();
 
-    try {
-      // Firestore doesn't support full-text search natively
-      // This is a simple implementation - consider using Algolia for production
-      const allDocs = await this.getAllDocuments();
-      const term = searchTerm.toLowerCase();
-
-      return allDocs.filter(doc =>
-        doc.name.toLowerCase().includes(term) ||
-        doc.description?.toLowerCase().includes(term) ||
-        doc.category?.toLowerCase().includes(term)
-      );
-    } catch (error) {
-      console.error('Error searching documents:', error);
-      throw error;
-    }
+          return allDocs.filter(doc =>
+            doc.name.toLowerCase().includes(term) ||
+            doc.description?.toLowerCase().includes(term) ||
+            doc.category?.toLowerCase().includes(term)
+          );
+        } catch (error) {
+          console.error('Error searching documents:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Search training modules
   static async searchTrainingModules(searchTerm: string): Promise<TrainingModule[]> {
-    if (isDevMode()) {
-      const allModules = await this.getAllTrainingModules();
-      const term = searchTerm.toLowerCase();
-      return allModules.filter(module =>
-        module.title.toLowerCase().includes(term) ||
-        module.type?.toLowerCase().includes(term)
-      );
-    }
+    return withDevMode(
+      async () => {
+        const allModules = await this.getAllTrainingModules();
+        const term = searchTerm.toLowerCase();
+        return allModules.filter(module =>
+          module.title.toLowerCase().includes(term) ||
+          module.type?.toLowerCase().includes(term)
+        );
+      },
+      async () => {
+        try {
+          const allModules = await this.getAllTrainingModules();
+          const term = searchTerm.toLowerCase();
 
-    try {
-      const allModules = await this.getAllTrainingModules();
-      const term = searchTerm.toLowerCase();
-
-      return allModules.filter(module =>
-        module.title.toLowerCase().includes(term) ||
-        module.type?.toLowerCase().includes(term)
-      );
-    } catch (error) {
-      console.error('Error searching training modules:', error);
-      throw error;
-    }
+          return allModules.filter(module =>
+            module.title.toLowerCase().includes(term) ||
+            module.type?.toLowerCase().includes(term)
+          );
+        } catch (error) {
+          console.error('Error searching training modules:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get all unique categories

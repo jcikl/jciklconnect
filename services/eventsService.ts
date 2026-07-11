@@ -19,7 +19,7 @@ import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Event } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
 import { PointsService } from './pointsService';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { apiCache } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
 
@@ -71,153 +71,153 @@ export class EventsService {
 
   /** Approved projects with eventStartDate (for Event List: Upcoming + Completed) */
   static async getAllEvents(): Promise<Event[]> {
-    if (isDevMode()) {
-      return [...this.mockEvents];
-    }
+    return withDevMode(
+      () => [...this.mockEvents],
+      () => apiCache.getOrSet(CACHE_KEY_ALL_EVENTS, async () => {
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.PROJECTS),
+              where('status', '==', 'Active')
+            )
+          );
 
-    return apiCache.getOrSet(CACHE_KEY_ALL_EVENTS, async () => {
-      try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, COLLECTIONS.PROJECTS),
-            where('status', '==', 'Active')
-          )
-        );
+          const events = snapshot.docs
+            .filter(d => {
+              const data = d.data();
+              return data.eventStartDate != null || data.date != null;
+            })
+            .map(d => this.projectDocToEvent({ id: d.id, data: () => d.data() }));
 
-        const events = snapshot.docs
-          .filter(d => {
-            const data = d.data();
-            return data.eventStartDate != null || data.date != null;
-          })
-          .map(d => this.projectDocToEvent({ id: d.id, data: () => d.data() }));
-
-        return events.sort((a, b) => {
-          const da = a.date ? new Date(a.date).getTime() : 0;
-          const db = b.date ? new Date(b.date).getTime() : 0;
-          return db - da;
-        });
-      } catch (error) {
-        if (isDevMode()) {
-          return [...this.mockEvents];
+          return events.sort((a, b) => {
+            const da = a.date ? new Date(a.date).getTime() : 0;
+            const db = b.date ? new Date(b.date).getTime() : 0;
+            return db - da;
+          });
+        } catch (error) {
+          console.error('Error fetching events:', error);
+          throw error;
         }
-        console.error('Error fetching events:', error);
-        throw error;
-      }
-    }, EVENTS_TTL);
+      }, EVENTS_TTL)
+    );
   }
 
   // Get event by ID (from projects collection)
   static async getEventById(eventId: string): Promise<Event | null> {
-    if (isDevMode()) {
-      return this.mockEvents.find(e => e.id === eventId) || null;
-    }
+    return withDevMode(
+      () => this.mockEvents.find(e => e.id === eventId) || null,
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+          const docSnap = await getDoc(docRef);
 
-    try {
-      const docRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const d = docSnap.data();
-        const hasDate = d?.eventStartDate != null || d?.date != null;
-        const isBannedStatus = ['Planning', 'Draft', 'Submitted', 'Under Review', 'Rejected', 'Cancelled'].includes(d?.status);
-        if (hasDate && !isBannedStatus) {
-          return this.projectDocToEvent({ id: docSnap.id, data: () => d });
+          if (docSnap.exists()) {
+            const d = docSnap.data();
+            const hasDate = d?.eventStartDate != null || d?.date != null;
+            const isBannedStatus = ['Planning', 'Draft', 'Submitted', 'Under Review', 'Rejected', 'Cancelled'].includes(d?.status);
+            if (hasDate && !isBannedStatus) {
+              return this.projectDocToEvent({ id: docSnap.id, data: () => d });
+            }
+          }
+          return null;
+        } catch (error) {
+          console.error('Error fetching event:', error);
+          throw error;
         }
       }
-      return null;
-    } catch (error) {
-      console.error('Error fetching event:', error);
-      throw error;
-    }
+    );
   }
 
   // Create new event
   static async createEvent(eventData: Omit<Event, 'id'>): Promise<string> {
-    if (isDevMode()) {
-      const newId = `mock-event-${Date.now()}`;
-      const newEvent: Event = {
-        id: newId,
-        ...eventData,
-        attendees: 0,
-        status: 'Upcoming',
-      };
-      this.mockEvents.unshift(newEvent);
-      console.log(`[DEV MODE] Created event: ${newId}`);
-      return newId;
-    }
+    return withDevMode(
+      () => {
+        const newId = `mock-event-${Date.now()}`;
+        const newEvent: Event = {
+          id: newId,
+          ...eventData,
+          attendees: 0,
+          status: 'Upcoming',
+        };
+        this.mockEvents.unshift(newEvent);
+        return newId;
+      },
+      async () => {
+        try {
+          const payload: Record<string, unknown> = {
+            title: eventData.title,
+            description: eventData.description ?? null,
+            eventType: eventData.type,
+            date: Timestamp.fromDate(new Date(eventData.date)),
+            location: eventData.location,
+            attendees: 0,
+            status: 'Upcoming' as const,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+          if (eventData.maxAttendees != null) payload.maxAttendees = eventData.maxAttendees;
+          if (eventData.endDate != null) payload.endDate = eventData.endDate;
+          if (eventData.time != null) payload.time = eventData.time;
+          if (eventData.organizerId != null && eventData.organizerId !== '') payload.organizerId = eventData.organizerId;
+          if (eventData.predictedDemand != null) payload.predictedDemand = eventData.predictedDemand;
+          payload.type = eventData.type;
 
-    try {
-      const payload: Record<string, unknown> = {
-        title: eventData.title,
-        description: eventData.description ?? null,
-        eventType: eventData.type,
-        date: Timestamp.fromDate(new Date(eventData.date)),
-        location: eventData.location,
-        attendees: 0,
-        status: 'Upcoming' as const,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-      if (eventData.maxAttendees != null) payload.maxAttendees = eventData.maxAttendees;
-      if (eventData.endDate != null) payload.endDate = eventData.endDate;
-      if (eventData.time != null) payload.time = eventData.time;
-      if (eventData.organizerId != null && eventData.organizerId !== '') payload.organizerId = eventData.organizerId;
-      if (eventData.predictedDemand != null) payload.predictedDemand = eventData.predictedDemand;
-      payload.type = eventData.type;
-
-      const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
-      this.invalidateEventsCache();
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating event:', error);
-      throw error;
-    }
+          const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
+          this.invalidateEventsCache();
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating event:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update event
   static async updateEvent(eventId: string, updates: Partial<Event>): Promise<void> {
-    if (isDevMode()) {
-      const index = this.mockEvents.findIndex(e => e.id === eventId);
-      if (index !== -1) {
-        this.mockEvents[index] = { ...this.mockEvents[index], ...updates };
-        console.log(`[DEV MODE] Updated event: ${eventId}`);
-      }
-      return;
-    }
+    return withDevMode(
+      () => {
+        const index = this.mockEvents.findIndex(e => e.id === eventId);
+        if (index !== -1) {
+          this.mockEvents[index] = { ...this.mockEvents[index], ...updates };
+        }
+      },
+      async () => {
+        try {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+          const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() };
+          for (const [k, v] of Object.entries(updates)) {
+            if (v !== undefined) {
+              if (k === 'type') updateData.eventType = v;
+              else if (k === 'date') updateData.date = Timestamp.fromDate(new Date(v as string));
+              else updateData[k] = v;
+            }
+          }
 
-    try {
-      const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-      const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() };
-      for (const [k, v] of Object.entries(updates)) {
-        if (v !== undefined) {
-          if (k === 'type') updateData.eventType = v;
-          else if (k === 'date') updateData.date = Timestamp.fromDate(new Date(v as string));
-          else updateData[k] = v;
+          await updateDoc(eventRef, updateData);
+          this.invalidateEventsCache();
+        } catch (error) {
+          console.error('Error updating event:', error);
+          throw error;
         }
       }
-
-      await updateDoc(eventRef, updateData);
-      this.invalidateEventsCache();
-    } catch (error) {
-      console.error('Error updating event:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete event
   static async deleteEvent(eventId: string): Promise<void> {
-    if (isDevMode()) {
-      this.mockEvents = this.mockEvents.filter(e => e.id !== eventId);
-      return;
-    }
-
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.PROJECTS, eventId));
-      this.invalidateEventsCache();
-    } catch (error) {
-      console.error('Error deleting event:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { this.mockEvents = this.mockEvents.filter(e => e.id !== eventId); },
+      async () => {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.PROJECTS, eventId));
+          this.invalidateEventsCache();
+        } catch (error) {
+          console.error('Error deleting event:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Register member for event
@@ -235,41 +235,42 @@ export class EventsService {
       registeredByName?: string | null;
     }
   ): Promise<void> {
-    if (isDevMode()) {
-      return;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+          const event = await this.getEventById(eventId);
 
-    try {
-      const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-      const event = await this.getEventById(eventId);
+          if (!event) throw new Error('Event not found');
 
-      if (!event) throw new Error('Event not found');
+          const existing = await EventRegistrationService.getByEventAndMember(eventId, memberId);
+          if (existing && existing.status !== 'cancelled') throw new Error('You have already registered for this event');
 
-      const existing = await EventRegistrationService.getByEventAndMember(eventId, memberId);
-      if (existing && existing.status !== 'cancelled') throw new Error('You have already registered for this event');
+          if (event.maxAttendees && event.attendees >= event.maxAttendees) {
+            throw new Error('Event is full');
+          }
 
-      if (event.maxAttendees && event.attendees >= event.maxAttendees) {
-        throw new Error('Event is full');
+          // Add member to attendees list
+          await updateDoc(eventRef, {
+            attendees: event.attendees + 1,
+            registeredMembers: arrayUnion(memberId),
+          });
+          // Re-register: reset existing cancelled doc; otherwise create new
+          if (existing && existing.status === 'cancelled') {
+            await EventRegistrationService.updateStatus(existing.id, 'registered', {
+              registeredBy: extraFields?.registeredBy,
+              registeredByName: extraFields?.registeredByName,
+            });
+          } else {
+            await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID, extraFields);
+          }
+        } catch (error) {
+          console.error('Error registering for event:', error);
+          throw error;
+        }
       }
-
-      // Add member to attendees list
-      await updateDoc(eventRef, {
-        attendees: event.attendees + 1,
-        registeredMembers: arrayUnion(memberId),
-      });
-      // Re-register: reset existing cancelled doc; otherwise create new
-      if (existing && existing.status === 'cancelled') {
-        await EventRegistrationService.updateStatus(existing.id, 'registered', {
-          registeredBy: extraFields?.registeredBy,
-          registeredByName: extraFields?.registeredByName,
-        });
-      } else {
-        await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID, extraFields);
-      }
-    } catch (error) {
-      console.error('Error registering for event:', error);
-      throw error;
-    }
+    );
   }
 
   // Cancel event registration
@@ -280,25 +281,29 @@ export class EventsService {
     cancelledByName: string,
     cancelledByRole: 'self' | 'admin' | 'board' | 'committee'
   ): Promise<void> {
-    if (isDevMode()) return;
-    try {
-      const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-      const event = await this.getEventById(eventId);
-      if (!event) throw new Error('Event not found');
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+          const event = await this.getEventById(eventId);
+          if (!event) throw new Error('Event not found');
 
-      await updateDoc(eventRef, {
-        attendees: Math.max(0, event.attendees - 1),
-        registeredMembers: arrayRemove(memberId),
-      });
+          await updateDoc(eventRef, {
+            attendees: Math.max(0, event.attendees - 1),
+            registeredMembers: arrayRemove(memberId),
+          });
 
-      const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
-      if (reg) {
-        await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, cancelledByRole);
+          const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
+          if (reg) {
+            await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, cancelledByRole);
+          }
+        } catch (error) {
+          console.error('Error canceling registration:', error);
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Error canceling registration:', error);
-      throw error;
-    }
+    );
   }
 
   // Mark attendance (check-in)
@@ -307,46 +312,46 @@ export class EventsService {
     memberId: string,
     checkInTime?: Date
   ): Promise<void> {
-    if (isDevMode()) {
-      // In dev mode, just return without doing anything
-      return;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+          const event = await this.getEventById(eventId);
 
-    try {
-      const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-      const event = await this.getEventById(eventId);
+          if (!event) throw new Error('Event not found');
 
-      if (!event) throw new Error('Event not found');
+          // Add to attendance list
+          await updateDoc(eventRef, {
+            attendanceList: arrayUnion({
+              memberId,
+              checkInTime: checkInTime ? Timestamp.fromDate(checkInTime) : Timestamp.now(),
+            }),
+          });
+          // 报名/缴费/签到一致：更新 EventRegistration 为已签到（Story 8.1）
+          const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
+          if (reg) {
+            const at = (checkInTime ?? new Date()).toISOString();
+            await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
+          }
 
-      // Add to attendance list
-      await updateDoc(eventRef, {
-        attendanceList: arrayUnion({
-          memberId,
-          checkInTime: checkInTime ? Timestamp.fromDate(checkInTime) : Timestamp.now(),
-        }),
-      });
-      // 报名/缴费/签到一致：更新 EventRegistration 为已签到（Story 8.1）
-      const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
-      if (reg) {
-        const at = (checkInTime ?? new Date()).toISOString();
-        await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
+          // Award points for attendance
+          await PointsService.awardEventAttendancePoints(
+            memberId,
+            eventId,
+            event.type,
+            undefined // Duration can be calculated later
+          );
+
+          // 按当年签到记录重算出席对比（签到次数 vs 已过月份）
+          const { MembersService } = await import('./membersService');
+          MembersService.recalculateAttendance(memberId).catch(console.error);
+        } catch (error) {
+          console.error('Error marking attendance:', error);
+          throw error;
+        }
       }
-
-      // Award points for attendance
-      await PointsService.awardEventAttendancePoints(
-        memberId,
-        eventId,
-        event.type,
-        undefined // Duration can be calculated later
-      );
-
-      // 按当年签到记录重算出席对比（签到次数 vs 已过月份）
-      const { MembersService } = await import('./membersService');
-      MembersService.recalculateAttendance(memberId).catch(console.error);
-    } catch (error) {
-      console.error('Error marking attendance:', error);
-      throw error;
-    }
+    );
   }
 
   // Get upcoming events (approved, date >= now)
@@ -386,38 +391,37 @@ export class EventsService {
       notes?: string;
     }
   ): Promise<void> {
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Would register guest for event ${eventId}:`, guestData);
-      return;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const col = collection(db, COLLECTIONS.GUEST_REGISTRATIONS);
+          const [emailSnap, phoneSnap] = await Promise.all([
+            getDocs(query(col, where('eventId', '==', eventId), where('email', '==', guestData.email))),
+            getDocs(query(col, where('eventId', '==', eventId), where('phone', '==', guestData.phone))),
+          ]);
+          const isDuplicate = (snap: { docs: { data(): Record<string, unknown> }[] }) =>
+            snap.docs.some(d => d.data().status !== 'Cancelled');
+          if (isDuplicate(emailSnap)) throw new Error('This email has already been registered for this event.');
+          if (isDuplicate(phoneSnap)) throw new Error('This phone number has already been registered for this event.');
 
-    try {
-      const col = collection(db, COLLECTIONS.GUEST_REGISTRATIONS);
-      const [emailSnap, phoneSnap] = await Promise.all([
-        getDocs(query(col, where('eventId', '==', eventId), where('email', '==', guestData.email))),
-        getDocs(query(col, where('eventId', '==', eventId), where('phone', '==', guestData.phone))),
-      ]);
-      const isDuplicate = (snap: { docs: { data(): Record<string, unknown> }[] }) =>
-        snap.docs.some(d => d.data().status !== 'Cancelled');
-      if (isDuplicate(emailSnap)) throw new Error('This email has already been registered for this event.');
-      if (isDuplicate(phoneSnap)) throw new Error('This phone number has already been registered for this event.');
+          const guestRegistration: Record<string, unknown> = {
+            eventId,
+            name: guestData.name,
+            email: guestData.email,
+            phone: guestData.phone,
+            registeredAt: Timestamp.now(),
+            status: 'Pending' as const,
+          };
+          if (guestData.organization != null) guestRegistration.organization = guestData.organization;
+          if (guestData.notes != null) guestRegistration.notes = guestData.notes;
 
-      const guestRegistration: Record<string, unknown> = {
-        eventId,
-        name: guestData.name,
-        email: guestData.email,
-        phone: guestData.phone,
-        registeredAt: Timestamp.now(),
-        status: 'Pending' as const,
-      };
-      if (guestData.organization != null) guestRegistration.organization = guestData.organization;
-      if (guestData.notes != null) guestRegistration.notes = guestData.notes;
-
-      await addDoc(col, guestRegistration);
-    } catch (error) {
-      console.error('Error registering guest for event:', error);
-      throw error;
-    }
+          await addDoc(col, guestRegistration);
+        } catch (error) {
+          console.error('Error registering guest for event:', error);
+          throw error;
+        }
+      }
+    );
   }
 }
-

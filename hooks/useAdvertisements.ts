@@ -1,42 +1,28 @@
 // Advertisements Data Hook
-import { useState, useEffect, useCallback } from 'react';
+import { useFirestoreCollection } from './useFirestoreCollection';
 import { AdvertisementService, Advertisement, PromotionPackage } from '../services/advertisementService';
 import { useToast } from '../components/ui/Common';
 
 export const useAdvertisements = () => {
-  const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
-  const [packages, setPackages] = useState<PromotionPackage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [ads, pkgs] = await Promise.all([
-        AdvertisementService.getAllAdvertisements(),
-        AdvertisementService.getPromotionPackages(),
-      ]);
-      setAdvertisements(ads);
-      setPackages(pkgs);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load advertisements';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
+  const { data: advertisements, loading: adsLoading, error: adsError, reload: reloadAds } =
+    useFirestoreCollection<Advertisement>({ loader: () => AdvertisementService.getAllAdvertisements() });
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const { data: packages, loading: pkgsLoading, error: pkgsError, reload: reloadPackages } =
+    useFirestoreCollection<PromotionPackage>({ loader: () => AdvertisementService.getPromotionPackages() });
+
+  const loading = adsLoading || pkgsLoading;
+  const error = adsError || pkgsError;
+
+  const loadData = async () => {
+    await Promise.all([reloadAds(), reloadPackages()]);
+  };
 
   const createAdvertisement = async (adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'>) => {
     try {
       const id = await AdvertisementService.createAdvertisement(adData);
-      await loadData();
+      await reloadAds();
       showToast('Advertisement created successfully', 'success');
       return id;
     } catch (err) {
@@ -49,7 +35,7 @@ export const useAdvertisements = () => {
   const updateAdvertisement = async (adId: string, updates: Partial<Advertisement>) => {
     try {
       await AdvertisementService.updateAdvertisement(adId, updates);
-      await loadData();
+      await reloadAds();
       showToast('Advertisement updated successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update advertisement';
@@ -61,7 +47,7 @@ export const useAdvertisements = () => {
   const deleteAdvertisement = async (adId: string) => {
     try {
       await AdvertisementService.deleteAdvertisement(adId);
-      await loadData();
+      await reloadAds();
       showToast('Advertisement deleted successfully', 'success');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete advertisement';
@@ -96,4 +82,3 @@ export const useAdvertisements = () => {
     getBenefitUsageHistory,
   };
 };
-

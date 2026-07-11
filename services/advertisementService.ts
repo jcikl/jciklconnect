@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { isDevMode } from '../utils/devMode';
+import { withDevMode } from '../utils/devMode';
 import { toDate } from '../utils/dateUtils';
 
 export interface Advertisement {
@@ -76,6 +76,25 @@ export interface PromotionPackage {
   updatedAt: Date | Timestamp;
 }
 
+const MOCK_AD: Advertisement = {
+  id: 'ad1',
+  title: 'Tech Solutions Inc.',
+  description: 'Premium IT services for JCI members',
+  type: 'Banner',
+  placement: ['Homepage'],
+  targetAudience: 'All Members',
+  imageUrl: 'https://via.placeholder.com/728x90',
+  linkUrl: 'https://example.com',
+  startDate: new Date('2024-01-01'),
+  endDate: new Date('2024-12-31'),
+  status: 'Active',
+  impressions: 1250,
+  clicks: 45,
+  priority: 5,
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
+};
+
 export class AdvertisementService {
   private static adsCache: Advertisement[] | null = null;
   private static adsPromise: Promise<Advertisement[]> | null = null;
@@ -101,64 +120,46 @@ export class AdvertisementService {
       return this.adsPromise;
     }
 
-    if (isDevMode()) {
-      return [
-        {
-          id: 'ad1',
-          title: 'Tech Solutions Inc.',
-          description: 'Premium IT services for JCI members',
-          type: 'Banner',
-          placement: ['Homepage'],
-          targetAudience: 'All Members',
-          imageUrl: 'https://via.placeholder.com/728x90',
-          linkUrl: 'https://example.com',
-          startDate: new Date('2024-01-01'),
-          endDate: new Date('2024-12-31'),
-          status: 'Active',
-          impressions: 1250,
-          clicks: 45,
-          priority: 5,
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-01'),
-        },
-      ];
-    }
+    return withDevMode(
+      () => [MOCK_AD],
+      () => {
+        this.adsPromise = (async () => {
+          try {
+            const snapshot = await getDocs(
+              query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'))
+            );
+            const ads = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
+              endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
+              createdAt: doc.data().createdAt?.toDate() || new Date(),
+              updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+            })) as Advertisement[];
 
-    this.adsPromise = (async () => {
-      try {
-        const snapshot = await getDocs(
-          query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'))
-        );
-        const ads = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
-          endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        })) as Advertisement[];
-        
-        // Sort in memory to avoid requiring a composite index
-        const sortedAds = ads.sort((a, b) => {
-          if (a.priority !== b.priority) {
-            return (b.priority || 0) - (a.priority || 0);
+            // Sort in memory to avoid requiring a composite index
+            const sortedAds = ads.sort((a, b) => {
+              if (a.priority !== b.priority) {
+                return (b.priority || 0) - (a.priority || 0);
+              }
+              const aDate = a.createdAt instanceof Date ? a.createdAt : new Date();
+              const bDate = b.createdAt instanceof Date ? b.createdAt : new Date();
+              return bDate.getTime() - aDate.getTime();
+            });
+
+            this.adsCache = sortedAds;
+            return sortedAds;
+          } catch (error) {
+            console.error('Error fetching advertisements:', error);
+            throw error;
+          } finally {
+            this.adsPromise = null;
           }
-          const aDate = a.createdAt instanceof Date ? a.createdAt : new Date();
-          const bDate = b.createdAt instanceof Date ? b.createdAt : new Date();
-          return bDate.getTime() - aDate.getTime();
-        });
+        })();
 
-        this.adsCache = sortedAds;
-        return sortedAds;
-      } catch (error) {
-        console.error('Error fetching advertisements:', error);
-        throw error;
-      } finally {
-        this.adsPromise = null;
+        return this.adsPromise;
       }
-    })();
-
-    return this.adsPromise;
+    );
   }
 
   // Get active advertisements for placement
@@ -173,240 +174,234 @@ export class AdvertisementService {
       return this.activeAdsPromise[placement];
     }
 
-    if (isDevMode()) {
-      return [
-        {
-          id: 'ad1',
-          title: 'Tech Solutions Inc.',
-          description: 'Premium IT services for JCI members',
-          type: 'Banner',
-          placement: ['Homepage'],
-          targetAudience: 'All Members',
-          imageUrl: 'https://via.placeholder.com/728x90',
-          linkUrl: 'https://example.com',
-          startDate: new Date('2024-01-01'),
-          endDate: new Date('2024-12-31'),
-          status: 'Active',
-          impressions: 1250,
-          clicks: 45,
-          priority: 5,
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-01'),
-        },
-      ];
-    }
+    return withDevMode(
+      () => [MOCK_AD],
+      () => {
+        this.activeAdsPromise[placement] = (async () => {
+          try {
+            const now = new Date();
+            const q = query(
+              collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'),
+              where('status', '==', 'Active')
+            );
 
-    this.activeAdsPromise[placement] = (async () => {
-      try {
-        const now = new Date();
-        const q = query(
-          collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'),
-          where('status', '==', 'Active')
-        );
-        
-        const snapshot = await getDocs(q);
-        const ads = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
-          endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        })) as Advertisement[];
+            const snapshot = await getDocs(q);
+            const ads = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
+              endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
+              createdAt: doc.data().createdAt?.toDate() || new Date(),
+              updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+            })) as Advertisement[];
 
-        const activeAds = ads.filter(ad => {
-          const placements = Array.isArray(ad.placement) ? ad.placement : [ad.placement];
-          if (!placements.includes(placement as any)) return false;
+            const activeAds = ads.filter(ad => {
+              const placements = Array.isArray(ad.placement) ? ad.placement : [ad.placement];
+              if (!placements.includes(placement as any)) return false;
 
-          const startDate = toDate(ad.startDate);
-          if (startDate > now) return false;
+              const startDate = toDate(ad.startDate);
+              if (startDate > now) return false;
 
-          if (ad.endDate) {
-            const endDate = toDate(ad.endDate);
-            if (endDate < now) return false;
+              if (ad.endDate) {
+                const endDate = toDate(ad.endDate);
+                if (endDate < now) return false;
+              }
+
+              return true;
+            }).sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+            this.activeAdsCache[placement] = {
+              data: activeAds,
+              timestamp: Date.now()
+            };
+            return activeAds;
+          } catch (error) {
+            console.error('Error fetching active advertisements:', error);
+            throw error;
+          } finally {
+            delete this.activeAdsPromise[placement];
           }
+        })();
 
-          return true;
-        }).sort((a, b) => (b.priority || 0) - (a.priority || 0));
-
-        this.activeAdsCache[placement] = {
-          data: activeAds,
-          timestamp: Date.now()
-        };
-        return activeAds;
-      } catch (error) {
-        console.error('Error fetching active advertisements:', error);
-        throw error;
-      } finally {
-        delete this.activeAdsPromise[placement];
+        return this.activeAdsPromise[placement];
       }
-    })();
-
-    return this.activeAdsPromise[placement];
+    );
   }
 
   // Record advertisement impression
   static async recordImpression(adId: string): Promise<void> {
-    if (isDevMode()) return;
-    try {
-      const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
-      await updateDoc(adRef, { impressions: increment(1), updatedAt: Timestamp.now() });
-    } catch (error) {
-      console.error('Error recording impression:', error);
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
+          await updateDoc(adRef, { impressions: increment(1), updatedAt: Timestamp.now() });
+        } catch (error) {
+          console.error('Error recording impression:', error);
+        }
+      }
+    );
   }
 
   // Record advertisement click
   static async recordClick(adId: string): Promise<void> {
-    if (isDevMode()) return;
-    try {
-      const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
-      await updateDoc(adRef, { clicks: increment(1), updatedAt: Timestamp.now() });
-    } catch (error) {
-      console.error('Error recording click:', error);
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
+          await updateDoc(adRef, { clicks: increment(1), updatedAt: Timestamp.now() });
+        } catch (error) {
+          console.error('Error recording click:', error);
+        }
+      }
+    );
   }
 
   // Create advertisement
   static async createAdvertisement(adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'>): Promise<string> {
     this.clearCache();
-    if (isDevMode()) {
-      const mockId = `mock-ad-${Date.now()}`;
-      console.log(`[DEV MODE] Simulating creation of advertisement with ID: ${mockId}`);
-      return mockId;
-    }
-    try {
-      const newAd: any = {
-        title: adData.title,
-        description: adData.description,
-        type: adData.type,
-        placement: adData.placement,
-        impressions: 0,
-        clicks: 0,
-        startDate: Timestamp.fromDate(toDate(adData.startDate)),
-        endDate: adData.endDate ? Timestamp.fromDate(toDate(adData.endDate)) : null,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
+    return withDevMode(
+      () => `mock-ad-${Date.now()}`,
+      async () => {
+        try {
+          const newAd: any = {
+            title: adData.title,
+            description: adData.description,
+            type: adData.type,
+            placement: adData.placement,
+            impressions: 0,
+            clicks: 0,
+            startDate: Timestamp.fromDate(toDate(adData.startDate)),
+            endDate: adData.endDate ? Timestamp.fromDate(toDate(adData.endDate)) : null,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
 
-      // Only include optional fields if they are defined
-      if (adData.imageUrl !== undefined) newAd.imageUrl = adData.imageUrl;
-      if (adData.logoUrl !== undefined) newAd.logoUrl = adData.logoUrl;
-      if (adData.linkUrl !== undefined) newAd.linkUrl = adData.linkUrl;
-      if (adData.budget !== undefined) newAd.budget = adData.budget;
-      if (adData.targetAudience !== undefined) newAd.targetAudience = adData.targetAudience;
-      if (adData.targetCriteria !== undefined) newAd.targetCriteria = adData.targetCriteria;
-      if (adData.status !== undefined) newAd.status = adData.status;
+          // Only include optional fields if they are defined
+          if (adData.imageUrl !== undefined) newAd.imageUrl = adData.imageUrl;
+          if (adData.logoUrl !== undefined) newAd.logoUrl = adData.logoUrl;
+          if (adData.linkUrl !== undefined) newAd.linkUrl = adData.linkUrl;
+          if (adData.budget !== undefined) newAd.budget = adData.budget;
+          if (adData.targetAudience !== undefined) newAd.targetAudience = adData.targetAudience;
+          if (adData.targetCriteria !== undefined) newAd.targetCriteria = adData.targetCriteria;
+          if (adData.status !== undefined) newAd.status = adData.status;
 
-      const docRef = await addDoc(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'), newAd);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating advertisement:', error);
-      throw error;
-    }
+          const docRef = await addDoc(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'), newAd);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating advertisement:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Update advertisement
   static async updateAdvertisement(adId: string, updates: Partial<Advertisement>): Promise<void> {
     this.clearCache();
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating update of advertisement ${adId} with updates:`, updates);
-      return;
-    }
-    try {
-      const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
-      const updateData: any = {
-        updatedAt: Timestamp.now(),
-      };
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
+          const updateData: any = {
+            updatedAt: Timestamp.now(),
+          };
 
-      // Only include defined fields
-      if (updates.title !== undefined) updateData.title = updates.title;
-      if (updates.description !== undefined) updateData.description = updates.description;
-      if (updates.type !== undefined) updateData.type = updates.type;
-      if (updates.placement !== undefined) updateData.placement = updates.placement;
-      if (updates.imageUrl !== undefined) updateData.imageUrl = updates.imageUrl;
-      if (updates.logoUrl !== undefined) updateData.logoUrl = updates.logoUrl;
-      if (updates.linkUrl !== undefined) updateData.linkUrl = updates.linkUrl;
-      if (updates.budget !== undefined) updateData.budget = updates.budget;
-      if (updates.targetAudience !== undefined) updateData.targetAudience = updates.targetAudience;
-      if (updates.targetCriteria !== undefined) updateData.targetCriteria = updates.targetCriteria;
-      if (updates.status !== undefined) updateData.status = updates.status;
+          // Only include defined fields
+          if (updates.title !== undefined) updateData.title = updates.title;
+          if (updates.description !== undefined) updateData.description = updates.description;
+          if (updates.type !== undefined) updateData.type = updates.type;
+          if (updates.placement !== undefined) updateData.placement = updates.placement;
+          if (updates.imageUrl !== undefined) updateData.imageUrl = updates.imageUrl;
+          if (updates.logoUrl !== undefined) updateData.logoUrl = updates.logoUrl;
+          if (updates.linkUrl !== undefined) updateData.linkUrl = updates.linkUrl;
+          if (updates.budget !== undefined) updateData.budget = updates.budget;
+          if (updates.targetAudience !== undefined) updateData.targetAudience = updates.targetAudience;
+          if (updates.targetCriteria !== undefined) updateData.targetCriteria = updates.targetCriteria;
+          if (updates.status !== undefined) updateData.status = updates.status;
 
-      if (updates.startDate) {
-        updateData.startDate = Timestamp.fromDate(toDate(updates.startDate));
+          if (updates.startDate) {
+            updateData.startDate = Timestamp.fromDate(toDate(updates.startDate));
+          }
+          if (updates.endDate) {
+            updateData.endDate = Timestamp.fromDate(toDate(updates.endDate));
+          }
+
+          await updateDoc(adRef, updateData);
+        } catch (error) {
+          console.error('Error updating advertisement:', error);
+          throw error;
+        }
       }
-      if (updates.endDate) {
-        updateData.endDate = Timestamp.fromDate(toDate(updates.endDate));
-      }
-
-      await updateDoc(adRef, updateData);
-    } catch (error) {
-      console.error('Error updating advertisement:', error);
-      throw error;
-    }
+    );
   }
 
   // Delete advertisement
   static async deleteAdvertisement(adId: string): Promise<void> {
     this.clearCache();
-    if (isDevMode()) {
-      console.log(`[DEV MODE] Simulating deletion of advertisement ${adId}`);
-      return;
-    }
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId));
-    } catch (error) {
-      console.error('Error deleting advertisement:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId));
+        } catch (error) {
+          console.error('Error deleting advertisement:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get promotion packages
   static async getPromotionPackages(): Promise<PromotionPackage[]> {
-    if (isDevMode()) {
-      console.log('[DEV MODE] Returning mock promotion packages');
-      return [];
-    }
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.PROMOTION_PACKAGES || 'promotionPackages'), orderBy('price', 'asc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      })) as PromotionPackage[];
-    } catch (error) {
-      console.error('Error fetching promotion packages:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.PROMOTION_PACKAGES || 'promotionPackages'), orderBy('price', 'asc'))
+          );
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+          })) as PromotionPackage[];
+        } catch (error) {
+          console.error('Error fetching promotion packages:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Get benefit usage history
   static async getBenefitUsageHistory(benefitId?: string, memberId?: string): Promise<BenefitUsage[]> {
-    if (isDevMode()) {
-      return [];
-    }
-    try {
-      let conditions = [];
-      if (benefitId) conditions.push(where('benefitId', '==', benefitId));
-      if (memberId) conditions.push(where('memberId', '==', memberId));
-      
-      const q = conditions.length > 0 
-        ? query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), ...conditions, orderBy('usedAt', 'desc'))
-        : query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), orderBy('usedAt', 'desc'));
+    return withDevMode(
+      () => [],
+      async () => {
+        try {
+          let conditions = [];
+          if (benefitId) conditions.push(where('benefitId', '==', benefitId));
+          if (memberId) conditions.push(where('memberId', '==', memberId));
 
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        usedAt: doc.data().usedAt?.toDate?.() || doc.data().usedAt,
-      })) as BenefitUsage[];
-    } catch (error) {
-      console.error('Error fetching benefit usage history:', error);
-      return [];
-    }
+          const q = conditions.length > 0
+            ? query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), ...conditions, orderBy('usedAt', 'desc'))
+            : query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), orderBy('usedAt', 'desc'));
+
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            usedAt: doc.data().usedAt?.toDate?.() || doc.data().usedAt,
+          })) as BenefitUsage[];
+        } catch (error) {
+          console.error('Error fetching benefit usage history:', error);
+          return [];
+        }
+      }
+    );
   }
 }
-
