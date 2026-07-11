@@ -4,6 +4,7 @@ import {
   Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown, ChevronUp, Sparkles, Filter
 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, Modal, useToast } from '../../ui/Common';
+import { Input } from '../../ui/Form';
 import {
   EngagementRequirementStatus,
   EngagementYear,
@@ -1145,7 +1146,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                         <input type="text" className={`${inputClassName} flex-1`} placeholder="Event 1"
                           value={editValues.event_participation_1 || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1: e.target.value }))} />
-                        <input type="date" className={`${inputClassName} sm:w-36`}
+                        <Input type="date" className="sm:w-36"
                           value={editValues.event_participation_1_date || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1_date: e.target.value }))} />
                       </div>
@@ -1153,7 +1154,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                         <input type="text" className={`${inputClassName} flex-1`} placeholder="Event 2"
                           value={editValues.event_participation_2 || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2: e.target.value }))} />
-                        <input type="date" className={`${inputClassName} sm:w-36`}
+                        <Input type="date" className="sm:w-36"
                           value={editValues.event_participation_2_date || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2_date: e.target.value }))} />
                       </div>
@@ -1174,7 +1175,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                         {COURSE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
                       <div className="flex gap-2">
-                        <input type="date" className={`${inputClassName} flex-1 sm:w-36 sm:flex-none`}
+                        <Input type="date" className="flex-1 sm:w-36 sm:flex-none"
                           value={editValues.jci_inspire_completion_date || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, jci_inspire_completion_date: e.target.value }))} />
                         <Button size="sm" variant={
@@ -1192,7 +1193,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                         value={editValues[`${req.type}_detail`] || ''}
                         onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_detail`]: e.target.value }))} />
                       <div className="flex gap-2">
-                        <input type="date" className={`${inputClassName} flex-1 sm:w-36 sm:flex-none`}
+                        <Input type="date" className="flex-1 sm:w-36 sm:flex-none"
                           value={editValues[`${req.type}_date`] || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_date`]: e.target.value }))} />
                         <Button size="sm" variant={

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Modal, useToast } from '../ui/Common';
+import { Input } from '../ui/Form';
 import { MembersService } from '../../services/membersService';
 import { PointsService } from '../../services/pointsService';
 import { SponsorshipsService } from '../../services/sponsorshipService';
@@ -1043,7 +1044,7 @@ const RadarSponsorshipManager: React.FC<{ members: Member[] }> = ({ members }) =
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">Date <span className="text-red-400">*</span></label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-jci-blue/30" required />
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
               </div>
             </div>
             {amount > 0 && (
