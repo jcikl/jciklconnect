@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "c741eec6633c3259",
+        "id": "a813359f9b7d2aab",
         "type": "tabs",
         "children": [
           {
-            "id": "48f637b5618be61f",
+            "id": "e1773e6f96bc2d51",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -175,18 +175,24 @@
       "bases:Create new base": false
     }
   },
-  "active": "48f637b5618be61f",
+  "active": "e1773e6f96bc2d51",
   "lastOpenFiles": [
-    "trash/components/accessibility/AccessibilityRunner.tsx",
-    "trash/components/modules/CanvaView.tsx",
-    "trash/services/memberBenefitsService.ts",
-    "trash/extractFirestoreSchema.js",
-    "trash/components/accessibility",
-    "App.tsx.tmp.14128.3283bc20fcf7",
+    "node_modules/@rollup/plugin-node-resolve/README.md",
+    "components/modules/Members/config/memberImportConfig.ts.tmp.14128.817680bf2b66",
+    "services/dataImportExportService.ts.tmp.14128.303d9a67f925",
+    "services/dataImportExportService.ts.tmp.14128.6c397ff01574",
+    "services/dataImportExportService.ts.tmp.14128.5120f2374f29",
+    "services/dataImportExportService.ts.tmp.14128.55208e555259",
+    "components/ui/IntroducerSelector.tsx.tmp.14128.96f274084c5e",
+    "components/modules/MemberEditForm.tsx.tmp.14128.817ebb4aced6",
+    "_bmad/bmm/workflows/4-implementation/dev-story/checklist.md",
+    "components/modules/MembersView.tsx.tmp.14128.edfeca759449",
+    "components/modules/MembersView.tsx.tmp.14128.9fe6cb0872cb",
+    "services/dataImportExportService.ts.tmp.14128.270f712ae280",
+    "functions/node_modules/is-stream/readme.md",
     "node_modules/jose/README.md",
     "node_modules/common-tags/readme.md",
     "FIREBASE_SETUP.md",
-    "CLAUDE.md",
-    "JCI KL(Eric/Untitled.base"
+    "CLAUDE.md"
   ]
 }

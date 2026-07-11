@@ -19,6 +19,7 @@ import {
   trimPreprocessor,
   trimLowerPreprocessor,
   trimUpperPreprocessor,
+  trimProperPreprocessor,
   removeWhitespacePreprocessor,
   formatPhonePreprocessor,
   splitCommaPreprocessor,
@@ -36,7 +37,7 @@ export const memberImportConfig: BatchImportConfig = {
       required: true,
       aliases: ['Full Name', 'Full Name (ID)', 'fullname', '全名'],
       validators: [notEmpty],
-      preprocessor: createChainedPreprocessor(trimPreprocessor, trimUpperPreprocessor),
+      preprocessor: createChainedPreprocessor(trimPreprocessor, trimProperPreprocessor),
     },
     {
       key: 'idNumber',

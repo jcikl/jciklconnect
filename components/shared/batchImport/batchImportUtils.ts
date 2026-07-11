@@ -77,6 +77,16 @@ export const trimUpperPreprocessor = (value: any): any => {
 };
 
 /**
+ * Generic preprocessor: trim and convert to proper case (Title Case)
+ */
+export const trimProperPreprocessor = (value: any): any => {
+  if (typeof value === 'string') {
+    return value.trim().replace(/\b\w/g, c => c.toUpperCase());
+  }
+  return value;
+};
+
+/**
  * Generic preprocessor: convert to number
  */
 export const toNumberPreprocessor = (value: any): number => {
