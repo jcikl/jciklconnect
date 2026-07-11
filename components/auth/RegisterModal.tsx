@@ -1,5 +1,5 @@
 // Register Modal Component - Optimized Version
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Mail, Lock, User, AlertCircle, Phone, CheckCircle, ChevronRight, ChevronLeft, Sparkles, Users, Shield, Star } from 'lucide-react';
 import { Modal, Button, useToast, ProgressBar } from '../ui/Common';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
@@ -54,6 +54,53 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const { signUp } = useAuth();
   const { showToast } = useToast();
 
+  // Real-time duplicate check for email and phone
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle');
+  const [phoneStatus, setPhoneStatus] = useState<'idle' | 'checking' | 'taken' | 'available'>('idle');
+  const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const checkField = async (field: 'email' | 'phone', value: string) => {
+    if (!value) return;
+    try {
+      const res = await fetch('/.netlify/functions/check-member-field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field, value }),
+      });
+      const data = await res.json();
+      if (field === 'email') setEmailStatus(data.exists ? 'taken' : 'available');
+      else setPhoneStatus(data.exists ? 'taken' : 'available');
+    } catch {
+      if (field === 'email') setEmailStatus('idle');
+      else setPhoneStatus('idle');
+    }
+  };
+
+  useEffect(() => {
+    const email = formData.email;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailStatus('idle');
+      return;
+    }
+    setEmailStatus('checking');
+    if (emailTimer.current) clearTimeout(emailTimer.current);
+    emailTimer.current = setTimeout(() => checkField('email', email), 600);
+    return () => { if (emailTimer.current) clearTimeout(emailTimer.current); };
+  }, [formData.email]);
+
+  useEffect(() => {
+    const phone = formData.phone;
+    if (!phone || phone.length < 8) {
+      setPhoneStatus('idle');
+      return;
+    }
+    setPhoneStatus('checking');
+    if (phoneTimer.current) clearTimeout(phoneTimer.current);
+    phoneTimer.current = setTimeout(() => checkField('phone', phone), 600);
+    return () => { if (phoneTimer.current) clearTimeout(phoneTimer.current); };
+  }, [formData.phone]);
+
   // Step icons for visual enhancement
   const stepIcons = [
     <User key="step1" size={20} />,
@@ -95,8 +142,20 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           setError('Please enter a valid email address');
           return false;
         }
+        if (emailStatus === 'taken') {
+          setError('此电邮已注册，请直接登录');
+          return false;
+        }
+        if (emailStatus === 'checking') {
+          setError('请稍候，正在验证电邮…');
+          return false;
+        }
         if (!formData.phone.trim()) {
           setError('Please enter your phone number');
+          return false;
+        }
+        if (phoneStatus === 'taken') {
+          setError('此电话号码已注册');
           return false;
         }
         if (!formData.gender) {
@@ -321,26 +380,56 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                name="email"
-                label="Email Address"
-                type="email"
-                placeholder="john.doe@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                icon={<Mail size={18} />}
-              />
-              <Input
-                name="phone"
-                label="Phone Number"
-                type="tel"
-                placeholder="60123456789"
-                value={formData.phone}
-                onChange={handleChange}
-                required
-                icon={<Phone size={18} />}
-              />
+              <div>
+                <Input
+                  name="email"
+                  label="Email Address"
+                  type="email"
+                  placeholder="john.doe@example.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  icon={<Mail size={18} />}
+                />
+                {emailStatus === 'checking' && (
+                  <p className="mt-1 text-xs text-slate-400">检查中…</p>
+                )}
+                {emailStatus === 'taken' && (
+                  <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle size={12} /> 此电邮已注册，请直接登录
+                  </p>
+                )}
+                {emailStatus === 'available' && (
+                  <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle size={12} /> 电邮可用
+                  </p>
+                )}
+              </div>
+              <div>
+                <Input
+                  name="phone"
+                  label="Phone Number"
+                  type="tel"
+                  placeholder="60123456789"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  required
+                  icon={<Phone size={18} />}
+                />
+                {phoneStatus === 'checking' && (
+                  <p className="mt-1 text-xs text-slate-400">检查中…</p>
+                )}
+                {phoneStatus === 'taken' && (
+                  <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle size={12} /> 此电话已注册
+                  </p>
+                )}
+                {phoneStatus === 'available' && (
+                  <p className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle size={12} /> 电话可用
+                  </p>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
