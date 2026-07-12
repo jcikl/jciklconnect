@@ -1,4 +1,4 @@
-// Probation to Full Member Promotion Service
+// Probation to Official Member Promotion Service
 import {
   PromotionProgress,
   PromotionRequirement,
@@ -484,7 +484,7 @@ export class PromotionService {
     for (const member of probationMembers) {
       const progress = await this.getPromotionProgress(member.id);
       if (progress?.isEligibleForPromotion) {
-        const promotion = await this.promoteToFullMember(member.id, 'system', 'automatic');
+        const promotion = await this.promoteToOfficialMember(member.id, 'system', 'automatic');
         if (promotion) {
           promotions.push(promotion);
         }
@@ -497,7 +497,7 @@ export class PromotionService {
   /**
    * Promote a Probation Member to Full Member
    */
-  static async promoteToFullMember(
+  static async promoteToOfficialMember(
     memberId: string,
     promotedBy: string,
     method: 'automatic' | 'manual' = 'automatic',
@@ -524,7 +524,7 @@ export class PromotionService {
 
     // Update member status
     await MembersService.updateMember(memberId, {
-      membershipType: 'Full',
+      membershipType: 'Official',
       role: UserRole.MEMBER
     });
     await this.updateMemberDues(memberId, this.FULL_MEMBER_DUES);
@@ -535,7 +535,7 @@ export class PromotionService {
       memberId,
       memberName: member.name,
       fromMembershipType: 'Probation',
-      toMembershipType: 'Full',
+      toMembershipType: 'Official',
       promotionDate: new Date(),
       promotionMethod: method,
       promotedBy,
@@ -592,7 +592,7 @@ export class PromotionService {
 
     // If override is true, perform promotion immediately to ensure roll and membershipType update
     if (overrideRequirements) {
-      await this.promoteToFullMember(memberId, requestedBy, 'manual', reason);
+      await this.promoteToOfficialMember(memberId, requestedBy, 'manual', reason);
     }
 
     return request;
@@ -620,7 +620,7 @@ export class PromotionService {
       // Trigger automatic promotion if enabled
       const settings = await this.getPromotionSettings();
       if (settings.automaticPromotionEnabled) {
-        await this.promoteToFullMember(memberId, 'system', 'automatic');
+        await this.promoteToOfficialMember(memberId, 'system', 'automatic');
       }
     }
   }

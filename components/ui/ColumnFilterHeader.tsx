@@ -4,6 +4,7 @@ import { Filter } from 'lucide-react';
 export interface ColumnFilterOption {
   value: string;
   label: string;
+  count?: number;
 }
 
 interface ColumnFilterHeaderProps {
@@ -98,7 +99,10 @@ export const ColumnFilterHeader: React.FC<ColumnFilterHeaderProps> = ({
                   checked={selected.includes(opt.value)}
                   onChange={() => toggle(opt.value)}
                 />
-                <span className="leading-tight">{opt.label}</span>
+                <span className="leading-tight flex-1">{opt.label}</span>
+                {opt.count !== undefined && (
+                  <span className="text-xs text-slate-400 tabular-nums">{opt.count}</span>
+                )}
               </label>
             ))}
           </div>

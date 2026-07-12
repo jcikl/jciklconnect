@@ -453,10 +453,10 @@ export class MembersService {
         ...(await this.syncComputedMembershipType(updates, currentData)),
       };
 
-      // Check for GUEST -> PROBATION transition to initialize membership record (if not already handled by caller)
-      if (updates.role === UserRole.PROBATION && !updates.membership) {
+      // Check for GUEST -> MEMBER transition to initialize membership record (if not already handled by caller)
+      if (updates.role === UserRole.MEMBER && !updates.membership) {
         if (currentData) {
-          // If moving from GUEST (or no role) to PROBATION
+          // If moving from GUEST (or no role) to MEMBER
           if (currentData.role === UserRole.GUEST || !currentData.role) {
             const joinDate = updates.joinDate || currentData.joinDate;
             const yearStr = joinDate ? String(new Date(joinDate).getFullYear()) : String(new Date().getFullYear());
@@ -1159,6 +1159,8 @@ export class MembersService {
    */
   static async batchSyncMembershipRecords(options: {
     year: number;
+    /** When set, sync all years from each member's effectiveJoinYear up to toYear (inclusive). `year` is ignored. */
+    toYear?: number;
     loIdFilter?: string | null;
     membershipTransactions?: Pick<Transaction, 'memberId' | 'category' | 'date'>[];
     /** When true, only members who already have membership[year] */
@@ -1175,13 +1177,16 @@ export class MembersService {
   }> {
     const {
       year,
+      toYear,
       loIdFilter,
       membershipTransactions,
       onlyExistingRecords = false,
     } = options;
 
+    const effectiveToYear = toYear ?? year;
+
     const result = {
-      year,
+      year: effectiveToYear,
       scanned: 0,
       updated: 0,
       created: 0,
@@ -1193,7 +1198,6 @@ export class MembersService {
 
     const config = await MembershipConfigService.getConfig();
     const { rules, calculationMode } = config;
-    const yearStr = String(year);
 
     const applyToMember = (member: Member): boolean => {
       const membershipType = (member.membershipType || 'Probation') as MembershipType;
@@ -1203,48 +1207,81 @@ export class MembersService {
         membershipTransactions
       );
 
-      if (effectiveJoinYear > year) {
-        result.skippedNotEligible += 1;
-        return false;
-      }
-
       const membership = { ...(member.membership || {}) } as Record<string, MembershipRecord>;
-      const existing = membership[yearStr];
+      let anyChange = false;
 
-      if (onlyExistingRecords && !existing) {
-        result.skippedNoRecord += 1;
-        return false;
-      }
-
-      const isFirstYear = effectiveJoinYear === year;
-      const targetDues = getTargetDuesForMembershipType(membershipType, isFirstYear, rules);
-      const amount = Number(existing?.amount || 0);
-      const nextStatus = this.statusFromMembershipAmount(amount, targetDues);
-
-      if (existing && existing.dues === targetDues && existing.status === nextStatus) {
-        result.alreadyCorrect += 1;
-        return false;
-      }
-
-      const hadRecord = Boolean(existing);
-      membership[yearStr] = {
-        ...(existing || {}),
-        year,
-        dues: targetDues,
-        amount,
-        status: nextStatus,
-        transactionId: existing?.transactionId || [],
-        ...(existing?.purpose !== undefined ? { purpose: existing.purpose } : {}),
-        ...(existing?.paymentDate !== undefined ? { paymentDate: existing.paymentDate } : {}),
-      };
-
-      member.membership = membership;
-      if (hadRecord) {
-        result.updated += 1;
+      if (toYear !== undefined) {
+        // Multi-year mode: loop from member's own join year to toYear
+        if (effectiveJoinYear > effectiveToYear) {
+          result.skippedNotEligible += 1;
+          return false;
+        }
+        for (let y = effectiveJoinYear; y <= effectiveToYear; y++) {
+          const yStr = String(y);
+          const existing = membership[yStr];
+          if (onlyExistingRecords && !existing) {
+            result.skippedNoRecord += 1;
+            continue;
+          }
+          const isFirstYear = effectiveJoinYear === y;
+          const targetDues = getTargetDuesForMembershipType(membershipType, isFirstYear, rules);
+          const amount = Number(existing?.amount || 0);
+          const nextStatus = this.statusFromMembershipAmount(amount, targetDues);
+          if (existing && existing.dues === targetDues && existing.status === nextStatus) {
+            result.alreadyCorrect += 1;
+            continue;
+          }
+          const hadRecord = Boolean(existing);
+          membership[yStr] = {
+            ...(existing || {}),
+            year: y,
+            dues: targetDues,
+            amount,
+            status: nextStatus,
+            transactionId: existing?.transactionId || [],
+            ...(existing?.purpose !== undefined ? { purpose: existing.purpose } : {}),
+            ...(existing?.paymentDate !== undefined ? { paymentDate: existing.paymentDate } : {}),
+          };
+          if (hadRecord) { result.updated += 1; } else { result.created += 1; }
+          anyChange = true;
+        }
       } else {
-        result.created += 1;
+        // Single-year mode (original behavior)
+        const yearStr = String(year);
+        if (effectiveJoinYear > year) {
+          result.skippedNotEligible += 1;
+          return false;
+        }
+        const existing = membership[yearStr];
+        if (onlyExistingRecords && !existing) {
+          result.skippedNoRecord += 1;
+          return false;
+        }
+        const isFirstYear = effectiveJoinYear === year;
+        const targetDues = getTargetDuesForMembershipType(membershipType, isFirstYear, rules);
+        const amount = Number(existing?.amount || 0);
+        const nextStatus = this.statusFromMembershipAmount(amount, targetDues);
+        if (existing && existing.dues === targetDues && existing.status === nextStatus) {
+          result.alreadyCorrect += 1;
+          return false;
+        }
+        const hadRecord = Boolean(existing);
+        membership[yearStr] = {
+          ...(existing || {}),
+          year,
+          dues: targetDues,
+          amount,
+          status: nextStatus,
+          transactionId: existing?.transactionId || [],
+          ...(existing?.purpose !== undefined ? { purpose: existing.purpose } : {}),
+          ...(existing?.paymentDate !== undefined ? { paymentDate: existing.paymentDate } : {}),
+        };
+        if (hadRecord) { result.updated += 1; } else { result.created += 1; }
+        anyChange = true;
       }
-      return true;
+
+      if (anyChange) member.membership = membership;
+      return anyChange;
     };
 
     if (isDevMode()) {
@@ -1304,6 +1341,77 @@ export class MembersService {
     options: Parameters<typeof MembersService.batchSyncMembershipRecords>[0]
   ) {
     return MembersService.batchSyncMembershipRecords(options);
+  }
+
+  /** TEMP MIGRATION: membershipType 'Full' → 'Official' */
+  static async migrateMembershipTypeFullToOfficial(): Promise<{ scanned: number; updated: number; errors: string[] }> {
+    const result = { scanned: 0, updated: 0, errors: [] as string[] };
+    if (isDevMode()) return result;
+
+    const members = await this.getAllMembers();
+    let batch = writeBatch(db);
+    let batchOps = 0;
+
+    for (const member of members) {
+      result.scanned++;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((member as any).membershipType !== 'Full') continue;
+      try {
+        batch.update(doc(db, COLLECTIONS.MEMBERS, member.id), {
+          membershipType: 'Official',
+          updatedAt: Timestamp.now(),
+        });
+        batchOps++;
+        result.updated++;
+        if (batchOps >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchOps = 0;
+        }
+      } catch (err) {
+        result.errors.push(`${member.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    if (batchOps > 0) await batch.commit();
+    return result;
+  }
+
+  /** TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it */
+  static async migrateDobToGeneralDob(): Promise<{ scanned: number; updated: number; errors: string[] }> {
+    const result = { scanned: 0, updated: 0, errors: [] as string[] };
+    if (isDevMode()) return result;
+
+    const members = await this.getAllMembers();
+    let batch = writeBatch(db);
+    let batchOps = 0;
+
+    for (const member of members) {
+      result.scanned++;
+      const generalDob = member.general?.dob;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = member as any;
+      const flatDob: string | undefined = raw.dateOfBirth || raw.dob;
+      if (generalDob || !flatDob) continue;
+      try {
+        batch.update(doc(db, COLLECTIONS.MEMBERS, member.id), {
+          'general.dob': flatDob,
+          updatedAt: Timestamp.now(),
+        });
+        batchOps++;
+        result.updated++;
+        if (batchOps >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchOps = 0;
+        }
+      } catch (err) {
+        result.errors.push(`${member.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    if (batchOps > 0) await batch.commit();
+    return result;
   }
 
   /**

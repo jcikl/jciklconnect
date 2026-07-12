@@ -51,7 +51,7 @@ export class DuesRenewalService {
         break;
 
       case 'Probation':
-      case 'Full':
+      case 'Official':
         // No special validation required
         break;
 
@@ -372,15 +372,9 @@ export class DuesRenewalService {
           const { CommunicationService } = await import('./communicationService');
 
           const membershipTypeNames: Record<MembershipType, string> = {
-            guest: 'Guest (准会员)',
-            'probation member': 'Probation Member (试用会员)',
-            'official member': 'Full Member (正式会员)',
-            'visiting member': 'Visiting Member (访问会员)',
-            'associate member': 'Associate Member (赞助会员)',
-            'lifetime member': 'Lifetime Member (终身会员)',
             Guest: 'Guest (准会员)',
             Probation: 'Probation Member (试用会员)',
-            Full: 'Full Member (正式会员)',
+            Official: 'Official Member (正式会员)',
             Honorary: 'Honorary Member (特友会员)',
             Senator: 'Senator (参议员)',
             Visiting: 'Visiting Member (访问会员)',

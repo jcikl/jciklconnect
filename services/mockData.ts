@@ -13,7 +13,7 @@ export const CURRENT_USER: Member = {
   churnRisk: 'Low',
   attendanceRate: 92,
   membership: {
-    '2024': { year: 2024, dues: 300, type: 'Full', amount: 300, status: 'paid', transactionId: ['t-mock-1'] }
+    '2024': { year: 2024, dues: 300, type: 'Official', amount: 300, status: 'paid', transactionId: ['t-mock-1'] }
   },
   badges: [
     { id: 'b1', name: 'Project Lead', icon: '🚀', description: 'Led a successful project' },
@@ -28,7 +28,7 @@ export const CURRENT_USER: Member = {
   ],
   mentorId: 'u4',
   menteeIds: ['u3'],
-  membershipType: 'Full'
+  membershipType: 'Official'
 };
 
 export const MOCK_STATS: DashboardStats = {
@@ -54,7 +54,7 @@ export const MOCK_DEV_ADMIN: Member = {
   churnRisk: 'Low',
   attendanceRate: 100,
   membership: {
-    '2024': { year: 2024, dues: 300, type: 'Full', amount: 300, status: 'paid', transactionId: ['t-mock-admin-1'] }
+    '2024': { year: 2024, dues: 300, type: 'Official', amount: 300, status: 'paid', transactionId: ['t-mock-admin-1'] }
   },
   badges: [
     { id: 'b-admin-1', name: 'Chapter Admin', icon: '🛡️', description: 'System administrator' },
@@ -63,7 +63,7 @@ export const MOCK_DEV_ADMIN: Member = {
   bio: 'JCI Local Organization administrator. Passionate about community development and digital transformation.',
   phone: '+60 12-345 6789',
   alternatePhone: '+60 12-345 6788',
-  membershipType: 'Full',
+  membershipType: 'Official',
   mentorId: undefined,
   menteeIds: ['u1', 'u2', 'u3'],
   careerHistory: [
@@ -111,7 +111,7 @@ export const MOCK_MEMBERS: Member[] = [
     id: 'u2',
     name: 'Sarah Chen',
     email: 'sarah.c@jci.local',
-    role: UserRole.PROBATION,
+    role: UserRole.MEMBER,
     tier: MemberTier.SILVER,
     points: 850,
     joinDate: '2022-02-10',
@@ -162,7 +162,7 @@ export const MOCK_MEMBERS: Member[] = [
     churnRisk: 'Low',
     attendanceRate: 98,
     membership: {
-      '2024': { year: 2024, dues: 300, type: 'Full', amount: 300, status: 'paid', transactionId: ['t-mock-jess-1'] }
+      '2024': { year: 2024, dues: 300, type: 'Official', amount: 300, status: 'paid', transactionId: ['t-mock-jess-1'] }
     },
     badges: [
       { id: 'b1', name: 'Project Lead', icon: '🚀', description: 'Led a successful project' },
@@ -174,7 +174,7 @@ export const MOCK_MEMBERS: Member[] = [
       { year: '2021', role: 'President', description: 'Chapter of the Year' }
     ],
     menteeIds: ['u1', 'u2'],
-    membershipType: 'Full'
+    membershipType: 'Official'
   },
 ];
 
@@ -492,7 +492,7 @@ export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
   {
     id: 'dues-2026-1',
     memberId: 'u1',
-    membershipType: 'Full' as MembershipType,
+    membershipType: 'Official' as MembershipType,
     duesYear: 2026,
     amount: 300,
     status: 'pending',
@@ -505,7 +505,7 @@ export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
   {
     id: 'dues-2026-2',
     memberId: 'u2',
-    membershipType: 'Full' as MembershipType,
+    membershipType: 'Official' as MembershipType,
     duesYear: 2026,
     amount: 300,
     status: 'paid',
@@ -519,7 +519,7 @@ export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
   {
     id: 'dues-1',
     memberId: 'u1',
-    membershipType: 'Full' as MembershipType,
+    membershipType: 'Official' as MembershipType,
     duesYear: DUES_YEAR,
     amount: 300,
     status: 'paid',
@@ -533,7 +533,7 @@ export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
   {
     id: 'dues-2',
     memberId: 'u2',
-    membershipType: 'Full' as MembershipType,
+    membershipType: 'Official' as MembershipType,
     duesYear: DUES_YEAR,
     amount: 300,
     status: 'paid',
@@ -561,7 +561,7 @@ export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
   {
     id: 'dues-4',
     memberId: 'u4',
-    membershipType: 'Full' as MembershipType,
+    membershipType: 'Official' as MembershipType,
     duesYear: DUES_YEAR,
     amount: 300,
     status: 'paid',
@@ -575,7 +575,7 @@ export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
   {
     id: 'dues-5',
     memberId: 'u1',
-    membershipType: 'Full' as MembershipType,
+    membershipType: 'Official' as MembershipType,
     duesYear: 2025,
     amount: 300,
     status: 'pending',
@@ -588,7 +588,7 @@ export const MOCK_DUES_RENEWAL_TRANSACTIONS: DuesRenewalTransaction[] = [
   {
     id: 'dues-6',
     memberId: 'u2',
-    membershipType: 'Full' as MembershipType,
+    membershipType: 'Official' as MembershipType,
     duesYear: 2025,
     amount: 300,
     status: 'overdue',

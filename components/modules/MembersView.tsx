@@ -194,6 +194,26 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
       membershipRules
     ), [membershipRules]);
 
+  // Count all members by membershipType (unfiltered, for filter option badges)
+  const membershipTypeCounts = useMemo(() => {
+    const counts: Partial<Record<MembershipType, number>> = {};
+    for (const m of members) {
+      const t = getMemberDisplayMembershipType(m);
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
+    return counts;
+  }, [members, membershipRules]);
+
+  // Count all members by role (unfiltered, for filter option badges)
+  const roleCounts = useMemo(() => {
+    const counts: Partial<Record<UserRole, number>> = {};
+    for (const m of members) {
+      const r = m.role as UserRole;
+      if (r) counts[r] = (counts[r] ?? 0) + 1;
+    }
+    return counts;
+  }, [members]);
+
   // Filter members based on search + column filters
   const filteredMembers = useMemo(() => {
     const term = (searchQuery || searchTerm).toLowerCase();
@@ -670,7 +690,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
           <div>
             {activeTab === 'directory' && (
-              <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0} emptyMessage="No members found">
+              <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchTerm && !searchQuery} emptyMessage="No members found">
                 <MemberTable
                   members={paginatedMembers}
                   onSelect={setSelectedMemberId}
@@ -683,7 +703,12 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   membershipTypeFilters={membershipTypeFilters}
                   onMembershipTypeFiltersChange={setMembershipTypeFilters}
                   getDisplayMembershipType={getMemberDisplayMembershipType}
+                  membershipTypeCounts={membershipTypeCounts}
+                  roleCounts={roleCounts}
                 />
+                {filteredMembers.length === 0 && (roleFilters.length > 0 || membershipTypeFilters.length > 0 || searchTerm || searchQuery) && (
+                  <div className="py-12 text-center text-slate-400 text-sm">No members match the current filters.</div>
+                )}
                 {filteredMembers.length > 0 && (
                   <div className="mt-4">
                     <Pagination

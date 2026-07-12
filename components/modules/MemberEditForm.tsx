@@ -104,7 +104,7 @@ function initFormValues(member: Member) {
     jacketSize: member.jacketSize || '',
     embroideredName: member.embroideredName || '',
     tshirtStatus: (member.tshirtStatus as string) || 'NA',
-    // Approval year for GUEST -> PROBATION transition
+    // Approval year for GUEST -> MEMBER transition
     membershipYear: member.joinDate ? new Date(member.joinDate).getFullYear() : new Date().getFullYear(),
   };
 }
@@ -167,8 +167,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         if (gender) newValues.gender = gender;
       }
 
-      // If role changed to PROBATION, default the year to joinDate year (from original member or form)
-      if (field === 'role' && value === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role)) {
+      // If role changed to MEMBER, default the year to joinDate year (from original member or form)
+      if (field === 'role' && value === UserRole.MEMBER && (member.role === UserRole.GUEST || !member.role)) {
         if (member.joinDate) {
           newValues.membershipYear = new Date(member.joinDate).getFullYear();
         } else {
@@ -308,8 +308,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       'business.interestedIndustries': interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,
     });
 
-    // Handle GUEST -> PROBATION membership initialization
-    if (formValues.role === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role)) {
+    // Handle GUEST -> MEMBER membership initialization
+    if (formValues.role === UserRole.MEMBER && (member.role === UserRole.GUEST || !member.role)) {
       const yearStr = String(formValues.membershipYear);
       updates.membership = {
         ...(member.membership || {}),
@@ -538,7 +538,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               </div>
 
               {/* Show year selection only when approving a Guest */}
-              {formValues.role === UserRole.PROBATION && (member.role === UserRole.GUEST || !member.role) && (
+              {formValues.role === UserRole.MEMBER && (member.role === UserRole.GUEST || !member.role) && (
                 <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
                   <label className="md:w-40 md:shrink-0 text-sm font-bold text-amber-600">Initiation Year</label>
                   <select

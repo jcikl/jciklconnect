@@ -29,20 +29,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageSettings: false,
     canApproveClaims: false,
   },
-  // PROBATION is deprecated as a permission tier - maps to MEMBER
-  [UserRole.PROBATION]: {
-    canViewMembers: true,
-    canEditMembers: false,
-    canViewFinance: false,
-    canEditFinance: false,
-    canManageProjects: false,
-    canManageEvents: true,
-    canManageInventory: false,
-    canManageAutomation: false,
-    canViewReports: false,
-    canManageSettings: false,
-    canApproveClaims: false,
-  },
   [UserRole.MEMBER]: {
     canViewMembers: true,
     canEditMembers: false,

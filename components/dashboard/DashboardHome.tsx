@@ -42,7 +42,6 @@ const normalizeMembership = (m: { membershipType?: string; role?: UserRole | str
   if (mt.includes('probation')) return 'probation';
   if (mt && !mt.includes('guest')) return 'full';
   if (!mt) {
-    if (m.role === UserRole.PROBATION) return 'probation';
     if (m.role && [UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(m.role as UserRole)) return 'full';
   }
   return 'other';

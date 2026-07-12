@@ -130,7 +130,7 @@ export function roleForMembershipType(
   currentRole?: UserRole | string
 ): UserRole {
   if (membershipType === 'Guest') return UserRole.GUEST;
-  if (membershipType === 'Probation') return UserRole.PROBATION;
+  if (membershipType === 'Probation') return UserRole.MEMBER;
   if (currentRole === UserRole.BOARD || currentRole === UserRole.ADMIN || currentRole === UserRole.SUPER_ADMIN) {
     return currentRole as UserRole;
   }
@@ -141,13 +141,13 @@ export type ComputeMembershipTypeInput = Pick<
   MembershipEligibilityInput,
   'nationality' | 'dateOfBirth' | 'senatorCertified' | 'senatorshipId' | 'role'
 > & {
-  /** Stored type — used to retain Full after PromotionTracking promotion */
+  /** Stored type — used to retain Official after PromotionTracking promotion */
   membershipType?: MembershipType;
   senatorshipBoardValidated?: boolean;
 };
 
 /**
- * Derive membershipType from profile (age, nationality, senatorship) and promotion state (Full).
+ * Derive membershipType from profile (age, nationality, senatorship) and promotion state (Official).
  * This is the single source of truth; the field is not user-editable.
  */
 export function computeMembershipTypeFromMember(
@@ -173,10 +173,10 @@ export function computeMembershipTypeFromMember(
     if (senatorCheck.valid) return 'Senator';
   }
 
-  if (member.membershipType === 'Full') {
-    const fullCheck = validateMembershipTypeEligibility(
+  if (member.membershipType === 'Official') {
+    const officialCheck = validateMembershipTypeEligibility(
       {
-        membershipType: 'Full',
+        membershipType: 'Official',
         nationality: member.nationality,
         dateOfBirth: member.dateOfBirth,
         senatorCertified: member.senatorCertified,
@@ -186,12 +186,12 @@ export function computeMembershipTypeFromMember(
       rules,
       referenceDate
     );
-    if (fullCheck.valid) return 'Full';
+    if (officialCheck.valid) return 'Official';
   }
 
   const suggested = suggestMembershipTypeForMember(member, rules, referenceDate);
 
-  if (suggested === 'Probation' && member.membershipType !== 'Full') {
+  if (suggested === 'Probation' && member.membershipType !== 'Official') {
     return 'Probation';
   }
 
@@ -208,7 +208,7 @@ export function getTargetDuesForMembershipType(
   rules: Record<MembershipType, MembershipRuleConfig>
 ): number {
   const base = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType] ?? 0;
-  if ((membershipType === 'Probation' || membershipType === 'Full') && isFirstYear) {
+  if ((membershipType === 'Probation' || membershipType === 'Official') && isFirstYear) {
     return base + FIRST_YEAR_REGISTRATION_FEE;
   }
   return base;
@@ -226,8 +226,8 @@ export function resolveMembershipTypeFromDues(
   if (exact) return exact[0] as MembershipType;
 
   const probationBase = rules.Probation?.duesAmount ?? MembershipDues.Probation;
-  const fullBase = rules.Full?.duesAmount ?? MembershipDues.Full;
-  if (dues === probationBase + FIRST_YEAR_REGISTRATION_FEE || dues === fullBase + FIRST_YEAR_REGISTRATION_FEE) {
+  const officialBase = rules.Official?.duesAmount ?? MembershipDues.Official;
+  if (dues === probationBase + FIRST_YEAR_REGISTRATION_FEE || dues === officialBase + FIRST_YEAR_REGISTRATION_FEE) {
     return 'Probation';
   }
 
@@ -235,9 +235,9 @@ export function resolveMembershipTypeFromDues(
 }
 
 export const DEFAULT_MEMBERSHIP_RULES: Record<MembershipType, MembershipRuleConfig> | any = {
-  Guest: { type: 'Guest', duesAmount: 0, nationalityLimit: 'None', ageLimit: {}, requiresSenatorship: false },
+  Guest: { type: 'Guest', duesAmount: 350, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Probation: { type: 'Probation', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
-  Full: { type: 'Full', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
+  Official: { type: 'Official', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Honorary: { type: 'Honorary', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Senator: { type: 'Senator', duesAmount: 0, nationalityLimit: 'Malaysian', ageLimit: {}, requiresSenatorship: true },
   Visiting: { type: 'Visiting', duesAmount: 500, nationalityLimit: 'Non-Malaysian', ageLimit: {}, requiresSenatorship: false },
@@ -294,7 +294,7 @@ export function resolveMembershipPurpose(
   rules: Record<MembershipType, MembershipRuleConfig>
 ): string {
   const probationDues = rules.Probation?.duesAmount ?? 300;
-  const fullDues = rules.Full?.duesAmount ?? 300;
+  const officialDues = rules.Official?.duesAmount ?? 300;
   const visitingDues = rules.Visiting?.duesAmount ?? 500;
   const associateDues = rules.Associate?.duesAmount ?? 50;
 
@@ -304,10 +304,10 @@ export function resolveMembershipPurpose(
   if (amount === associateDues) {
     return `${year} Associate Membership`;
   }
-  if (amount === probationDues + 50 || amount === fullDues + 50) {
+  if (amount === probationDues + 50 || amount === officialDues + 50) {
     return `${year} New Membership`;
   }
-  if (amount === fullDues || amount === probationDues) {
+  if (amount === officialDues || amount === probationDues) {
     return `${year} Renewed Membership`;
   }
   return `${year} Membership`;

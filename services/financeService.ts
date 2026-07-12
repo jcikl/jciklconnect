@@ -1203,7 +1203,7 @@ export class FinanceService {
             if (memberIdVal) {
               const rules = await MembershipConfigService.getRules();
               const memberObj = MOCK_MEMBERS.find(m => m.id === memberIdVal) || null;
-              const membershipType = memberObj?.membershipType || 'Full';
+              const membershipType = memberObj?.membershipType || 'Official';
               const resolvedPurpose = resolveMembershipPurpose(
                 currentTransaction?.amount || 0,
                 yearVal,
@@ -1893,7 +1893,7 @@ export class FinanceService {
               dateOfBirth: member.dateOfBirth,
               senatorCertified: member.senatorCertified,
               senatorshipId: member.senatorshipId,
-              role: 'PROBATION',
+              role: 'MEMBER',
               membershipType: member.membershipType,
             },
             rules
@@ -2220,8 +2220,8 @@ export class FinanceService {
 
           if (alreadyRenewed) continue;
 
-          // Determine membership type (default to 'Full' if not set)
-          const membershipType = member.membershipType || 'Full';
+          // Determine membership type (default to 'Official' if not set)
+          const membershipType = member.membershipType || 'Official';
 
           // Validate membership type eligibility
           if (membershipType === 'Honorary') {
@@ -2418,7 +2418,7 @@ export class FinanceService {
         const member = await MembersService.getMemberById(transaction.memberId);
         if (!member) continue;
 
-        const membershipType = member.membershipType || 'Full';
+        const membershipType = member.membershipType || 'Official';
         if (!byType[membershipType]) byType[membershipType] = { total: 0, paid: 0, pending: 0, overdue: 0 };
         byType[membershipType].total++;
 
@@ -2497,7 +2497,7 @@ export class FinanceService {
       }> = [];
 
       for (const member of allMembers) {
-        const membershipType = member.membershipType || 'Full';
+        const membershipType = member.membershipType || 'Official';
         const duesYear = new Date().getFullYear(); // Default to current year or derive from context
         const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
         const duesAmount = baseDues + ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50);
@@ -2585,7 +2585,7 @@ export class FinanceService {
         return { success: false, error: 'Member not found' };
       }
 
-      const membershipType = member.membershipType || 'Full';
+      const membershipType = member.membershipType || 'Official';
       const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
       const expectedAmount = baseDues + ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50);
 

@@ -97,7 +97,7 @@ export const usePermissions = () => {
   const isLegacyBoardRole = effectiveRole === UserRole.BOARD;
   const isBoardUser = isCurrentBoardMember || isLegacyBoardRole;
   const isPlainMember =
-    (effectiveRole === UserRole.MEMBER || effectiveRole === UserRole.PROBATION) && !isBoardUser;
+    effectiveRole === UserRole.MEMBER && !isBoardUser;
 
   /** Workspace modules (Members, Communication, Gamification etc.) — board, admin only; not plain members/guests */
   const canAccessWorkspaceModules =
@@ -117,8 +117,8 @@ export const usePermissions = () => {
     hasAnyPermission,
     hasAllPermissions,
     isGuest: effectiveRole === UserRole.GUEST,
-    isProbationMember: effectiveRole === UserRole.PROBATION, // Kept for backward compat with MembersView probation flow
-    isMember: effectiveRole === UserRole.MEMBER || effectiveRole === UserRole.PROBATION,
+    isProbationMember: false,
+    isMember: effectiveRole === UserRole.MEMBER,
     isPlainMember,
     isCurrentBoardMember: isBoardUser,
     isBoard: isBoardUser,

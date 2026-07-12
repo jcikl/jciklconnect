@@ -776,7 +776,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                   alt={member.name}
                 />
               </div>
-              <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-jci-navy shadow ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-400' : member.role === UserRole.PROBATION ? 'bg-amber-400' : 'bg-slate-400'}`} title={member.role} />
+              <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-jci-navy shadow ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-400' : 'bg-slate-400'}`} title={member.role} />
             </div>
             {/* Name + meta */}
             <div className="flex-1 min-w-0">
@@ -908,7 +908,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                   alt={member.name}
                 />
               </div>
-              <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' : member.role === UserRole.PROBATION ? 'bg-amber-500' : 'bg-slate-500'}`} title={member.role} />
+              <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' : 'bg-slate-500'}`} title={member.role} />
             </div>
           </div>
 

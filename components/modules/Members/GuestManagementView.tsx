@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import {
-  Mail, Phone, Calendar, Users, UserCheck, FileText, CheckCircle, Shield
+  Mail, Phone, Calendar, Users, UserCheck, FileText
 } from 'lucide-react';
 import { Button, Badge, Modal, useToast } from '../../ui/Common';
 import type { Member, ProbationTask } from '../../../types';
@@ -13,16 +13,13 @@ import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 
 // Guest Management View Component
 export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: string) => void }> = ({ searchQuery, onSelect }) => {
-  const { members, updateMember, batchUpdateMembers } = useMembers();
+  const { members, updateMember } = useMembers();
   const { member: currentMember } = useAuth();
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
   const [guests, setGuests] = useState<Member[]>([]);
-  const [probationMembers, setProbationMembers] = useState<Member[]>([]);
   const [selectedGuest, setSelectedGuest] = useState<Member | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [showProbationTasksModal, setShowProbationTasksModal] = useState(false);
-  const [selectedProbationMember, setSelectedProbationMember] = useState<Member | null>(null);
 
   const getInitiationYear = (dateStr?: string | null) => {
     if (!dateStr) return new Date().getFullYear();
@@ -54,9 +51,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
     };
 
     const guestList = members.filter(m => m.role === UserRole.GUEST && filterFn(m));
-    const probationList = members.filter(m => m.role === UserRole.PROBATION && filterFn(m));
     setGuests(guestList);
-    setProbationMembers(probationList);
   }, [members, searchQuery]);
 
   useEffect(() => {
@@ -103,7 +98,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
       const yearStr = String(approvalYear);
 
       await updateMember(guestId, {
-        role: UserRole.PROBATION,
+        role: UserRole.MEMBER,
         membershipType: 'Probation' as any,
         probationTasks: defaultTasks,
         probationApprovedBy: currentMember?.id,
@@ -167,7 +162,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         const guest = guests.find(g => g.id === id);
         return {
           id,
-          role: UserRole.PROBATION,
+          role: UserRole.MEMBER,
           membershipType: 'Probation' as any,
           probationTasks: defaultTasks,
           probationApprovedBy: currentMember?.id,
@@ -209,80 +204,6 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
       setSelectedGuestIds(new Set());
     } else {
       setSelectedGuestIds(new Set(guests.map(g => g.id)));
-    }
-  };
-
-  const handleCompleteTask = async (memberId: string, taskId: string) => {
-    try {
-      const member = members.find(m => m.id === memberId);
-      if (!member || !member.probationTasks) return;
-
-      const updatedTasks = member.probationTasks.map(task =>
-        task.id === taskId
-          ? { ...task, status: 'Completed' as const, completedAt: new Date().toISOString() }
-          : task
-      );
-
-      // Check if all tasks are completed
-      const allCompleted = updatedTasks.every(task => task.status === 'Completed' || task.status === 'Verified');
-
-      await updateMember(memberId, {
-        probationTasks: updatedTasks,
-        ...(allCompleted && {
-          role: UserRole.MEMBER,
-          probationCompletedAt: new Date().toISOString(),
-        }),
-      });
-
-      if (allCompleted) {
-        showToast('All probation tasks completed! Member promoted to official member', 'success');
-      } else {
-        showToast('Task marked as completed', 'success');
-      }
-    } catch (err) {
-      showToast('Failed to update task', 'error');
-    }
-  };
-
-  const handleVerifyTask = async (memberId: string, taskId: string) => {
-    if (!canApprove) {
-      showToast('Only board members can verify tasks', 'error');
-      return;
-    }
-
-    try {
-      const member = members.find(m => m.id === memberId);
-      if (!member || !member.probationTasks) return;
-
-      const updatedTasks = member.probationTasks.map(task =>
-        task.id === taskId
-          ? {
-            ...task,
-            status: 'Verified' as const,
-            verifiedBy: currentMember?.id,
-            verifiedAt: new Date().toISOString(),
-          }
-          : task
-      );
-
-      // Check if all tasks are verified
-      const allVerified = updatedTasks.every(task => task.status === 'Verified');
-
-      await updateMember(memberId, {
-        probationTasks: updatedTasks,
-        ...(allVerified && {
-          role: UserRole.MEMBER,
-          probationCompletedAt: new Date().toISOString(),
-        }),
-      });
-
-      if (allVerified) {
-        showToast('All tasks verified! Member promoted to official member', 'success');
-      } else {
-        showToast('Task verified', 'success');
-      }
-    } catch (err) {
-      showToast('Failed to verify task', 'error');
     }
   };
 
@@ -390,64 +311,6 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
           <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
             <Users className="mx-auto text-slate-300 mb-3" size={32} />
             <p className="text-slate-500 font-medium">No guests pending approval</p>
-          </div>
-        )}
-      </div>
-
-      {/* Probation Members Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Probation Members</h3>
-          <span className="bg-amber-100 text-amber-700 text-xs font-black px-2.5 py-1 rounded-full">{probationMembers.length}</span>
-        </div>
-        {probationMembers.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3">
-            {probationMembers.map(member => {
-              const tasks = member.probationTasks || [];
-              const completed = tasks.filter(t => t.status === 'Completed' || t.status === 'Verified').length;
-              const total = tasks.length;
-              const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-              return (
-                <div key={member.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="relative shrink-0">
-                      <img src={member.avatar || undefined} className="w-10 h-10 rounded-full border border-slate-100" alt={member.name} />
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 border-2 border-white rounded-full" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-slate-900 text-sm truncate">{member.name}</div>
-                      <div className="text-xs text-slate-500 truncate">{member.email}</div>
-                      {total > 0 && (
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-[80px]">
-                            <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-400">{completed}/{total} tasks</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => onSelect(member.id)}
-                      className="h-8 px-3 rounded-lg text-slate-600 hover:text-jci-blue hover:border-jci-blue hover:bg-jci-blue/5 text-xs">
-                      <FileText size={12} className="mr-1.5" />Review
-                    </Button>
-                    {canApprove && (
-                      <Button size="sm"
-                        onClick={() => { setSelectedProbationMember(member); setShowProbationTasksModal(true); }}
-                        className="h-8 px-3 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 text-white text-xs">
-                        <CheckCircle size={12} className="mr-1.5" />Tasks
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="p-6 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-            <Users className="mx-auto text-slate-300 mb-2" size={28} />
-            <p className="text-slate-500 font-medium text-sm">No probation members</p>
           </div>
         )}
       </div>
@@ -560,90 +423,6 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         </Modal>
       )}
 
-      {/* Probation Tasks Modal */}
-      {showProbationTasksModal && selectedProbationMember && (
-        <Modal
-          isOpen={showProbationTasksModal}
-          onClose={() => {
-            setShowProbationTasksModal(false);
-            setSelectedProbationMember(null);
-          }}
-          title={`Probation Tasks: ${selectedProbationMember.name}`}
-          size="lg"
-        >
-          <div className="space-y-4">
-            {selectedProbationMember.probationTasks && selectedProbationMember.probationTasks.length > 0 ? (
-              <div className="space-y-3">
-                {selectedProbationMember.probationTasks.map(task => (
-                  <div
-                    key={task.id}
-                    className={`p-4 border rounded-lg ${task.status === 'Verified'
-                      ? 'bg-green-50 border-green-200'
-                      : task.status === 'Completed'
-                        ? 'bg-blue-50 border-blue-200'
-                        : 'bg-slate-50 border-slate-200'
-                      }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-3 gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-slate-900 truncate">{task.title}</h4>
-                          <Badge
-                            className="shrink-0"
-                            variant={
-                              task.status === 'Verified'
-                                ? 'success'
-                                : task.status === 'Completed'
-                                  ? 'info'
-                                  : 'neutral'
-                            }
-                          >
-                            {task.status}
-                          </Badge>
-                        </div>
-                        {task.description && (
-                          <p className="text-sm text-slate-600 mb-2">{task.description}</p>
-                        )}
-                        {task.category && (
-                          <Badge variant="neutral">{task.category}</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      {task.status === 'Pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleCompleteTask(selectedProbationMember.id, task.id)}
-                        >
-                          <CheckCircle size={14} className="mr-2" />
-                          Mark Complete
-                        </Button>
-                      )}
-                      {task.status === 'Completed' && canApprove && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleVerifyTask(selectedProbationMember.id, task.id)}
-                        >
-                          <Shield size={14} className="mr-2" />
-                          Verify
-                        </Button>
-                      )}
-                      {task.verifiedAt && (
-                        <span className="text-xs text-slate-500">
-                          Verified on {new Date(task.verifiedAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-slate-500 py-4">No probation tasks assigned</p>
-            )}
-          </div>
-        </Modal>
-      )}
     </div>
   );
 };

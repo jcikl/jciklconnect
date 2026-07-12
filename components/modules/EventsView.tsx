@@ -979,11 +979,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                           if (!mem) return 'Public';
                           if (isDirector(mem)) return 'Comm. Dir.';
                           if (isBoardMember(mem)) return 'Board';
-                          const rv = (mem.role ?? mem.systemRole ?? '').toUpperCase();
+                          const rv = (mem.role ?? '').toUpperCase();
                           if (rv === 'ADMIN' || rv === 'SUPER_ADMIN') return 'Admin';
                           if (rv === 'BOARD') return 'Board';
                           if (rv === 'MEMBER') return 'Member';
-                          if (rv === 'PROBATION') return 'Probation';
                           return 'Guest';
                         })();
                         const isCancelled = r.status === 'cancelled';

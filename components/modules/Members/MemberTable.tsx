@@ -6,6 +6,18 @@ import { ColumnFilterHeader } from '../../ui/ColumnFilterHeader';
 import type { Member, UserRole, MembershipType } from '../../../types';
 import { MembersService } from '../../../services/membersService';
 
+const getMemberAge = (member: Member): number | null => {
+  const dob = member.dateOfBirth || member.general?.dob;
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+};
+
 /** 出席对比：当年签到次数 vs 已过月份（入会年份从入会月起算），每年重算 */
 export const getAttendanceDisplay = (m: Member) => {
   const year = new Date().getFullYear();
@@ -16,7 +28,6 @@ export const getAttendanceDisplay = (m: Member) => {
 
 const ROLE_FILTER_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'GUEST' as UserRole, label: 'Guest' },
-  { value: 'PROBATION' as UserRole, label: 'Probation' },
   { value: 'MEMBER' as UserRole, label: 'Member' },
   { value: 'BOARD' as UserRole, label: 'Board' },
   { value: 'ADMIN' as UserRole, label: 'Admin' },
@@ -27,7 +38,7 @@ const ROLE_FILTER_OPTIONS: { value: UserRole; label: string }[] = [
 const MEMBERSHIP_TYPE_FILTER_OPTIONS: { value: MembershipType; label: string }[] = [
   { value: 'Guest', label: 'Guest' },
   { value: 'Probation', label: 'Probation' },
-  { value: 'Full', label: 'Full' },
+  { value: 'Official', label: 'Official' },
   { value: 'Honorary', label: 'Honorary' },
   { value: 'Senator', label: 'Senator' },
   { value: 'Visiting', label: 'Visiting' },
@@ -87,6 +98,10 @@ const DesktopMemberRow = React.memo(function DesktopMemberRow({
       <div className="px-6 flex-none" style={{ width: 120 }}>
         <Badge variant={member.role === 'BOARD' as UserRole ? 'info' : 'neutral'}>{member.role}</Badge>
       </div>
+      {/* Age */}
+      <div className="px-6 flex-none text-sm text-slate-600" style={{ width: 72 }}>
+        {getMemberAge(member) ?? <span className="text-slate-300">—</span>}
+      </div>
       {/* Membership Type */}
       <div className="px-6 flex-none" style={{ width: 160 }}>
         <Badge variant={membershipTypeBadgeVariant(displayType)}>{displayType}</Badge>
@@ -127,11 +142,13 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
   isSelected,
   onSelect,
   onToggleSelection,
+  getDisplayMembershipType,
 }: {
   member: Member;
   isSelected: boolean;
   onSelect: (id: string) => void;
   onToggleSelection: (id: string) => void;
+  getDisplayMembershipType: (m: Member) => MembershipType;
 }) {
   const tierColor = member.tier === 'Platinum'
     ? 'bg-purple-500' : member.tier === 'Gold'
@@ -141,6 +158,8 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
   const riskHigh = member.churnRisk === 'High';
   const riskMed = member.churnRisk === 'Medium';
   const att = getAttendanceDisplay(member);
+  const displayType = getDisplayMembershipType(member);
+  const age = getMemberAge(member);
 
   return (
     <div
@@ -186,11 +205,13 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
             <span className="text-[11px] text-slate-400 truncate">{member.email}</span>
           </div>
           {/* Mini stats bar */}
-          <div className="flex items-center gap-3 mt-1.5">
-            <span className={`text-[10px] font-black ${member.tier === 'Platinum' ? 'text-purple-500' : member.tier === 'Gold' ? 'text-amber-500' : 'text-slate-500'}`}>
-              {member.tier}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${membershipTypeBadgeVariant(displayType) === 'warning' ? 'bg-amber-100 text-amber-700' : membershipTypeBadgeVariant(displayType) === 'info' ? 'bg-blue-100 text-blue-700' : membershipTypeBadgeVariant(displayType) === 'success' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+              {displayType}
             </span>
-            <span className="text-[10px] text-slate-400">{member.points} pts</span>
+            {age !== null && (
+              <span className="text-[10px] text-slate-400">{age}y</span>
+            )}
             <div className="flex items-center gap-1 flex-1">
               <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden max-w-[48px]">
                 <div className={`h-full rounded-full ${att.checkins < att.months ? 'bg-amber-400' : 'bg-green-400'}`}
@@ -209,7 +230,7 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
 });
 
 // Desktop virtual header minimum width (sum of all column widths + flex member col)
-const DESKTOP_MIN_WIDTH = 56 + 120 + 160 + 140 + 192 + 120 + 80 + 240; // ~1108px
+const DESKTOP_MIN_WIDTH = 56 + 120 + 72 + 160 + 140 + 192 + 120 + 80 + 240; // ~1180px
 const DESKTOP_ROW_HEIGHT = 72;
 const MOBILE_ROW_HEIGHT = 80;
 
@@ -226,6 +247,8 @@ const MemberTableBase: React.FC<{
   membershipTypeFilters: MembershipType[],
   onMembershipTypeFiltersChange: (types: MembershipType[]) => void,
   getDisplayMembershipType: (member: Member) => MembershipType,
+  membershipTypeCounts?: Partial<Record<MembershipType, number>>,
+  roleCounts?: Partial<Record<UserRole, number>>,
 }> = ({
   members,
   onSelect,
@@ -238,6 +261,8 @@ const MemberTableBase: React.FC<{
   membershipTypeFilters,
   onMembershipTypeFiltersChange,
   getDisplayMembershipType,
+  membershipTypeCounts,
+  roleCounts,
 }) => {
     const desktopScrollRef = React.useRef<HTMLDivElement>(null);
     const mobileScrollRef = React.useRef<HTMLDivElement>(null);
@@ -275,15 +300,16 @@ const MemberTableBase: React.FC<{
               <div className="px-6 py-4 flex-none overflow-visible" style={{ width: 120 }}>
                 <ColumnFilterHeader
                   label="Role"
-                  options={ROLE_FILTER_OPTIONS}
+                  options={roleCounts ? ROLE_FILTER_OPTIONS.map(o => ({ ...o, count: roleCounts[o.value] ?? 0 })) : ROLE_FILTER_OPTIONS}
                   selected={roleFilters}
                   onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
                 />
               </div>
+              <div className="px-6 py-4 flex-none text-sm font-semibold text-slate-500" style={{ width: 72 }}>Age</div>
               <div className="px-6 py-4 flex-none overflow-visible" style={{ width: 160 }}>
                 <ColumnFilterHeader
                   label="Membership Type"
-                  options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
+                  options={membershipTypeCounts ? MEMBERSHIP_TYPE_FILTER_OPTIONS.map(o => ({ ...o, count: membershipTypeCounts[o.value as MembershipType] ?? 0 })) : MEMBERSHIP_TYPE_FILTER_OPTIONS}
                   selected={membershipTypeFilters}
                   onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
                 />
@@ -330,13 +356,13 @@ const MemberTableBase: React.FC<{
         <div className="md:hidden border-b border-slate-100 px-4 py-3 flex gap-2 overflow-x-auto bg-slate-50/50">
           <ColumnFilterHeader
             label="Role"
-            options={ROLE_FILTER_OPTIONS}
+            options={roleCounts ? ROLE_FILTER_OPTIONS.map(o => ({ ...o, count: roleCounts[o.value] ?? 0 })) : ROLE_FILTER_OPTIONS}
             selected={roleFilters}
             onChange={(vals) => onRoleFiltersChange(vals as UserRole[])}
           />
           <ColumnFilterHeader
             label="Membership Type"
-            options={MEMBERSHIP_TYPE_FILTER_OPTIONS}
+            options={membershipTypeCounts ? MEMBERSHIP_TYPE_FILTER_OPTIONS.map(o => ({ ...o, count: membershipTypeCounts[o.value as MembershipType] ?? 0 })) : MEMBERSHIP_TYPE_FILTER_OPTIONS}
             selected={membershipTypeFilters}
             onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
           />
@@ -366,6 +392,7 @@ const MemberTableBase: React.FC<{
                   isSelected={selectedIds.has(members[virtualRow.index].id)}
                   onSelect={onSelect}
                   onToggleSelection={onToggleSelection}
+                  getDisplayMembershipType={getDisplayMembershipType}
                 />
               </div>
             ))}

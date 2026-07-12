@@ -1,6 +1,5 @@
 export enum UserRole {
   GUEST = 'GUEST',
-  PROBATION = 'PROBATION',
   MEMBER = 'MEMBER',
   BOARD = 'BOARD',
   ADMIN = 'ADMIN',
@@ -15,7 +14,6 @@ export enum MemberTier {
   PLATINUM = 'Platinum'
 }
 
-export type SystemRole = 'guest' | 'member' | 'board' | 'admin';
 
 export interface RadarStats {
   training: number;

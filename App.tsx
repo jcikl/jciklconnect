@@ -206,9 +206,7 @@ export const JCIKLApp: React.FC = () => {
       const enriched = all.map(m => {
         const isBoard = boardPositionMap.has(m.id);
         const isCommDir = !isBoard && commissionDirectorSet.has(m.id);
-        const isProbation = !isBoard && !isCommDir && (
-          !!(m as any).probationTasks || (m.role || '').toUpperCase() === UserRole.PROBATION
-        );
+        const isProbation = !isBoard && !isCommDir && !!(m as any).probationTasks;
         // sortOrder: Board=0, CommDir=1, Member=2, Probation=3
         const sortOrder = isBoard ? 0 : isCommDir ? 1 : isProbation ? 3 : 2;
         return {
@@ -1578,7 +1576,7 @@ export const JCIKLApp: React.FC = () => {
                     key={m.id}
                     onClick={async () => {
                       setMemberPickerOpen(false);
-                      const role = m.labelColor === 'purple' ? UserRole.BOARD : m.labelColor === 'teal' ? UserRole.MEMBER : m.labelColor === 'amber' ? UserRole.PROBATION : UserRole.MEMBER;
+                      const role = m.labelColor === 'purple' ? UserRole.BOARD : UserRole.MEMBER;
                       await simulateAsMember(m.id, role);
                       showToast(`Viewing as ${m.name} (${m.label})`, 'info');
                     }}

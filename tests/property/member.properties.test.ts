@@ -227,7 +227,7 @@ describe('Member Management Properties', () => {
             name: fc.option(fc.string({ minLength: 1 }), { nil: '' }),
             email: fc.option(fc.string({ minLength: 1 }), { nil: '' }),
             phone: fc.option(fc.string({ minLength: 1 }), { nil: '' }),
-            membershipType: fc.option(fc.constantFrom('Full', 'Probation', 'Honorary', 'Visiting', 'Senator', 'Invalid'), { nil: '' }),
+            membershipType: fc.option(fc.constantFrom('Official', 'Probation', 'Honorary', 'Visiting', 'Senator', 'Invalid'), { nil: '' }),
             status: fc.option(fc.constantFrom('Active', 'Inactive', 'Suspended', 'Pending', 'Invalid'), { nil: '' }),
             dateOfBirth: fc.option(fc.string({ minLength: 1 }), { nil: '' })
           }),
@@ -270,7 +270,7 @@ describe('Member Management Properties', () => {
             }
 
             // Enum validation
-            if (row.membershipType && !['Full', 'Probation', 'Honorary', 'Visiting', 'Senator'].includes(row.membershipType)) {
+            if (row.membershipType && !['Official', 'Probation', 'Honorary', 'Visiting', 'Senator'].includes(row.membershipType)) {
               errors.push({
                 row: rowNumber,
                 field: 'membershipType',
@@ -573,14 +573,14 @@ describe('Member Management Properties', () => {
           // Simulate automatic promotion logic
           if (shouldTriggerAutomaticPromotion) {
             promotionTriggered = true;
-            newMembershipType = 'Full';
+            newMembershipType = 'Official';
             promotionDate = new Date();
           }
 
           // Property: Automatic promotion should only trigger when all requirements are met AND automatic promotion is enabled
           if (memberData.allRequirementsCompleted && memberData.automaticPromotionEnabled) {
             expect(promotionTriggered).toBe(true);
-            expect(newMembershipType).toBe('Full');
+            expect(newMembershipType).toBe('Official');
             expect(promotionDate).toBeDefined();
           }
 
@@ -609,7 +609,7 @@ describe('Member Management Properties', () => {
           const originalMembershipType = 'Probation';
           if (promotionTriggered) {
             expect(originalMembershipType).toBe('Probation');
-            expect(newMembershipType).toBe('Full');
+            expect(newMembershipType).toBe('Official');
           }
         }
       ),
@@ -641,11 +641,11 @@ describe('Member Management Properties', () => {
           // Simulate promotion process
           let oldDuesAmount = PROBATION_DUES;
           let newDuesAmount = PROBATION_DUES;
-          let newMembershipType: 'Probation' | 'Full' = memberData.originalMembershipType;
+          let newMembershipType: 'Probation' | 'Official' = memberData.originalMembershipType;
           let duesAdjusted = false;
 
           if (memberData.promotionTriggered) {
-            newMembershipType = 'Full';
+            newMembershipType = 'Official';
             newDuesAmount = FULL_MEMBER_DUES;
             duesAdjusted = true;
           }
@@ -656,7 +656,7 @@ describe('Member Management Properties', () => {
           // Property: After promotion, dues should be adjusted to Full Member amount (RM300)
           if (memberData.promotionTriggered) {
             expect(newDuesAmount).toBe(300);
-            expect(newMembershipType).toBe('Full');
+            expect(newMembershipType).toBe('Official');
             expect(duesAdjusted).toBe(true);
           }
 
@@ -683,7 +683,7 @@ describe('Member Management Properties', () => {
             const promotionRecord = {
               memberId: memberData.memberId,
               fromMembershipType: 'Probation',
-              toMembershipType: 'Full',
+              toMembershipType: 'Official',
               oldDuesAmount,
               newDuesAmount,
               promotionDate: new Date()
@@ -692,7 +692,7 @@ describe('Member Management Properties', () => {
             expect(promotionRecord.oldDuesAmount).toBe(350);
             expect(promotionRecord.newDuesAmount).toBe(300);
             expect(promotionRecord.fromMembershipType).toBe('Probation');
-            expect(promotionRecord.toMembershipType).toBe('Full');
+            expect(promotionRecord.toMembershipType).toBe('Official');
           }
         }
       ),

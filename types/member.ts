@@ -1,15 +1,9 @@
-import { UserRole, MemberTier, SystemRole, RadarStats } from './common';
+import { UserRole, MemberTier, RadarStats } from './common';
 
 export type MembershipType =
-  | 'guest'
-  | 'probation member'
-  | 'official member'
-  | 'visiting member'
-  | 'associate member'
-  | 'lifetime member'
   | 'Guest'
   | 'Probation'
-  | 'Full'
+  | 'Official'
   | 'Honorary'
   | 'Senator'
   | 'Visiting'
@@ -156,7 +150,7 @@ export const MEMBER_LOOKUP_FIELDS = ['name', 'email', 'phone', 'fullName', 'curr
 
 export interface Member {
   id: string;
-  systemRole?: SystemRole;
+
   general?: {
     name: string;
     chineseName?: string;
@@ -345,7 +339,7 @@ export interface Member {
   badgesCount?: number;
   projectsCount?: number;
   trainingsCount?: number;
-  role?: UserRole | SystemRole | string;
+  role?: UserRole | string;
   tier?: MemberTier | string;
   churnRisk?: string;
   duesStatus?: string;
@@ -442,15 +436,9 @@ export interface BusinessProfile {
 }
 
 export const MembershipDues: Record<MembershipType, number> = {
-  guest: 0,
-  'probation member': 300,
-  'official member': 300,
-  'visiting member': 500,
-  'associate member': 50,
-  'lifetime member': 0,
-  Guest: 0,
+  Guest: 350,
   Probation: 300,
-  Full: 300,
+  Official: 300,
   Honorary: 0,
   Senator: 0,
   Visiting: 500,

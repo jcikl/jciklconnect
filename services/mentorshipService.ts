@@ -60,7 +60,7 @@ export class MentorshipService {
         if (m.id === menteeId) return false;
         if (m.menteeIds && m.menteeIds.length >= 5) return false; // Max 5 mentees per mentor
         if (m.points < 500) return false; // Minimum experience threshold
-        if (m.role === UserRole.GUEST || m.role === UserRole.PROBATION) return false;
+        if (m.role === UserRole.GUEST) return false;
         return true;
       });
 

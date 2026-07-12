@@ -5,7 +5,7 @@ import { Save, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button, useToast } from '../ui/Common';
 import { MembersService } from '../../services/membersService';
 
-const MEMBERSHIP_TYPES: MembershipType[] = ['Guest', 'Probation', 'Full', 'Honorary', 'Senator', 'Visiting', 'Associate'];
+const MEMBERSHIP_TYPES: MembershipType[] = ['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'];
 
 const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = ({ checked, onChange }) => (
   <button
@@ -28,7 +28,6 @@ export const MembershipConfigView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [syncingTypes, setSyncingTypes] = useState(false);
   const [syncingRecords, setSyncingRecords] = useState(false);
-  const [syncYear, setSyncYear] = useState(new Date().getFullYear());
   const { showToast } = useToast();
 
   useEffect(() => { loadRules(); }, []);
@@ -58,10 +57,10 @@ export const MembershipConfigView: React.FC = () => {
   };
 
   const handleBatchSyncMembershipTypes = async () => {
-    if (!window.confirm(`根据 ${syncYear} 年会费记录与当前 Config，批量推断并写入 members.membershipType？\n\n不修改 membership 字段。请先保存 Config 再执行。`)) return;
+    if (!window.confirm('根据当前 Config，批量推断并写入 members.membershipType？\n\n不修改 membership 字段。请先保存 Config 再执行。')) return;
     setSyncingTypes(true);
     try {
-      const result = await MembersService.batchSyncMembershipTypes({ year: syncYear });
+      const result = await MembersService.batchSyncMembershipTypes({ year: new Date().getFullYear() });
       showToast(`membershipType: updated ${result.updated}, unchanged ${result.alreadyCorrect}`, 'success');
     } catch (e) {
       showToast('Failed to sync membershipType', 'error');
@@ -69,10 +68,11 @@ export const MembershipConfigView: React.FC = () => {
   };
 
   const handleBatchSyncMembershipRecords = async () => {
-    if (!window.confirm(`根据 membershipType 与当前 Config，批量更新 ${syncYear} 年 members.membership？\n\n仅更新已有 membership 记录（不新建）。请先保存 Config。`)) return;
+    const currentYear = new Date().getFullYear();
+    if (!window.confirm(`根据各会员 joined date 与当前 Config，校正从入会年至 ${currentYear} 的所有已有 membership 记录 dues？\n\n仅更新已有记录（不新建）。请先保存 Config。`)) return;
     setSyncingRecords(true);
     try {
-      const result = await MembersService.batchSyncMembershipRecords({ year: syncYear, onlyExistingRecords: true });
+      const result = await MembersService.batchSyncMembershipRecords({ year: currentYear, toYear: currentYear, onlyExistingRecords: false });
       showToast(`membership: updated ${result.updated}, already correct ${result.alreadyCorrect}`, 'success');
     } catch (e) {
       showToast('Failed to sync membership records', 'error');
@@ -92,13 +92,6 @@ export const MembershipConfigView: React.FC = () => {
       {/* Toolbar */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 shrink-0">Year</span>
-          <input
-            type="number"
-            className="w-16 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-jci-blue"
-            value={syncYear}
-            onChange={(e) => setSyncYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
-          />
           <div className="flex-1" />
           <Button size="sm" onClick={handleSave} disabled={isBusy} className="flex items-center gap-1.5 shrink-0">
             <Save size={12} />
@@ -126,7 +119,7 @@ export const MembershipConfigView: React.FC = () => {
               {/* Header row: name + senatorship */}
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-sm text-slate-800">
-                  {type}{type === 'Full' ? ' (Official)' : ''}
+                  {type}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-400">Senatorship</span>
@@ -198,7 +191,7 @@ export const MembershipConfigView: React.FC = () => {
               return (
                 <tr key={type} className="hover:bg-slate-50/60 transition-colors">
                   <td className="px-4 py-2.5 text-sm font-medium text-slate-700 whitespace-nowrap">
-                    {type}{type === 'Full' ? ' (Official)' : ''}
+                    {type}
                   </td>
                   <td className="px-4 py-2.5">
                     <input type="number" min="0"
@@ -286,6 +279,7 @@ export const MembershipConfigView: React.FC = () => {
           </label>
         </div>
       </div>
+
 
     </div>
   );
