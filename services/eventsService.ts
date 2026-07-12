@@ -46,6 +46,7 @@ export class EventsService {
       : (typeof endDateVal === 'string' ? endDateVal : undefined);
     // Use eventStartTime as primary time, fallback to time for backward compatibility
     const timeVal = data.eventStartTime ?? data.time;
+    const endTimeVal = data.eventEndTime ?? undefined;
     return {
       id: d.id,
       title: data.title ?? data.name ?? '',
@@ -53,6 +54,7 @@ export class EventsService {
       date: dateStr,
       endDate: endDateStr,
       time: timeVal ?? undefined,
+      endTime: endTimeVal,
       type: (data.eventType ?? data.type) ?? 'Meeting',
       attendees: data.attendees ?? 0,
       maxAttendees: data.maxAttendees ?? undefined,

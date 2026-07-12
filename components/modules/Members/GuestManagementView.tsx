@@ -50,7 +50,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
       );
     };
 
-    const guestList = members.filter(m => m.role === UserRole.GUEST && filterFn(m));
+    const guestList = members.filter(m => (m.role === UserRole.GUEST || m.membershipType === 'Guest') && filterFn(m));
     setGuests(guestList);
   }, [members, searchQuery]);
 
@@ -255,7 +255,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
             {guests.map(guest => (
               <div key={guest.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all gap-4">
                 <div className="flex items-center gap-4 flex-1">
-                  {canApprove && (
+                  {canApprove && guest.role === UserRole.GUEST && (
                     <input
                       type="checkbox"
                       className="w-4 h-4 rounded border-gray-300 text-jci-blue focus:ring-jci-blue"
@@ -289,7 +289,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
                     <FileText size={14} className="mr-2" />
                     Review
                   </Button>
-                  {canApprove && (
+                  {canApprove && guest.role === UserRole.GUEST && (
                     <Button
                       size="sm"
                       onClick={() => {

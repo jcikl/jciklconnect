@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Edit, RefreshCw, Download, Globe, Image, ExternalLink, Plus, Trash2, Clock, DollarSign, Check, Calendar, Info } from 'lucide-react';
+import { FileText, Edit, RefreshCw, Download, Globe, Image, ExternalLink, Plus, Trash2, Clock, DollarSign, Check, Calendar, Info, MapPin } from 'lucide-react';
 import { Button, Badge, Drawer, useToast } from '../../ui/Common';
 import { Input, Select, Textarea } from '../../ui/Form';
 import { Project, ProjectLevel, ProjectPillar, ProjectType } from '../../../types';
@@ -43,6 +43,7 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
   const [editEventEndTime, setEditEventEndTime] = useState(project.eventEndTime || '');
   const [editPriceMin, setEditPriceMin] = useState(project.priceMin != null ? String(project.priceMin) : '');
   const [editPriceMax, setEditPriceMax] = useState(project.priceMax != null ? String(project.priceMax) : '');
+  const [editLocation, setEditLocation] = useState(project.location || '');
   const [descExpanded, setDescExpanded] = useState(false);
 
   useEffect(() => {
@@ -159,6 +160,7 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
         eventEndTime: editEventEndTime || undefined,
         priceMin: editPriceMin !== '' ? Number(editPriceMin) : undefined,
         priceMax: editPriceMax !== '' ? Number(editPriceMax) : undefined,
+        location: editLocation || undefined,
       });
       setIsEditing(false);
       setEditStep(1);
@@ -323,6 +325,10 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                   value={editPriceMin} onChange={(e) => setEditPriceMin(e.target.value)} icon={<DollarSign size={16} />} />
                 <Input name="priceMax" label="Max Price (RM)" type="number" min="0" placeholder="e.g. 150"
                   value={editPriceMax} onChange={(e) => setEditPriceMax(e.target.value)} icon={<DollarSign size={16} />} />
+              </div>
+              <div className="mt-2">
+                <Input name="location" label="Location" placeholder="e.g. KLCC Convention Centre"
+                  value={editLocation} onChange={(e) => setEditLocation(e.target.value)} icon={<MapPin size={16} />} />
               </div>
             </div>
             <div>

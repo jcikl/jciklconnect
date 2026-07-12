@@ -103,6 +103,9 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
         const evFormatDay = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
         const evFormatWeekday = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' });
         const evTime = selectedEvent.time || (evDate.getHours() !== 0 || evDate.getMinutes() !== 0 ? evDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null);
+        const evEndTime = selectedEvent.endTime ?? null;
+        const fmtTime = (t: string) => { const [h,m]=t.split(':').map(Number); const ap=h>=12?'PM':'AM'; return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`; };
+        const evTimeRange = evTime ? (evEndTime && fmtTime(evEndTime) !== fmtTime(evTime) ? `${fmtTime(evTime)} – ${fmtTime(evEndTime)}` : fmtTime(evTime)) : null;
         const evPriceMin = selectedEvent.priceMin ?? selectedEvent.price;
         const evPriceMax = selectedEvent.priceMax;
         const closeModal = () => {
@@ -192,13 +195,15 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
                       {evIsMultiDay ? (
                         <>
-                          <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)} – {evFormatDay(evEndDate!)}</p>
-                          <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} – {evFormatWeekday(evEndDate!)}</p>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {evDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} – {evFormatDay(evEndDate!)} ({evFormatWeekday(evDate)} – {evFormatWeekday(evEndDate!)})
+                          </p>
+                          {evTimeRange && <p className="text-xs text-slate-500">{evTimeRange}</p>}
                         </>
                       ) : (
                         <>
                           <p className="text-sm font-semibold text-slate-800">{evFormatDay(evDate)}</p>
-                          {evTime && <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} · {evTime}</p>}
+                          {evTimeRange && <p className="text-xs text-slate-500">{evFormatWeekday(evDate)} · {evTimeRange}</p>}
                         </>
                       )}
                     </div>

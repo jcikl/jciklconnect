@@ -553,6 +553,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const formatDay = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); // "22 Oct 2026"
   const formatWeekday = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' }); // "Thu"
   const eventTime = event.time || (date.getHours() !== 0 || date.getMinutes() !== 0 ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null);
+  const fmtTime12 = (t: string) => { const [h,m]=t.split(':').map(Number); return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; };
+  const eventTimeRange = eventTime ? (event.endTime && fmtTime12(event.endTime) !== fmtTime12(eventTime) ? `${fmtTime12(eventTime)} – ${fmtTime12(event.endTime)}` : fmtTime12(eventTime)) : null;
+  const formatDayShort = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   const priceMin = event.priceMin ?? event.price;
   const priceMax = event.priceMax;
   const isRegisteredFromEvent = !!(member && event.registeredMembers?.includes(member.id));
@@ -686,14 +689,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                         {isMultiDay ? (
                           <>
                             <p className="text-sm font-semibold text-slate-800">
-                              {formatDay(date)} – {formatDay(endDate!)}
+                              {formatDayShort(date)} – {formatDay(endDate!)} ({formatWeekday(date)} – {formatWeekday(endDate!)})
                             </p>
-                            <p className="text-xs text-slate-500">{formatWeekday(date)} – {formatWeekday(endDate!)}</p>
+                            {eventTimeRange && <p className="text-xs text-slate-500">{eventTimeRange}</p>}
                           </>
                         ) : (
                           <>
                             <p className="text-sm font-semibold text-slate-800">{formatDay(date)}</p>
-                            {eventTime && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTime}</p>}
+                            {eventTimeRange && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTimeRange}</p>}
                           </>
                         )}
                       </div>
@@ -1165,13 +1168,13 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Date & Time</p>
                     {isMultiDay ? (
                       <>
-                        <p className="text-sm font-semibold text-slate-800">{formatDay(date)} – {formatDay(endDate!)}</p>
-                        <p className="text-xs text-slate-500">{formatWeekday(date)} – {formatWeekday(endDate!)}</p>
+                        <p className="text-sm font-semibold text-slate-800">{formatDayShort(date)} – {formatDay(endDate!)} ({formatWeekday(date)} – {formatWeekday(endDate!)})</p>
+                        {eventTimeRange && <p className="text-xs text-slate-500">{eventTimeRange}</p>}
                       </>
                     ) : (
                       <>
                         <p className="text-sm font-semibold text-slate-800">{formatDay(date)}</p>
-                        {eventTime && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTime}</p>}
+                        {eventTimeRange && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTimeRange}</p>}
                       </>
                     )}
                   </div>

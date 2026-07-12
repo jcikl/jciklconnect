@@ -10,7 +10,8 @@ const EventRowBase: React.FC<{
   onRegister?: () => void;
   onCheckIn?: () => void;
   onClick?: () => void;
-}> = ({ event, member, onRegister, onCheckIn, onClick }) => {
+  showLocation?: boolean;
+}> = ({ event, member, onRegister, onCheckIn, onClick, showLocation = true }) => {
   const date = new Date(event.date);
   const isUpcoming = date >= new Date(new Date().setHours(0, 0, 0, 0));
   const isRegistered = member && event.registeredMembers?.includes(member.id);
@@ -38,10 +39,31 @@ const EventRowBase: React.FC<{
           )}
         </div>
         {/* Date pill */}
-        <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl px-2.5 py-1.5 shadow-sm text-center min-w-[44px]">
-          <p className="text-[9px] font-black text-jci-blue uppercase tracking-widest leading-none">{date.toLocaleString('default', { month: 'short' })}</p>
-          <p className="text-lg font-black text-slate-900 leading-tight">{date.getDate()}</p>
-        </div>
+        {(() => {
+          const end = event.endDate ? new Date(event.endDate) : null;
+          const sameMonth = end && end.getMonth() === date.getMonth() && end.getFullYear() === date.getFullYear();
+          const diffMonth = end && !sameMonth;
+          const isRange = end && end.getDate() !== date.getDate();
+          return (
+            <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl px-2.5 py-1.5 shadow-sm text-center min-w-[44px]">
+              {isRange ? (
+                <>
+                  <p className="text-[9px] font-black text-jci-blue uppercase tracking-widest leading-none">
+                    {date.toLocaleString('default', { month: 'short' })}
+                  </p>
+                  <p className="text-sm font-black text-slate-900 leading-tight">
+                    {date.getDate()} - {diffMonth ? `${end.toLocaleString('default', { month: 'short' })} ` : ''}{end.getDate()}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[9px] font-black text-jci-blue uppercase tracking-widest leading-none">{date.toLocaleString('default', { month: 'short' })}</p>
+                  <p className="text-lg font-black text-slate-900 leading-tight">{date.getDate()}</p>
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Bottom: Info */}
@@ -50,12 +72,27 @@ const EventRowBase: React.FC<{
         <div className="flex flex-col gap-1 text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <Clock size={11} className="text-slate-400 flex-shrink-0" />
-            <span>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <span>
+              {(() => {
+                const fmt = (t: string) => {
+                  const [h, m] = t.split(':').map(Number);
+                  const ampm = h >= 12 ? 'PM' : 'AM';
+                  const h12 = h % 12 || 12;
+                  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+                };
+                const startTime = event.time ? fmt(event.time) : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                if (!event.endTime) return startTime;
+                const endTime = fmt(event.endTime);
+                return endTime !== startTime ? `${startTime} – ${endTime}` : startTime;
+              })()}
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <MapPin size={11} className="text-slate-400 flex-shrink-0" />
-            <span className="truncate">{event.location || 'TBA'}</span>
-          </div>
+          {showLocation && (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <MapPin size={11} className="text-slate-400 flex-shrink-0" />
+              <span className="truncate">{event.location || 'TBA'}</span>
+            </div>
+          )}
           <div className="flex items-center gap-1.5">
             <Users size={11} className="text-slate-400 flex-shrink-0" />
             <span>{event.attendees}{event.maxAttendees ? `/${event.maxAttendees}` : ''} registered</span>

@@ -820,7 +820,12 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                       {/* Name + join date */}
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-slate-900 truncate">{member.fullName || member.name}</div>
-                        <div className="text-[11px] text-slate-400">Joined {member.joinDate}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {member.membershipType && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{member.membershipType}</span>
+                          )}
+                          <span className="text-[11px] text-slate-400">Joined {member.joinDate}</span>
+                        </div>
                       </div>
                       {/* Eligible badge/promote or req dots */}
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -958,7 +963,12 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                     {/* Name + join date + dots */}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm text-slate-900 truncate">{member.fullName || member.name}</div>
-                      <div className="text-[11px] text-slate-400">Joined {member.joinDate}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {member.membershipType && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{member.membershipType}</span>
+                        )}
+                        <span className="text-[11px] text-slate-400">Joined {member.joinDate}</span>
+                      </div>
                       <div className="flex gap-1 mt-1">
                         {progress.requirements.map((req, i) => (
                           <div

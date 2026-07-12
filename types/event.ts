@@ -7,6 +7,7 @@ export interface Event {
   date: string;
   endDate?: string;
   time?: string;
+  endTime?: string;
   type: 'Meeting' | 'Training' | 'Social' | 'Project' | 'International';
   attendees: number;
   maxAttendees?: number;
