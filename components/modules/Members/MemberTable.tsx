@@ -148,7 +148,7 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
   isSelected: boolean;
   onSelect: (id: string) => void;
   onToggleSelection: (id: string) => void;
-  getDisplayMembershipType: (m: Member) => MembershipType;
+  getDisplayMembershipType?: (m: Member) => MembershipType;
 }) {
   const tierColor = member.tier === 'Platinum'
     ? 'bg-purple-500' : member.tier === 'Gold'
@@ -158,7 +158,7 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
   const riskHigh = member.churnRisk === 'High';
   const riskMed = member.churnRisk === 'Medium';
   const att = getAttendanceDisplay(member);
-  const displayType = getDisplayMembershipType(member);
+  const displayType = getDisplayMembershipType ? getDisplayMembershipType(member) : ((member.membershipType as MembershipType) || 'Probation');
   const age = getMemberAge(member);
 
   return (
