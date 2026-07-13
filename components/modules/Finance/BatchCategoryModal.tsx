@@ -149,7 +149,7 @@ export function BatchCategoryModal({
     useEffect(() => {
         if (category === 'Membership' && memberId) {
             const member = members.find(m => m.id === memberId);
-            const membershipType = member?.membershipType || 'Full';
+            const membershipType = member?.membershipType || 'Official';
             const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
             const duesAmount = rules[membershipType as MembershipType]?.duesAmount ?? 300;
             const y = year || currentYear;

@@ -245,8 +245,8 @@ export const MemberStatisticsView: React.FC<{
         </Card>
         <Card title="Membership Type Breakdown">
           {(() => {
-            const types = ['Full', 'Probation', 'Guest', 'Senator', 'Honorary'];
-            const labels: Record<string, string> = { Full: 'Full Member', Probation: 'Probation', Guest: 'Guest', Senator: 'Senator', Honorary: 'Honorary' };
+            const types = ['Official', 'Probation', 'Guest', 'Senator', 'Honorary'];
+            const labels: Record<string, string> = { Official: 'Official Member', Probation: 'Probation', Guest: 'Guest', Senator: 'Senator', Honorary: 'Honorary' };
             const data = types
               .map(key => ({ name: labels[key], value: members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length }))
               .filter(d => d.value > 0);
@@ -255,7 +255,7 @@ export const MemberStatisticsView: React.FC<{
                 data={data}
                 colorOffset={0}
                 onSegmentClick={name => {
-                  const keyMap: Record<string, string> = { 'Full Member': 'Full', 'Probation': 'Probation', 'Guest': 'Guest', 'Senator': 'Senator', 'Honorary': 'Honorary' };
+                  const keyMap: Record<string, string> = { 'Official Member': 'Official', 'Probation': 'Probation', 'Guest': 'Guest', 'Senator': 'Senator', 'Honorary': 'Honorary' };
                   const key = keyMap[name] || name;
                   const filtered = members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase());
                   setDrawerSegment({ label: `Membership: ${name}`, members: filtered });

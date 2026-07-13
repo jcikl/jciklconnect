@@ -28,12 +28,13 @@ import {
 } from '../../../types';
 import {
   MembershipConfigService,
-  resolveMembershipPurpose,
   DEFAULT_MEMBERSHIP_RULES,
   getTargetDuesForMembershipType,
   resolveMembershipTypeFromDues,
 } from '../../../services/membershipConfigService';
 import type { Transaction } from '../../../types';
+import { buildCategoryFields } from '../../../utils/transactionCategoryUtils';
+import { PaymentButton } from '../../shared/toyyib/PaymentButton';
 // Re-scan trigger
 
 /** First-year membership dues (base + registration), shown as "New" in breakdown */
@@ -168,12 +169,18 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       for (const tx of unlinked) {
         const member = findMatchingMember(tx, members);
         if (member) {
-          const purpose = resolveMembershipPurpose(tx.amount, selectedYear, rules);
+          const catFields = buildCategoryFields({
+            category: 'Membership',
+            amount: tx.amount,
+            year: selectedYear,
+            memberId: member.id,
+            rules,
+          });
           await FinanceService.updateTransaction(tx.id, {
             memberId: member.id,
-            projectId: `${selectedYear} membership`,
+            projectId: catFields.projectId,
             category: 'Membership',
-            purpose,
+            purpose: catFields.purpose,
           });
           matched++;
         } else {
@@ -539,15 +546,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   }, [mergedRenewals, members, filterType, filterStatus]);
 
   const membershipTypeColors: Record<MembershipType, string> = {
-    guest: 'bg-blue-100 text-blue-800',
-    'probation member': 'bg-blue-100 text-blue-800',
-    'official member': 'bg-green-100 text-green-800',
-    'visiting member': 'bg-orange-100 text-orange-800',
-    'associate member': 'bg-cyan-100 text-cyan-800',
-    'lifetime member': 'bg-purple-100 text-purple-800',
     Guest: 'bg-blue-100 text-blue-800',
     Probation: 'bg-blue-100 text-blue-800',
-    Full: 'bg-green-100 text-green-800',
+    Official: 'bg-green-100 text-green-800',
     Honorary: 'bg-purple-100 text-purple-800',
     Senator: 'bg-yellow-100 text-yellow-800',
     Visiting: 'bg-orange-100 text-orange-800',
@@ -803,7 +804,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               >
                 <option value="all">All Types</option>
                 <option value="Probation">Probation</option>
-                <option value="Full">Full</option>
+                <option value="Official">Official</option>
                 <option value="Honorary">Honorary</option>
                 <option value="Senator">Senator</option>
                 <option value="Visiting">Visiting</option>
@@ -890,16 +891,30 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                           {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
                         </td>
                         <td className="py-2.5 px-3">
-                          {canWhatsApp && (
-                            <button
-                              type="button"
-                              onClick={() => sendWhatsAppDuesReminder(m!.name, m!.phone, selectedYear, Math.max(0, outstanding))}
-                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors"
-                              title={`WhatsApp 提醒 ${m?.name}`}
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {canWhatsApp && (
+                              <button
+                                type="button"
+                                onClick={() => sendWhatsAppDuesReminder(m!.name, m!.phone, selectedYear, Math.max(0, outstanding))}
+                                className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors"
+                                title={`WhatsApp 提醒 ${m?.name}`}
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {m && renewal.status !== 'paid' && renewal.status !== 'over paid' &&
+                              renewal.membershipType !== 'Honorary' && renewal.membershipType !== 'Senator' && (
+                              <PaymentButton
+                                type="membership"
+                                member={m as any}
+                                year={selectedYear}
+                                size="sm"
+                                label="Pay"
+                                existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
+                                existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
+                              />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -962,6 +977,18 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                           >
                             <MessageCircle className="w-3 h-3" /> WA
                           </button>
+                        )}
+                        {m && renewal.status !== 'paid' && renewal.status !== 'over paid' &&
+                          renewal.membershipType !== 'Honorary' && renewal.membershipType !== 'Senator' && (
+                          <PaymentButton
+                            type="membership"
+                            member={m as any}
+                            year={selectedYear}
+                            size="sm"
+                            label="Pay"
+                            existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
+                            existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
+                          />
                         )}
                       </div>
                     </div>

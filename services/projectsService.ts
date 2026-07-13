@@ -206,6 +206,16 @@ export class ProjectsService {
           await deleteDoc(projectRef);
           this.invalidateProjectsCache();
 
+          // Clear projectId from bank transactions that reference this project (情景 M)
+          const txQuery = query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('projectId', '==', projectId)
+          );
+          const txSnap = await getDocs(txQuery);
+          await Promise.all(txSnap.docs.map(d =>
+            updateDoc(d.ref, { projectId: null, updatedAt: Timestamp.now() })
+          ));
+
           // Recalculate radar stats for affected members (revocation)
           if (memberIdsToRecalculate.size > 0) {
             for (const memberId of memberIdsToRecalculate) {

@@ -31,7 +31,12 @@ export const formatDate = (date: string | Date | undefined | null): string => {
  */
 export const formatDateToDDMMMYYYY = (date: any): string => {
   if (!date) return '—';
-  
+
+  // Handle Firestore Timestamp objects ({ seconds, nanoseconds } or with .toDate())
+  if (typeof date === 'object' && 'seconds' in date) {
+    date = typeof date.toDate === 'function' ? date.toDate() : new Date(date.seconds * 1000);
+  }
+
   const d = new Date(date);
   
   // Check if date is valid

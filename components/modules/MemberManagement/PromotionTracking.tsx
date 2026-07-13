@@ -572,7 +572,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
 
   const handlePromoteMember = async (memberId: string, method: 'automatic' | 'manual' = 'automatic') => {
     try {
-      const promotion = await PromotionService.promoteToFullMember(
+      const promotion = await PromotionService.promoteToOfficialMember(
         memberId,
         'current_user_id', // Would come from auth context
         method,

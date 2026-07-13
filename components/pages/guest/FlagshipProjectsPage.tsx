@@ -187,18 +187,9 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
 
                         {/* Footer */}
                         <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                          {hasPhotos ? (
-                            <button
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-jci-blue hover:text-sky-600 transition-colors"
-                              onClick={() => { setSelectedProject(project); setLightboxIndex(0); }}
-                            >
-                              <ImageIcon size={13} /> {allPhotos.length} {allPhotos.length === 1 ? 'Photo' : 'Photos'}
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-400 flex items-center gap-1"><ImageIcon size={12} /> No photos yet</span>
-                          )}
+                          <span />
                           <Button
-                            onClick={onRegister}
+                            onClick={() => setSelectedProject(project)}
                             className="text-xs font-bold px-4 py-1.5 bg-jci-blue hover:bg-jci-blue/90 text-white border-0 h-8 rounded-xl"
                           >
                             Get Involved
@@ -224,6 +215,16 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
             title={selectedProject.title}
             size="lg"
             drawerOnMobile
+            footer={
+              <div className="flex gap-3 w-full">
+                <Button onClick={onRegister} className="flex-1 bg-jci-blue text-white hover:bg-jci-blue/90 border-0 py-3 text-sm font-bold shadow-md">
+                  Register / Get Involved
+                </Button>
+                <Button variant="ghost" onClick={() => setSelectedProject(null)} className="flex-1 border border-slate-200 text-slate-700 font-semibold py-3 text-sm">
+                  Close
+                </Button>
+              </div>
+            }
           >
             <div className="space-y-6">
               {/* Top Section with Logo and Banner */}
@@ -388,14 +389,6 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
                 </div>
               )}
 
-              <div className="pt-4 flex gap-3">
-                <Button onClick={onRegister} className="flex-1 bg-jci-blue text-white hover:bg-jci-blue/90 border-0 py-3 text-sm font-bold shadow-md">
-                  Register / Get Involved
-                </Button>
-                <Button variant="ghost" onClick={() => setSelectedProject(null)} className="flex-1 border border-slate-200 text-slate-700 font-semibold py-3 text-sm">
-                  Close
-                </Button>
-              </div>
             </div>
           </Modal>
         )}

@@ -24,6 +24,7 @@ import { MembersService } from '../../services/membersService';
 import { MemberJourneyService, MemberJourney } from '../../services/memberJourneyService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 import type { Event } from '../../types';
+import { EventRow } from '../modules/Events/EventRow';
 import { UserRole } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
@@ -36,15 +37,15 @@ import 'swiper/css/pagination';
 
 
 /** membershipType 归一化：兼容旧版小写值（'probation member' / 'official member'…）与缺失值（按角色兜底） */
-const normalizeMembership = (m: { membershipType?: string; role?: UserRole | string } | null): 'probation' | 'full' | 'other' => {
-  if (!m) return 'other';
+const normalizeMembership = (m: { membershipType?: string; role?: UserRole | string } | null): 'probation' | 'full' | 'guest' => {
+  if (!m) return 'guest';
   const mt = (m.membershipType || '').toLowerCase();
   if (mt.includes('probation')) return 'probation';
   if (mt && !mt.includes('guest')) return 'full';
   if (!mt) {
     if (m.role && [UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(m.role as UserRole)) return 'full';
   }
-  return 'other';
+  return 'guest';
 };
 
 interface DashboardHomeProps {
@@ -146,7 +147,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load Leadership/Trainer journey (shown to all members in the journey modal)
   useEffect(() => {
-    if (!member || normalizeMembership(member) === 'other') return;
+    if (!member || normalizeMembership(member) === 'guest') return;
     let cancelled = false;
     MemberJourneyService.getJourney(member)
       .then(j => { if (!cancelled) setPathwayJourney(j); })
@@ -156,7 +157,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load Promotion Progress for Probation and Full members (Journey modal shows it for both)
   useEffect(() => {
-    if (!member || normalizeMembership(member) === 'other') return;
+    if (!member || normalizeMembership(member) === 'guest') return;
     const loadPromotion = async () => {
       setPromoLoading(true);
       try {
@@ -171,9 +172,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     loadPromotion();
   }, [member]);
 
-  // Load Engagement Progress for Full members
+  // Load Engagement Progress for all members (Probation included)
   useEffect(() => {
-    if (!member || normalizeMembership(member) !== 'full') return;
+    if (!member || normalizeMembership(member) === 'guest') return;
     const loadEngagement = async () => {
       setEngagementLoading(true);
       try {
@@ -620,61 +621,20 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               <p className="text-sm">No {eventTab} events</p>
             </div>
           ) : (
-            <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 snap-x snap-mandatory">
+            <div className="flex flex-col gap-3">
               {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date()))
                 .sort((a, b) => eventTab === 'upcoming' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, 8)
-                .map(event => {
-                  const isRecommended = false;
-                  const isRegistered = myRegistrationEventIds.includes(event.id!);
-                  const date = new Date(event.date);
-                  const isUpcoming = eventTab === 'upcoming';
-                  return (
-                    <div
-                      key={event.id}
-                      className="flex flex-col flex-none w-[60.6%] sm:w-auto rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer active:scale-[0.99] snap-start"
-                      onClick={() => setSelectedEventForDetail(event)}
-                    >
-                      {/* Poster */}
-                      <div className="relative w-full h-32 bg-gradient-to-br from-blue-50 to-slate-100 overflow-hidden flex-shrink-0">
-                        {event.imageUrl ? (
-                          <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-                            <Calendar size={32} strokeWidth={1.5} />
-                            <span className="text-[10px] font-semibold mt-1 text-slate-400">No Poster</span>
-                          </div>
-                        )}
-                        <div className="absolute top-2 left-2 flex items-center gap-1">
-                          {event.predictedDemand === 'High' && isUpcoming && (
-                            <Badge variant="jci" className="text-[9px] px-1.5 py-0.5 bg-jci-blue/90 backdrop-blur-sm shadow-sm border-0 text-white">Hot</Badge>
-                          )}
-                        </div>
-                        <div className="absolute bottom-2 right-2 bg-white/95 backdrop-blur-sm rounded-xl px-2 py-1 shadow-sm text-center min-w-[36px]">
-                          <p className="text-[8px] font-black text-jci-blue uppercase tracking-widest leading-none">{date.toLocaleString('default', { month: 'short' })}</p>
-                          <p className="text-sm font-black text-slate-900 leading-tight">{date.getDate()}</p>
-                        </div>
-                      </div>
-                      {/* Info */}
-                      <div className="flex flex-col p-3 gap-1.5">
-                        <div className="flex items-start gap-1">
-                          <h4 className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug flex-1">{event.title}</h4>
-                          {isRecommended && <Badge variant="jci" className="bg-purple-100 text-purple-600 border-none px-1.5 py-0 text-[9px] flex-shrink-0">AI</Badge>}
-                        </div>
-                        <p className="text-[10px] text-slate-500">{event.attendees} Attending</p>
-                        {isUpcoming && (
-                          isRegistered ? (
-                            <Badge variant="success" className="mt-auto text-center text-[10px] py-1">Registered</Badge>
-                          ) : (
-                            <Button size="sm" variant="primary" className="mt-auto w-full text-xs" onClick={(e) => { e.stopPropagation(); setSelectedEventForDetail(event); }}>
-                              Register
-                            </Button>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                .slice(0, 5)
+                .map(event => (
+                  <EventRow
+                    key={event.id}
+                    event={event}
+                    member={member}
+                    horizontal
+                    onRegister={() => setSelectedEventForDetail(event)}
+                    onClick={() => setSelectedEventForDetail(event)}
+                  />
+                ))}
             </div>
           )}
           {((eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length > 8 && onNavigate) && (
@@ -814,9 +774,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                 {/* 1st Year step */}
                 <button
-                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  onClick={() => !isProbationMember && setJourneyActiveTab('firstYear')}
-                  disabled={isProbationMember}
+                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                  onClick={() => setJourneyActiveTab('firstYear')}
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementFirst?.isCompleted ? 'bg-emerald-500 text-white'
                     : journeyActiveTab === 'firstYear' ? 'bg-sky-500 text-white'
@@ -828,7 +787,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     : engagementFirst?.isCompleted ? 'text-emerald-400'
                       : 'text-white/40'
                     }`}>1st Year</span>
-                  {!isProbationMember && engagementFirst && (
+                  {engagementFirst && (
                     <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-emerald-400' : 'text-sky-400'}`}>
                       {engagementFirst.overallProgress.toFixed(0)}%
                     </span>
@@ -840,9 +799,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                 {/* 2nd Year step */}
                 <button
-                  className={`flex flex-col items-center gap-1.5 flex-1 focus:outline-none ${isProbationMember ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  onClick={() => !isProbationMember && setJourneyActiveTab('secondYear')}
-                  disabled={isProbationMember}
+                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                  onClick={() => setJourneyActiveTab('secondYear')}
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementSecond?.isCompleted ? 'bg-emerald-500 text-white'
                     : journeyActiveTab === 'secondYear' ? 'bg-violet-500 text-white'
@@ -854,7 +812,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     : engagementSecond?.isCompleted ? 'text-emerald-400'
                       : 'text-white/40'
                     }`}>2nd Year</span>
-                  {!isProbationMember && engagementSecond && (
+                  {engagementSecond && (
                     <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-emerald-400' : 'text-violet-400'}`}>
                       {engagementSecond.overallProgress.toFixed(0)}%
                     </span>

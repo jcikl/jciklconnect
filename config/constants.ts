@@ -80,6 +80,7 @@ export const COLLECTIONS = {
   BOARD_TERM_SETTINGS: 'boardTermSettings',
   INQUIRIES: 'inquiries',
   TOYYIB_CATEGORIES: 'toyyibCategories',
+  TOYYIB_BILLS: 'toyyibBills',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

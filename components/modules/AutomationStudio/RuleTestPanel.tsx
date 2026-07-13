@@ -28,7 +28,7 @@ const SAMPLE_TEST_DATA: Record<string, RuleTestData> = {
       name: 'John Doe',
       email: 'john.doe@example.com',
       points: 150,
-      membershipType: 'Full',
+      membershipType: 'Official',
       joinDate: '2023-01-15',
       // lastLogin: '2024-12-19',
     },

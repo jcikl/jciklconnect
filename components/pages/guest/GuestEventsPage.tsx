@@ -66,9 +66,6 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                 <h2 className="text-3xl font-bold text-slate-900 mb-2">Activity Calendar</h2>
                 <p className="text-slate-600">View all upcoming events and activities</p>
               </div>
-              <Button variant="outline" onClick={onLogin}>
-                Login to Register
-              </Button>
             </div>
             <div className="mt-8">
               <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-jci-blue" /></div>}>

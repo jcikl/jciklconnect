@@ -19,12 +19,13 @@ const TransactionForm = lazy(() => import('./Finance/TransactionForm'));
 const BankTransactionImportModal = lazy(() => import('./Finance/BankTransactionImportModal'));
 const BankMatchingModal = lazy(() => import('./Finance/BankMatchingModal').then(m => ({ default: m.BankMatchingModal })));
 const BatchCategoryModal = lazy(() => import('./Finance/BatchCategoryModal').then(m => ({ default: m.BatchCategoryModal })));
+const PaymentRequestsView = lazy(() => import('./PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
 import { FirstUseBanner } from '../ui/FirstUseBanner';
 import { projectFinancialService } from '../../services/projectFinancialService';
 import { ProjectsService } from '../../services/projectsService';
 import { useHelpModal } from '../../contexts/HelpModalContext';
 import { MembersService } from '../../services/membersService';
-import { MembershipConfigService, resolveMembershipPurpose } from '../../services/membershipConfigService';
+import { MembershipConfigService } from '../../services/membershipConfigService';
 import { getAdministrativeProjectIds, addAdministrativeProjectId } from '../../utils/administrativeProjectsStorage';
 import { InventoryService } from '../../services/inventoryService';
 import { ADMINISTRATIVE_PURPOSES } from '../../config/constants';
@@ -175,6 +176,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     availableYears,
     monthlyAccountSummary,
     projectTransactions,
+    membershipTransactions,
+    administrativeTransactions,
     uncategorizedProjectTxCount,
     projectAccountYearOptions,
     filteredProjectAccounts,
@@ -222,7 +225,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
-          <p className="text-slate-500 text-sm">Bookkeeping Â· dues collection Â· budgeting</p>
+          <p className="text-slate-500 text-sm">Bookkeeping · dues collection · budgeting</p>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-20 shrink-0">
@@ -258,7 +261,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       <div className="px-4 md:px-6">
         <Tabs
-          tabs={['Dashboard', 'Transactions', 'Project Account', 'Membership', 'Administrative', 'Reconciliation']}
+          tabs={['Dashboard', 'Transactions', 'Project Account', 'Membership', 'Administrative', 'Payment Requests', 'Reconciliation']}
           activeTab={moduleTab}
           onTabChange={setModuleTab}
         />
@@ -285,16 +288,16 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Net Balance</p>
                 <p className={`text-xl font-bold mt-1 leading-tight tabular-nums ${summary && summary.netBalance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
-                  {summary ? formatCurrency(summary.netBalance) : 'â€”'}
+                  {summary ? formatCurrency(summary.netBalance) : '—'}
                 </p>
                 <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-mono tabular-nums truncate">{summary ? formatCurrency(summary.totalIncome) : 'â€”'}</span>
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums truncate">{summary ? formatCurrency(summary.totalIncome) : '—'}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                    <span className="text-[10px] text-slate-400 font-mono tabular-nums truncate">{summary ? formatCurrency(summary.totalExpenses) : 'â€”'}</span>
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums truncate">{summary ? formatCurrency(summary.totalExpenses) : '—'}</span>
                   </div>
                 </div>
               </div>
@@ -308,7 +311,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           </LoadingState>
 
           <div className="grid md:grid-cols-3 gap-6 min-w-0">
-            {/* Main Content: Transactions â€” order-2 on mobile so Bank Accounts appears first */}
+            {/* Main Content: Transactions — order-2 on mobile so Bank Accounts appears first */}
             <div className="md:col-span-2 space-y-6 order-2 md:order-1 min-w-0">
               <Card
                 title="Recent Transactions"
@@ -391,9 +394,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
               }>
                 {(() => {
                   const currentYear = new Date().getFullYear();
-                  const duesTxs = transactions.filter(t => {
+                  const duesTxs = membershipTransactions.filter(t => {
                     const txYear = new Date(t.date).getFullYear();
-                    return txYear === currentYear && isTransactionInCategory(t, 'Membership');
+                    return txYear === currentYear;
                   });
                   const duesPendingCount = duesTxs.filter(t => t.status === 'Pending').length;
                   const duesClearedCount = duesTxs.filter(t => t.status === 'Cleared').length;
@@ -459,10 +462,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         >
                           <div className="flex items-start justify-between gap-1 mb-1">
                             <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider truncate leading-tight">
-                              {acc.bankName ? `${acc.bankName} Â· ` : ''}{acc.name}
+                              {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
                             </p>
                             {acc.accountNumber && (
-                              <span className="text-[10px] text-slate-400 font-mono shrink-0">Â·Â·Â·{acc.accountNumber.slice(-4)}</span>
+                              <span className="text-[10px] text-slate-400 font-mono shrink-0">···{acc.accountNumber.slice(-4)}</span>
                             )}
                           </div>
                           <p className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(acc.balance, acc.currency)}</p>
@@ -487,12 +490,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                               <p className="text-[11px] text-slate-400 uppercase font-semibold tracking-wider truncate">
-                                {acc.bankName ? `${acc.bankName} Â· ` : ''}{acc.name}
+                                {acc.bankName ? `${acc.bankName} · ` : ''}{acc.name}
                               </p>
                               <p className="text-base font-bold text-slate-900 mt-0.5 tabular-nums">{formatCurrency(acc.balance, acc.currency)}</p>
                             </div>
                             {acc.accountNumber && (
-                              <span className="text-[11px] text-slate-400 font-mono shrink-0 mt-1">Â·Â·Â·{acc.accountNumber.slice(-4)}</span>
+                              <span className="text-[11px] text-slate-400 font-mono shrink-0 mt-1">···{acc.accountNumber.slice(-4)}</span>
                             )}
                           </div>
                           <div className="flex items-center justify-between mt-1.5">
@@ -516,7 +519,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Membership' && hasPermission('canViewFinance') && (
         <Suspense fallback={<div className="py-12 text-center text-slate-400 text-sm">Loading...</div>}>
         <DuesRenewalDashboard
-          membershipTransactions={transactions.filter(t => isTransactionInCategory(t, 'Membership'))}
+          membershipTransactions={membershipTransactions}
           onEditMembershipTransaction={(tx, filterYear) => {
             setEditingTransaction(tx);
             setEditingMembershipFilterYear(filterYear);
@@ -537,7 +540,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Administrative' && hasPermission('canViewFinance') && (
         <AsyncErrorBoundary>
           <AdministrativeTab
-            transactions={transactions}
+            transactions={administrativeTransactions}
             isTransactionInCategory={isTransactionInCategory}
             adminAccountYearFilter={adminAccountYearFilter}
             dynamicAdministrativeProjectIds={dynamicAdministrativeProjectIds}
@@ -552,6 +555,14 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             setIsAddAdministrativeProjectOpen={setIsAddAdministrativeProjectOpen}
             projects={projects}
           />
+        </AsyncErrorBoundary>
+      )}
+
+      {moduleTab === 'Payment Requests' && (
+        <AsyncErrorBoundary>
+          <Suspense fallback={<LoadingState loading>{null}</LoadingState>}>
+            <PaymentRequestsView searchQuery={searchQuery} />
+          </Suspense>
         </AsyncErrorBoundary>
       )}
 
@@ -611,7 +622,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                               </div>
                               <span className="text-sm font-bold text-rose-600 shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</span>
                             </div>
-                            <p className="text-sm font-semibold text-slate-800 leading-snug truncate">{pr.purpose || pr.items?.[0]?.purpose || 'â€”'}</p>
+                            <p className="text-sm font-semibold text-slate-800 leading-snug truncate">{pr.purpose || pr.items?.[0]?.purpose || '—'}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-[11px] text-slate-400">{formatDate(pr.date)}</span>
                               {hasSuggestion && (
@@ -628,12 +639,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                             onChange={e => setPrSelectedBankTx(prev => ({ ...prev, [pr.id]: e.target.value }))}
                             className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
                           >
-                            <option value="">â€” select bank transaction â€”</option>
+                            <option value="">— select bank transaction —</option>
                             {hasSuggestion && (
                               <optgroup label={`Suggested (same amount, Â±14 days)`}>
                                 {suggestions.map(t => (
                                   <option key={t.id} value={t.id}>
-                                    âœ“ {formatDate(t.date)} Â· {t.description} Â· {formatCurrency(t.amount)}
+                                    ✓ {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
                                   </option>
                                 ))}
                               </optgroup>
@@ -642,7 +653,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                               <optgroup label="Other bank expenses">
                                 {bankExpenses.filter(t => !suggestions.find(s => s.id === t.id)).map(t => (
                                   <option key={t.id} value={t.id}>
-                                    {formatDate(t.date)} Â· {t.description} Â· {formatCurrency(t.amount)}
+                                    {formatDate(t.date)} · {t.description} · {formatCurrency(t.amount)}
                                   </option>
                                 ))}
                               </optgroup>
@@ -655,7 +666,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                             className="w-full"
                           >
                             <Link2 size={13} className="mr-1.5" />
-                            {prLinkingId === pr.id ? 'Linkingâ€¦' : 'Confirm Match'}
+                            {prLinkingId === pr.id ? 'Linking…' : 'Confirm Match'}
                           </Button>
                         </div>
                       </div>
@@ -694,7 +705,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 />
                 <Button onClick={handleReconciliationQuery} disabled={reconciliationLoading} className="shrink-0">
                   {reconciliationLoading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
-                  <span className="ml-1.5 hidden sm:inline">{reconciliationLoading ? 'Searchingâ€¦' : 'Search'}</span>
+                  <span className="ml-1.5 hidden sm:inline">{reconciliationLoading ? 'Searching…' : 'Search'}</span>
                 </Button>
               </div>
             </div>
@@ -737,7 +748,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                 </div>
                                 {tx.status !== 'Reconciled' && (
                                   <Button size="sm" onClick={() => handleMarkReconciled(tx.id)} disabled={reconcilingId !== null} className="shrink-0 text-[11px] px-2 py-1">
-                                    {reconcilingId === tx.id ? 'Processingâ€¦' : 'Mark Reconciled'}
+                                    {reconcilingId === tx.id ? 'Processing…' : 'Mark Reconciled'}
                                   </Button>
                                 )}
                               </div>
@@ -765,7 +776,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                 <span className="text-[11px] text-slate-400 font-mono truncate">{pr.referenceNumber}</span>
                                 <span className="font-mono font-bold text-sm shrink-0 text-slate-700">{formatCurrency(pr.totalAmount || pr.amount)}</span>
                               </div>
-                              <p className="text-sm font-semibold text-slate-900 leading-snug truncate mb-1.5">{pr.purpose || 'â€”'}</p>
+                              <p className="text-sm font-semibold text-slate-900 leading-snug truncate mb-1.5">{pr.purpose || '—'}</p>
                               <div className="flex items-center gap-1.5">
                                 <Badge variant={pr.status === 'approved' ? 'success' : pr.status === 'rejected' ? 'error' : 'warning'} className="text-[10px]">
                                   {pr.status === 'approved' ? 'Approved' : pr.status === 'rejected' ? 'Rejected' : 'Pending'}
@@ -911,10 +922,23 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           footer={
             <div className="flex gap-2 w-full">
               <Button variant="ghost" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-              <Button className="flex-1 shadow-sm" type="submit" form="edit-transaction-form">Update Transaction</Button>
+              <Button
+                className="flex-1 shadow-sm"
+                type="submit"
+                form="edit-transaction-form"
+                disabled={editingTransaction.status === 'Reconciled' || editingTransaction.status === 'Partially Reconciled'}
+              >
+                Update Transaction
+              </Button>
             </div>
           }
         >
+          {(editingTransaction.status === 'Reconciled' || editingTransaction.status === 'Partially Reconciled') && (
+            <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm flex items-center gap-2">
+              <span className="font-semibold">🔒 Locked:</span>
+              This transaction is <strong>{editingTransaction.status}</strong> and cannot be edited. Delink it from all project transactions to unlock.
+            </div>
+          )}
           <form id="edit-transaction-form" onSubmit={handleUpdateTransaction} className="space-y-6">
             <Suspense fallback={<div className="py-8 text-center text-slate-400 text-sm">Loading...</div>}>
             <TransactionForm
@@ -1188,7 +1212,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                   onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, referenceNumber: e.target.value })}
                                 />
                               ) : (
-                                tx.referenceNumber || 'â€”'
+                                tx.referenceNumber || '—'
                               )}
                             </td>
                             <td className="p-3 text-slate-500">
@@ -1200,7 +1224,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                   onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, purpose: e.target.value })}
                                 />
                               ) : (
-                                tx.purpose || 'â€”'
+                                tx.purpose || '—'
                               )}
                             </td>
                             <td className="p-3">
@@ -1424,7 +1448,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       <Drawer
         isOpen={isAccountDetailOpen}
         onClose={() => setIsAccountDetailOpen(false)}
-        title={detailAccount ? (detailAccount.bankName ? `${detailAccount.bankName} Â· ${detailAccount.name}` : detailAccount.name) : 'Account Details'}
+        title={detailAccount ? (detailAccount.bankName ? `${detailAccount.bankName} · ${detailAccount.name}` : detailAccount.name) : 'Account Details'}
         size="lg"
       >
         <div className="space-y-6">
@@ -1471,10 +1495,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                         {formatCurrency(data.openingBalance, detailAccount?.currency)}
                       </td>
                       <td className="py-3 px-4 text-green-600 font-medium text-right font-mono">
-                        {data.income > 0 ? `+${formatCurrency(data.income)}` : 'â€”'}
+                        {data.income > 0 ? `+${formatCurrency(data.income)}` : '—'}
                       </td>
                       <td className="py-3 px-4 text-red-600 font-medium text-right font-mono">
-                        {data.expenses > 0 ? `-${formatCurrency(data.expenses)}` : 'â€”'}
+                        {data.expenses > 0 ? `-${formatCurrency(data.expenses)}` : '—'}
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-900 text-right font-mono">
                         {formatCurrency(data.closingBalance, detailAccount?.currency)}
@@ -1529,7 +1553,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 <span className="text-[10px] text-slate-400 font-medium hidden sm:block mt-0.5">
                   {batchOperationProgress
                     ? `${batchOperationProgress.current}/${batchOperationProgress.total}`
-                    : `${selectedTxIds.size} main â€¢ ${selectedSplitIds.size} splits`
+                    : `${selectedTxIds.size} main • ${selectedSplitIds.size} splits`
                   }
                 </span>
               </div>

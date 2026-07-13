@@ -711,7 +711,7 @@ export const JCIKLApp: React.FC = () => {
       case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
       case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': return <DeveloperInterface />;
-      case 'TOYYIB': return <ApiConfigView />;
+      case 'TOYYIB': return <ToyyibView />;
       case 'WHAPI_CONFIG': return <ApiConfigView />;
       case 'API_CONFIG': return <ApiConfigView />;
       case 'MEMBERSHIP_CONFIG': return <SystemConfigView />;

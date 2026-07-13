@@ -6,6 +6,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -21,6 +22,9 @@ import { removeUndefined } from '../utils/dataUtils';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_PAYMENT_REQUESTS } from './mockData';
 import { FinanceService } from './financeService';
+
+/** Board positions authorised to approve/reject PRs (情景 25) */
+const APPROVER_BOARD_TITLES = ['President', 'Secretary', 'Honorary Treasurer'];
 
 /** In-memory store for dev mode so create/updateStatus persist during session. */
 let devPaymentRequests: PaymentRequest[] = [...MOCK_PAYMENT_REQUESTS];
@@ -73,7 +77,7 @@ export class PaymentRequestService {
     const loId = data.loId ?? DEFAULT_LO_ID;
     const referenceNumber = data.referenceNumber ?? (await this.generateReferenceNumber(loId));
     return withDevMode(
-      () => {
+      async () => {
         const id = `pr-dev-${Date.now()}`;
         const now = new Date().toISOString();
         const newPr: PaymentRequest = {
@@ -107,6 +111,8 @@ export class PaymentRequestService {
           reviewedAt: null,
         };
         devPaymentRequests = [newPr, ...devPaymentRequests];
+        // Notify approvers if submitted immediately (情景 NN)
+        if (newPr.status === 'submitted') await this._notifyApprovers(newPr);
         return { id, referenceNumber };
       },
       async () => {
@@ -141,6 +147,11 @@ export class PaymentRequestService {
       reviewedAt: null,
     });
     const ref = await addDoc(collection(db, COLLECTIONS.PAYMENT_REQUESTS), payload);
+    // Notify approvers if submitted immediately (情景 NN)
+    if ((data.status ?? 'submitted') === 'submitted') {
+      const pr = { id: ref.id, ...payload, referenceNumber } as unknown as PaymentRequest;
+      await this._notifyApprovers(pr);
+    }
     return { id: ref.id, referenceNumber };
   });
   }
@@ -209,40 +220,161 @@ export class PaymentRequestService {
   });
   }
 
+  /**
+   * Approve or reject a PR. Only President / Secretary / Honorary Treasurer may act (情景 25).
+   * Pass reviewerBoardTitle from the member profile of the reviewer.
+   * For rejection, rejectionReason is required (KK).
+   */
   static async updateStatus(
     id: string,
     status: 'approved' | 'rejected',
-    reviewedBy: string
+    reviewedBy: string,
+    opts?: { reviewerBoardTitle?: string; rejectionReason?: string }
   ): Promise<void> {
+    const { reviewerBoardTitle, rejectionReason } = opts ?? {};
+
+    // Role gate (情景 25)
+    if (reviewerBoardTitle && !APPROVER_BOARD_TITLES.some(t => reviewerBoardTitle.includes(t))) {
+      throw new Error(`Only ${APPROVER_BOARD_TITLES.join(', ')} may approve or reject payment requests.`);
+    }
+    if (status === 'rejected' && !rejectionReason?.trim()) {
+      throw new Error('A rejection reason is required (情景 KK).');
+    }
+
     return withDevMode(
       async () => {
         const now = new Date().toISOString();
         const idx = devPaymentRequests.findIndex((p) => p.id === id);
         if (idx >= 0) {
           devPaymentRequests = [...devPaymentRequests];
-          devPaymentRequests[idx] = { ...devPaymentRequests[idx], status, reviewedBy, reviewedAt: now, updatedAt: now };
+          devPaymentRequests[idx] = {
+            ...devPaymentRequests[idx],
+            status,
+            reviewedBy,
+            reviewedAt: now,
+            updatedAt: now,
+            ...(status === 'rejected' ? { rejectionReason: rejectionReason ?? null } : {}),
+          };
         }
         if (status === 'approved') {
           const pr = devPaymentRequests.find((p) => p.id === id);
           if (pr) await this._createExpenseTransaction(pr, reviewedBy);
         }
+        // Notify applicant (AA)
+        const pr = devPaymentRequests.find((p) => p.id === id);
+        if (pr) await this._notifyApplicant(pr, status, rejectionReason);
       },
       async () => {
-    const now = Timestamp.now();
-    await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
-      status,
-      reviewedBy: reviewedBy ?? null,
-      reviewedAt: now,
-      updatedAt: now,
-    });
-    if (status === 'approved') {
-      const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
-      if (snap.exists()) {
-        const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
-        await this._createExpenseTransaction(pr, reviewedBy);
+        const now = Timestamp.now();
+        const payload: any = {
+          status,
+          reviewedBy: reviewedBy ?? null,
+          reviewedAt: now,
+          updatedAt: now,
+        };
+        if (status === 'rejected') payload.rejectionReason = rejectionReason ?? null;
+
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
+
+        if (status === 'approved') {
+          const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+          if (snap.exists()) {
+            const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
+            await this._createExpenseTransaction(pr, reviewedBy);
+          }
+        }
+        // Notify applicant (AA)
+        const snap2 = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        if (snap2.exists()) {
+          const pr = { id: snap2.id, ...snap2.data() } as PaymentRequest;
+          await this._notifyApplicant(pr, status, rejectionReason);
+        }
       }
-    }
-  });
+    );
+  }
+
+  /**
+   * Mark PR as paid when a bank transaction is matched to its expense transaction (情景 26).
+   * paidAt is the bank transaction date.
+   */
+  static async markAsPaid(id: string, bankTxDate: string): Promise<void> {
+    return withDevMode(
+      () => {
+        const idx = devPaymentRequests.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          const now = new Date().toISOString();
+          devPaymentRequests = [...devPaymentRequests];
+          devPaymentRequests[idx] = { ...devPaymentRequests[idx], status: 'paid', paidAt: bankTxDate, updatedAt: now };
+        }
+      },
+      async () => {
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
+          status: 'paid',
+          paidAt: bankTxDate,
+          updatedAt: Timestamp.now(),
+        });
+        // Notify applicant (AA)
+        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        if (snap.exists()) {
+          const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
+          await this._notifyApplicant(pr, 'paid');
+        }
+      }
+    );
+  }
+
+  /**
+   * Revert PR from 'paid' back to 'approved' when bank tx match is cancelled (情景 E).
+   */
+  static async revertPaid(id: string): Promise<void> {
+    return withDevMode(
+      () => {
+        const idx = devPaymentRequests.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          devPaymentRequests = [...devPaymentRequests];
+          devPaymentRequests[idx] = { ...devPaymentRequests[idx], status: 'approved', paidAt: null, updatedAt: new Date().toISOString() };
+        }
+      },
+      async () => {
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
+          status: 'approved',
+          paidAt: null,
+          updatedAt: Timestamp.now(),
+        });
+      }
+    );
+  }
+
+  /**
+   * Resubmit a rejected PR after edits (情景 H).
+   * Resets status to 'submitted' and clears rejection data.
+   */
+  static async resubmit(id: string, updatedBy: string): Promise<void> {
+    return withDevMode(
+      async () => {
+        const idx = devPaymentRequests.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          const now = new Date().toISOString();
+          devPaymentRequests = [...devPaymentRequests];
+          const pr = { ...devPaymentRequests[idx], status: 'submitted' as const, rejectionReason: null, reviewedBy: null, reviewedAt: null, updatedAt: now, updatedBy };
+          devPaymentRequests[idx] = pr;
+          // Notify approvers (NN)
+          await this._notifyApprovers(pr);
+        }
+      },
+      async () => {
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
+          status: 'submitted',
+          rejectionReason: null,
+          reviewedBy: null,
+          reviewedAt: null,
+          updatedAt: Timestamp.now(),
+          updatedBy,
+        });
+        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        if (snap.exists()) await this._notifyApprovers({ id: snap.id, ...snap.data() } as PaymentRequest);
+      }
+    );
   }
 
   // Auto-create a Pending expense transaction when a PR is approved.
@@ -271,13 +403,33 @@ export class PaymentRequestService {
         year,
         source: 'manual',
       } as any);
+      // Clear failure flag on success
+      await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { expenseTxFailed: false });
     } catch (err) {
       // Non-fatal: log but don't block the approval
       console.error('[PaymentRequestService] Failed to auto-create expense transaction for PR', pr.id, err);
+      // Mark failure so UI can surface a retry button (情景 I)
+      try {
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { expenseTxFailed: true });
+      } catch { /* ignore */ }
     }
   }
 
-  static async update(id: string, updates: Partial<Pick<PaymentRequest, 'purpose' | 'amount' | 'activityRef' | 'status'>>, updatedBy?: string | null): Promise<void> {
+  /** Retry creating expense transaction for an approved PR (情景 I) */
+  static async retryCreateExpenseTransaction(prId: string, retriedBy: string): Promise<void> {
+    return withDevMode(
+      async () => { console.log(`[Dev Mode] Retrying expense tx creation for PR ${prId}`); },
+      async () => {
+        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, prId));
+        if (!snap.exists()) throw new Error('Payment request not found');
+        const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
+        if (pr.status !== 'approved') throw new Error('PR is not in approved status');
+        await this._createExpenseTransaction(pr, retriedBy);
+      }
+    );
+  }
+
+  static async update(id: string, updates: Partial<Pick<PaymentRequest, 'purpose' | 'amount' | 'totalAmount' | 'activityRef' | 'status' | 'items'>>, updatedBy?: string | null): Promise<void> {
     return withDevMode(
       () => {
         const idx = devPaymentRequests.findIndex((p) => p.id === id);
@@ -288,33 +440,151 @@ export class PaymentRequestService {
         }
       },
       async () => {
-    const payload = removeUndefined({
-      ...updates,
-      updatedAt: Timestamp.now(),
-      updatedBy: updatedBy ?? null,
-    });
-    await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
-  });
+        const payload = removeUndefined({
+          ...updates,
+          updatedAt: Timestamp.now(),
+          updatedBy: updatedBy ?? null,
+        });
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
+
+        // If amount changed and PR is already approved, sync the linked expense transaction (情景 R)
+        if ((updates.amount !== undefined || updates.totalAmount !== undefined)) {
+          const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+          if (snap.exists()) {
+            const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
+            if (pr.status === 'approved') {
+              await this._syncExpenseTransactionAmount(pr);
+            }
+          }
+        }
+      }
+    );
   }
 
   static async cancel(id: string, userId: string): Promise<void> {
     return withDevMode(
-      () => {
+      async () => {
         const now = new Date().toISOString();
         const idx = devPaymentRequests.findIndex((p) => p.id === id);
         if (idx >= 0) {
           devPaymentRequests = [...devPaymentRequests];
           devPaymentRequests[idx] = { ...devPaymentRequests[idx], status: 'cancelled', updatedAt: now, updatedBy: userId };
         }
+        // Delete linked expense transaction in dev mode (情景 G)
+        await this._deleteExpenseTransactionForPR(id);
+        // Notify applicant (AA)
+        const pr = devPaymentRequests.find((p) => p.id === id);
+        if (pr) await this._notifyApplicant(pr, 'cancelled');
       },
       async () => {
-        const now = Timestamp.now();
+        // Delete linked expense transaction before cancelling (情景 G)
+        await this._deleteExpenseTransactionForPR(id);
+
         await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
           status: 'cancelled',
-          updatedAt: now,
+          updatedAt: Timestamp.now(),
           updatedBy: userId,
         });
+        // Notify applicant (AA)
+        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        if (snap.exists()) await this._notifyApplicant({ id: snap.id, ...snap.data() } as PaymentRequest, 'cancelled');
       }
     );
+  }
+
+  /** Hard-delete a PR (dev role only). Also removes any linked expense transaction. */
+  static async deletePR(id: string): Promise<void> {
+    return withDevMode(
+      async () => {
+        await this._deleteExpenseTransactionForPR(id);
+        devPaymentRequests = devPaymentRequests.filter(p => p.id !== id);
+      },
+      async () => {
+        await this._deleteExpenseTransactionForPR(id);
+        await deleteDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+      }
+    );
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────────────
+
+  /** Delete any expense transaction linked to this PR (情景 G, 23) */
+  private static async _deleteExpenseTransactionForPR(prId: string): Promise<void> {
+    try {
+      const allTx = await FinanceService.getAllTransactions();
+      const linked = allTx.filter(t => t.paymentRequestId === prId);
+      for (const tx of linked) {
+        await FinanceService.deleteTransaction(tx.id);
+      }
+    } catch (err) {
+      console.error('[PaymentRequestService] Failed to delete expense transaction for PR', prId, err);
+    }
+  }
+
+  /** Update amount on the expense transaction linked to this PR (情景 R) */
+  private static async _syncExpenseTransactionAmount(pr: PaymentRequest): Promise<void> {
+    try {
+      const allTx = await FinanceService.getAllTransactions();
+      const linked = allTx.filter(t => t.paymentRequestId === pr.id && t.type === 'Expense');
+      for (const tx of linked) {
+        await FinanceService.updateTransaction(tx.id, { amount: pr.totalAmount || pr.amount });
+      }
+    } catch (err) {
+      console.error('[PaymentRequestService] Failed to sync expense transaction amount for PR', pr.id, err);
+    }
+  }
+
+  /** Write in-app notification to a member (情景 AA) */
+  private static async _writeNotification(memberId: string, title: string, message: string): Promise<void> {
+    try {
+      await import('firebase/firestore').then(async ({ collection: col, addDoc: add, Timestamp: Ts }) => {
+        await add(col(db, COLLECTIONS.NOTIFICATIONS), {
+          memberId,
+          title,
+          message,
+          type: 'info',
+          read: false,
+          timestamp: Ts.now(),
+        });
+      });
+    } catch (err) {
+      console.warn('[PaymentRequestService] Failed to write notification', err);
+    }
+  }
+
+  /** Notify PR applicant of status change (情景 AA) */
+  private static async _notifyApplicant(pr: PaymentRequest, status: string, rejectionReason?: string): Promise<void> {
+    if (!pr.applicantId) return;
+    const statusLabel: Record<string, string> = {
+      approved: 'Approved',
+      rejected: 'Rejected',
+      cancelled: 'Cancelled',
+      paid: 'Paid',
+    };
+    const label = statusLabel[status] ?? status;
+    const message = status === 'rejected' && rejectionReason
+      ? `Your payment request ${pr.referenceNumber} has been ${label}. Reason: ${rejectionReason}`
+      : `Your payment request ${pr.referenceNumber} has been ${label}.`;
+    await this._writeNotification(pr.applicantId, `Payment Request ${label}`, message);
+  }
+
+  /** Notify authorised approvers of a new/resubmitted PR (情景 NN) */
+  private static async _notifyApprovers(pr: PaymentRequest): Promise<void> {
+    try {
+      const { MembersService } = await import('./membersService');
+      const members = await MembersService.getAllMembers();
+      const approvers = members.filter(m =>
+        m.currentBoardPosition && APPROVER_BOARD_TITLES.some(t => (m.currentBoardPosition ?? '').includes(t))
+      );
+      for (const approver of approvers) {
+        await this._writeNotification(
+          approver.id,
+          'New Payment Request',
+          `${pr.applicantName ?? 'A member'} submitted payment request ${pr.referenceNumber} for review.`
+        );
+      }
+    } catch (err) {
+      console.warn('[PaymentRequestService] Failed to notify approvers', err);
+    }
   }
 }

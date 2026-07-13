@@ -3,7 +3,8 @@ import { X, Plus, Trash2, Lightbulb, Edit, Check } from 'lucide-react';
 import { Transaction, TransactionSplit } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
 import { projectFinancialService } from '../../../services/projectFinancialService';
-import { MembershipConfigService, resolveMembershipPurpose, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
+import { MembershipConfigService, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
+import { buildCategoryFields, buildCategoryCleanupUpdates } from '../../../utils/transactionCategoryUtils';
 import { MembershipType, MembershipRuleConfig } from '../../../types';
 import * as Forms from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
@@ -22,7 +23,7 @@ interface TransactionSplitModalProps {
   projectPurposes?: string[];
 }
 
-type CategoryType = 'Projects & Activities' | 'Membership' | 'Administrative';
+type CategoryType = 'Projects & Activities' | 'Membership' | 'Administrative' | '';
 
 interface SplitItem {
   id?: string; // Existing split ID if updating
@@ -73,11 +74,15 @@ export function TransactionSplitModal({
 
   useEffect(() => {
     if (editForm && editForm.category === 'Membership') {
-      const year = editForm.year || new Date().getFullYear();
-      const amount = editForm.amount || 0;
-      const resolvedPurpose = resolveMembershipPurpose(amount, year, membershipRules || DEFAULT_MEMBERSHIP_RULES);
-      if (editForm.purpose !== resolvedPurpose) {
-        setEditForm(prev => prev ? { ...prev, purpose: resolvedPurpose } : null);
+      const catFields = buildCategoryFields({
+        category: 'Membership',
+        amount: editForm.amount || 0,
+        year: editForm.year,
+        memberId: editForm.memberId,
+        rules: membershipRules || DEFAULT_MEMBERSHIP_RULES,
+      });
+      if (catFields.purpose && editForm.purpose !== catFields.purpose) {
+        setEditForm(prev => prev ? { ...prev, purpose: catFields.purpose!, projectId: catFields.projectId! } : null);
       }
     }
   }, [editForm?.category, editForm?.amount, editForm?.year, membershipRules]);
@@ -258,11 +263,16 @@ export function TransactionSplitModal({
     { value: 'Projects & Activities', label: 'Projects & Activities' },
     { value: 'Membership', label: 'Membership' },
     { value: 'Administrative', label: 'Administrative' },
+    { value: '', label: 'Uncategorized (Remainder)' },
   ];
 
   const totalSplitAmount = splits.reduce((sum, split) => sum + split.amount, 0);
   const remainingAmount = transaction.amount - totalSplitAmount;
-  const isValid = Math.abs(remainingAmount) < 0.01 && splits.every(s => s.amount > 0 && s.description.trim());
+  const uncategorizedSplits = splits.filter(s => s.category === '');
+  const hasMultipleUncategorized = uncategorizedSplits.length > 1;
+  const isValid = Math.abs(remainingAmount) < 0.01
+    && splits.every(s => s.amount > 0 && s.description.trim())
+    && !hasMultipleUncategorized;
 
   const handleAddSplit = () => {
     const newSplit: SplitItem = {
@@ -279,6 +289,22 @@ export function TransactionSplitModal({
     setSplits([...splits, newSplit]);
   };
 
+  const handleAddRemainderSplit = () => {
+    if (remainingAmount <= 0 || uncategorizedSplits.length > 0) return;
+    const newSplit: SplitItem = {
+      category: '' as CategoryType,
+      year: currentYear,
+      projectId: '',
+      memberId: '',
+      purpose: '',
+      paymentRequestId: '',
+      amount: Math.round(remainingAmount * 100) / 100,
+      description: 'Uncategorized remainder',
+      id: undefined
+    };
+    setSplits([...splits, newSplit]);
+  };
+
   const handleRemoveSplit = (index: number) => {
     if (splits.length > 1) {
       setSplits(splits.filter((_, i) => i !== index));
@@ -287,13 +313,19 @@ export function TransactionSplitModal({
 
   const handleQuickSplit = () => {
     const year = new Date().getFullYear();
+    const membershipFields = buildCategoryFields({
+      category: 'Membership',
+      amount: 350,
+      year,
+      rules: membershipRules || DEFAULT_MEMBERSHIP_RULES,
+    });
     const quickSplits: SplitItem[] = [
       {
         category: 'Membership',
         year: year,
-        projectId: '',
+        projectId: membershipFields.projectId || '',
         memberId: '',
-        purpose: resolveMembershipPurpose(350, year, membershipRules || DEFAULT_MEMBERSHIP_RULES),
+        purpose: membershipFields.purpose || '',
         paymentRequestId: '',
         amount: 350,
         description: `${year} Membership Fee`,
@@ -349,27 +381,32 @@ export function TransactionSplitModal({
 
   const handleSplitChange = (index: number, field: keyof SplitItem, value: any) => {
     const newSplits = [...splits];
-    newSplits[index] = { ...newSplits[index], [field]: value };
+    const current = newSplits[index];
+    newSplits[index] = { ...current, [field]: value };
 
-    if (field === 'category' && value === 'Membership') {
-      newSplits[index].projectId = '';
-      newSplits[index].purpose = '';
-    } else if (field === 'category' && value === 'Administrative') {
-      newSplits[index].memberId = '';
-      newSplits[index].purpose = '';
-    } else if (field === 'category' && value === 'Projects & Activities') {
-      newSplits[index].memberId = '';
-      newSplits[index].purpose = '';
+    if (field === 'category' && value !== '') {
+      const cleanup = buildCategoryCleanupUpdates({
+        finalCategory: value as 'Projects & Activities' | 'Membership' | 'Administrative',
+        previousCategory: current.category !== '' ? current.category : undefined,
+        explicitKeys: new Set(),
+      });
+      if (cleanup.memberId === null) newSplits[index].memberId = '';
+      if (cleanup.projectId === null) newSplits[index].projectId = '';
+      if (cleanup.purpose === null) newSplits[index].purpose = '';
     }
 
-    // Auto-generate purpose for Membership category
-    if (newSplits[index].category === 'Membership') {
-      if (field === 'memberId' || field === 'year') {
-        const member = memberOptions.find(m => m.id === newSplits[index].memberId);
-        const membershipType = member?.membershipType || 'Full';
-        const year = newSplits[index].year || new Date().getFullYear();
-        newSplits[index].purpose = `${year} ${membershipType} membership`;
-      }
+    // Auto-derive projectId and purpose for Membership when relevant fields change
+    if (newSplits[index].category === 'Membership' &&
+        (field === 'category' || field === 'memberId' || field === 'year' || field === 'amount')) {
+      const catFields = buildCategoryFields({
+        category: 'Membership',
+        amount: newSplits[index].amount,
+        year: newSplits[index].year,
+        memberId: newSplits[index].memberId,
+        rules: membershipRules || DEFAULT_MEMBERSHIP_RULES,
+      });
+      if (catFields.projectId) newSplits[index].projectId = catFields.projectId;
+      if (catFields.purpose) newSplits[index].purpose = catFields.purpose;
     }
 
     setSplits(newSplits);
@@ -485,6 +522,17 @@ export function TransactionSplitModal({
                 <Plus className="w-4 h-4" />
                 Add Split
               </Button>
+              {remainingAmount > 0.01 && uncategorizedSplits.length === 0 && (
+                <Button
+                  onClick={handleAddRemainderSplit}
+                  variant="outline"
+                  className="text-sm px-3 py-1 flex items-center gap-2 text-slate-500 hover:bg-slate-50 transition-colors"
+                  title="Add an uncategorized split for the remaining amount"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Remainder
+                </Button>
+              )}
             </div>
           </div>
 
@@ -695,6 +743,11 @@ export function TransactionSplitModal({
           {Math.abs(remainingAmount) >= 0.01 && (
             <div className="text-xs text-red-600">
               Split amounts must equal the transaction amount
+            </div>
+          )}
+          {hasMultipleUncategorized && (
+            <div className="text-xs text-amber-600">
+              Only one uncategorized remainder split is allowed per transaction.
             </div>
           )}
         </div>

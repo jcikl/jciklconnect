@@ -46,6 +46,10 @@ export const BatchImportModal: React.FC<Props> = ({
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; errors: number; done: boolean } | null>(null);
   const [failedImportRows, setFailedImportRows] = useState<Set<number>>(new Set());
+  // Inline row editing (情景 LL)
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+  const [editingRowValues, setEditingRowValues] = useState<Record<string, any>>({});
+  const [manualOverrideRows, setManualOverrideRows] = useState<Record<number, ImportRow>>({});
 
   // Custom column-header dropdown
   const [openDropdownCol, setOpenDropdownCol] = useState<number | null>(null);
@@ -226,7 +230,11 @@ export const BatchImportModal: React.FC<Props> = ({
     });
   }, [pastedText, columnMapping, config, context]);
 
-  const parsedRows = parsedTsvRows;
+  // Merge manual overrides into parsedRows (情景 LL)
+  const parsedRows = useMemo(() =>
+    parsedTsvRows.map(r => manualOverrideRows[r.index] ?? r),
+    [parsedTsvRows, manualOverrideRows]
+  );
   const validRows = useMemo(() => parsedRows.filter(r => r.valid), [parsedRows]);
   const invalidRows = useMemo(() => parsedRows.filter(r => !r.valid), [parsedRows]);
 
@@ -254,6 +262,35 @@ export const BatchImportModal: React.FC<Props> = ({
       setSelectedRows(new Set(tableDisplayRows.map(r => r.index)));
     }
   };
+
+  // Save inline-edited row: re-run preprocessors + validators + rowPostProcessor (情景 LL)
+  const handleSaveEditedRow = useCallback((rowIndex: number) => {
+    const parsed = { ...editingRowValues };
+    const errors: string[] = [];
+    for (const field of config.fields) {
+      const rawVal = parsed[field.key];
+      const processed = field.preprocessor ? field.preprocessor(rawVal) : rawVal;
+      parsed[field.key] = processed;
+      const valueToValidate = (processed !== undefined && processed !== null && processed !== '') ? processed : (field.defaultValue !== undefined ? field.defaultValue : '');
+      if (valueToValidate !== '' || field.required) {
+        const fieldErrors = validateField(valueToValidate, field.validators, { ...context, row: parsed });
+        errors.push(...fieldErrors);
+      }
+    }
+    let rowObj: ImportRow = {
+      index: rowIndex,
+      raw: editingRowValues,
+      parsed,
+      errors,
+      valid: errors.length === 0 && !config.fields.some(f => f.required && !parsed[f.key]),
+    };
+    if (config.rowPostProcessor) {
+      rowObj = config.rowPostProcessor(rowObj, context);
+    }
+    setManualOverrideRows(prev => ({ ...prev, [rowIndex]: rowObj }));
+    setEditingRowIndex(null);
+    setEditingRowValues({});
+  }, [editingRowValues, config, context]);
 
   const handleDeleteSelected = () => {
     if (selectedRows.size === 0) return;
@@ -1048,9 +1085,11 @@ export const BatchImportModal: React.FC<Props> = ({
                       return (
                       <React.Fragment key={row.index}>
                         <tr
-                          onClick={() => handleRowClick(row.index)}
+                          onClick={() => { if (editingRowIndex !== row.index) handleRowClick(row.index); }}
                           className={`border-b border-slate-100 cursor-pointer transition-colors ${
-                            importFailed
+                            editingRowIndex === row.index
+                              ? 'bg-blue-50/60'
+                              : importFailed
                               ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100/80 dark:hover:bg-red-900/30'
                               : row.valid ? 'bg-white hover:bg-green-50' : 'bg-red-50/60 hover:bg-red-100/60'
                           } ${selectedRowIndex === row.index ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
@@ -1105,6 +1144,16 @@ export const BatchImportModal: React.FC<Props> = ({
                               })()}
                             </td>
                           ))}
+                          {/* Edit button (情景 LL) */}
+                          <td className="px-1 py-1.5 w-7 text-center" onClick={e => e.stopPropagation()}>
+                            {editingRowIndex === row.index ? (
+                              <button type="button" onClick={() => { setEditingRowIndex(null); setEditingRowValues({}); }}
+                                className="text-[10px] text-slate-400 hover:text-red-500 px-1 py-0.5 rounded" title="Cancel edit">✕</button>
+                            ) : (
+                              <button type="button" onClick={() => { setEditingRowIndex(row.index); setEditingRowValues({ ...row.parsed }); }}
+                                className="text-[10px] text-slate-400 hover:text-jci-blue px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="Edit row">✎</button>
+                            )}
+                          </td>
                           {/* Import-failure dot indicator at end of row */}
                           {importFailed && (
                             <td className="px-2 py-1.5 w-6 text-center" title="导入时出错">
@@ -1112,6 +1161,28 @@ export const BatchImportModal: React.FC<Props> = ({
                             </td>
                           )}
                         </tr>
+                        {/* Inline edit sub-row (情景 LL) */}
+                        {editingRowIndex === row.index && (
+                          <tr className="bg-blue-50/40 border-b border-blue-200">
+                            <td colSpan={2} />
+                            {config.tableColumns.filter(c => c.key !== 'valid').map(col => (
+                              <td key={col.key} className="px-1 py-1">
+                                <input
+                                  type={col.key === 'income' || col.key === 'expense' ? 'number' : col.key === 'date' ? 'date' : 'text'}
+                                  value={editingRowValues[col.key] ?? ''}
+                                  onChange={e => setEditingRowValues(prev => ({ ...prev, [col.key]: e.target.value }))}
+                                  className="w-full text-xs px-1.5 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                                  placeholder={col.label}
+                                />
+                              </td>
+                            ))}
+                            <td className="px-1 py-1">
+                              <button type="button" onClick={() => handleSaveEditedRow(row.index)}
+                                className="text-[11px] font-semibold text-white bg-jci-blue hover:bg-blue-700 px-2 py-1 rounded">Save</button>
+                            </td>
+                            <td />
+                          </tr>
+                        )}
                         {!row.valid && row.errors.length > 0 && (
                           <tr className="bg-red-50 border-b border-red-100">
                             <td colSpan={config.tableColumns.length + 2} className="px-3 py-1.5">

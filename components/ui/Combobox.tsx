@@ -212,17 +212,28 @@ export const Combobox: React.FC<ComboboxProps> = ({
                     placeholder={placeholder}
                     disabled={disabled}
                     className={`
-          block w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm
+          block w-full rounded-lg border border-slate-300 py-1.5 text-sm pr-14 pl-3
           focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20
           disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed
           transition-colors
           `}
                 />
-                <div className="absolute inset-y-0 right-0 flex items-center">
+                <div className="absolute inset-y-0 right-0 flex items-center gap-0.5 pr-1">
+                    {hasValue && !disabled && (
+                        <button
+                            type="button"
+                            onClick={handleClear}
+                            className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
+                            tabIndex={-1}
+                        >
+                            <X size={13} />
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={() => setOpen(!open)}
-                        className="text-slate-400 hover:text-slate-600"
+                        className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
+                        tabIndex={-1}
                     >
                         <ChevronDown size={14} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
                     </button>

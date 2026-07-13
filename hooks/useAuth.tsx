@@ -16,7 +16,7 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { COLLECTIONS } from '../config/constants';
+import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Member, UserRole, MemberTier } from '../types';
 import { MOCK_DEV_ADMIN } from '../services/mockData';
 import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
@@ -465,6 +465,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const cleanMember = Object.fromEntries(
       Object.entries(newMember).filter(([, v]) => v !== undefined)
     );
+    if (!cleanMember.loId) cleanMember.loId = DEFAULT_LO_ID;
 
     // Save to the new UID (this links the Firebase Auth user to the profile data)
     await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);

@@ -822,6 +822,12 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
 
+    // ToyyibPay Bills: Board/Admin can write; all authenticated members can read
+    match /toyyibBills/{billId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

@@ -173,6 +173,33 @@ export const bankTransactionImportConfig: BatchImportConfig = {
     ['2026-02-17', 'Office Supplies', 'ADM-2026-001', '0', '50', 'Administrative', 'Secretariat', 'Stationery'],
   ],
 
+  // Duplicate detection: mark rows that match existing transactions (情景 A)
+  rowPostProcessor: (row, context) => {
+    const existing: any[] = context?.existingTransactions || [];
+    if (!existing.length) return row;
+    const parsed = row.parsed;
+    const income = parsed.income || 0;
+    const expense = parsed.expense || 0;
+    const amount = income > 0 ? income : Math.abs(expense);
+    const rowDate = parsed.date ? String(parsed.date).substring(0, 10) : '';
+    const rowRef = parsed.referenceNumber ? String(parsed.referenceNumber).trim().toLowerCase() : '';
+    const rowDesc = parsed.description ? String(parsed.description).trim().toLowerCase() : '';
+    const isDuplicate = existing.some(t => {
+      const tDate = t.date ? String(t.date).substring(0, 10) : '';
+      if (tDate !== rowDate) return false;
+      if (rowRef && t.referenceNumber && t.referenceNumber.trim().toLowerCase() === rowRef) return true;
+      return Math.abs(t.amount - amount) < 0.01 && t.description?.trim().toLowerCase() === rowDesc;
+    });
+    if (isDuplicate) {
+      return {
+        ...row,
+        errors: [...row.errors, 'Possible duplicate: transaction with same date/amount/description already exists'],
+        valid: false,
+      };
+    }
+    return row;
+  },
+
   // Import function - called for each valid row
   importer: async (row, context) => {
     let projectId = '';

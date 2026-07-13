@@ -293,15 +293,20 @@ export const TransactionForm: React.FC<Props> = ({
                 {editingTransaction?.category === 'Membership' && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Member</label>
-                    <Combobox
-                      options={members.map(m => m.name)}
-                      value={members.find(m => m.id === editingTransaction?.memberId)?.name || ''}
-                      onChange={(value) => {
-                        const member = members.find(m => m.name === value);
-                        setEditingTransaction?.({ ...editingTransaction!, memberId: member?.id || '' });
-                      }}
-                      placeholder="Select or type to search member..."
-                    />
+                    <div className="relative">
+                      <Combobox
+                        options={members.map(m => m.name)}
+                        value={members.find(m => m.id === editingTransaction?.memberId)?.name || ''}
+                        onChange={(value) => {
+                          const member = members.find(m => m.name === value);
+                          setEditingTransaction?.({ ...editingTransaction!, memberId: member?.id || '' });
+                        }}
+                        placeholder="Select or type to search member..."
+                      />
+                      {editingTransaction?.memberId && (
+                        <button type="button" onClick={() => setEditingTransaction?.({ ...editingTransaction!, memberId: '' })} className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5" aria-label="Clear member">✕</button>
+                      )}
+                    </div>
                   </div>
                 )}
 

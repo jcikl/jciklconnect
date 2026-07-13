@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 
@@ -11,6 +11,10 @@ export interface CreateBillParams {
   billPhone: string;
   externalReferenceNo?: string;
   categoryCode?: string;
+  /** Member UID — used for duplicate-bill detection */
+  memberId?: string;
+  /** Project ID — used for duplicate-bill detection on event payments */
+  projectId?: string;
 }
 
 export interface ToyyibBillResponse {
@@ -22,6 +26,34 @@ export interface ToyyibCategory {
   categoryCode: string;
   categoryName: string;
   categoryDescription: string;
+  categoryStatus?: string;
+  createdAt?: any;
+  billCount?: number;
+  totalAmount?: number;
+  linkedType?: 'membership' | 'project';
+  linkedProjectId?: string;
+  linkedProjectName?: string;
+  /** Membership type this category is for — amount auto-resolved from MembershipConfigService */
+  membershipType?: string;
+  /** Year this membership category covers, e.g. "2026" */
+  linkedYear?: string;
+}
+
+export interface ToyyibBillRecord {
+  billCode: string;
+  categoryCode: string;
+  billName: string;
+  billDescription?: string;
+  billAmount: number;
+  billTo: string;
+  billEmail: string;
+  /** ToyyibPay billpaymentStatus: "1"=paid, "2"=pending, "3"=failed, "4"=settling */
+  billpaymentStatus: string;
+  billPaymentDate?: string;
+  /** Member UID — used for duplicate-bill detection */
+  memberId?: string;
+  /** Project ID — used for duplicate-bill detection on event payments */
+  projectId?: string;
   createdAt?: any;
 }
 
@@ -62,7 +94,9 @@ export class ToyyibService {
       billDescription: params.billDescription,
       billPriceSetting: '0',
       billPayorInfo: '1',
-      billAmount: params.billAmount.toFixed(2),
+      billMultiPayment: '1',
+      billPaymentChannel: '2', // 0=FPX only, 1=Credit Card only, 2=both
+      billAmount: Math.round(params.billAmount * 100).toString(), // ToyyibPay expects sen (cents)
       billReturnUrl: window.location.origin + TOYYIB_CONFIG.RETURN_URL_SUFFIX,
       billCallbackUrl: window.location.origin + TOYYIB_CONFIG.CALLBACK_URL_SUFFIX,
       billExternalReferenceNo: params.externalReferenceNo || '',
@@ -73,6 +107,21 @@ export class ToyyibService {
 
     if (Array.isArray(data) && data.length > 0) {
       const billCode = data[0].BillCode;
+      // Persist to Firestore for per-category aggregation
+      const billRecord: Omit<ToyyibBillRecord, 'createdAt'> & { createdAt: any } = {
+        billCode,
+        categoryCode: params.categoryCode || TOYYIB_CONFIG.CATEGORY_CODE,
+        billName: params.billName,
+        billDescription: params.billDescription,
+        billAmount: params.billAmount,
+        billTo: params.billTo,
+        billEmail: params.billEmail,
+        billpaymentStatus: '2',
+        createdAt: serverTimestamp(),
+      };
+      if (params.memberId) billRecord.memberId = params.memberId;
+      if (params.projectId) billRecord.projectId = params.projectId;
+      await addDoc(collection(db, COLLECTIONS.TOYYIB_BILLS), billRecord);
       return {
         billCode,
         paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${billCode}`
@@ -85,8 +134,25 @@ export class ToyyibService {
   // Category codes are stored in Firestore (toyyibCategories collection), seeded with CATEGORY_CODE.
 
   static async getCategories(): Promise<ToyyibCategory[]> {
-    // Load known category codes from Firestore
-    const snap = await getDocs(collection(db, COLLECTIONS.TOYYIB_CATEGORIES));
+    // Load known category codes from Firestore, plus bill aggregates in parallel
+    const [snap, billsSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTIONS.TOYYIB_CATEGORIES)),
+      getDocs(collection(db, COLLECTIONS.TOYYIB_BILLS)),
+    ]);
+
+    // Aggregate bills by categoryCode
+    const billStats: Record<string, { count: number; total: number }> = {};
+    billsSnap.docs.forEach(d => {
+      const b = d.data() as ToyyibBillRecord;
+      if (!b.categoryCode) return;
+      if (!billStats[b.categoryCode]) billStats[b.categoryCode] = { count: 0, total: 0 };
+      billStats[b.categoryCode].count += 1;
+      billStats[b.categoryCode].total += b.billAmount || 0;
+    });
+    // Build a map of Firestore metadata (linked fields, membershipType) keyed by code
+    const firestoreMeta: Record<string, any> = {};
+    snap.docs.forEach(d => { firestoreMeta[d.id] = d.data(); });
+
     let codes: string[] = snap.docs.map(d => d.id);
 
     // Always include the configured default category code
@@ -106,22 +172,42 @@ export class ToyyibService {
     const results = await Promise.allSettled(
       codes.map(async code => {
         const details = await proxyCall('getCategoryDetails', { categoryCode: code });
-        if (Array.isArray(details) && details.length > 0) return details[0] as ToyyibCategory;
-        return null;
+        // ToyyibPay returns a plain object (sandbox) or array (production)
+        const raw = Array.isArray(details) ? details[0] : details;
+        if (!raw || typeof raw !== 'object') return null;
+        const stats = billStats[code] || { count: 0, total: 0 };
+        const meta = firestoreMeta[code] || {};
+        return {
+          categoryCode: code,
+          categoryName: raw.CategoryName || raw.categoryName || '',
+          categoryDescription: raw.categoryDescription || raw.CategoryDescription || '',
+          categoryStatus: raw.categoryStatus ?? raw.CategoryStatus ?? '0',
+          billCount: stats.count,
+          totalAmount: stats.total,
+          linkedType: meta.linkedType,
+          linkedProjectId: meta.linkedProjectId,
+          linkedProjectName: meta.linkedProjectName,
+          membershipType: meta.membershipType,
+        } as ToyyibCategory;
       })
     );
 
     return results
-      .filter((r): r is PromiseFulfilledResult<ToyyibCategory> => r.status === 'fulfilled' && r.value !== null)
-      .map(r => r.value);
+      .filter((r): r is PromiseFulfilledResult<ToyyibCategory> => r.status === 'fulfilled' && r.value !== null && r.value !== undefined)
+      .map(r => r.value!);
   }
 
   private static async saveCategoryToFirestore(cat: Omit<ToyyibCategory, 'createdAt'>): Promise<void> {
-    await setDoc(
-      doc(db, COLLECTIONS.TOYYIB_CATEGORIES, cat.categoryCode),
-      { categoryName: cat.categoryName, categoryDescription: cat.categoryDescription, createdAt: serverTimestamp() },
-      { merge: true }
-    );
+    const payload: Record<string, any> = {
+      categoryName: cat.categoryName,
+      categoryDescription: cat.categoryDescription,
+      createdAt: serverTimestamp(),
+    };
+    if (cat.linkedType) payload.linkedType = cat.linkedType;
+    if (cat.linkedProjectId) payload.linkedProjectId = cat.linkedProjectId;
+    if (cat.linkedProjectName) payload.linkedProjectName = cat.linkedProjectName;
+    if (cat.membershipType) payload.membershipType = cat.membershipType;
+    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, cat.categoryCode), payload, { merge: true });
   }
 
   static async createCategory(catname: string, catdescription: string): Promise<any[]> {
@@ -137,8 +223,35 @@ export class ToyyibService {
     return result;
   }
 
+  static async updateCategoryLink(
+    categoryCode: string,
+    link: Pick<ToyyibCategory, 'linkedType' | 'linkedProjectId' | 'linkedProjectName' | 'membershipType'>
+  ): Promise<void> {
+    const payload: Record<string, any> = { linkedType: link.linkedType ?? null };
+    payload.linkedProjectId = link.linkedProjectId ?? null;
+    payload.linkedProjectName = link.linkedProjectName ?? null;
+    payload.membershipType = link.membershipType ?? null;
+    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode), payload, { merge: true });
+  }
+
   static async deleteCategory(categoryCode: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode));
+  }
+
+  // Re-link an existing ToyyibPay category by code (fetch live details, then save to Firestore)
+  static async importCategory(categoryCode: string): Promise<ToyyibCategory> {
+    const details = await proxyCall('getCategoryDetails', { categoryCode });
+    const raw = Array.isArray(details) ? details[0] : details;
+    if (!raw || typeof raw !== 'object' || (!raw.CategoryName && !raw.categoryName)) {
+      throw new Error('Category not found in ToyyibPay — check the code and try again');
+    }
+    const cat: Omit<ToyyibCategory, 'createdAt'> = {
+      categoryCode,
+      categoryName: raw.CategoryName || raw.categoryName || '',
+      categoryDescription: raw.categoryDescription || raw.CategoryDescription || '',
+    };
+    await ToyyibService.saveCategoryToFirestore(cat);
+    return cat;
   }
 
   static async getCategoryDetails(categoryCode: string): Promise<any[]> {
@@ -146,14 +259,159 @@ export class ToyyibService {
     return Array.isArray(data) ? data : [];
   }
 
-  static async getBills(): Promise<any[]> {
-    try {
-      const data = await proxyCall('getBills');
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.error('ToyyibPay getBills failed:', error);
-      return [];
+  static async getBills(): Promise<ToyyibBillRecord[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.TOYYIB_BILLS));
+    return snap.docs.map(d => ({ ...(d.data() as ToyyibBillRecord), id: d.id }));
+  }
+
+  /**
+   * Check whether an active (non-failed) bill already exists for this member + category.
+   * Used to prevent duplicate bills when the user clicks the payment button more than once.
+   *
+   * Pass `projectId` for event payments; omit for membership dues (category alone is sufficient).
+   *
+   * Returns the existing bill's paymentUrl if found, or null if safe to create a new bill.
+   */
+  static async findExistingActiveBill(
+    memberId: string,
+    categoryCode: string,
+    projectId?: string,
+  ): Promise<{ billCode: string; paymentUrl: string } | null> {
+    const constraints: any[] = [
+      where('memberId', '==', memberId),
+      where('categoryCode', '==', categoryCode),
+      limit(1),
+    ];
+    if (projectId) constraints.splice(2, 0, where('projectId', '==', projectId));
+
+    const snap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), ...constraints));
+    for (const d of snap.docs) {
+      const bill = d.data() as ToyyibBillRecord;
+      // "3" = failed — allow re-creation; everything else is active or paid
+      if (bill.billpaymentStatus !== '3') {
+        return {
+          billCode: bill.billCode,
+          paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${bill.billCode}`,
+        };
+      }
     }
+    return null;
+  }
+
+  /**
+   * Fetch the latest payment status from ToyyibPay for a single bill and persist to Firestore.
+   * Returns the updated record, or null if no transaction data is available.
+   */
+  static async syncBillStatus(billCode: string): Promise<Pick<ToyyibBillRecord, 'billpaymentStatus' | 'billPaymentDate'> | null> {
+    const data = await proxyCall('getBillTransactions', { billCode });
+    console.log('[ToyyibPay] getBillTransactions raw response:', data);
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const txn = data[0];
+    console.log('[ToyyibPay] txn[0] fields:', {
+      billpaymentStatus: txn.billpaymentStatus,
+      billPaymentDate: txn.billPaymentDate,
+      billpaymentChannel: txn.billpaymentChannel,
+      billpaymentAmount: txn.billpaymentAmount,
+      billpaymentSettlement: txn.billpaymentSettlement,
+      billStatus: txn.billStatus,
+    });
+    // billpaymentStatus: "1"=paid, "2"=pending, "3"=failed, "4"=settling (pending settlement)
+    const billpaymentStatus: string = String(txn.billpaymentStatus ?? '2');
+    const billPaymentDate: string = txn.billPaymentDate ?? '';
+
+    const snap = await getDocs(collection(db, COLLECTIONS.TOYYIB_BILLS));
+    const match = snap.docs.find(d => (d.data() as ToyyibBillRecord).billCode === billCode);
+    if (match) {
+      await updateDoc(doc(db, COLLECTIONS.TOYYIB_BILLS, match.id), { billpaymentStatus, billPaymentDate });
+    }
+    return { billpaymentStatus, billPaymentDate };
+  }
+
+  // ── Bill description formatters ───────────────────────────────────────────────
+
+  static formatMembershipBillDescription(
+    name: string,
+    nationalId: string | undefined,
+    contact: string,
+    year: number,
+    isGuest = false,
+  ): string {
+    const idSuffix = nationalId?.slice(-4);
+    const prefix = `[${year} Renewal Membership]`;
+    if (isGuest || !idSuffix) return `${prefix} ${name}, ${contact}`;
+    return `${prefix} ${name} (${idSuffix}), ${contact}`;
+  }
+
+  static formatEventBillDescription(
+    projectTitle: string,
+    name: string,
+    nationalId: string | undefined,
+    contact: string,
+  ): string {
+    const idSuffix = nationalId?.slice(-4);
+    const prefix = `[${projectTitle} - Ticketing]`;
+    if (!idSuffix) return `${prefix} ${name}, ${contact}`;
+    return `${prefix} ${name} (${idSuffix}), ${contact}`;
+  }
+
+  // ── Lazy category creation ────────────────────────────────────────────────────
+
+  /**
+   * Return the categoryCode for the given membership year's ToyyibPay category,
+   * creating it on first use.
+   */
+  static async getOrCreateMembershipCategory(year: number): Promise<string> {
+    const snap = await getDocs(query(
+      collection(db, COLLECTIONS.TOYYIB_CATEGORIES),
+      where('linkedType', '==', 'membership'),
+      where('linkedYear', '==', String(year)),
+      limit(1),
+    ));
+    if (!snap.empty) return snap.docs[0].id;
+
+    const catName = `${year} Membership`;
+    const result = await proxyCall('createCategory', { catname: catName, catdescription: catName });
+    if (!Array.isArray(result) || !result[0]?.CategoryCode) {
+      throw new Error(`Failed to create ToyyibPay category for ${catName}`);
+    }
+    const categoryCode: string = result[0].CategoryCode;
+    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode), {
+      categoryName: catName,
+      categoryDescription: catName,
+      linkedType: 'membership',
+      linkedYear: String(year),
+      createdAt: serverTimestamp(),
+    });
+    return categoryCode;
+  }
+
+  /**
+   * Return the categoryCode for the given project's ToyyibPay category,
+   * creating it on first use.
+   */
+  static async getOrCreateProjectCategory(projectId: string, projectTitle: string): Promise<string> {
+    const snap = await getDocs(query(
+      collection(db, COLLECTIONS.TOYYIB_CATEGORIES),
+      where('linkedType', '==', 'project'),
+      where('linkedProjectId', '==', projectId),
+      limit(1),
+    ));
+    if (!snap.empty) return snap.docs[0].id;
+
+    const result = await proxyCall('createCategory', { catname: projectTitle, catdescription: projectTitle });
+    if (!Array.isArray(result) || !result[0]?.CategoryCode) {
+      throw new Error(`Failed to create ToyyibPay category for ${projectTitle}`);
+    }
+    const categoryCode: string = result[0].CategoryCode;
+    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode), {
+      categoryName: projectTitle,
+      categoryDescription: projectTitle,
+      linkedType: 'project',
+      linkedProjectId: projectId,
+      linkedProjectName: projectTitle,
+      createdAt: serverTimestamp(),
+    });
+    return categoryCode;
   }
 
   static async getSettlements(): Promise<any[]> {

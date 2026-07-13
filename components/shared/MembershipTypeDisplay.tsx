@@ -49,7 +49,7 @@ export const MembershipTypeDisplay: React.FC<MembershipTypeDisplayProps> = ({
   );
 
   const variant =
-    computedType === 'Full'
+    computedType === 'Official'
       ? 'success'
       : computedType === 'Probation'
         ? 'warning'

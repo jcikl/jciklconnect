@@ -30,6 +30,10 @@ import {
   computeMembershipTypeFromMember,
   roleForMembershipType,
 } from './membershipConfigService';
+import {
+  buildMembershipProjectId,
+  buildCategoryCleanupUpdates,
+} from '../utils/transactionCategoryUtils';
 
 
 
@@ -308,8 +312,8 @@ export class FinanceService {
             return {
               id: s.id,
               date: parent?.date || new Date().toISOString(),
-              description: s.description || parent?.description || '',
-              purpose: s.purpose || parent?.purpose || '',
+              description: parent?.description || '',
+              purpose: s.purpose || null,
               amount: s.amount,
               type: s.type || parent?.type || 'Expense',
               category: s.category || parent?.category || 'Projects & Activities',
@@ -379,8 +383,10 @@ export class FinanceService {
             virtualTransactionsFromSplits.push({
               id: doc.id,
               date: parent.date,
-              description: splitData.description || parent.description || '',
-              purpose: splitData.purpose || parent.purpose || '',
+              // description always from parent bank tx (情景 14)
+              description: parent.description || '',
+              // purpose from the linked project transaction (情景 15); fallback to split purpose
+              purpose: splitData.purpose || null,
               amount: splitData.amount,
               type: splitData.type || parent.type,
               category: splitData.category || parent.category,
@@ -549,12 +555,15 @@ export class FinanceService {
   // Create transaction split (upsert: update existing or create new)
   static async createTransactionSplit(
     parentTransactionId: string,
-    splits: Array<{ id?: string; category: 'Projects & Activities' | 'Membership' | 'Administrative'; year?: number; projectId?: string; memberId?: string; purpose?: string; paymentRequestId?: string; amount: number; description: string }>,
+    splits: Array<{ id?: string; category: 'Projects & Activities' | 'Membership' | 'Administrative' | ''; year?: number; projectId?: string; memberId?: string; purpose?: string; paymentRequestId?: string; amount: number; description: string }>,
     createdBy: string
   ): Promise<string[]> {
     return withDevMode(
       async () => {
         console.log(`[Dev Mode] Creating/updating ${splits.length} splits for transaction ${parentTransactionId}`);
+        // Resolve split child to real parent (情景 P/DD)
+        const maybeSplit = devModeSplits.find(s => s.id === parentTransactionId);
+        if (maybeSplit) parentTransactionId = maybeSplit.parentTransactionId;
         // Find parent transaction
         const parentTransaction = localMockTransactions.find(t => t.id === parentTransactionId);
         if (!parentTransaction) {
@@ -637,6 +646,14 @@ export class FinanceService {
       },
       async () => {
     try {
+      // If parentTransactionId is actually a split child ID, resolve to the real parent (情景 P/DD)
+      let resolvedParentId = parentTransactionId;
+      const maybeSplitDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, parentTransactionId));
+      if (maybeSplitDoc.exists()) {
+        resolvedParentId = (maybeSplitDoc.data() as TransactionSplit).parentTransactionId;
+      }
+      parentTransactionId = resolvedParentId;
+
       // Get parent transaction
       const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId));
       if (!parentDoc.exists()) {
@@ -838,6 +855,12 @@ export class FinanceService {
       async () => {
         try {
           const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
+
+          // Fetch current split before applying updates (needed for inventory diff)
+          const currentDoc = await getDoc(splitRef);
+          if (!currentDoc.exists()) throw new Error('Split not found');
+          const currentSplit = currentDoc.data() as TransactionSplit;
+
           await updateDoc(splitRef, {
             ...removeUndefined(updates),
             updatedAt: Timestamp.now(),
@@ -845,12 +868,11 @@ export class FinanceService {
 
           // If amount changed, validate total still equals parent
           if (updates.amount !== undefined) {
-            const splitDoc = await getDoc(splitRef);
-            if (splitDoc.exists()) {
-              const split = splitDoc.data() as TransactionSplit;
+            const updatedDoc = await getDoc(splitRef);
+            if (updatedDoc.exists()) {
+              const split = updatedDoc.data() as TransactionSplit;
               const allSplits = await this.getTransactionSplits(split.parentTransactionId);
               const totalSplitAmount = allSplits.reduce((sum, s) => sum + s.amount, 0);
-
               const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
               if (parentDoc.exists()) {
                 const parentAmount = parentDoc.data().amount;
@@ -860,6 +882,44 @@ export class FinanceService {
                   );
                 }
               }
+            }
+          }
+
+          // Sync inventory stock movement for this split
+          const fullSplit = { ...currentSplit, ...updates } as TransactionSplit;
+          const { InventoryService } = await import('./inventoryService');
+
+          const hadLinkage = currentSplit.inventoryLinkId && currentSplit.inventoryQuantity;
+          const hasLinkage = fullSplit.inventoryLinkId && fullSplit.inventoryQuantity;
+
+          if (hadLinkage && !hasLinkage) {
+            // Case A: inventory linkage removed — delete stock movement
+            await InventoryService.deleteStockMovementForRef(splitId);
+          } else if (hasLinkage) {
+            // Case B: inventory linkage added or changed
+            const fieldsChanged =
+              (updates.inventoryLinkId !== undefined && updates.inventoryLinkId !== currentSplit.inventoryLinkId) ||
+              (updates.inventoryVariant !== undefined && updates.inventoryVariant !== currentSplit.inventoryVariant) ||
+              (updates.inventoryQuantity !== undefined && updates.inventoryQuantity !== currentSplit.inventoryQuantity) ||
+              (updates.type !== undefined && updates.type !== currentSplit.type);
+
+            let shouldSync = fieldsChanged;
+            if (!shouldSync) {
+              try {
+                const hasMovement = await InventoryService.hasStockMovementForRef(splitId);
+                if (!hasMovement) shouldSync = true;
+              } catch (e) {
+                console.warn('Error checking inventory sync status for split:', e);
+              }
+            }
+
+            if (shouldSync) {
+              await InventoryService.updateStockMovementForRef(splitId, {
+                itemId: fullSplit.inventoryLinkId!,
+                variantSize: fullSplit.inventoryVariant || '',
+                quantity: fullSplit.inventoryQuantity!,
+                operation: 'decrement',
+              });
             }
           }
         } catch (error) {
@@ -913,6 +973,13 @@ export class FinanceService {
           }
 
           const split = splitDoc.data() as TransactionSplit;
+
+          // Cleanup inventory stock movement before deleting
+          if (split.inventoryLinkId && split.inventoryQuantity) {
+            const { InventoryService } = await import('./inventoryService');
+            await InventoryService.deleteStockMovementForRef(splitId);
+          }
+
           await deleteDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
 
           // Update parent transaction splitIds array
@@ -940,6 +1007,11 @@ export class FinanceService {
           }
 
           await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), updateData);
+
+          // Sync member membership if deleted split was Membership category
+          if (split.category === 'Membership' && split.memberId && split.year) {
+            await this.syncMemberMembership(split.memberId, `${split.year} membership`);
+          }
         } catch (error) {
           console.error('Error deleting transaction split:', error);
           throw error;
@@ -1179,67 +1251,29 @@ export class FinanceService {
         const idx = localMockTransactions.findIndex(t => t.id === txId);
         if (idx !== -1) {
           const currentTransaction = localMockTransactions[idx];
-          
-          // Determine the final category
-          const finalCategory = categoryUpdates.category !== undefined 
-            ? categoryUpdates.category 
-            : currentTransaction?.category;
+          const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
+          const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
+            ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category, explicitKeys }),
             updatedAt: new Date().toISOString(),
           };
 
-          // Apply category-specific cleanup rules
           if (finalCategory === 'Membership') {
-            const yearVal = categoryUpdates.year || currentTransaction?.year || 
+            const yearVal = categoryUpdates.year || currentTransaction?.year ||
               (currentTransaction?.date ? new Date(currentTransaction.date).getFullYear() : new Date().getFullYear());
-            
             if (!categoryUpdates.projectId) {
-              updateData.projectId = `${yearVal} membership`;
+              updateData.projectId = buildMembershipProjectId(yearVal);
             }
-            
             const memberIdVal = categoryUpdates.memberId !== undefined ? categoryUpdates.memberId : currentTransaction?.memberId;
-            if (memberIdVal) {
+            if (memberIdVal && !('purpose' in categoryUpdates)) {
               const rules = await MembershipConfigService.getRules();
-              const memberObj = MOCK_MEMBERS.find(m => m.id === memberIdVal) || null;
-              const membershipType = memberObj?.membershipType || 'Official';
-              const resolvedPurpose = resolveMembershipPurpose(
-                currentTransaction?.amount || 0,
-                yearVal,
-                rules
-              );
-              if (!categoryUpdates.purpose) {
-                updateData.purpose = resolvedPurpose;
-              }
-            }
-          } else if (finalCategory === 'Administrative') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            // Only clear projectId/purpose if user didn't explicitly provide them
-            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
-              updateData.purpose = null;
-            }
-          } else if (finalCategory === 'Projects & Activities') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
-              updateData.purpose = null;
+              updateData.purpose = resolveMembershipPurpose(currentTransaction?.amount || 0, yearVal, rules);
             }
           }
 
-          localMockTransactions[idx] = {
-            ...currentTransaction,
-            ...updateData,
-          } as Transaction;
+          localMockTransactions[idx] = { ...currentTransaction, ...updateData } as Transaction;
           updatedCount++;
         }
       }
@@ -1256,56 +1290,25 @@ export class FinanceService {
             ? ({ id: currentDoc.id, ...currentDoc.data() } as Transaction)
             : null;
 
-          const finalCategory = categoryUpdates.category !== undefined 
-            ? categoryUpdates.category 
-            : currentTransaction?.category;
+          const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
+          const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
+            ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category, explicitKeys }),
             updatedAt: Timestamp.now(),
           };
 
-          // Apply category-specific cleanup rules
           if (finalCategory === 'Membership') {
-            const yearVal = categoryUpdates.year || currentTransaction?.year || 
-              (currentTransaction?.date ? new Date(currentTransaction.date).getFullYear() : new Date().getFullYear());
-            
+            const yearVal = categoryUpdates.year || currentTransaction?.year ||
+              (currentTransaction?.date ? new Date((currentTransaction.date as any)?.toDate?.() ?? currentTransaction.date).getFullYear() : new Date().getFullYear());
             if (!categoryUpdates.projectId) {
-              updateData.projectId = `${yearVal} membership`;
+              updateData.projectId = buildMembershipProjectId(yearVal);
             }
-            
             const memberIdVal = categoryUpdates.memberId !== undefined ? categoryUpdates.memberId : currentTransaction?.memberId;
-            if (memberIdVal) {
+            if (memberIdVal && !('purpose' in categoryUpdates)) {
               const rules = await MembershipConfigService.getRules();
-              const resolvedPurpose = resolveMembershipPurpose(
-                currentTransaction?.amount || 0,
-                yearVal,
-                rules
-              );
-              // Only auto-set purpose if user didn't explicitly provide one
-              if (!('purpose' in categoryUpdates)) {
-                updateData.purpose = resolvedPurpose;
-              }
-            }
-          } else if (finalCategory === 'Administrative') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Administrative') {
-              updateData.purpose = null;
-            }
-          } else if (finalCategory === 'Projects & Activities') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            if (!('projectId' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentTransaction?.category !== 'Projects & Activities') {
-              updateData.purpose = null;
+              updateData.purpose = resolveMembershipPurpose(currentTransaction?.amount || 0, yearVal, rules);
             }
           }
 
@@ -1322,7 +1325,14 @@ export class FinanceService {
             await this.syncMemberMembership(nextTransaction.memberId, projectId);
           }
 
+          // Sync old member when category changes AWAY from Membership (情景 V)
           if (
+            currentTransaction?.category === 'Membership' &&
+            currentTransaction.memberId &&
+            finalCategory !== 'Membership'
+          ) {
+            await this.syncMemberMembership(currentTransaction.memberId, currentTransaction.projectId);
+          } else if (
             currentTransaction?.category === 'Membership' &&
             currentTransaction.memberId &&
             (currentTransaction.memberId !== nextTransaction.memberId || currentTransaction.projectId !== nextTransaction.projectId)
@@ -1370,48 +1380,24 @@ export class FinanceService {
         const idx = devModeSplits.findIndex(s => s.id === splitId);
         if (idx !== -1) {
           const currentSplit = devModeSplits[idx];
-          
-          const finalCategory = categoryUpdates.category !== undefined 
-            ? categoryUpdates.category 
-            : currentSplit?.category;
+          const finalCategory = categoryUpdates.category ?? currentSplit?.category;
+          const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
+          const catForCleanup = (finalCategory as string) === '' ? undefined : finalCategory as import('../utils/transactionCategoryUtils').TransactionCategory;
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
+            ...(catForCleanup
+              ? buildCategoryCleanupUpdates({ finalCategory: catForCleanup, previousCategory: currentSplit?.category || undefined, explicitKeys })
+              : {}),
             updatedAt: new Date().toISOString(),
           };
 
-          // Apply category-specific cleanup rules
-          if (finalCategory === 'Membership') {
+          if (finalCategory === 'Membership' && !categoryUpdates.projectId) {
             const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
-            if (!categoryUpdates.projectId) {
-              updateData.projectId = `${yearVal} membership`;
-            }
-          } else if (finalCategory === 'Administrative') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
-              updateData.purpose = null;
-            }
-          } else if (finalCategory === 'Projects & Activities') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
-              updateData.purpose = null;
-            }
+            updateData.projectId = buildMembershipProjectId(yearVal);
           }
 
-          devModeSplits[idx] = {
-            ...currentSplit,
-            ...updateData,
-          } as TransactionSplit;
+          devModeSplits[idx] = { ...currentSplit, ...updateData } as TransactionSplit;
           updatedCount++;
         }
       }
@@ -1428,41 +1414,21 @@ export class FinanceService {
             ? ({ id: currentDoc.id, ...currentDoc.data() } as TransactionSplit)
             : null;
 
-          const finalCategory = categoryUpdates.category !== undefined 
-            ? categoryUpdates.category 
-            : currentSplit?.category;
+          const finalCategory = categoryUpdates.category ?? currentSplit?.category;
+          const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
+          const catForCleanup2 = (finalCategory as string) === '' ? undefined : finalCategory as import('../utils/transactionCategoryUtils').TransactionCategory;
           const updateData: any = {
             ...removeUndefined(categoryUpdates),
+            ...(catForCleanup2
+              ? buildCategoryCleanupUpdates({ finalCategory: catForCleanup2, previousCategory: currentSplit?.category || undefined, explicitKeys })
+              : {}),
             updatedAt: Timestamp.now(),
           };
 
-          // Apply category-specific cleanup rules
-          if (finalCategory === 'Membership') {
+          if (finalCategory === 'Membership' && !categoryUpdates.projectId) {
             const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
-            if (!categoryUpdates.projectId) {
-              updateData.projectId = `${yearVal} membership`;
-            }
-          } else if (finalCategory === 'Administrative') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Administrative') {
-              updateData.purpose = null;
-            }
-          } else if (finalCategory === 'Projects & Activities') {
-            if (categoryUpdates.memberId === undefined) {
-              updateData.memberId = null;
-            }
-            if (!('projectId' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
-              updateData.projectId = null;
-            }
-            if (!('purpose' in categoryUpdates) && currentSplit?.category !== 'Projects & Activities') {
-              updateData.purpose = null;
-            }
+            updateData.projectId = buildMembershipProjectId(yearVal);
           }
 
           await updateDoc(splitRef, updateData);
@@ -1567,6 +1533,12 @@ export class FinanceService {
           if (transaction && transaction.category === 'Membership' && transaction.memberId) {
             await this.syncMemberMembership(transaction.memberId as string, transaction.projectId);
           }
+
+          // Revert PR from 'paid' → 'approved' when the linked bank tx is deleted (情景 E)
+          if (transaction?.paymentRequestId) {
+            const { PaymentRequestService } = await import('./paymentRequestService');
+            await PaymentRequestService.revertPaid(transaction.paymentRequestId);
+          }
         } catch (error) {
           console.error('Error deleting transaction:', error);
           throw error;
@@ -1646,12 +1618,18 @@ export class FinanceService {
         const btx = docSnap.data() as Transaction;
         const btxLinkedIds = btx.projectTransactionIds || [];
         const newLinkedIds = btxLinkedIds.filter((id: string) => id !== transactionId);
+        const willClear = newLinkedIds.length === 0;
         await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, docSnap.id), {
           projectTransactionIds: newLinkedIds,
           projectTransactionId: newLinkedIds[0] || null,
-          status: newLinkedIds.length > 0 ? 'Reconciled' : 'Cleared',
-          ...(newLinkedIds.length === 0 ? { purpose: '' } : {}),
+          status: willClear ? 'Cleared' : 'Reconciled',
+          ...(willClear ? { purpose: '' } : {}),
         });
+        // Revert PR from 'paid' → 'approved' when the matching bank tx is delinked (情景 E)
+        if (willClear && btx.paymentRequestId) {
+          const { PaymentRequestService } = await import('./paymentRequestService');
+          await PaymentRequestService.revertPaid(btx.paymentRequestId);
+        }
       }
 
       // 2. Clean up transaction splits linked to this project transaction
@@ -1666,15 +1644,27 @@ export class FinanceService {
         const newLinkedIds = splitLinkedIds.filter((id: string) => id !== transactionId);
         
         if (split.autoGenerated && newLinkedIds.length === 0) {
-          // If it was auto-generated and has no remaining links, delete it
           await this.deleteTransactionSplit(docSnap.id);
         } else {
-          // Otherwise update its links
-          await this.updateTransactionSplit(docSnap.id, {
+          await updateDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, docSnap.id), {
             projectTransactionIds: newLinkedIds,
             projectTransactionId: newLinkedIds[0] || null,
             ...(newLinkedIds.length === 0 ? { purpose: '' } : {}),
-          } as any);
+            updatedAt: Timestamp.now(),
+          });
+        }
+
+        // Revert parent bank tx status when split is delinked (情景 W / HH / OO)
+        if (newLinkedIds.length === 0 && !split.autoGenerated) {
+          const parentBankTxDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
+          if (parentBankTxDoc.exists()) {
+            const allParentSplits = await this.getTransactionSplits(split.parentTransactionId);
+            const anyLinked = allParentSplits.some(s => s.id !== docSnap.id && (s.projectTransactionIds?.length ?? 0) > 0);
+            await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), {
+              status: anyLinked ? 'Partially Reconciled' : 'Cleared',
+              updatedAt: Timestamp.now(),
+            });
+          }
         }
       }
 
@@ -1752,10 +1742,10 @@ export class FinanceService {
       const canonicalProjectId = this.getMembershipProjectIdFromYear(yearNum) || projectId;
 
       // 2. Fetch membership transactions for member (filter by year in memory — resilient to projectId variants)
+      // Single-field query avoids requiring a composite (memberId + category) index in Firestore
       const q = query(
         collection(db, COLLECTIONS.TRANSACTIONS),
-        where('memberId', '==', memberId),
-        where('category', '==', 'Membership')
+        where('memberId', '==', memberId)
       );
       const snapshot = await getDocs(q);
       const queriedTransactions = snapshot.docs
@@ -1767,7 +1757,7 @@ export class FinanceService {
             date: this.normalizeTransactionDate(data.date),
           } as Transaction;
         })
-        .filter(tx => this.transactionBelongsToMembershipYear(tx, yearNum));
+        .filter(tx => tx.category === 'Membership' && this.transactionBelongsToMembershipYear(tx, yearNum));
 
       const transactions = this.mergeMembershipTransactionsForYear(
         queriedTransactions,
@@ -1831,6 +1821,10 @@ export class FinanceService {
 
       // No linked membership transactions for this member/year:
       // rollback linkage-derived fields and reset to pending summary.
+      // Exception: Inactive members retain their historical dues record (情景 L).
+      if (allMembershipTransactions.length === 0 && member.role === 'INACTIVE') {
+        return;
+      }
       if (allMembershipTransactions.length === 0) {
         currentMembership[yearStr] = {
           year: yearNum,
@@ -1840,10 +1834,21 @@ export class FinanceService {
           transactionId: [],
         };
 
-        await updateDoc(memberRef, {
+        const zeroTxUpdates: any = {
           membership: currentMembership,
           updatedAt: Timestamp.now(),
-        });
+        };
+
+        // Revert back to Guest only if they were promoted via the guest approval flow (probationApprovedAt is set)
+        if (member.membershipType === 'Probation' && member.role === 'MEMBER' && member.probationApprovedAt) {
+          zeroTxUpdates.role = 'GUEST';
+          zeroTxUpdates.membershipType = 'Guest';
+          zeroTxUpdates.probationApprovedBy = null;
+          zeroTxUpdates.probationApprovedAt = null;
+          zeroTxUpdates.probationTasks = null;
+        }
+
+        await updateDoc(memberRef, zeroTxUpdates);
         return;
       }
 
@@ -1988,8 +1993,13 @@ export class FinanceService {
           const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
 
           // Calculate dynamic balance for each account
+          // Exclude isSplit parents — their amount is decomposed into splits which are NOT in this collection,
+          // so the parent row's amount still represents the real bank movement. Include it as-is. (情景 T)
+          // isSplit parents ARE the real transaction; no double-count exists. Filter only virtual isSplitChild rows
+          // which are never stored in the transactions collection anyway. So no change needed here — the balance
+          // is correct as long as we don't also count split children (which live in transaction_splits, not transactions).
           return accounts.map(account => {
-            const accountTransactions = transactions.filter(t => t.bankAccountId === account.id);
+            const accountTransactions = transactions.filter(t => t.bankAccountId === account.id && !t.isSplitChild);
             const transactionSum = accountTransactions.reduce((sum, t) => {
               return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
             }, 0);
@@ -2061,6 +2071,25 @@ export class FinanceService {
     );
   }
 
+  // Delete bank account — guarded: refuses if linked transactions exist (情景 BB)
+  static async deleteBankAccount(accountId: string): Promise<void> {
+    return withDevMode(
+      () => { console.log(`[Dev Mode] Mocking delete for bank account ${accountId}`); },
+      async () => {
+        const txQuery = query(
+          collection(db, COLLECTIONS.TRANSACTIONS),
+          where('bankAccountId', '==', accountId),
+          limit(1)
+        );
+        const txSnap = await getDocs(txQuery);
+        if (!txSnap.empty) {
+          throw new Error('Cannot delete a bank account that has linked transactions. Reassign or delete the transactions first.');
+        }
+        await deleteDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId));
+      }
+    );
+  }
+
   // Get transactions by category
   static async getTransactionsByCategory(category: Transaction['category']): Promise<Transaction[]> {
     try {
@@ -2106,10 +2135,11 @@ export class FinanceService {
         if (tx.isSplit && tx.splitIds && tx.splitIds.length > 0) {
           const splits = splitsMap[tx.id] || [];
           splits.forEach(split => {
+            if (!split.category) return; // skip uncategorized remainder splits in reports
             flattenedTransactions.push({
               ...tx,
               id: split.id,
-              category: split.category,
+              category: split.category as Transaction['category'],
               amount: split.amount,
               description: split.description,
               projectId: split.projectId,

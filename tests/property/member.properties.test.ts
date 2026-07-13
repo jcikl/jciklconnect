@@ -367,9 +367,6 @@ describe('Member Management Properties', () => {
             [UserRole.MEMBER]: [
               'id', 'name', 'email', 'membershipType', 'status'
             ],
-            [UserRole.PROBATION]: [
-              'id', 'name', 'email', 'membershipType', 'status'
-            ],
             [UserRole.GUEST]: [
               'id', 'name', 'membershipType'
             ],

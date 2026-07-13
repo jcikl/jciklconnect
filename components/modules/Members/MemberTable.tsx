@@ -48,7 +48,7 @@ const MEMBERSHIP_TYPE_FILTER_OPTIONS: { value: MembershipType; label: string }[]
 const membershipTypeBadgeVariant = (
   type?: MembershipType
 ): 'success' | 'warning' | 'info' | 'neutral' => {
-  if (type === 'Full') return 'success';
+  if (type === 'Official') return 'success';
   if (type === 'Probation') return 'warning';
   if (type === 'Visiting' || type === 'Senator') return 'info';
   return 'neutral';

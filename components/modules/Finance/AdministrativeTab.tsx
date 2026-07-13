@@ -1,11 +1,12 @@
 import React from 'react';
-import { Plus, Edit, Trash2, Briefcase } from 'lucide-react';
+import { Plus, Edit, Trash2, Briefcase, FileText, ChevronDown } from 'lucide-react';
 import { Button, Badge } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
 import { UNASSIGNED_PROJECT_ID } from '../../../hooks/useFinanceData';
-import type { Transaction, Project } from '../../../types';
+import { PaymentRequestService } from '../../../services/paymentRequestService';
+import type { Transaction, Project, PaymentRequest, PaymentRequestStatus } from '../../../types';
 
 interface AdministrativeTabProps {
   transactions: Transaction[];
@@ -24,6 +25,14 @@ interface AdministrativeTabProps {
   projects: Project[];
 }
 
+const PR_STATUS_FILTER_OPTIONS: { label: string; value: PaymentRequestStatus | 'all' }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Pending', value: 'submitted' },
+  { label: 'Approved', value: 'approved' },
+  { label: 'Paid', value: 'paid' },
+  { label: 'Rejected', value: 'rejected' },
+];
+
 const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
   transactions,
   isTransactionInCategory,
@@ -40,6 +49,15 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
   setIsAddAdministrativeProjectOpen,
   projects,
 }) => {
+  const [adminPRs, setAdminPRs] = React.useState<PaymentRequest[]>([]);
+  const [prStatusFilter, setPrStatusFilter] = React.useState<PaymentRequestStatus | 'all'>('all');
+
+  React.useEffect(() => {
+    PaymentRequestService.list({ pageSize: 500 }).then(({ items }) => {
+      setAdminPRs(items.filter(pr => pr.category === 'administrative'));
+    }).catch(() => {});
+  }, []);
+
   const activeYear = adminAccountYearFilter;
   const adminTransactions = transactions.filter(t => isTransactionInCategory(t, 'Administrative'));
   const adminFiltered = activeYear === 0
@@ -135,8 +153,68 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
       )}
 
       {/* ── Summary strip + Transactions ── */}
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-        {/* Left: Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-10 gap-4">
+        {/* Payment Requests card (情景 24) */}
+        <div className="md:col-span-2">
+          {(() => {
+            const yearPRs = activeYear === 0 ? adminPRs : adminPRs.filter(pr => {
+              const y = pr.date ? new Date(pr.date).getFullYear() : new Date(pr.createdAt).getFullYear();
+              return y === activeYear;
+            });
+            const filteredPRs = prStatusFilter === 'all' ? yearPRs : yearPRs.filter(pr => pr.status === prStatusFilter);
+            const pendingAmt = yearPRs.filter(p => p.status === 'submitted').reduce((s, p) => s + (p.totalAmount || p.amount || 0), 0);
+            const approvedAmt = yearPRs.filter(p => p.status === 'approved').reduce((s, p) => s + (p.totalAmount || p.amount || 0), 0);
+            const paidAmt = yearPRs.filter(p => p.status === 'paid').reduce((s, p) => s + (p.totalAmount || p.amount || 0), 0);
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-4 pt-3 pb-2 border-b border-slate-100 flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5"><FileText size={13} className="text-jci-blue" />Payment Requests</h3>
+                    <p className="text-[11px] text-slate-400">{activeYear === 0 ? 'All time' : activeYear} · Administrative</p>
+                  </div>
+                </div>
+                <div className="px-3 py-2 border-b border-slate-100">
+                  <div className="flex gap-1 flex-wrap">
+                    {PR_STATUS_FILTER_OPTIONS.map(opt => (
+                      <button key={opt.value} onClick={() => setPrStatusFilter(opt.value)}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${prStatusFilter === opt.value ? 'bg-jci-blue text-white border-jci-blue' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'}`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="px-4 py-3 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] text-amber-600">Pending</span>
+                    <span className="text-xs font-mono font-semibold text-amber-600">{formatCurrency(pendingAmt)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] text-blue-600">Approved</span>
+                    <span className="text-xs font-mono font-semibold text-blue-600">{formatCurrency(approvedAmt)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] text-green-600">Paid</span>
+                    <span className="text-xs font-mono font-semibold text-green-600">{formatCurrency(paidAmt)}</span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100">
+                    <p className="text-[10px] text-slate-400">{filteredPRs.length} PR{filteredPRs.length !== 1 ? 's' : ''} {prStatusFilter === 'all' ? 'total' : prStatusFilter}</p>
+                    <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
+                      {filteredPRs.slice(0, 8).map(pr => (
+                        <div key={pr.id} className="flex justify-between items-center text-[10px]">
+                          <span className="truncate text-slate-600 max-w-[65%]">{pr.purpose || pr.remark || pr.referenceNumber}</span>
+                          <span className="font-mono text-slate-700 shrink-0">{formatCurrency(pr.totalAmount || pr.amount || 0)}</span>
+                        </div>
+                      ))}
+                      {filteredPRs.length > 8 && <p className="text-[10px] text-slate-400 text-center">+{filteredPRs.length - 8} more</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Summary card */}
         <div className="md:col-span-2">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-4 pt-3 pb-2 border-b border-slate-100">
@@ -164,7 +242,7 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
         </div>
 
         {/* Right: Transactions */}
-        <div className="md:col-span-5">
+        <div className="md:col-span-6">
           {/* Title row */}
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-slate-800">

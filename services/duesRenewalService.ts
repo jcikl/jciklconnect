@@ -466,7 +466,7 @@ export class DuesRenewalService {
         const byMembershipType: DuesRenewalSummary['byMembershipType'] = {
           Guest: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
           Probation: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
-          Full: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
+          Official: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
           Honorary: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
           Senator: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
           Visiting: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
@@ -521,7 +521,7 @@ export class DuesRenewalService {
           const byMembershipType: DuesRenewalSummary['byMembershipType'] = {
             Guest: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
             Probation: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
-            Full: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
+            Official: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
             Honorary: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
             Senator: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },
             Visiting: { total: 0, paid: 0, pending: 0, overdue: 0, totalAmount: 0, paidAmount: 0 },

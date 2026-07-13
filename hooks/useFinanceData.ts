@@ -8,7 +8,7 @@ import { PaymentRequestService } from '../services/paymentRequestService';
 import { projectFinancialService } from '../services/projectFinancialService';
 import { ProjectsService } from '../services/projectsService';
 import { MembersService } from '../services/membersService';
-import { MembershipConfigService, resolveMembershipPurpose } from '../services/membershipConfigService';
+import { MembershipConfigService } from '../services/membershipConfigService';
 import { InventoryService } from '../services/inventoryService';
 import { getAdministrativeProjectIds } from '../utils/administrativeProjectsStorage';
 import { ADMINISTRATIVE_PURPOSES } from '../config/constants';
@@ -17,6 +17,10 @@ import {
   isTransactionInCategory as isTransactionInCategoryUtil,
   getTransactionAccountLabel as getTransactionAccountLabelUtil,
 } from '../utils/financeUtils';
+import {
+  buildCategoryFields,
+  buildAdministrativePurpose,
+} from '../utils/transactionCategoryUtils';
 import type { Transaction, BankAccount, ProjectFinancialAccount, TransactionSplit, InventoryItem } from '../types';
 import type { PaymentRequest, Project, MembershipType } from '../types';
 
@@ -447,6 +451,76 @@ export function useFinanceData(searchQuery?: string) {
     }
     return allPt.filter(tx => tx.projectId === selectedProjectFilter);
   }, [transactions, selectedProjectFilter, transactionSplits]);
+
+  const membershipTransactions = useMemo(() => {
+    const direct = transactions.filter(tx => {
+      if (!isTransactionInCategory(tx, 'Membership')) return false;
+      if (tx.isSplit && tx.splitIds && tx.splitIds.length > 0) return false;
+      return true;
+    });
+
+    const splitChildren: Transaction[] = [];
+    Object.entries(transactionSplits).forEach(([parentId, splits]) => {
+      const parentTx = transactions.find(t => t.id === parentId);
+      splits.forEach(split => {
+        if (split.category === 'Membership') {
+          splitChildren.push({
+            id: split.id,
+            date: parentTx?.date || '',
+            description: split.description,
+            purpose: split.purpose,
+            amount: split.amount,
+            type: parentTx?.type || 'Expense',
+            category: 'Membership',
+            status: parentTx?.status || 'Pending',
+            projectId: split.projectId,
+            memberId: split.memberId,
+            bankAccountId: parentTx?.bankAccountId,
+            paymentRequestId: split.paymentRequestId,
+            isSplitChild: true,
+            parentTransactionId: parentId,
+          } as Transaction);
+        }
+      });
+    });
+
+    return [...direct, ...splitChildren];
+  }, [transactions, transactionSplits]);
+
+  const administrativeTransactions = useMemo(() => {
+    const direct = transactions.filter(tx => {
+      if (!isTransactionInCategory(tx, 'Administrative')) return false;
+      if (tx.isSplit && tx.splitIds && tx.splitIds.length > 0) return false;
+      return true;
+    });
+
+    const splitChildren: Transaction[] = [];
+    Object.entries(transactionSplits).forEach(([parentId, splits]) => {
+      const parentTx = transactions.find(t => t.id === parentId);
+      splits.forEach(split => {
+        if (split.category === 'Administrative') {
+          splitChildren.push({
+            id: split.id,
+            date: parentTx?.date || '',
+            description: split.description,
+            purpose: split.purpose,
+            amount: split.amount,
+            type: parentTx?.type || 'Expense',
+            category: 'Administrative',
+            status: parentTx?.status || 'Pending',
+            projectId: split.projectId,
+            memberId: split.memberId,
+            bankAccountId: parentTx?.bankAccountId,
+            paymentRequestId: split.paymentRequestId,
+            isSplitChild: true,
+            parentTransactionId: parentId,
+          } as Transaction);
+        }
+      });
+    });
+
+    return [...direct, ...splitChildren];
+  }, [transactions, transactionSplits]);
 
   const uncategorizedProjectTxCount = useMemo(() => {
     return transactions.filter(tx => isTransactionInCategory(tx, 'Projects & Activities') && (tx.projectId === null || tx.projectId === '')).length;
@@ -1056,17 +1130,21 @@ export function useFinanceData(searchQuery?: string) {
       let purpose: string | undefined;
       let memberId: string | undefined;
 
-      if (category === 'Membership') {
-        memberId = (formData.get('memberId') as string)?.trim() || undefined;
-        const year = parseInt((formData.get('year') as string) || String(new Date().getFullYear()), 10);
-        projectId = `${year} membership`;
-        const amount = parseFloat(formData.get('amount') as string) || 0;
-        const rules = await MembershipConfigService.getRules();
-        purpose = resolveMembershipPurpose(amount, year, rules);
-      } else {
-        projectId = (formData.get('projectId') as string)?.trim() || undefined;
-        purpose = (formData.get('purpose') as string)?.trim() || undefined;
-      }
+      const amount = parseFloat(formData.get('amount') as string) || 0;
+      const year = parseInt((formData.get('year') as string) || String(new Date().getFullYear()), 10);
+      const rules = category === 'Membership' ? await MembershipConfigService.getRules() : undefined;
+      const catFields = buildCategoryFields({
+        category,
+        amount,
+        year,
+        memberId: (formData.get('memberId') as string)?.trim() || undefined,
+        projectId: (formData.get('projectId') as string)?.trim() || undefined,
+        purpose: (formData.get('purpose') as string)?.trim() || undefined,
+        rules,
+      });
+      projectId = catFields.projectId;
+      purpose = catFields.purpose;
+      memberId = catFields.memberId ?? undefined;
 
       const transactionData = {
         date: formData.get('date') as string,
@@ -1319,6 +1397,7 @@ export function useFinanceData(searchQuery?: string) {
     if (!bankTxId || !user?.uid) return;
     setPrLinkingId(prId);
     try {
+      const bankTx = transactions.find(t => t.id === bankTxId);
       const expenseTx = transactions.find(t => t.paymentRequestId === prId && t.type === 'Expense');
       if (expenseTx?.id) {
         await FinanceService.matchTransactions(expenseTx.id, bankTxId, user.uid);
@@ -1329,6 +1408,10 @@ export function useFinanceData(searchQuery?: string) {
           reconciledAt: new Date().toISOString(),
           reconciledBy: user.uid,
         });
+      }
+      // Mark PR as paid with the bank transaction date (情景 26)
+      if (bankTx?.date) {
+        await PaymentRequestService.markAsPaid(prId, bankTx.date);
       }
       showToast('PR linked to bank transaction', 'success');
       await loadData();
@@ -1397,25 +1480,36 @@ export function useFinanceData(searchQuery?: string) {
     const referenceNumber = formData.has('referenceNumber') ? (formData.get('referenceNumber') as string)?.trim() || null : editingTransaction.referenceNumber;
     const paymentRequestId = formData.has('paymentRequestId') ? (formData.get('paymentRequestId') as string)?.trim() || null : editingTransaction.paymentRequestId;
 
-    let projectIdVal: string | undefined = editingTransaction.projectId;
-    let purposeVal: string | undefined = editingTransaction.purpose;
-    let memberIdVal: string | undefined = editingTransaction.memberId;
+    const rules = category === 'Membership' ? await MembershipConfigService.getRules() : undefined;
+    const memberIdInput = formData.has('memberId')
+      ? (formData.get('memberId') as string)?.trim() || undefined
+      : editingTransaction.memberId;
+    const projectIdInput = formData.has('projectId')
+      ? (formData.get('projectId') as string)?.trim() || undefined
+      : editingTransaction.projectId;
+    // Administrative: form field is the base part (year prefix added by buildCategoryFields)
+    const adminPurposeBase = formData.has('purpose')
+      ? (formData.get('purpose') as string)?.trim() || ''
+      : editingAdministrativePurposeBase;
+    // P&A: form field is the full purpose string
+    const paPurpose = formData.has('purpose')
+      ? (formData.get('purpose') as string)?.trim() || undefined
+      : editingTransaction.purpose;
 
-    if (category === 'Membership') {
-      memberIdVal = formData.has('memberId') ? (formData.get('memberId') as string)?.trim() || undefined : editingTransaction.memberId;
-      const year = editingMembershipYear;
-      projectIdVal = `${year} membership`;
-      const rules = await MembershipConfigService.getRules();
-      purposeVal = resolveMembershipPurpose(amount, year, rules);
-    } else if (category === 'Administrative') {
-      projectIdVal = formData.has('projectId') ? (formData.get('projectId') as string)?.trim() || undefined : editingTransaction.projectId;
-      const year = editingAdministrativeYear;
-      const purposeBase = formData.has('purpose') ? (formData.get('purpose') as string)?.trim() || '' : editingAdministrativePurposeBase;
-      purposeVal = purposeBase ? `${year} ${purposeBase}` : editingTransaction.purpose;
-    } else {
-      projectIdVal = formData.has('projectId') ? (formData.get('projectId') as string)?.trim() || undefined : editingTransaction.projectId;
-      purposeVal = formData.has('purpose') ? (formData.get('purpose') as string)?.trim() || undefined : editingTransaction.purpose;
-    }
+    const catFields = buildCategoryFields({
+      category,
+      amount,
+      year: category === 'Membership' ? editingMembershipYear : editingAdministrativeYear,
+      memberId: memberIdInput,
+      projectId: projectIdInput,
+      purposeBase: category === 'Administrative' ? adminPurposeBase : undefined,
+      purpose: category === 'Projects & Activities' ? paPurpose : undefined,
+      rules,
+    });
+
+    const projectIdVal: string | undefined = catFields.projectId ?? editingTransaction.projectId;
+    const purposeVal: string | undefined = catFields.purpose ?? editingTransaction.purpose;
+    const memberIdVal: string | undefined = catFields.memberId ?? editingTransaction.memberId;
 
     const updatedTransaction: Partial<Transaction> = {
       date,
@@ -1581,6 +1675,8 @@ export function useFinanceData(searchQuery?: string) {
     availableYears,
     monthlyAccountSummary,
     projectTransactions,
+    membershipTransactions,
+    administrativeTransactions,
     uncategorizedProjectTxCount,
     projectAccountYearOptions,
     filteredProjectAccounts,

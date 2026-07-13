@@ -1,15 +1,31 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import {
-  Mail, Phone, Calendar, Users, UserCheck, FileText
+  Mail, Phone, Calendar, Users, UserCheck, FileText, CreditCard, CheckCircle, AlertCircle
 } from 'lucide-react';
 import { Button, Badge, Modal, useToast } from '../../ui/Common';
-import type { Member, ProbationTask } from '../../../types';
+import type { Member, ProbationTask, Transaction } from '../../../types';
 import { UserRole, MembershipDues } from '../../../types';
 import { useMembers } from '../../../hooks/useMembers';
 import { useAuth } from '../../../hooks/useAuth';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
+import { FinanceService } from '../../../services/financeService';
+
+// Normalize string for fuzzy name matching (same logic as DuesRenewalDashboard)
+const norm = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const findMatchingTransaction = (guest: Member, txs: Transaction[]): Transaction | null => {
+  const names = [norm(guest.name), norm(guest.fullName)].filter(n => n.length >= 3);
+  for (const tx of txs) {
+    const desc = norm(tx.description);
+    const ref = norm(tx.referenceNumber ?? '');
+    for (const name of names) {
+      if (desc.includes(name) || ref.includes(name)) return tx;
+    }
+  }
+  return null;
+};
 
 // Guest Management View Component
 export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: string) => void }> = ({ searchQuery, onSelect }) => {
@@ -20,6 +36,12 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
   const [guests, setGuests] = useState<Member[]>([]);
   const [selectedGuest, setSelectedGuest] = useState<Member | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+
+  // Payment matching state
+  const [matchedTx, setMatchedTx] = useState<Transaction | null>(null);
+  const [txLoading, setTxLoading] = useState(false);
+  const [unlinkedMembershipTxs, setUnlinkedMembershipTxs] = useState<Transaction[]>([]);
+  const [showTxPicker, setShowTxPicker] = useState(false);
 
   const getInitiationYear = (dateStr?: string | null) => {
     if (!dateStr) return new Date().getFullYear();
@@ -60,6 +82,37 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
     }
   }, [selectedGuest]);
 
+  // Search for matching payment transaction when approval modal opens
+  useEffect(() => {
+    if (!showApprovalModal || !selectedGuest) return;
+    setTxLoading(true);
+    setMatchedTx(null);
+    setShowTxPicker(false);
+    FinanceService.getAllTransactions()
+      .then(all => {
+        const unlinked = all.filter(t =>
+          t.type === 'Income' &&
+          t.category === 'Membership' &&
+          !t.memberId &&
+          !t.isSplitChild
+        );
+        setUnlinkedMembershipTxs(unlinked);
+        setMatchedTx(findMatchingTransaction(selectedGuest, unlinked));
+      })
+      .catch(() => {
+        setUnlinkedMembershipTxs([]);
+      })
+      .finally(() => setTxLoading(false));
+  }, [showApprovalModal, selectedGuest]);
+
+  const closeApprovalModal = () => {
+    setShowApprovalModal(false);
+    setSelectedGuest(null);
+    setMatchedTx(null);
+    setUnlinkedMembershipTxs([]);
+    setShowTxPicker(false);
+  };
+
   const handleApproveGuest = async (guestId: string) => {
     if (!canApprove) {
       showToast('Only board members can approve guests', 'error');
@@ -67,7 +120,6 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
     }
 
     try {
-      // Default probation tasks
       const defaultTasks: ProbationTask[] = [
         {
           id: `task-${Date.now()}-1`,
@@ -96,6 +148,9 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
       ];
 
       const yearStr = String(approvalYear);
+      const dues = ((selectedGuest?.jciCareer?.hasPaidInitiationFee ?? selectedGuest?.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation;
+      const paidAmount = matchedTx?.amount ?? 0;
+      const membershipStatus = paidAmount >= dues ? 'paid' : paidAmount > 0 ? 'partial' : 'pending';
 
       await updateMember(guestId, {
         role: UserRole.MEMBER,
@@ -107,17 +162,29 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
           ...(selectedGuest?.membership || {}),
           [yearStr]: {
             year: approvalYear,
-            dues: ((selectedGuest?.jciCareer?.hasPaidInitiationFee ?? selectedGuest?.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
-            amount: 0,
-            status: 'pending',
-            transactionId: []
+            dues,
+            amount: paidAmount,
+            status: membershipStatus,
+            transactionId: matchedTx ? [matchedTx.id] : []
           }
         }
       });
 
+      // Link the matched transaction to this member
+      if (matchedTx) {
+        const purpose = paidAmount >= dues
+          ? `${approvalYear} New Membership`
+          : `${approvalYear} Membership`;
+        await FinanceService.updateTransaction(matchedTx.id, {
+          memberId: guestId,
+          projectId: `${approvalYear} membership`,
+          category: 'Membership',
+          purpose,
+        });
+      }
+
       showToast('Guest approved and moved to probation member', 'success');
-      setShowApprovalModal(false);
-      setSelectedGuest(null);
+      closeApprovalModal();
     } catch (err) {
       showToast('Failed to approve guest', 'error');
     }
@@ -157,11 +224,36 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         },
       ];
 
+      // Fetch unlinked membership transactions once for batch auto-matching
+      let batchUnlinkedTxs: Transaction[] = [];
+      try {
+        const all = await FinanceService.getAllTransactions();
+        batchUnlinkedTxs = all.filter(t =>
+          t.type === 'Income' &&
+          t.category === 'Membership' &&
+          !t.memberId &&
+          !t.isSplitChild
+        );
+      } catch {
+        // Non-fatal: proceed without tx matching
+      }
+
       const yearStr = String(approvalYear);
-      const updates = Array.from(selectedGuestIds).map(id => {
+      const usedTxIds = new Set<string>();
+
+      await Promise.all(Array.from(selectedGuestIds).map(async id => {
         const guest = guests.find(g => g.id === id);
-        return {
-          id,
+        const dues = ((guest?.jciCareer?.hasPaidInitiationFee ?? guest?.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation;
+
+        // Find match from remaining unlinked txs (exclude already used in this batch)
+        const available = batchUnlinkedTxs.filter(t => !usedTxIds.has(t.id));
+        const tx = guest ? findMatchingTransaction(guest, available) : null;
+        if (tx) usedTxIds.add(tx.id);
+
+        const paidAmount = tx?.amount ?? 0;
+        const membershipStatus = paidAmount >= dues ? 'paid' : paidAmount > 0 ? 'partial' : 'pending';
+
+        await updateMember(id, {
           role: UserRole.MEMBER,
           membershipType: 'Probation' as any,
           probationTasks: defaultTasks,
@@ -171,16 +263,24 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
             ...(guest?.membership || {}),
             [yearStr]: {
               year: approvalYear,
-              dues: ((guest?.jciCareer?.hasPaidInitiationFee ?? guest?.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
-              amount: 0,
-              status: 'pending',
-              transactionId: []
+              dues,
+              amount: paidAmount,
+              status: membershipStatus,
+              transactionId: tx ? [tx.id] : []
             }
           }
-        } as Partial<Member>;
-      });
+        } as Partial<Member>);
 
-      await Promise.all(updates.map(update => updateMember(update.id, update)));
+        if (tx) {
+          const purpose = paidAmount >= dues ? `${approvalYear} New Membership` : `${approvalYear} Membership`;
+          await FinanceService.updateTransaction(tx.id, {
+            memberId: id,
+            projectId: `${approvalYear} membership`,
+            category: 'Membership',
+            purpose,
+          });
+        }
+      }));
 
       showToast(`Successfully approved ${selectedGuestIds.size} guests`, 'success');
       setShowBatchApprovalModal(false);
@@ -319,23 +419,84 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
       {showApprovalModal && selectedGuest && (
         <Modal
           isOpen={showApprovalModal}
-          onClose={() => {
-            setShowApprovalModal(false);
-            setSelectedGuest(null);
-          }}
+          onClose={closeApprovalModal}
           title={`Approve Guest: ${selectedGuest.name}`}
         >
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
               Approving this guest will move them to probation member status. They will need to complete probation tasks before becoming an official member.
             </p>
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-semibold text-blue-900 mb-2">Default Probation Tasks:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Attend Orientation Session</li>
-                <li>• Complete Member Profile</li>
-                <li>• Attend First Event</li>
-              </ul>
+
+            {/* Payment Matching */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <h4 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
+                <CreditCard size={14} />
+                Payment Record
+              </h4>
+              {txLoading ? (
+                <p className="text-xs text-slate-500 animate-pulse">Searching for matching payment...</p>
+              ) : matchedTx ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <CheckCircle size={13} />
+                    <span className="text-xs font-bold">Matched Payment Found</span>
+                  </div>
+                  <div className="text-xs text-slate-600 space-y-0.5 pl-5">
+                    <div className="font-medium">{formatDateToDDMMMYYYY(matchedTx.date)} · RM {matchedTx.amount.toFixed(2)}</div>
+                    <div className="truncate text-slate-500">{matchedTx.description}</div>
+                    {matchedTx.referenceNumber && (
+                      <div className="text-slate-400">Ref: {matchedTx.referenceNumber}</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setShowTxPicker(v => !v)}
+                    className="text-xs text-jci-blue underline pl-5"
+                  >
+                    {showTxPicker ? 'Hide' : 'Change'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-amber-600">
+                    <AlertCircle size={13} />
+                    <span className="text-xs font-medium">No matching payment found</span>
+                  </div>
+                  <p className="text-xs text-slate-500 pl-5">Membership dues will be set as pending.</p>
+                  {unlinkedMembershipTxs.length > 0 && (
+                    <button
+                      onClick={() => setShowTxPicker(v => !v)}
+                      className="text-xs text-jci-blue underline pl-5"
+                    >
+                      {showTxPicker ? 'Hide' : 'Select manually'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Transaction picker */}
+              {showTxPicker && (
+                <div className="border border-slate-200 rounded-lg overflow-hidden mt-2">
+                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100">
+                    <button
+                      onClick={() => { setMatchedTx(null); setShowTxPicker(false); }}
+                      className="w-full px-3 py-2 text-left text-xs text-slate-400 italic hover:bg-slate-50"
+                    >
+                      No payment — set as pending
+                    </button>
+                    {unlinkedMembershipTxs.map(tx => (
+                      <button
+                        key={tx.id}
+                        onClick={() => { setMatchedTx(tx); setShowTxPicker(false); }}
+                        className={`w-full px-3 py-2 text-left text-xs hover:bg-blue-50 transition-colors ${matchedTx?.id === tx.id ? 'bg-blue-50 text-jci-blue' : 'text-slate-700'}`}
+                      >
+                        <div className="font-medium">{formatDateToDDMMMYYYY(tx.date)} · RM {tx.amount.toFixed(2)}</div>
+                        <div className="text-slate-500 truncate">{tx.description}</div>
+                        {tx.referenceNumber && <div className="text-slate-400">Ref: {tx.referenceNumber}</div>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
@@ -351,18 +512,22 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
               </select>
               <p className="text-[10px] text-amber-600 italic">This will set the year for the initial membership record.</p>
             </div>
+            {!matchedTx && !txLoading && (
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1.5">
+                <AlertCircle size={13} />
+                A matched payment record is required before approving.
+              </p>
+            )}
             <div className="flex gap-2 justify-end">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setShowApprovalModal(false);
-                  setSelectedGuest(null);
-                }}
+                onClick={closeApprovalModal}
               >
                 Cancel
               </Button>
               <Button
                 onClick={() => handleApproveGuest(selectedGuest.id)}
+                disabled={!matchedTx || txLoading}
               >
                 <UserCheck size={16} className="mr-2" />
                 Approve as Probation Member
@@ -381,15 +546,13 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         >
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Approving these guests will move them to probation member status. They will need to complete probation tasks before becoming official members.
+              Approving these guests will move them to probation member status. Payment records will be auto-matched by name from unlinked membership transactions.
             </p>
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-semibold text-blue-900 mb-2">Default Probation Tasks:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Attend Orientation Session</li>
-                <li>• Complete Member Profile</li>
-                <li>• Attend First Event</li>
-              </ul>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-2">
+              <CreditCard size={14} className="text-slate-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-slate-600">
+                Payment records will be matched automatically by name. Unmatched guests will be set as pending payment.
+              </p>
             </div>
 
             <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">

@@ -9,6 +9,7 @@ import type { Member, BoardMember } from '../../../types';
 import { UserRole } from '../../../types';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
+import { PaymentButton } from '../../shared/toyyib/PaymentButton';
 
 interface MemberDetailCareerTabProps {
   member: Member;
@@ -22,6 +23,7 @@ interface MemberDetailCareerTabProps {
   handleFindMentors: () => void;
   loadingMatches: boolean;
   setShowPaymentHistoryModal: React.Dispatch<React.SetStateAction<boolean>>;
+  canEditRoleType?: boolean;
 }
 
 const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) => {
@@ -29,7 +31,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
     member, isEditMode, inlineValues, setInlineValues,
     boardPositions, commissionDirectorPositions,
     mentor, mentees, handleFindMentors, loadingMatches,
-    setShowPaymentHistoryModal,
+    setShowPaymentHistoryModal, canEditRoleType,
   } = props;
 
   return (
@@ -131,6 +133,34 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                     </div>
                   </div>
                 )}
+              {canEditRoleType && (
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Role</label>
+                    <select
+                      value={inlineValues.role}
+                      onChange={e => setInlineValues({ ...inlineValues, role: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    >
+                      {[UserRole.GUEST, UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Membership Type</label>
+                    <select
+                      value={inlineValues.membershipType}
+                      onChange={e => setInlineValues({ ...inlineValues, membershipType: e.target.value })}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    >
+                      {['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
               </div>
             </div>
           ) : (
@@ -184,6 +214,30 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 >
                   <Clock size={12} /> View Payment History
                 </Button>
+
+                {/* Pay dues button — shown when dues are not paid for the current year */}
+                {(() => {
+                  const currentYear = new Date().getFullYear();
+                  const rec = member.membership?.[String(currentYear)];
+                  const isPaid = rec?.status === 'paid' || rec?.status === 'over paid';
+                  const noPaymentNeeded = member.membershipType === 'Honorary' || member.membershipType === 'Senator';
+                  if (noPaymentNeeded) return null;
+                  return (
+                    <div className="mt-2 pt-3 border-t border-slate-100">
+                      <p className="text-xs text-slate-500 mb-2">{currentYear} Dues Payment</p>
+                      <PaymentButton
+                        type="membership"
+                        member={member}
+                        year={currentYear}
+                        label={isPaid ? undefined : 'Pay Dues'}
+                        size="sm"
+                        existingPaymentUrl={rec?.toyyibPaymentUrl}
+                        existingBillStatus={isPaid ? '1' : rec?.toyyibPaymentStatus}
+                        className="w-full justify-center"
+                      />
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Senator Details Section */}
