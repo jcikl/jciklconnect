@@ -10,6 +10,18 @@
   package = "@netlify/plugin-functions-install-core"
 
 [[redirects]]
+  from = "/api/webhooks/toyyibpay"
+  to = "/.netlify/functions/toyyibpay-callback"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/toyyibpay"
+  to = "/.netlify/functions/toyyibpay-api"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { CreditCard, Shield, ExternalLink, AlertCircle, CheckCircle, Smartphone, Layout, List, Wallet, Plus, Settings, Search, Clock } from 'lucide-react';
+import { CreditCard, Shield, ExternalLink, AlertCircle, CheckCircle, Smartphone, Layout, List, Wallet, Plus, Settings, Search, Clock, RefreshCw } from 'lucide-react';
 import { Card, Button, Badge, Modal, useToast, Tabs, StatCard } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { ToyyibService } from '../../services/toyyibService';
@@ -128,10 +128,17 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-800">Bill Categories</h3>
-          <Button size="sm" variant="primary" className="flex items-center gap-2" onClick={() => setIsCreateCategoryModalOpen(true)}>
-            <Plus size={16} /> Create Category
-          </Button>
+          <h3 className="text-lg font-bold text-slate-800">Bill Categories
+            <span className="ml-2 text-sm font-normal text-slate-400">({categories.length} from ToyyibPay)</span>
+          </h3>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={loadData} isLoading={isRefreshing} title="Refresh from ToyyibPay">
+              <RefreshCw size={15} className="text-slate-500" />
+            </Button>
+            <Button size="sm" variant="primary" className="flex items-center gap-2" onClick={() => setIsCreateCategoryModalOpen(true)}>
+              <Plus size={16} /> Create Category
+            </Button>
+          </div>
         </div>
         <Card>
           <div className="p-6">
@@ -147,7 +154,17 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {categories.length > 0 ? (
+                  {isRefreshing ? (
+                    [1, 2, 3].map(i => (
+                      <tr key={i}>
+                        <td className="py-4"><div className="h-4 bg-slate-100 rounded animate-pulse w-32 mb-1" /><div className="h-3 bg-slate-100 rounded animate-pulse w-48" /></td>
+                        <td className="py-4"><div className="h-3 bg-slate-100 rounded animate-pulse w-20" /></td>
+                        <td className="py-4"><div className="h-5 bg-slate-100 rounded-full animate-pulse w-14" /></td>
+                        <td className="py-4"><div className="h-3 bg-slate-100 rounded animate-pulse w-6" /></td>
+                        <td className="py-4 text-right"><div className="h-6 bg-slate-100 rounded animate-pulse w-24 ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : categories.length > 0 ? (
                     categories.map((cat, idx) => (
                       <tr key={cat.categoryCode || idx} className="group hover:bg-slate-50 transition-colors">
                         <td className="py-4">
@@ -156,27 +173,27 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                         </td>
                         <td className="py-4 font-mono text-xs text-slate-500">{cat.categoryCode}</td>
                         <td className="py-4">
-                          <Badge 
-                            variant={cat.categoryStatus === '1' ? 'success' : 'neutral'} 
+                          <Badge
+                            variant={cat.categoryStatus === '1' ? 'success' : 'neutral'}
                             className="text-[10px]"
                           >
                             {cat.categoryStatus === '1' ? 'ACTIVE' : 'INACTIVE'}
                           </Badge>
                         </td>
-                        <td className="py-4 text-slate-600 font-medium">-</td>
+                        <td className="py-4 text-slate-600 font-medium">{cat.billCount ?? '-'}</td>
                         <td className="py-4 text-right space-x-2">
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             className="h-8 px-2 py-0 text-jci-blue hover:bg-sky-50"
                             onClick={() => handleViewCategoryDetails(cat.categoryCode)}
                             isLoading={isLoadingDetails && selectedCategory?.categoryCode === cat.categoryCode}
                           >
                             Details
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             className="h-8 px-2 py-0 text-red-500 hover:bg-red-50"
                             onClick={() => handleDeleteCategory(cat.categoryCode)}
                           >
@@ -187,7 +204,9 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 italic">No categories found</td>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 italic">
+                        No categories found — check that the API key is configured and click ↺ to retry
+                      </td>
                     </tr>
                   )}
                 </tbody>
