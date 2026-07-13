@@ -861,24 +861,13 @@ export const JCIKLApp: React.FC = () => {
                   <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Workspace</p>
 
                   {canViewEventsManagement && (
-                    <>
-                      <SidebarItem
-                        icon={<FolderKanban size={18} />}
-                        label="Events Management"
-                        isActive={view === 'PROJECTS'}
-                        onClick={() => { handleViewChange('PROJECTS'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      {!isPlainMember && (
-                        <SidebarItem
-                          icon={<Briefcase size={18} />}
-                          label="Flagship Projects Mgt"
-                          isActive={view === 'FLAGSHIP_PROJECTS_MGT'}
-                          onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setIsSidebarOpen(false); }}
-                          isCollapsed={isSidebarCollapsed}
-                        />
-                      )}
-                    </>
+                    <SidebarItem
+                      icon={<FolderKanban size={18} />}
+                      label="Events Management"
+                      isActive={view === 'PROJECTS'}
+                      onClick={() => { handleViewChange('PROJECTS'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
                   )}
                   <SidebarItem
                     icon={<CheckSquare size={18} />}
@@ -887,15 +876,6 @@ export const JCIKLApp: React.FC = () => {
                     onClick={() => { handleViewChange('SURVEYS'); setIsSidebarOpen(false); }}
                     isCollapsed={isSidebarCollapsed}
                   />
-                  {canAccessEventsAndPayments && (
-                    <SidebarItem
-                      icon={<FileText size={18} />}
-                      label="Payment Requests"
-                      isActive={view === 'PAYMENT_REQUESTS'}
-                      onClick={() => { handleViewChange('PAYMENT_REQUESTS'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
                   {hasPermission('canViewFinance') && (
                     <>
                       <SidebarItem
@@ -915,23 +895,13 @@ export const JCIKLApp: React.FC = () => {
                     </>
                   )}
                   {(isBoard || isAdmin) && (
-                    <>
-                      <SidebarItem
-                        icon={<Megaphone size={18} />}
-                        label="Partnerships & Promotions"
-                        isActive={view === 'ADVERTISEMENTS'}
-                        onClick={() => { handleViewChange('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<Handshake size={18} />}
-                        label="Sponsorships"
-                        isActive={view === 'SPONSORSHIPS'}
-                        onClick={() => { handleViewChange('SPONSORSHIPS'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-
-                    </>
+                    <SidebarItem
+                      icon={<Handshake size={18} />}
+                      label="Sponsorships"
+                      isActive={view === 'SPONSORSHIPS'}
+                      onClick={() => { handleViewChange('SPONSORSHIPS'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
                   )}
                   {canAccessWorkspaceModules && (
                     <SidebarItem
@@ -942,6 +912,36 @@ export const JCIKLApp: React.FC = () => {
                       isCollapsed={isSidebarCollapsed}
                     />
                   )}
+                </div>
+              )}
+              {(isBoard || isAdmin || isDeveloper) && (
+                <div className="pt-4 mt-4 border-t border-slate-100">
+                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Portal</p>
+                  {canViewEventsManagement && !isPlainMember && (
+                    <SidebarItem
+                      icon={<Briefcase size={18} />}
+                      label="Flagship Projects Mgt"
+                      isActive={view === 'FLAGSHIP_PROJECTS_MGT'}
+                      onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
+                  )}
+                  {(isBoard || isAdmin) && (
+                    <SidebarItem
+                      icon={<Megaphone size={18} />}
+                      label="Partnerships & Promotions"
+                      isActive={view === 'ADVERTISEMENTS'}
+                      onClick={() => { handleViewChange('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
+                      isCollapsed={isSidebarCollapsed}
+                    />
+                  )}
+                  <SidebarItem
+                    icon={<BookOpen size={18} />}
+                    label="Publications"
+                    isActive={view === 'PUBLICATIONS'}
+                    onClick={() => { handleViewChange('PUBLICATIONS'); setIsSidebarOpen(false); }}
+                    isCollapsed={isSidebarCollapsed}
+                  />
                 </div>
               )}
               {member?.role !== UserRole.GUEST && (isBoard || isAdmin || isDeveloper) && (
@@ -989,13 +989,6 @@ export const JCIKLApp: React.FC = () => {
                         label="Config"
                         isActive={view === 'SYSTEM_CONFIG' || view === 'MEMBERSHIP_CONFIG' || view === 'ACCESS_CONFIG'}
                         onClick={() => { handleViewChange('SYSTEM_CONFIG'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<BookOpen size={18} />}
-                        label="Publications"
-                        isActive={view === 'PUBLICATIONS'}
-                        onClick={() => { handleViewChange('PUBLICATIONS'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
                     </>
