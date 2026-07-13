@@ -21,12 +21,17 @@ async function callToyyib(endpoint, extraParams = {}) {
   return response.json();
 }
 
-// Try to call ToyyibPay; return fallback on 404 (endpoint not supported in sandbox or doesn't exist)
+// Try to call ToyyibPay; return fallback when endpoint is unsupported (404/405) or returns non-JSON
 async function callToyyibOrEmpty(endpoint, extraParams = {}, fallback = []) {
   try {
     return await callToyyib(endpoint, extraParams);
   } catch (err) {
-    if (err.message.includes('HTTP 404') || err.message.includes('HTTP 405')) {
+    const isUnsupported =
+      err.message.includes('HTTP 404') ||
+      err.message.includes('HTTP 405') ||
+      err instanceof SyntaxError ||
+      err.name === 'SyntaxError';
+    if (isUnsupported) {
       console.warn(`[toyyibpay-api] ${endpoint} not available (${err.message}), returning fallback`);
       return fallback;
     }
