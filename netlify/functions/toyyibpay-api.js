@@ -2,8 +2,6 @@
  * ToyyibPay API Proxy
  * Forwards requests to ToyyibPay API server-side to bypass browser CORS restrictions.
  * Supported actions: getCategories, getCategoryDetails, createCategory, createBill, getBills, getSettlements
- *
- * Mapped URL: /api/toyyibpay  (via netlify.toml redirect)
  */
 
 const SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY || 'tl5be74e-pazq-kti6-xci2-bh6npgb4gcjv';
@@ -21,6 +19,19 @@ async function callToyyib(endpoint, extraParams = {}) {
   });
   if (!response.ok) throw new Error(`ToyyibPay ${endpoint} HTTP ${response.status}`);
   return response.json();
+}
+
+// Try to call ToyyibPay; return fallback on 404 (endpoint not supported in sandbox or doesn't exist)
+async function callToyyibOrEmpty(endpoint, extraParams = {}, fallback = []) {
+  try {
+    return await callToyyib(endpoint, extraParams);
+  } catch (err) {
+    if (err.message.includes('HTTP 404') || err.message.includes('HTTP 405')) {
+      console.warn(`[toyyibpay-api] ${endpoint} not available (${err.message}), returning fallback`);
+      return fallback;
+    }
+    throw err;
+  }
 }
 
 exports.handler = async (event) => {
@@ -64,10 +75,14 @@ exports.handler = async (event) => {
         result = await callToyyib('createBill', params);
         break;
       case 'getBills':
-        result = await callToyyib('getAllBill');
+        // Try getBillTransactions first (sandbox), fall back to getAllBill (production)
+        result = await callToyyibOrEmpty('getBillTransactions', {}, []);
+        if (!Array.isArray(result) || result.length === 0) {
+          result = await callToyyibOrEmpty('getAllBill', {}, []);
+        }
         break;
       case 'getSettlements':
-        result = await callToyyib('getUserSettlement');
+        result = await callToyyibOrEmpty('getUserSettlement', {}, []);
         break;
       default:
         return { statusCode: 400, headers: cors, body: `Unknown action: ${action}` };
