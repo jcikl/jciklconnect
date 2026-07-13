@@ -80,14 +80,21 @@ exports.handler = async (event) => {
         result = await callToyyib('createBill', params);
         break;
       case 'getBills':
-        // Try getBillTransactions first (sandbox), fall back to getAllBill (production)
-        result = await callToyyibOrEmpty('getBillTransactions', {}, []);
-        if (!Array.isArray(result) || result.length === 0) {
-          result = await callToyyibOrEmpty('getAllBill', {}, []);
-        }
+        // ToyyibPay has no "list all bills" endpoint — getBillTransactions requires a specific billCode.
+        // Return empty array; bills are tracked in our own Firestore instead.
+        result = [];
         break;
       case 'getSettlements':
-        result = await callToyyibOrEmpty('getUserSettlement', {}, []);
+        // Get Settlement Summary is Enterprise Partner only — not available for regular accounts.
+        result = [];
+        break;
+      case 'getBillTransactions':
+        // Check transactions for a specific bill
+        if (!params.billCode) return { statusCode: 400, headers: cors, body: 'billCode required' };
+        result = await callToyyib('getBillTransactions', {
+          billCode: params.billCode,
+          ...(params.billpaymentStatus ? { billpaymentStatus: params.billpaymentStatus } : {}),
+        });
         break;
       default:
         return { statusCode: 400, headers: cors, body: `Unknown action: ${action}` };
