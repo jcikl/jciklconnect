@@ -68,10 +68,14 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     }
   };
 
-  const handleDeleteCategory = (categoryCode: string) => {
-    // Note: Official API doesn't list a delete endpoint in standard docs,
-    // so we'll simulate or show an alert. If it exists, it would be called here.
-    showToast('Delete category is not directly supported by this ToyyibPay API version. Please manage via dashboard.', 'warning');
+  const handleDeleteCategory = async (categoryCode: string) => {
+    try {
+      await ToyyibService.deleteCategory(categoryCode);
+      showToast('Category removed from system (ToyyibPay account unchanged)', 'success');
+      loadData();
+    } catch (error) {
+      showToast('Failed to remove category', 'error');
+    }
   };
 
   const loadData = useCallback(async () => {

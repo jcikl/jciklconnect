@@ -1,4 +1,6 @@
-import { TOYYIB_CONFIG } from '../config/constants';
+import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 
 export interface CreateBillParams {
   billName: string;
@@ -14,6 +16,13 @@ export interface CreateBillParams {
 export interface ToyyibBillResponse {
   billCode: string;
   paymentUrl: string;
+}
+
+export interface ToyyibCategory {
+  categoryCode: string;
+  categoryName: string;
+  categoryDescription: string;
+  createdAt?: any;
 }
 
 // All ToyyibPay API calls go through our Netlify Function proxy to avoid CORS.
@@ -73,56 +82,68 @@ export class ToyyibService {
   }
 
   // ToyyibPay has no "list all categories" endpoint — getCategoryDetails requires a specific code.
-  // We maintain a localStorage cache of known category codes and fetch details for each.
-  private static readonly CATEGORIES_CACHE_KEY = 'toyyib_category_codes';
+  // Category codes are stored in Firestore (toyyibCategories collection), seeded with CATEGORY_CODE.
 
-  private static getCachedCategoryCodes(): string[] {
-    try {
-      const stored = localStorage.getItem(ToyyibService.CATEGORIES_CACHE_KEY);
-      const codes: string[] = stored ? JSON.parse(stored) : [];
-      // Always include the configured default category code
-      if (TOYYIB_CONFIG.CATEGORY_CODE && !codes.includes(TOYYIB_CONFIG.CATEGORY_CODE)) {
-        codes.unshift(TOYYIB_CONFIG.CATEGORY_CODE);
-      }
-      return codes;
-    } catch {
-      return TOYYIB_CONFIG.CATEGORY_CODE ? [TOYYIB_CONFIG.CATEGORY_CODE] : [];
+  static async getCategories(): Promise<ToyyibCategory[]> {
+    // Load known category codes from Firestore
+    const snap = await getDocs(collection(db, COLLECTIONS.TOYYIB_CATEGORIES));
+    let codes: string[] = snap.docs.map(d => d.id);
+
+    // Always include the configured default category code
+    if (TOYYIB_CONFIG.CATEGORY_CODE && !codes.includes(TOYYIB_CONFIG.CATEGORY_CODE)) {
+      codes = [TOYYIB_CONFIG.CATEGORY_CODE, ...codes];
+      // Persist it so future calls don't need to re-seed
+      await ToyyibService.saveCategoryToFirestore({
+        categoryCode: TOYYIB_CONFIG.CATEGORY_CODE,
+        categoryName: 'Default',
+        categoryDescription: '',
+      });
     }
-  }
 
-  private static saveCategoryCode(code: string): void {
-    try {
-      const codes = ToyyibService.getCachedCategoryCodes();
-      if (!codes.includes(code)) {
-        codes.push(code);
-        localStorage.setItem(ToyyibService.CATEGORIES_CACHE_KEY, JSON.stringify(codes));
-      }
-    } catch {}
-  }
-
-  static async getCategories(): Promise<any[]> {
-    const codes = ToyyibService.getCachedCategoryCodes();
     if (codes.length === 0) return [];
+
+    // Fetch live details from ToyyibPay for each code
     const results = await Promise.allSettled(
-      codes.map(code => ToyyibService.getCategoryDetails(code))
+      codes.map(async code => {
+        const details = await proxyCall('getCategoryDetails', { categoryCode: code });
+        if (Array.isArray(details) && details.length > 0) return details[0] as ToyyibCategory;
+        return null;
+      })
     );
+
     return results
-      .filter((r): r is PromiseFulfilledResult<any[]> => r.status === 'fulfilled')
-      .flatMap(r => r.value)
-      .filter(Boolean);
+      .filter((r): r is PromiseFulfilledResult<ToyyibCategory> => r.status === 'fulfilled' && r.value !== null)
+      .map(r => r.value);
+  }
+
+  private static async saveCategoryToFirestore(cat: Omit<ToyyibCategory, 'createdAt'>): Promise<void> {
+    await setDoc(
+      doc(db, COLLECTIONS.TOYYIB_CATEGORIES, cat.categoryCode),
+      { categoryName: cat.categoryName, categoryDescription: cat.categoryDescription, createdAt: serverTimestamp() },
+      { merge: true }
+    );
   }
 
   static async createCategory(catname: string, catdescription: string): Promise<any[]> {
     const result = await proxyCall('createCategory', { catname, catdescription });
-    // Save the new category code to local cache so getCategories can find it
+    // Save the new category code to Firestore so getCategories can find it
     if (Array.isArray(result) && result[0]?.CategoryCode) {
-      ToyyibService.saveCategoryCode(result[0].CategoryCode);
+      await ToyyibService.saveCategoryToFirestore({
+        categoryCode: result[0].CategoryCode,
+        categoryName: catname,
+        categoryDescription: catdescription,
+      });
     }
     return result;
   }
 
+  static async deleteCategory(categoryCode: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode));
+  }
+
   static async getCategoryDetails(categoryCode: string): Promise<any[]> {
-    return proxyCall('getCategoryDetails', { categoryCode });
+    const data = await proxyCall('getCategoryDetails', { categoryCode });
+    return Array.isArray(data) ? data : [];
   }
 
   static async getBills(): Promise<any[]> {
