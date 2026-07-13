@@ -816,6 +816,12 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
 
+    // ToyyibPay Categories: Board/Admin can manage; all authenticated members can read
+    match /toyyibCategories/{categoryCode} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
