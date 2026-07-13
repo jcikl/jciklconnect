@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:netlify": "netlify dev",
     "dev:a11y": "cross-env VITE_A11Y_SCAN=true vite",
     "build": "vite build",
     "preview": "vite preview",
