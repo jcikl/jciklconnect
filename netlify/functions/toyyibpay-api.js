@@ -67,6 +67,7 @@ exports.handler = async (event) => {
     switch (action) {
       case 'getCategories':
         result = await callToyyib('getCategoryDetails');
+        console.log('[toyyibpay-api] getCategories raw result:', JSON.stringify(result));
         break;
       case 'getCategoryDetails':
         if (!params.categoryCode) return { statusCode: 400, headers: cors, body: 'categoryCode required' };
