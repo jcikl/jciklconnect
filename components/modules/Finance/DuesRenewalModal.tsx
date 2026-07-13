@@ -106,7 +106,7 @@ export const DuesRenewalModal: React.FC<DuesRenewalModalProps> = ({
           <div className="pt-2 border-t border-slate-200 mt-2">
             <p className="text-xs text-slate-500">
               <strong>Note:</strong> Pro-rata payments will be automatically calculated for members who joined mid-year ({year}).
-              The system calculates: (Full Amount / 12) &times; Remaining Months.
+              The system calculates: (Full Amount / 12) × Remaining Months.
             </p>
           </div>
         </div>

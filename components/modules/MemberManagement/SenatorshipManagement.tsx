@@ -167,7 +167,7 @@ export const SenatorshipManagement: React.FC<Props> = ({
           <div className="text-sm text-slate-600">
             <p className="font-medium text-slate-900 mb-1">Senatorship validation</p>
             <p>
-              Members enter their senatorship number under Membership &amp; Status. Board of Directors
+              Members enter their senatorship number under Membership & Status. Board of Directors
               validates here; once validated, the number cannot be changed in member profiles.
             </p>
           </div>

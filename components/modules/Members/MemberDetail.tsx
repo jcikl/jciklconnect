@@ -44,7 +44,7 @@ import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
-  const { resetPassword, member: currentAuthMember } = useAuth();
+  const { resetPassword, member: currentAuthMember, simulatedRole } = useAuth();
   // Points columns in the Activities Log are visible to the President only
   const isPresident = (currentAuthMember?.jciCareer?.currentBoardPosition || currentAuthMember?.currentBoardPosition) === 'President';
   // Always derive the latest member data from the live members array so the UI
@@ -210,6 +210,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       senatorshipBoardValidated: !!member.senatorshipBoardValidated,
       senatorshipValidatedBy: (member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) || '',
       senatorshipValidatedAt: (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) || '',
+      role: member.role || '',
+      membershipType: member.membershipType || '',
     });
     setActiveInlineEditCard(card);
     setIsEditMode(true);
@@ -292,6 +294,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         'jciCareer.senatorshipValidatedBy': inlineValues.senatorshipValidatedBy?.trim(),
         senatorshipValidatedAt: inlineValues.senatorshipValidatedAt?.trim(),
         'jciCareer.senatorshipValidatedAt': inlineValues.senatorshipValidatedAt?.trim(),
+        ...(inlineValues.role ? { role: inlineValues.role } : {}),
+        ...(inlineValues.membershipType ? { membershipType: inlineValues.membershipType } : {}),
       });
       const finalAvatar = inlineValues.avatar;
       const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
@@ -618,7 +622,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     }
   };
 
-  // Whether this member's email already has a Firebase Auth account (Google/password) â€”
+  // Whether this member's email already has a Firebase Auth account (Google/password) —
   // if so, the CTA becomes "Reset Password" instead of "Send Invite"
   const [authEmailExists, setAuthEmailExists] = useState<boolean | null>(null);
   useEffect(() => {
@@ -633,7 +637,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     })
       .then(res => (res.ok ? res.json() : null))
       .then(data => { if (!cancelled && data) setAuthEmailExists(!!data.exists); })
-      .catch(() => { /* keep null â€” fall back to Send Invite */ });
+      .catch(() => { /* keep null — fall back to Send Invite */ });
     return () => { cancelled = true; };
   }, [member.id]);
 
@@ -786,7 +790,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
                 <p className="text-white/70 text-xs mt-0.5 truncate">
                   <Briefcase size={10} className="inline mr-1 opacity-70" />
-                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' Â· ')}
+                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
               <div className="flex flex-col gap-0.5 mt-1 text-white/60 text-[10px]">
@@ -805,7 +809,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               <span className="text-jci-blue">{member.role}</span>
               {member.introducer && (
                 <>
-                  <span className="text-slate-300 mx-0.5">Â·</span>
+                  <span className="text-slate-300 mx-0.5">·</span>
                   <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
                 </>
               )}
@@ -861,7 +865,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                     <Button variant="outline" size="sm" className="h-9 px-3 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
                   )
                 )}
-                {isDeveloper && !isSelfView && (
+                {(isDeveloper || (isAdmin && simulatedRole === null)) && !isSelfView && (
                   <Button variant="outline" size="sm" className="h-9 px-3 text-red-500 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
                 )}
               </>
@@ -884,7 +888,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                 <X size={17} />
               </button>
             )}
-            {/* Name, Tier Badge, position, company â€” pl-52 clears avatar */}
+            {/* Name, Tier Badge, position, company — pl-52 clears avatar */}
             <div className="absolute bottom-4 left-0 right-0 px-6 pl-52 flex flex-col justify-end gap-1">
               <div className="flex flex-row items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.name}</h1>
@@ -892,13 +896,13 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
                 <p className="text-sm font-semibold text-white/70 flex items-center gap-1.5">
                   <Briefcase size={13} className="text-white/50 shrink-0" />
-                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' Â· ')}
+                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
             </div>
           </div>
 
-          {/* åŒºå—äºŒ: avatar â€” absolute, straddles banner/strip boundary (top-24 = 10rem - 4rem) */}
+          {/* åŒºå—äºŒ: avatar — absolute, straddles banner/strip boundary (top-24 = 10rem - 4rem) */}
           <div className="absolute left-6 top-24 z-20">
             <div className="relative">
               <div className="p-1 bg-white rounded-full shadow-xl">
@@ -912,7 +916,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             </div>
           </div>
 
-          {/* åŒºå—ä¸‰: contact + actions strip â€” directly below banner, pl-52 clears avatar */}
+          {/* åŒºå—ä¸‰: contact + actions strip — directly below banner, pl-52 clears avatar */}
           <div className="px-6 pl-52 py-3 border-b border-slate-100 flex items-center gap-4">
             {/* å·¦ï¼šchips */}
             <div className="flex-1 flex flex-col gap-1.5">
@@ -928,7 +932,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                   <span className="text-jci-blue">{member.role}</span>
                   {member.introducer && (
                     <>
-                      <span className="text-slate-300 mx-0.5">Â·</span>
+                      <span className="text-slate-300 mx-0.5">·</span>
                       <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
                     </>
                   )}
@@ -987,7 +991,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                       <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
                     )
                   )}
-                  {isDeveloper && !isSelfView && (
+                  {(isDeveloper || (isAdmin && simulatedRole === null)) && !isSelfView && (
                     <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
                   )}
                 </>
@@ -1046,7 +1050,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       </section>
 
       {/* NEW: Wolf-like Persona & Ambition Visualizer (Phase 1) */}
-      {canEditMembers && <div className="grid md:grid-cols-2 gap-6">
+      {canEditMembers && <div className="grid grid-cols-2 gap-3 md:gap-6">
         <Card className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white border-none shadow-xl overflow-hidden relative">
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Target size={120} />
@@ -1186,6 +1190,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             handleFindMentors={handleFindMentors}
             loadingMatches={loadingMatches}
             setShowPaymentHistoryModal={setShowPaymentHistoryModal}
+            canEditRoleType={isDeveloper || (isAdmin && simulatedRole === null)}
           />
         </AsyncErrorBoundary>
       )}
@@ -1349,7 +1354,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         <Modal
           isOpen={showPaymentHistoryModal}
           onClose={() => setShowPaymentHistoryModal(false)}
-          title={`Membership Dues History â€” ${member.name}`}
+          title={`Membership Dues History — ${member.name}`}
           size="md"
           bottomSheet
         >
@@ -1418,7 +1423,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                             Target: RM {record.dues || 0}
                           </p>
                           {record.dues > 0 && record.amount >= record.dues && (
-                            <p className="text-[10px] text-green-600 font-bold">âœ“ Fulfilled</p>
+                            <p className="text-[10px] text-green-600 font-bold">{'✓'} Fulfilled</p>
                           )}
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+﻿﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers, Image, MoreVertical, Info, Tag, ExternalLink } from 'lucide-react';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, Drawer } from '../ui/Common';
@@ -447,13 +447,13 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <div>
+      {selectedProject && (
+        <button onClick={() => setSelectedProjectId(null)} className="text-xs text-slate-400 hover:text-jci-blue font-semibold transition-colors">← Events Management</button>
+      )}
+      <div className="flex flex-row justify-between items-center gap-2">
+        <div className="min-w-0 flex-1">
           {selectedProject ? (
-            <div className="min-w-0">
-              <button onClick={() => setSelectedProjectId(null)} className="text-xs text-slate-400 hover:text-jci-blue font-semibold transition-colors">← Events Management</button>
-              <h2 className="text-lg md:text-2xl font-bold text-slate-900 truncate leading-tight mt-0.5">{selectedProject.name ?? selectedProject.title ?? 'Project'}</h2>
-            </div>
+            <h2 className="text-lg md:text-2xl font-bold text-slate-900 truncate leading-tight">{selectedProject.name ?? selectedProject.title ?? 'Project'}</h2>
           ) : (
             <>
               <h2 className="text-2xl font-bold text-slate-900">Events Management</h2>
@@ -461,7 +461,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             </>
           )}
         </div>
-        <div className="flex gap-2 shrink-0 self-end sm:self-auto">
+        <div className="flex gap-2 shrink-0">
           {!selectedProject && (
             <>
               <div className="hidden md:flex gap-2"></div>
@@ -495,11 +495,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                     <Badge variant="success" className="h-10 px-4"><Globe size={14} className="mr-1" />Published</Badge>
                     <Button variant="danger" onClick={() => handleStatusUpdate('Approved')} disabled={isStatusUpdating}><Lock size={16} className="mr-2" />Unpublish</Button>
                   </>
-                )}
-                {(selectedProject.status === 'Approved' || selectedProject.status === 'Active') && (
-                  <Button variant="outline" onClick={handleClaimReimbursement} className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
-                    <DollarSign size={16} className="mr-2" />Claim Reimbursement
-                  </Button>
                 )}
               </div>
 
@@ -540,11 +535,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                     {selectedProject.status === 'Active' && (
                       <button onClick={() => handleStatusUpdate('Approved')} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                         <Lock size={14} />Unpublish
-                      </button>
-                    )}
-                    {(selectedProject.status === 'Approved' || selectedProject.status === 'Active') && (
-                      <button onClick={handleClaimReimbursement} className="w-full text-left px-4 py-2.5 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2">
-                        <DollarSign size={14} />Claim Reimbursement
                       </button>
                     )}
                   </div>
@@ -922,7 +912,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                       'bg-slate-100 text-slate-400'
                     }`}>
                     <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-white/30">
-                      {s < createProjectStep ? 'âœ"' : s}
+                      {s < createProjectStep ? '✓' : s}
                     </span>
                     <span className="hidden sm:inline">{label}</span>
                     <span className="sm:hidden">{s === 1 ? 'Media' : 'Details'}</span>
@@ -1065,8 +1055,8 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             <Input name="defaultBudget" label="Default Budget (RM)" type="number" step="0.01" defaultValue={selectedTemplate?.defaultBudget?.toString()} />
             <Input name="estimatedDuration" label="Estimated Duration (hours)" type="number" step="0.5" defaultValue={selectedTemplate?.estimatedDuration?.toString()} />
           </div>
-          <Textarea name="checklist" label="Checklist (one item per line)" placeholder="Venue booking&#10;Catering&#10;Registration setup" defaultValue={selectedTemplate?.checklist?.join('\n')} rows={4} helperText="Enter each checklist item on a new line" />
-          <Textarea name="resources" label="Required Resources (one item per line)" placeholder="Projector&#10;Sound system&#10;Tables" defaultValue={selectedTemplate?.requiredResources?.join('\n')} rows={3} helperText="Enter each resource on a new line" />
+          <Textarea name="checklist" label="Checklist (one item per line)" placeholder={`Venue booking\nCatering\nRegistration setup`} defaultValue={selectedTemplate?.checklist?.join('\n')} rows={4} helperText="Enter each checklist item on a new line" />
+          <Textarea name="resources" label="Required Resources (one item per line)" placeholder={`Projector\nSound system\nTables`} defaultValue={selectedTemplate?.requiredResources?.join('\n')} rows={3} helperText="Enter each resource on a new line" />
         </form>
       </Modal>
 

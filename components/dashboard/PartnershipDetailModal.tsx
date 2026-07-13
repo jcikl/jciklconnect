@@ -196,7 +196,7 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
             )}
             {ad.termsAndConditions && (
               <div className="border-t border-slate-100 pt-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Terms &amp; Conditions</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Terms & Conditions</p>
                 <p className="text-slate-500 text-xs leading-relaxed whitespace-pre-wrap">{ad.termsAndConditions}</p>
               </div>
             )}

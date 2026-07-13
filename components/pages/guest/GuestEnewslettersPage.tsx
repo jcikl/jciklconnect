@@ -305,7 +305,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
           title={
             <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
               <span className="bg-sky-100 text-jci-blue text-xs font-bold px-2.5 py-1 rounded-md uppercase self-start md:self-auto">
-                {selectedNewsletter.year} &middot; {selectedNewsletter.issue}
+                {selectedNewsletter.year} · {selectedNewsletter.issue}
               </span>
               <h2 className="text-lg font-bold text-slate-800 line-clamp-1">{selectedNewsletter.title}</h2>
             </div>
@@ -387,7 +387,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                           <BookOpen size={28} className="text-white/80" />
                         </div>
                         <h2 className="text-base font-black leading-snug mb-1">{selectedNewsletter.title}</h2>
-                        <p className="text-xs text-sky-200/80 font-semibold">{selectedNewsletter.issue} &middot; {selectedNewsletter.year}</p>
+                        <p className="text-xs text-sky-200/80 font-semibold">{selectedNewsletter.issue} · {selectedNewsletter.year}</p>
                       </div>
                       <div className="p-5 text-center">
                         <p className="text-xs text-slate-500 leading-relaxed">PDF preview is not available for this issue. Use the buttons above to open or download.</p>
@@ -439,7 +439,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                         <FileText size={14} className={`flex-shrink-0 mt-0.5 ${isCurrent ? 'text-jci-blue' : 'text-slate-400'}`} />
                         <div className="min-w-0 flex-1">
                           <p className={`text-xs font-black truncate leading-tight ${isCurrent ? 'text-jci-blue' : 'text-slate-700'}`}>{item.title}</p>
-                          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{item.year} &middot; {item.issue}</p>
+                          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{item.year} · {item.issue}</p>
                         </div>
                       </div>
                     );

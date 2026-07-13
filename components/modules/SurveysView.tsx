@@ -235,7 +235,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                                     <p className="font-semibold text-slate-900 mt-1 group-hover:text-jci-blue transition-colors">{survey.title}</p>
                                                     {survey.description && <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{survey.description}</p>}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-slate-600">{survey.targetAudience || 'â€”'}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-600">{survey.targetAudience || '—'}</td>
                                                 <td className="px-4 py-3">
                                                     <span className="font-semibold text-slate-900">{survey.responsesCount || 0}</span>
                                                 </td>
@@ -444,7 +444,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                     <div className="text-jci-blue shrink-0">{getQuestionIcon(question.type)}</div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-slate-900 truncate">{question.question || 'Untitled Question'}</p>
-                                        <p className="text-xs text-slate-400">{getQuestionLabel(question.type)}{question.required && ' Â· Required'}</p>
+                                        <p className="text-xs text-slate-400">{getQuestionLabel(question.type)}{question.required && ' · Required'}</p>
                                     </div>
                                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                         <button type="button" onClick={() => handleEditQuestion(question)}

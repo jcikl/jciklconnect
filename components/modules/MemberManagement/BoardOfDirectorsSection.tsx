@@ -490,7 +490,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       </div>
                       {logoUploading && (
                         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-4">
-                          <p className="text-xs text-white font-bold">Uploadingâ€¦</p>
+                          <p className="text-xs text-white font-bold">Uploading…</p>
                           <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden"><div className="h-full bg-white transition-all rounded-full" style={{ width: `${logoUploadProgress}%` }} /></div>
                         </div>
                       )}
@@ -513,7 +513,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                       </label>
                     )}
                   </div>
-                  {/* Group Photos â€” side by side cards */}
+                  {/* Group Photos — side by side cards */}
                   {([
                     {
                       key: 'groupPhotoUrl' as const,
@@ -591,7 +591,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                         {/* Upload progress overlay */}
                         {item.uploading && (
                           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-6">
-                            <p className="text-xs text-white font-bold">Uploadingâ€¦</p>
+                            <p className="text-xs text-white font-bold">Uploading…</p>
                             <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden">
                               <div className="h-full bg-white transition-all rounded-full" style={{ width: `${item.progress}%` }} />
                             </div>

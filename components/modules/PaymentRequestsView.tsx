@@ -1,6 +1,6 @@
 ﻿// Payment Requests “ submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User } from 'lucide-react';
+import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User, Trash2 } from 'lucide-react';
 import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
 import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentRequestModal';
 import { Input, Select } from '../ui/Form';
@@ -26,6 +26,7 @@ const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
+  paid: 'Paid',
 };
 
 const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label }) => {
@@ -97,7 +98,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const { showToast } = useToast();
   const helpModal = useHelpModal();
   const { user, member } = useAuth();
-  const { hasPermission, isActivityFinance } = usePermissions();
+  const { hasPermission, isActivityFinance, isDeveloper, isAdmin } = usePermissions();
   const [myList, setMyList] = useState<PaymentRequest[]>([]);
   const [financeList, setFinanceList] = useState<PaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -259,6 +260,35 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       await loadMyList();
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Operation failed', 'error');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleRetryExpenseTx = async (id: string) => {
+    if (!user?.uid) return;
+    setActioningId(id);
+    try {
+      await PaymentRequestService.retryCreateExpenseTransaction(id, user.uid);
+      showToast('Expense transaction created successfully', 'success');
+      await loadFinanceList();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Retry failed', 'error');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDeletePR = async (id: string) => {
+    if (!confirm('Permanently delete this payment request? This cannot be undone.')) return;
+    setActioningId(id);
+    try {
+      await PaymentRequestService.deletePR(id);
+      showToast('Payment request deleted', 'success');
+      await loadFinanceList();
+      await loadMyList();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Delete failed', 'error');
     } finally {
       setActioningId(null);
     }
@@ -753,7 +783,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                         {filteredMyList.map((pr) => (
                           <React.Fragment key={pr.id}>
                             <tr
-                              className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
+                              className={`group hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
                               onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
                             >
                               <td className="py-3 px-2 w-px whitespace-nowrap">
@@ -780,6 +810,11 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                     {pr.status === 'submitted' && (
                                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleCancel(pr.id); }} disabled={actioningId !== null} className="text-red-500 hover:bg-red-50" title="Cancel">
                                         <X size={13} />
+                                      </Button>
+                                    )}
+                                    {(isDeveloper || isAdmin) && (
+                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeletePR(pr.id); }} disabled={actioningId !== null} className="text-red-600 hover:bg-red-50 border border-red-200" title="Delete (Dev)">
+                                        <Trash2 size={13} />
                                       </Button>
                                     )}
                                   </div>
@@ -927,7 +962,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                         {filteredFinanceList.map((pr) => (
                           <React.Fragment key={pr.id}>
                             <tr
-                              className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
+                              className={`group hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
                               onClick={() => setExpandedId(expandedId === pr.id ? null : pr.id)}
                             >
                               <td className="py-3 px-2 w-px whitespace-nowrap">
@@ -960,6 +995,16 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                           <XCircle size={13} />
                                         </Button>
                                       </>
+                                    )}
+                                    {pr.status === 'approved' && pr.expenseTxFailed && (
+                                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleRetryExpenseTx(pr.id); }} disabled={actioningId !== null} title="Retry creating expense transaction" className="text-orange-600 border-orange-300 hover:bg-orange-50 text-[10px]">
+                                        <RefreshCw size={11} className="mr-1" />Retry Tx
+                                      </Button>
+                                    )}
+                                    {(isDeveloper || isAdmin) && (
+                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeletePR(pr.id); }} disabled={actioningId !== null} className="text-red-600 hover:bg-red-50 border border-red-200" title="Delete (Dev)">
+                                        <Trash2 size={13} />
+                                      </Button>
                                     )}
                                   </div>
                                 </div>

@@ -166,7 +166,7 @@ const ProjectGridBase: React.FC<ProjectGridProps> = ({
                       <span className="text-xs text-slate-300">"</span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                        âš  {formatCurrency(Math.abs(diff))} diff
+                        ⚠ {formatCurrency(Math.abs(diff))} diff
                       </span>
                     )}
                   </td>
@@ -242,7 +242,7 @@ const ProjectGridBase: React.FC<ProjectGridProps> = ({
                   </span>
                 ) : (ptNet === 0 && bankNet === 0) ? null : (
                   <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0">
-                    âš  {formatCurrency(Math.abs(diff))}
+                    ⚠ {formatCurrency(Math.abs(diff))}
                   </span>
                 )}
               </div>

@@ -102,11 +102,12 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
     }
   };
 
-  // Auto-sync when a valid JCI Roadmap URL is pasted
+  // Auto-sync when a valid JCI Roadmap URL is pasted (only if different from saved value)
   useEffect(() => {
     const isJciRoadmapUrl = /jcimalaysia\.cc\/roadmap\/.*[?&]eventid=\d+/.test(editRoadmapUrl)
       || /^\d{4,6}$/.test(editRoadmapUrl.trim());
-    if (isJciRoadmapUrl && !isFetchingPoster) {
+    // Skip if the URL hasn't changed from what's already saved — avoids firing on mount/StrictMode double-run
+    if (isJciRoadmapUrl && !isFetchingPoster && editRoadmapUrl !== (project.roadmapUrl || '')) {
       handleFetchPosterForEdit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

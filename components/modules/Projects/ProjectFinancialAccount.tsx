@@ -8,11 +8,12 @@ import { LoadingState } from '../../ui/Loading';
 import { useMembers } from '../../../hooks/useMembers';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate, toDate } from '../../../utils/dateUtils';
-import { Project, BankAccount, Transaction } from '../../../types';
+import { Project, BankAccount, Transaction, TransactionSplit, PaymentRequest } from '../../../types';
 import { ProjectAccount } from '../../../services/projectAccountsService';
 import { FinanceService } from '../../../services/financeService';
 import { ReconciliationService } from '../../../services/reconciliationService';
 import { SubmitPaymentRequestModal } from '../PaymentRequests/SubmitPaymentRequestModal';
+import { PaymentRequestService } from '../../../services/paymentRequestService';
 
 // Project Financial Account Component
 interface ProjectFinancialAccountProps {
@@ -75,8 +76,12 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
     }).filter(Boolean);
     return new Set(selectedTxTypes).size > 1;
   }, [selectedBankTxIds, bankTransactions]);
+  const [bankTxSplits, setBankTxSplits] = useState<Record<string, TransactionSplit[]>>({});
+  const [expandedSplitParents, setExpandedSplitParents] = useState<Set<string>>(new Set());
   const [tempSelectedProjectTxIds, setTempSelectedProjectTxIds] = useState<Record<string, string[]>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [projectPRs, setProjectPRs] = useState<PaymentRequest[]>([]);
+  const [loadingPRs, setLoadingPRs] = useState(false);
   const [isAddingIncome, setIsAddingIncome] = useState(false);
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
@@ -94,6 +99,16 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
       loadBankAccounts();
     }
   }, [account]);
+
+  useEffect(() => {
+    if (activeFinancialTab === 'paymentRequests' && projectPRs.length === 0 && !loadingPRs) {
+      setLoadingPRs(true);
+      PaymentRequestService.list({ activityRef: projectId })
+        .then(result => setProjectPRs(result.items))
+        .catch(err => console.error('Failed to load project PRs', err))
+        .finally(() => setLoadingPRs(false));
+    }
+  }, [activeFinancialTab, projectId]);
 
   const loadBankAccounts = async () => {
     try {
@@ -116,6 +131,14 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
       // Fetch official bank transactions (transactions collection tagged with projectId)
       const bankTx = await FinanceService.getBankTransactionsByProject(account.projectId);
       setBankTransactions(bankTx);
+      // Load splits for any split-parent bank txs (情景 PP)
+      const splitParents = bankTx.filter(t => (t as any).isSplit && !((t as any).isSplitChild));
+      if (splitParents.length > 0) {
+        const splitsEntries = await Promise.all(
+          splitParents.map(async t => [t.id, await FinanceService.getTransactionSplits(t.id)] as [string, TransactionSplit[]])
+        );
+        setBankTxSplits(Object.fromEntries(splitsEntries));
+      }
     } catch (err) {
       console.error('Failed to load transactions', err);
     } finally {
@@ -601,7 +624,8 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
           tabs={[
             { id: 'budget', label: 'Budget' },
             { id: 'projectTrx', label: 'Transactions' },
-            { id: 'bankTrx', label: 'Bank Trx' }
+            { id: 'bankTrx', label: 'Bank Trx' },
+            { id: 'paymentRequests', label: 'Claims' },
           ]}
           activeTab={activeFinancialTab}
           onTabChange={setActiveFinancialTab}
@@ -743,12 +767,6 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
                     </p>
                   )}
 
-                  {/* Actions */}
-                  <div className="pt-1">
-                    <Button variant="success" size="sm" className="w-full" onClick={handleClaimReimbursement}>
-                      <DollarSign size={13} className="mr-1.5" />Claim Reimbursement
-                    </Button>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1219,8 +1237,12 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
                                     const tempSelected = tempSelectedProjectTxIds[tx.id];
                                     const hasChanged = tempSelected !== undefined && JSON.stringify(tempSelected.slice().sort()) !== JSON.stringify(linkedIds.slice().sort());
                                     const selectedValue = tempSelected !== undefined ? tempSelected : linkedIds;
+                                    const txSplits = bankTxSplits[tx.id] || [];
+                                    const hasSplits = (tx as any).isSplit && txSplits.length > 0;
+                                    const isExpanded = expandedSplitParents.has(tx.id);
                                     return (
-                                      <tr key={tx.id} className="hover:bg-slate-50/70 group transition-colors">
+                                      <React.Fragment key={tx.id}>
+                                      <tr className="hover:bg-slate-50/70 group transition-colors">
                                         <td className="py-1.5 px-3">
                                           <Checkbox checked={selectedBankTxIds.includes(tx.id)} onChange={(e) => {
                                             if (e.target.checked) setSelectedBankTxIds([...selectedBankTxIds, tx.id]);
@@ -1228,25 +1250,58 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
                                           }} />
                                         </td>
                                         <td className="py-1.5 px-2 text-slate-400 text-xs font-mono whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
-                                        <td className="py-1.5 px-2 text-slate-800 text-sm">{tx.description}</td>
+                                        <td className="py-1.5 px-2 text-slate-800 text-sm">
+                                          <div className="flex items-center gap-1.5">
+                                            {hasSplits && (
+                                              <button type="button" onClick={() => setExpandedSplitParents(prev => { const s = new Set(prev); s.has(tx.id) ? s.delete(tx.id) : s.add(tx.id); return s; })}
+                                                className="text-jci-blue hover:bg-blue-50 rounded p-0.5 shrink-0" title="Show splits">
+                                                <Layout size={12} />
+                                              </button>
+                                            )}
+                                            <span>{tx.description}</span>
+                                            {hasSplits && <span className="text-[10px] text-slate-400 font-mono shrink-0">{txSplits.length} splits</span>}
+                                          </div>
+                                        </td>
                                         <td className="py-1.5 px-2 text-slate-400 text-xs font-mono">{tx.referenceNumber || '—'}</td>
                                         <td className="py-1.5 px-2">
-                                          <div className="flex items-center gap-1.5">
-                                            <div className="flex-1 min-w-0">
-                                              <MultiSelectDropdown
-                                                selected={selectedValue}
-                                                onChange={(ids) => setTempSelectedProjectTxIds(prev => ({ ...prev, [tx.id]: ids }))}
-                                                options={getAvailableProjectTxOptions(tx)}
-                                                placeholder="Link..."
-                                              />
-                                            </div>
-                                            {hasChanged && (
-                                              <div className="flex gap-1 shrink-0">
-                                                <button onClick={() => handleLinkBankTransaction(tx.id, selectedValue)} className="p-1 text-green-600 border border-green-200 hover:bg-green-50 rounded shadow-sm"><Check size={14} /></button>
-                                                <button onClick={() => setTempSelectedProjectTxIds(prev => { const c = { ...prev }; delete c[tx.id]; return c; })} className="p-1 text-red-500 border border-red-200 hover:bg-red-50 rounded shadow-sm"><X size={14} /></button>
+                                          {!hasSplits ? (
+                                            <div className="space-y-1">
+                                              <div className="flex items-center gap-1.5">
+                                                <div className="flex-1 min-w-0">
+                                                  <MultiSelectDropdown
+                                                    selected={selectedValue}
+                                                    onChange={(ids) => setTempSelectedProjectTxIds(prev => ({ ...prev, [tx.id]: ids }))}
+                                                    options={getAvailableProjectTxOptions(tx)}
+                                                    placeholder="Link..."
+                                                  />
+                                                </div>
+                                                {hasChanged && (
+                                                  <div className="flex gap-1 shrink-0">
+                                                    <button onClick={() => handleLinkBankTransaction(tx.id, selectedValue)} className="p-1 text-green-600 border border-green-200 hover:bg-green-50 rounded shadow-sm"><Check size={14} /></button>
+                                                    <button onClick={() => setTempSelectedProjectTxIds(prev => { const c = { ...prev }; delete c[tx.id]; return c; })} className="p-1 text-red-500 border border-red-200 hover:bg-red-50 rounded shadow-sm"><X size={14} /></button>
+                                                  </div>
+                                                )}
                                               </div>
-                                            )}
-                                          </div>
+                                              {/* Per-project-tx amount breakdown (情景 EE) */}
+                                              {linkedIds.length > 1 && txSplits.length > 0 && (
+                                                <div className="space-y-0.5 pl-1">
+                                                  {linkedIds.map(lid => {
+                                                    const splitForLink = txSplits.find(s => s.projectTransactionId === lid || s.projectTransactionIds?.includes(lid));
+                                                    const projTx = transactions.find(t => t.id === lid);
+                                                    if (!splitForLink) return null;
+                                                    return (
+                                                      <div key={lid} className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                                                        <span className="truncate max-w-[100px]">{projTx?.description || projTx?.purpose || lid.substring(0, 8)}</span>
+                                                        <span className="font-mono text-slate-600 shrink-0">{formatCurrency(splitForLink.amount, account.currency)}</span>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span className="text-[11px] text-slate-400 italic">Link per split ↓</span>
+                                          )}
                                         </td>
                                         <td className={`py-1.5 px-2 text-right font-mono font-semibold text-sm ${accentColor}`}>
                                           {isIncome ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), account.currency)}
@@ -1257,6 +1312,52 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
                                           </Badge>
                                         </td>
                                       </tr>
+                                      {/* Split sub-rows (情景 PP) */}
+                                      {hasSplits && isExpanded && txSplits.map(split => {
+                                        const splitLinkedIds = split.projectTransactionIds || (split.projectTransactionId ? [split.projectTransactionId] : []);
+                                        const splitTempSelected = tempSelectedProjectTxIds[split.id];
+                                        const splitHasChanged = splitTempSelected !== undefined && JSON.stringify(splitTempSelected.slice().sort()) !== JSON.stringify(splitLinkedIds.slice().sort());
+                                        const splitSelectedValue = splitTempSelected !== undefined ? splitTempSelected : splitLinkedIds;
+                                        const splitAsFakeTx = { ...tx, id: split.id, amount: split.amount, projectTransactionIds: splitLinkedIds };
+                                        return (
+                                          <tr key={split.id} className="bg-slate-50/60 border-l-2 border-l-jci-blue/20">
+                                            <td className="py-1 px-3" />
+                                            <td className="py-1 px-2 text-slate-300 text-xs font-mono pl-6">└</td>
+                                            <td className="py-1 px-2 text-slate-600 text-xs pl-2">
+                                              <span>{split.description || split.category || 'Split'}</span>
+                                              {split.category && <span className="ml-1.5 text-[10px] text-slate-400 bg-slate-100 rounded px-1">{split.category}</span>}
+                                            </td>
+                                            <td className="py-1 px-2 text-slate-300 text-xs">—</td>
+                                            <td className="py-1 px-2">
+                                              <div className="flex items-center gap-1.5">
+                                                <div className="flex-1 min-w-0">
+                                                  <MultiSelectDropdown
+                                                    selected={splitSelectedValue}
+                                                    onChange={(ids) => setTempSelectedProjectTxIds(prev => ({ ...prev, [split.id]: ids }))}
+                                                    options={getAvailableProjectTxOptions(splitAsFakeTx)}
+                                                    placeholder="Link split..."
+                                                  />
+                                                </div>
+                                                {splitHasChanged && (
+                                                  <div className="flex gap-1 shrink-0">
+                                                    <button onClick={() => handleLinkBankTransaction(split.id, splitSelectedValue)} className="p-1 text-green-600 border border-green-200 hover:bg-green-50 rounded shadow-sm"><Check size={14} /></button>
+                                                    <button onClick={() => setTempSelectedProjectTxIds(prev => { const c = { ...prev }; delete c[split.id]; return c; })} className="p-1 text-red-500 border border-red-200 hover:bg-red-50 rounded shadow-sm"><X size={14} /></button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className={`py-1 px-2 text-right font-mono text-xs ${accentColor}`}>
+                                              {isIncome ? '+' : '-'}{formatCurrency(Math.abs(split.amount), account.currency)}
+                                            </td>
+                                            <td className="py-1 px-2">
+                                              <Badge variant={splitLinkedIds.length > 0 ? 'success' : 'warning'} className="text-[10px]">
+                                                {splitLinkedIds.length > 0 ? 'Linked' : 'Unlinked'}
+                                              </Badge>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                      </React.Fragment>
                                     );
                                   })}
                                 </React.Fragment>
@@ -1366,6 +1467,72 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
                 </>
               );
             })()}
+          </div>
+        )}
+        {activeFinancialTab === 'paymentRequests' && (
+          <div className="space-y-3 animate-in fade-in duration-500">
+            <p className="text-xs text-slate-500">{projectPRs.length} claim{projectPRs.length !== 1 ? 's' : ''} linked to this project</p>
+            {loadingPRs ? (
+              <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+            ) : (
+              <div className="space-y-3">
+                {/* New Claim row */}
+                <div
+                  className="flex items-center gap-2 px-4 py-3 cursor-pointer text-slate-400 hover:text-jci-blue hover:bg-blue-50/50 transition-colors rounded-xl border border-dashed border-slate-200 hover:border-jci-blue"
+                  onClick={handleClaimReimbursement}
+                >
+                  <div className="w-6 h-6 rounded border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                    <Plus size={12} />
+                  </div>
+                  <span className="text-sm font-semibold">New Claim</span>
+                </div>
+                {/* Grouped by applicant */}
+                {(() => {
+                  const statusColors: Record<string, string> = {
+                    submitted: 'bg-amber-50 text-amber-700 border-amber-200',
+                    approved: 'bg-green-50 text-green-700 border-green-200',
+                    paid: 'bg-blue-50 text-blue-700 border-blue-200',
+                    rejected: 'bg-red-50 text-red-700 border-red-200',
+                    cancelled: 'bg-slate-50 text-slate-500 border-slate-200',
+                    draft: 'bg-slate-50 text-slate-500 border-slate-200',
+                  };
+                  const statusLabel: Record<string, string> = { submitted: 'Pending', approved: 'Approved', paid: 'Paid', rejected: 'Rejected', cancelled: 'Cancelled', draft: 'Draft' };
+                  const grouped = projectPRs.reduce<Record<string, { name: string; prs: typeof projectPRs }>>((acc, pr) => {
+                    const key = pr.applicantId || 'unknown';
+                    if (!acc[key]) acc[key] = { name: pr.applicantName || pr.applicantId || 'Unknown', prs: [] };
+                    acc[key].prs.push(pr);
+                    return acc;
+                  }, {});
+                  return Object.entries(grouped).map(([key, { name, prs: applicantPRs }]) => {
+                    const total = applicantPRs.reduce((sum, pr) => sum + (pr.totalAmount || pr.amount || 0), 0);
+                    return (
+                      <div key={key} className="rounded-xl border border-slate-100 overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-100">
+                          <span className="text-xs font-semibold text-slate-600">{name}</span>
+                          <span className="text-xs font-mono font-bold text-slate-700">{formatCurrency(total)}</span>
+                        </div>
+                        <div className="divide-y divide-slate-50">
+                          {applicantPRs.map(pr => (
+                            <div key={pr.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50/60 transition-colors">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-slate-800 truncate">{pr.purpose || pr.items?.[0]?.purpose || '—'}</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">{pr.referenceNumber} · {new Date(pr.createdAt).toLocaleDateString()}</p>
+                              </div>
+                              <div className="flex items-center gap-3 ml-4 shrink-0">
+                                <span className="text-sm font-bold font-mono text-slate-800">{formatCurrency(pr.totalAmount || pr.amount)}</span>
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColors[pr.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                  {statusLabel[pr.status] || pr.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </div>
         )}
       </div>

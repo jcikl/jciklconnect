@@ -128,7 +128,7 @@ export const usePermissions = () => {
     isOrganizationSecretary: false, // Deprecated - use dynamic assignment
     isOrganizationFinance: false, // Deprecated - use dynamic assignment
     isActivityFinance: false, // Deprecated - use dynamic assignment
-    isDeveloper: devMode,
+    isDeveloper: devMode || !!simulatedRole,
     effectiveRole, // Return the effective role being used
   };
 };
