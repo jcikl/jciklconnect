@@ -174,7 +174,17 @@ export const EventRegistrationService = {
   async updateStatus(
     registrationId: string,
     status: EventRegistrationStatus,
-    options?: { paidAt?: string | null; checkedInAt?: string | null; registeredBy?: string | null; registeredByName?: string | null; paidByName?: string | null; checkedInByName?: string | null }
+    options?: {
+      paidAt?: string | null;
+      checkedInAt?: string | null;
+      registeredBy?: string | null;
+      registeredByName?: string | null;
+      paidByName?: string | null;
+      checkedInByName?: string | null;
+      paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
+      financeTransactionId?: string;
+      matchedBankTxId?: string;
+    }
   ): Promise<void> {
     return withDevMode(
       () => {
@@ -197,6 +207,9 @@ export const EventRegistrationService = {
         if (options?.registeredByName !== undefined) updateData.registeredByName = options.registeredByName;
         if (options?.paidByName !== undefined) updateData.paidByName = options.paidByName ?? null;
         if (options?.checkedInByName !== undefined) updateData.checkedInByName = options.checkedInByName ?? null;
+        if (options?.paymentMethod !== undefined) updateData.paymentMethod = options.paymentMethod;
+        if (options?.financeTransactionId !== undefined) updateData.financeTransactionId = options.financeTransactionId;
+        if (options?.matchedBankTxId !== undefined) updateData.matchedBankTxId = options.matchedBankTxId;
         await updateDoc(ref, updateData);
       }
     );

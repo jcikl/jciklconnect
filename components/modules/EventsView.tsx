@@ -30,6 +30,7 @@ import { EventBudgetEditModal } from './Events/EventBudgetEditModal';
 import { EventFeedbackTab } from './Events/EventFeedbackTab';
 import { EventFeedbackModal } from './Events/EventFeedbackModal';
 import { EventQRCheckIn } from './Events/EventQRCheckIn';
+import { FinanceService } from '../../services/financeService';
 
 type ViewMode = 'list' | 'calendar';
 
@@ -236,6 +237,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [updatingRegId, setUpdatingRegId] = useState<string | null>(null);
+  const [markPaidReg, setMarkPaidReg] = useState<EventRegistration | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [participantSubTab, setParticipantSubTab] = useState<'all' | 'board' | 'director' | 'member' | 'guest'>('all');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -477,13 +479,48 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     }
   };
 
-  const handleMarkPaid = async (reg: EventRegistration) => {
+  const handleMarkPaid = (reg: EventRegistration) => {
+    setMarkPaidReg(reg);
+  };
+
+  const handleConfirmMarkPaid = async (paymentMethod: 'bank_transfer' | 'cash') => {
+    const reg = markPaidReg;
+    if (!reg) return;
+    setMarkPaidReg(null);
     setUpdatingRegId(reg.id);
     try {
       const now = new Date().toISOString();
       const actorName = member?.name ?? member?.id ?? 'Admin';
-      await EventRegistrationService.updateStatus(reg.id, 'paid', { paidAt: now, paidByName: actorName });
-      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: now, paidByName: actorName } : r)));
+      const today = now.split('T')[0];
+
+      // Create income transaction (Pending)
+      let financeTransactionId: string | undefined;
+      try {
+        const amount = event?.price ?? 0;
+        financeTransactionId = await FinanceService.createTransaction({
+          type: 'Income',
+          category: 'Projects & Activities',
+          status: 'Pending',
+          paymentMethod,
+          projectId: event?.id,
+          memberId: reg.memberId,
+          eventRegistrationId: reg.id,
+          amount,
+          description: `Event ticket — ${event?.title ?? reg.eventId}`,
+          date: today,
+          source: 'manual',
+        } as Parameters<typeof FinanceService.createTransaction>[0]);
+      } catch (e) {
+        console.warn('[handleConfirmMarkPaid] Failed to create income tx:', e);
+      }
+
+      await EventRegistrationService.updateStatus(reg.id, 'paid', {
+        paidAt: now,
+        paidByName: actorName,
+        paymentMethod,
+        ...(financeTransactionId ? { financeTransactionId } : {}),
+      });
+      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: now, paidByName: actorName, paymentMethod } : r)));
       showToast('Marked as paid', 'success');
     } catch {
       showToast('Operation failed', 'error');
@@ -1028,7 +1065,6 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                       roleLabel === 'Board' ? 'bg-jci-blue/10 text-jci-blue' :
                                       roleLabel === 'Admin' ? 'bg-purple-100 text-purple-700' :
                                       roleLabel === 'Member' ? 'bg-slate-100 text-slate-500' :
-                                      roleLabel === 'Probation' ? 'bg-yellow-100 text-yellow-700' :
                                       roleLabel === 'Public' ? 'bg-orange-100 text-orange-700' :
                                       'bg-slate-100 text-slate-400'
                                     }`}>{roleLabel}</span>
@@ -1316,6 +1352,18 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </select>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Payment method selection modal */}
+      {markPaidReg && (
+        <Modal isOpen onClose={() => setMarkPaidReg(null)} title="Mark as Paid" size="sm">
+          <p className="text-sm text-slate-600 mb-4">Select payment method for <span className="font-medium">{markPaidReg.memberName ?? markPaidReg.memberId}</span>:</p>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={() => handleConfirmMarkPaid('bank_transfer')}>Bank Transfer</Button>
+            <Button className="flex-1" onClick={() => handleConfirmMarkPaid('cash')}>Cash</Button>
+          </div>
+          <Button variant="ghost" className="w-full mt-2" onClick={() => setMarkPaidReg(null)}>Cancel</Button>
         </Modal>
       )}
     </>

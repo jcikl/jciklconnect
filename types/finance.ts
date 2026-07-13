@@ -5,7 +5,7 @@ export type TransactionType = 'project' | 'operations' | 'dues' | 'merchandise';
 export interface TransactionSplit {
   id: string;
   parentTransactionId: string;
-  category: 'Projects & Activities' | 'Membership' | 'Administrative';
+  category: 'Projects & Activities' | 'Membership' | 'Administrative' | '';
   type: 'Income' | 'Expense';
   year?: number;
   projectId?: string;
@@ -32,7 +32,7 @@ export interface Transaction {
   amount: number;
   type: 'Income' | 'Expense';
   category: 'Projects & Activities' | 'Membership' | 'Administrative';
-  status: 'Pending' | 'Cleared' | 'Reconciled';
+  status: 'Pending' | 'Cleared' | 'Reconciled' | 'Partially Reconciled';
   projectId?: string;
   memberId?: string;
   bankAccountId?: string;
@@ -64,6 +64,9 @@ export interface Transaction {
   matchedBankTxIds?: string[];
   matchStatus?: 'unmatched' | 'partial' | 'full' | 'over';
   source?: 'bank_import' | 'manual';
+  eventRegistrationId?: string;
+  paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
+  toyyibBillCode?: string;
 }
 
 export interface BankAccount {
@@ -78,7 +81,7 @@ export interface BankAccount {
   accountType?: 'Current' | 'Savings' | 'Investment' | 'Fixed Deposit' | 'Cash' | 'Other';
 }
 
-export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'cancelled';
+export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'paid';
 
 export interface PaymentRequestItem {
   purpose: string;
@@ -115,6 +118,9 @@ export interface PaymentRequest {
   updatedBy?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  paidAt?: string | null;
+  expenseTxFailed?: boolean;
 }
 
 export interface ReconciliationRecord {

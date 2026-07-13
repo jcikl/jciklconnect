@@ -54,6 +54,8 @@ export interface EventRegistration {
   /** billpaymentStatus: "1"=paid, "2"=pending, "3"=failed, "4"=settling */
   toyyibPaymentStatus?: string;
   billExternalReferenceNo?: string;
+  financeTransactionId?: string;
+  paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
 }
 
 export interface NonMemberLead {

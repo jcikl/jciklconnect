@@ -101,9 +101,10 @@ exports.handler = async (event) => {
     let billMemberId = null;
     let billYear = null;
     let billProjectId = null;
+    let billData = null;
 
     if (!billsQuery.empty) {
-      const billData = billsQuery.docs[0].data();
+      billData = billsQuery.docs[0].data();
       billMemberId = billData.memberId || null;
       billProjectId = billData.projectId || null;
       // Extract year from billName e.g. "2026 Renewal Membership"
@@ -135,13 +136,60 @@ exports.handler = async (event) => {
       .get();
 
     if (!evtRegQuery.empty) {
+      const evtRegDoc = evtRegQuery.docs[0];
+      const evtRegData = evtRegDoc.data();
+
       const evtUpdate = {
         toyyibPaymentStatus: billpaymentStatus || (isSuccess ? '1' : '3'),
         updatedAt: Timestamp.now(),
       };
       if (billExternalReferenceNo) evtUpdate.billExternalReferenceNo = billExternalReferenceNo;
-      if (isSuccess) evtUpdate.status = 'paid';
-      await evtRegQuery.docs[0].ref.update(evtUpdate);
+
+      if (isSuccess) {
+        evtUpdate.status = 'paid';
+        evtUpdate.paymentMethod = 'toyyib';
+        evtUpdate.paidAt = billPaymentDate;
+
+        // ── Create income transaction (Pending) for this event payment ──────
+        // Resolve ticket price: query event doc for ticketPrice
+        let ticketPrice = 0;
+        const eventId = evtRegData.eventId || billProjectId;
+        if (eventId) {
+          try {
+            const eventSnap = await db.collection('events').doc(eventId).get();
+            if (eventSnap.exists) {
+              ticketPrice = eventSnap.data().price || eventSnap.data().ticketPrice || 0;
+            }
+          } catch (e) {
+            console.warn('[toyyibpay-callback] Could not fetch event price:', e);
+          }
+        }
+
+        const txData = {
+          type: 'Income',
+          category: 'Projects & Activities',
+          status: 'Pending',
+          paymentMethod: 'toyyib',
+          projectId: billProjectId || eventId || null,
+          memberId: billMemberId || evtRegData.memberId || null,
+          eventRegistrationId: evtRegDoc.id,
+          toyyibBillCode: billCode,
+          amount: ticketPrice,
+          description: `Event ticket — ${billData?.billName || billCode}`,
+          date: billPaymentDate ? billPaymentDate.split('T')[0] : new Date().toISOString().split('T')[0],
+          referenceNumber: billExternalReferenceNo || transactionId || null,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          source: 'manual',
+        };
+
+        const txRef = await db.collection('transactions').add(txData);
+
+        // Link transaction ID back to eventRegistration
+        evtUpdate.financeTransactionId = txRef.id;
+      }
+
+      await evtRegDoc.ref.update(evtUpdate);
     }
 
     if (isSuccess || resolvedStatus === 'settling') {
