@@ -47,8 +47,21 @@ exports.handler = async (event) => {
   const transactionId = data.transaction_id;
   const billCode = data.billcode;
   const orderId = data.order_id;
+  // ToyyibPay sends status_id in callback; billpaymentStatus in getBillTransactions response
+  // status_id: 1=success, others=fail  |  billpaymentStatus: 1=paid, 2=pending, 3=failed, 4=settling
   const statusId = data.status_id;
+  const billpaymentStatus = data.billpaymentStatus;
+  const billExternalReferenceNo = data.billExternalReferenceNo || null;
   const isSuccess = statusId === '1';
+
+  // Map billpaymentStatus to our internal status
+  const resolvedStatus =
+    billpaymentStatus === '1' ? 'paid' :
+    billpaymentStatus === '3' ? 'failed' :
+    billpaymentStatus === '4' ? 'settling' :
+    isSuccess ? 'paid' : 'pending';
+
+  const billPaymentDate = data.billPaymentDate || new Date().toISOString();
 
   if (!transactionId || !billCode) {
     return { statusCode: 400, body: 'Missing required fields' };
@@ -79,7 +92,59 @@ exports.handler = async (event) => {
   });
 
   try {
-    if (isSuccess) {
+    // ── Always update toyyibBills collection ─────────────────────────────────
+    const billsQuery = await db.collection('toyyibBills')
+      .where('billCode', '==', billCode)
+      .limit(1)
+      .get();
+
+    let billMemberId = null;
+    let billYear = null;
+    let billProjectId = null;
+
+    if (!billsQuery.empty) {
+      const billData = billsQuery.docs[0].data();
+      billMemberId = billData.memberId || null;
+      billProjectId = billData.projectId || null;
+      // Extract year from billName e.g. "2026 Renewal Membership"
+      const yearMatch = (billData.billName || '').match(/^(\d{4})\s/);
+      if (yearMatch) billYear = yearMatch[1];
+
+      const billUpdate = {
+        billpaymentStatus: billpaymentStatus || (isSuccess ? '1' : '3'),
+        billPaymentDate,
+        updatedAt: Timestamp.now(),
+      };
+      if (billExternalReferenceNo) billUpdate.billExternalReferenceNo = billExternalReferenceNo;
+      await billsQuery.docs[0].ref.update(billUpdate);
+    }
+
+    // ── Write billExternalReferenceNo back to member's membership record ─────
+    if (billMemberId && billYear && billExternalReferenceNo) {
+      await db.collection('members').doc(billMemberId).update({
+        [`membership.${billYear}.billExternalReferenceNo`]: billExternalReferenceNo,
+        [`membership.${billYear}.toyyibPaymentStatus`]: billpaymentStatus || (isSuccess ? '1' : '3'),
+        updatedAt: Timestamp.now(),
+      });
+    }
+
+    // ── Update eventRegistrations linked to this billCode ────────────────────
+    const evtRegQuery = await db.collection('eventRegistrations')
+      .where('toyyibBillCode', '==', billCode)
+      .limit(1)
+      .get();
+
+    if (!evtRegQuery.empty) {
+      const evtUpdate = {
+        toyyibPaymentStatus: billpaymentStatus || (isSuccess ? '1' : '3'),
+        updatedAt: Timestamp.now(),
+      };
+      if (billExternalReferenceNo) evtUpdate.billExternalReferenceNo = billExternalReferenceNo;
+      if (isSuccess) evtUpdate.status = 'paid';
+      await evtRegQuery.docs[0].ref.update(evtUpdate);
+    }
+
+    if (isSuccess || resolvedStatus === 'settling') {
       // Find PaymentRequest or other entity linked to this billCode
       const prQuery = await db.collection('paymentRequests')
         .where('toyyibBillCode', '==', billCode)

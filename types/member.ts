@@ -27,6 +27,11 @@ export interface MembershipRecord {
   transactionId?: string[];
   purpose?: string;
   paymentDate?: string;
+  toyyibBillCode?: string;
+  toyyibPaymentUrl?: string;
+  /** billpaymentStatus: "1"=paid, "2"=pending, "3"=failed, "4"=settling */
+  toyyibPaymentStatus?: string;
+  billExternalReferenceNo?: string;
 }
 
 export interface MemberPromotionProgress {
