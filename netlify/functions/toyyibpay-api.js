@@ -66,8 +66,9 @@ exports.handler = async (event) => {
     let result;
     switch (action) {
       case 'getCategories':
-        result = await callToyyib('getCategoryDetails');
-        console.log('[toyyibpay-api] getCategories raw result:', JSON.stringify(result));
+        // ToyyibPay has no "list all" endpoint — getCategoryDetails requires a specific categoryCode.
+        // The client now calls getCategoryDetails per code; this action is kept for compatibility.
+        result = [];
         break;
       case 'getCategoryDetails':
         if (!params.categoryCode) return { statusCode: 400, headers: cors, body: 'categoryCode required' };

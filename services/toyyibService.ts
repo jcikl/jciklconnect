@@ -72,18 +72,53 @@ export class ToyyibService {
     throw new Error(data?.msg || 'Failed to create bill');
   }
 
-  static async getCategories(): Promise<any[]> {
+  // ToyyibPay has no "list all categories" endpoint — getCategoryDetails requires a specific code.
+  // We maintain a localStorage cache of known category codes and fetch details for each.
+  private static readonly CATEGORIES_CACHE_KEY = 'toyyib_category_codes';
+
+  private static getCachedCategoryCodes(): string[] {
     try {
-      const data = await proxyCall('getCategories');
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.error('ToyyibPay getCategories failed:', error);
-      return [];
+      const stored = localStorage.getItem(ToyyibService.CATEGORIES_CACHE_KEY);
+      const codes: string[] = stored ? JSON.parse(stored) : [];
+      // Always include the configured default category code
+      if (TOYYIB_CONFIG.CATEGORY_CODE && !codes.includes(TOYYIB_CONFIG.CATEGORY_CODE)) {
+        codes.unshift(TOYYIB_CONFIG.CATEGORY_CODE);
+      }
+      return codes;
+    } catch {
+      return TOYYIB_CONFIG.CATEGORY_CODE ? [TOYYIB_CONFIG.CATEGORY_CODE] : [];
     }
   }
 
+  private static saveCategoryCode(code: string): void {
+    try {
+      const codes = ToyyibService.getCachedCategoryCodes();
+      if (!codes.includes(code)) {
+        codes.push(code);
+        localStorage.setItem(ToyyibService.CATEGORIES_CACHE_KEY, JSON.stringify(codes));
+      }
+    } catch {}
+  }
+
+  static async getCategories(): Promise<any[]> {
+    const codes = ToyyibService.getCachedCategoryCodes();
+    if (codes.length === 0) return [];
+    const results = await Promise.allSettled(
+      codes.map(code => ToyyibService.getCategoryDetails(code))
+    );
+    return results
+      .filter((r): r is PromiseFulfilledResult<any[]> => r.status === 'fulfilled')
+      .flatMap(r => r.value)
+      .filter(Boolean);
+  }
+
   static async createCategory(catname: string, catdescription: string): Promise<any[]> {
-    return proxyCall('createCategory', { catname, catdescription });
+    const result = await proxyCall('createCategory', { catname, catdescription });
+    // Save the new category code to local cache so getCategories can find it
+    if (Array.isArray(result) && result[0]?.CategoryCode) {
+      ToyyibService.saveCategoryCode(result[0].CategoryCode);
+    }
+    return result;
   }
 
   static async getCategoryDetails(categoryCode: string): Promise<any[]> {
