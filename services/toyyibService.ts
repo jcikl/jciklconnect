@@ -17,9 +17,9 @@ export interface ToyyibBillResponse {
 }
 
 // All ToyyibPay API calls go through our Netlify Function proxy to avoid CORS.
-// In local dev (no Netlify), the proxy isn't available — calls fall back to mock data.
+// Calls /.netlify/functions/toyyibpay-api directly (works on Netlify; 404s gracefully in local Vite dev).
 async function proxyCall(action: string, params: Record<string, string> = {}): Promise<any> {
-  const response = await fetch('/api/toyyibpay', {
+  const response = await fetch('/.netlify/functions/toyyibpay-api', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...params }),
