@@ -855,7 +855,8 @@ service cloud.firestore {
     match /systemLogs/{logId} {
       allow read: if isAdmin() || isDeveloper();
       allow create: if isAuthenticated();
-      allow update, delete: if false;
+      allow delete: if isAdmin() || isDeveloper();
+      allow update: if false;
     }
 
     // Default: deny all other access

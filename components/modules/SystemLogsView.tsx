@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
-import { Activity, RefreshCw, Database, Wifi, Trash2, PenLine, Copy, Check } from 'lucide-react';
+import { Activity, RefreshCw, Database, Wifi, Trash2, PenLine, Copy, Check, AlertTriangle } from 'lucide-react';
 
 type OpType = 'ALL' | 'READ' | 'WRITE' | 'DELETE' | 'LISTENER';
 
@@ -58,6 +58,23 @@ export const SystemLogsView: React.FC = () => {
   const [filter, setFilter] = useState<OpType>('ALL');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  async function handleClearAll() {
+    if (!confirmClear) { setConfirmClear(true); return; }
+    setClearing(true);
+    setConfirmClear(false);
+    try {
+      const snap = await getDocs(query(collection(db, COLLECTIONS.SYSTEM_LOGS), limit(500)));
+      await Promise.all(snap.docs.map(d => deleteDoc(doc(db, COLLECTIONS.SYSTEM_LOGS, d.id))));
+      setLogs([]);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to clear logs');
+    } finally {
+      setClearing(false);
+    }
+  }
 
   function handleCopy(doc: LogDoc, e: React.MouseEvent) {
     e.stopPropagation();
@@ -150,6 +167,16 @@ export const SystemLogsView: React.FC = () => {
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             刷新
+          </button>
+          <button
+            onClick={handleClearAll}
+            disabled={clearing || logs.length === 0}
+            className={`flex items-center gap-1.5 text-xs transition-colors disabled:opacity-40 ${
+              confirmClear ? 'text-red-500 font-semibold' : 'text-slate-500 hover:text-red-500'
+            }`}
+          >
+            {confirmClear ? <AlertTriangle size={13} /> : <Trash2 size={13} />}
+            {clearing ? '清除中…' : confirmClear ? '确认清除？' : '清除全部'}
           </button>
         </div>
       </div>
