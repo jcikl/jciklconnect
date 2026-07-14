@@ -51,7 +51,6 @@ export function useFinanceData(searchQuery?: string) {
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [matchingAccount, setMatchingAccount] = useState<BankAccount | null>(null);
   const [renewalYear, setRenewalYear] = useState<number>(new Date().getFullYear());
-  const [duesAmount, setDuesAmount] = useState<number>(150);
   const [isRenewing, setIsRenewing] = useState(false);
   const [moduleTab, setModuleTab] = useState('Dashboard');
   const [txSearchTerm, setTxSearchTerm] = useState('');
@@ -1325,7 +1324,7 @@ export function useFinanceData(searchQuery?: string) {
         Array.from(selectedTxIds).map(async (id) => {
           try {
             const tx = transactions.find(t => t.id === id);
-            if (tx && tx.status !== 'Cleared') {
+            if (tx && tx.status !== 'Cleared' && tx.status !== 'Reconciled' && tx.status !== 'Partially Reconciled') {
               await FinanceService.updateTransaction(id, { ...tx, status: 'Cleared' });
             }
             setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
@@ -1399,8 +1398,9 @@ export function useFinanceData(searchQuery?: string) {
     try {
       const bankTx = transactions.find(t => t.id === bankTxId);
       const expenseTx = transactions.find(t => t.paymentRequestId === prId && t.type === 'Expense');
-      if (expenseTx?.id) {
-        await FinanceService.matchTransactions(expenseTx.id, bankTxId, user.uid);
+      const matchedViaPair = !!expenseTx?.id;
+      if (matchedViaPair) {
+        await FinanceService.matchTransactions(expenseTx!.id!, bankTxId, user.uid);
       } else {
         await FinanceService.updateTransaction(bankTxId, {
           paymentRequestId: prId,
@@ -1409,9 +1409,25 @@ export function useFinanceData(searchQuery?: string) {
           reconciledBy: user.uid,
         });
       }
-      // Mark PR as paid with the bank transaction date (情景 26)
-      if (bankTx?.date) {
-        await PaymentRequestService.markAsPaid(prId, bankTx.date);
+      // Mark PR as paid (情景 26). Always runs — a missing bank tx date must not
+      // silently skip this step and leave the PR matched-but-not-marked-paid,
+      // invisible to both the pending-reconciliation list and the paid list.
+      try {
+        await PaymentRequestService.markAsPaid(prId, bankTx?.date || new Date().toISOString().split('T')[0]);
+      } catch (markPaidErr) {
+        // Compensate: undo the match so we don't leave a half-applied link.
+        if (matchedViaPair) {
+          await FinanceService.unmatchTransactions(expenseTx!.id!, bankTxId).catch(() => {});
+        } else {
+          // Revert the direct bank tx update
+          await FinanceService.updateTransaction(bankTxId, {
+            paymentRequestId: undefined,
+            status: 'Cleared',
+            reconciledAt: undefined,
+            reconciledBy: undefined,
+          }).catch(() => {});
+        }
+        throw markPaidErr;
       }
       showToast('PR linked to bank transaction', 'success');
       await loadData();
@@ -1423,6 +1439,24 @@ export function useFinanceData(searchQuery?: string) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prSelectedBankTx, user, transactions, showToast]);
+
+  // Manual trigger for the event-registration income auto-matcher (情景 P1-14) —
+  // this pipeline otherwise only runs right after a bank import, so finance needs
+  // a way to re-run it on demand (e.g. after fixing a mismatched reference number).
+  const handleRunEventAutoMatch = useCallback(async (bankAccountId?: string) => {
+    setLoading(true);
+    try {
+      const { EventPaymentMatchingService } = await import('../services/eventPaymentMatchingService');
+      const summary = await EventPaymentMatchingService.runAutoMatch(bankAccountId);
+      showToast(`Auto-match: ${summary.matched.length} matched, ${summary.unmatched.length} unmatched, ${summary.errors.length} errors`, summary.errors.length ? 'error' : 'success');
+      await loadData();
+    } catch (e) {
+      showToast('Auto-match failed', 'error');
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showToast]);
 
   const handleReconciliationQuery = useCallback(async () => {
     const ref = refNumberQuery.trim();
@@ -1463,6 +1497,35 @@ export function useFinanceData(searchQuery?: string) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, showToast]);
+
+  const handleVoidTransaction = useCallback(async (tx: Transaction) => {
+    const reason = window.prompt(`Void reason for "${tx.description}"?\n(Required — this will be recorded on the transaction.)`);
+    if (reason === null) return; // cancelled
+    if (!reason.trim()) { showToast('Void reason is required', 'error'); return; }
+    if (!user?.uid) return;
+    try {
+      await FinanceService.voidTransaction(tx.id, reason.trim(), user.uid);
+      showToast('Transaction voided', 'success');
+      await loadData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to void', 'error');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, showToast]);
+
+  const handleUnmatchTransaction = useCallback(async (tx: Transaction) => {
+    const partnerId = tx.matchedBankTxIds?.[0];
+    if (!partnerId) return;
+    if (!confirm('Unmatch this transaction? Both sides will revert to their previous status.')) return;
+    try {
+      await FinanceService.unmatchTransactions(tx.id, partnerId);
+      showToast('Transaction unmatched', 'success');
+      await loadData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to unmatch', 'error');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showToast]);
 
   const handleUpdateTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1645,7 +1708,6 @@ export function useFinanceData(searchQuery?: string) {
 
     // dues renewal
     renewalYear, setRenewalYear,
-    duesAmount, setDuesAmount,
     isRenewing, setIsRenewing,
 
     // admin
@@ -1710,8 +1772,11 @@ export function useFinanceData(searchQuery?: string) {
     handleBatchDelete,
     handleBatchApprove,
     handleLinkPrToBankTx,
+    handleRunEventAutoMatch,
     handleReconciliationQuery,
     handleMarkReconciled,
+    handleVoidTransaction,
+    handleUnmatchTransaction,
     handleUpdateTransaction,
     handleSelectAllTransactions,
     handleAddProjectTrx,

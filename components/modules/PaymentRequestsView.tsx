@@ -110,6 +110,8 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
   const [successRef, setSuccessRef] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [rejectDialogId, setRejectDialogId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewFileName, setPdfPreviewFileName] = useState<string>('payment-request.pdf');
@@ -250,11 +252,15 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     };
   }, [activeTab, filteredMyList, filteredFinanceList]);
 
-  const handleApproveReject = async (id: string, status: 'approved' | 'rejected') => {
+  const handleApproveReject = async (id: string, status: 'approved' | 'rejected', rejectionReason?: string) => {
     if (!user?.uid) return;
     setActioningId(id);
+    const reviewerBoardTitle = (member as any)?.currentBoardPosition ?? (member as any)?.jciCareer?.currentBoardPosition;
     try {
-      await PaymentRequestService.updateStatus(id, status, user.uid);
+      await PaymentRequestService.updateStatus(id, status, user.uid, {
+        ...(rejectionReason ? { rejectionReason } : {}),
+        ...(reviewerBoardTitle ? { reviewerBoardTitle } : {}),
+      });
       showToast(status === 'approved' ? 'Approved' : 'Rejected', 'success');
       await loadFinanceList();
       await loadMyList();
@@ -263,6 +269,18 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     } finally {
       setActioningId(null);
     }
+  };
+
+  const handleRejectClick = (id: string) => {
+    setRejectReason('');
+    setRejectDialogId(id);
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectDialogId) return;
+    if (!rejectReason.trim()) { showToast('Rejection reason is required', 'error'); return; }
+    await handleApproveReject(rejectDialogId, 'rejected', rejectReason.trim());
+    setRejectDialogId(null);
   };
 
   const handleRetryExpenseTx = async (id: string) => {
@@ -991,7 +1009,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                         <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'approved'); }} disabled={actioningId !== null} title="Approve">
                                           <CheckCircle size={13} />
                                         </Button>
-                                        <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'rejected'); }} disabled={actioningId !== null} title="Reject">
+                                        <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); handleRejectClick(pr.id); }} disabled={actioningId !== null} title="Reject">
                                           <XCircle size={13} />
                                         </Button>
                                       </>
@@ -1000,6 +1018,16 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                       <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleRetryExpenseTx(pr.id); }} disabled={actioningId !== null} title="Retry creating expense transaction" className="text-orange-600 border-orange-300 hover:bg-orange-50 text-[10px]">
                                         <RefreshCw size={11} className="mr-1" />Retry Tx
                                       </Button>
+                                    )}
+                                    {pr.status === 'cancelled' && pr.expenseTxFailed && (
+                                      <span title="Expense transaction could not be deleted — finance must void it manually" className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-600 border border-orange-300 rounded px-1.5 py-0.5 bg-orange-50">
+                                        <RefreshCw size={10} />Orphan Tx
+                                      </span>
+                                    )}
+                                    {pr.amountSyncFailed && (
+                                      <span title="PR amount changed but expense transaction amount is out of sync — finance must update manually" className="inline-flex items-center gap-1 text-[10px] font-medium text-yellow-700 border border-yellow-300 rounded px-1.5 py-0.5 bg-yellow-50">
+                                        ⚠ Amt Mismatch
+                                      </span>
                                     )}
                                     {(isDeveloper || isAdmin) && (
                                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeletePR(pr.id); }} disabled={actioningId !== null} className="text-red-600 hover:bg-red-50 border border-red-200" title="Delete (Dev)">
@@ -1146,7 +1174,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                               {pr.status === 'submitted' && (
                                 <>
                                   <Button size="sm" variant="success" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null} className="flex-1">Approve</Button>
-                                  <Button size="sm" variant="danger" onClick={() => handleApproveReject(pr.id, 'rejected')} disabled={actioningId !== null} className="flex-1">Reject</Button>
+                                  <Button size="sm" variant="danger" onClick={() => handleRejectClick(pr.id)} disabled={actioningId !== null} className="flex-1">Reject</Button>
                                 </>
                               )}
                             </div>
@@ -1202,6 +1230,27 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         preselectedCategory={submitPreselectedCategory}
         onSuccess={(ref) => { setSuccessRef(ref); loadMyList(); }}
       />
+
+      {/* Rejection reason dialog */}
+      <Modal isOpen={!!rejectDialogId} onClose={() => setRejectDialogId(null)} title="Reject Payment Request">
+        <div className="space-y-4 p-1">
+          <p className="text-sm text-slate-600">Please provide a reason for rejecting this payment request. The applicant will be notified.</p>
+          <textarea
+            className="w-full border border-slate-300 rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-rose-400"
+            rows={3}
+            placeholder="e.g. Missing receipts, incorrect amount, out of budget…"
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setRejectDialogId(null)}>Cancel</Button>
+            <Button variant="danger" size="sm" onClick={handleRejectConfirm} disabled={actioningId !== null || !rejectReason.trim()}>
+              Confirm Reject
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

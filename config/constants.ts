@@ -58,7 +58,6 @@ export const COLLECTIONS = {
   GUEST_REGISTRATIONS: 'guestRegistrations',
   /** Guest 页面访问统计（浏览次数/逗留时长/Sign Up 点击） */
   GUEST_PAGE_STATS: 'guestPageStats',
-  DUES_RENEWALS: 'duesRenewals',
   PAYMENT_REQUESTS: 'paymentRequests',
   /** 活动报名/缴费/签到统一名单（Story 8.1） */
   EVENT_REGISTRATIONS: 'eventRegistrations',
@@ -81,6 +80,8 @@ export const COLLECTIONS = {
   INQUIRIES: 'inquiries',
   TOYYIB_CATEGORIES: 'toyyibCategories',
   TOYYIB_BILLS: 'toyyibBills',
+  /** Finance alerts written by server-side processes (webhook, auto-match) for manual review */
+  FINANCE_ALERTS: 'finance_alerts',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

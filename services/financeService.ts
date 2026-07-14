@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType } from '../types';
+import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType, FinanceAlert } from '../types';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS, MOCK_MEMBERS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
@@ -1090,6 +1090,10 @@ export class FinanceService {
       }
       const currentTransaction = currentDoc.data() as Transaction;
 
+      if (currentTransaction.status === 'Reconciled' || currentTransaction.status === 'Partially Reconciled') {
+        throw new Error(`Cannot edit a ${currentTransaction.status} transaction. Unmatch it first before making changes.`);
+      }
+
       const updateData: any = {
         ...removeUndefined(updates),
         updatedAt: Timestamp.now(),
@@ -1518,6 +1522,10 @@ export class FinanceService {
           // Fetch transaction first to sync inventory if needed
           const transaction = await this.getTransactionById(transactionId);
 
+          if (transaction?.status === 'Reconciled' || transaction?.status === 'Partially Reconciled') {
+            throw new Error(`Cannot delete a ${transaction.status} transaction. Unmatch it first before deleting.`);
+          }
+
           if (transaction && transaction.inventoryLinkId && transaction.inventoryQuantity) {
             // Remove stock movement if exists
             const { InventoryService } = await import('./inventoryService');
@@ -1525,6 +1533,16 @@ export class FinanceService {
           } else if (transaction) {
             // Only call sync if we didn't use the new method, just in case (e.g. legacy check)
             await this.syncTransactionWithInventory(transaction, true);
+          }
+
+          // If this is a matched income tx, remove the match from the linked bank tx first
+          if (transaction?.matchedBankTxIds?.length) {
+            const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
+            for (const bankTxId of transaction.matchedBankTxIds) {
+              await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
+                console.warn('[deleteTransaction] Could not clean up bank tx link:', err)
+              );
+            }
           }
 
           await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
@@ -1797,8 +1815,13 @@ export class FinanceService {
 
       const allMembershipTransactions = [...transactions, ...splitTransactions];
 
-      // 3. Calculate total amount
-      const totalAmount = allMembershipTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      // 3. Calculate total amount — only money that has actually cleared/reconciled counts.
+      // A Pending transaction (e.g. just created by initiateDuesRenewal, not yet paid) must
+      // NOT count toward "paid", or the member shows as paid before any money moves.
+      const clearedMembershipTransactions = allMembershipTransactions.filter(
+        (tx) => tx.status === 'Cleared' || tx.status === 'Reconciled' || tx.status === 'Partially Reconciled'
+      );
+      const totalAmount = clearedMembershipTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
       const latestTx = [...allMembershipTransactions].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       )[0];
@@ -1817,7 +1840,8 @@ export class FinanceService {
       const yearStr = year;
 
       const type = member.membershipType || 'Probation';
-      const duesAmount = currentMembership[yearStr]?.dues || MembershipDues[type as keyof typeof MembershipDues] || 0;
+      const configRules = await MembershipConfigService.getRules();
+      const duesAmount = currentMembership[yearStr]?.dues ?? configRules[type]?.duesAmount ?? MembershipDues[type as keyof typeof MembershipDues] ?? 0;
 
       // No linked membership transactions for this member/year:
       // rollback linkage-derived fields and reset to pending summary.
@@ -1839,8 +1863,14 @@ export class FinanceService {
           updatedAt: Timestamp.now(),
         };
 
-        // Revert back to Guest only if they were promoted via the guest approval flow (probationApprovedAt is set)
-        if (member.membershipType === 'Probation' && member.role === 'MEMBER' && member.probationApprovedAt) {
+        // Revert to Guest only when: promoted via approval flow AND entry fee not yet confirmed paid.
+        // If hasPaidInitiationFee=true the RM350 was already collected — deleting a renewal tx
+        // must never strip their Probation status.
+        const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
+        if (member.membershipType === 'Probation'
+            && member.role === 'MEMBER'
+            && member.probationApprovedAt
+            && !hasPaidFee) {
           zeroTxUpdates.role = 'GUEST';
           zeroTxUpdates.membershipType = 'Guest';
           zeroTxUpdates.probationApprovedBy = null;
@@ -1882,29 +1912,13 @@ export class FinanceService {
         updatedAt: Timestamp.now()
       };
 
-      // 7. Auto-update hasPaidInitiationFee and role if Guest -> Probation
+      // 7. Mark entry fee paid when Guest's payment clears — promotion to Probation
+      //    requires explicit board approval (President / Secretary / Honorary Treasurer)
+      //    via GuestManagementView. Do NOT auto-promote here.
       if (status === 'paid' || status === 'over paid') {
         if (!(member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee)) {
           updates['jciCareer.hasPaidInitiationFee'] = true;
           updates.hasPaidInitiationFee = true;
-        }
-
-        // Guest first-year payment (350+): promote to Config-eligible type (not always Probation)
-        if ((member.role === 'GUEST' || !member.role) && totalAmount >= 350) {
-          const rules = await MembershipConfigService.getRules();
-          const promotedType = computeMembershipTypeFromMember(
-            {
-              nationality: member.nationality,
-              dateOfBirth: member.dateOfBirth,
-              senatorCertified: member.senatorCertified,
-              senatorshipId: member.senatorshipId,
-              role: 'MEMBER',
-              membershipType: member.membershipType,
-            },
-            rules
-          );
-          updates.membershipType = promotedType;
-          updates.role = roleForMembershipType(promotedType, member.role);
         }
       }
 
@@ -2193,7 +2207,8 @@ export class FinanceService {
   }
 
   // Automated dues renewal with membership type support
-  // Handles 5 membership types: Probation (RM350), Full (RM300), Honorary (RM50), Senator (RM0), Visiting (RM500)
+  // Handles membership types: Probation (RM300), Official (RM300), Honorary (RM0), Senator (RM0), Visiting (RM500), Associate (RM50)
+  // All non-Guest first-year members also pay a one-time RM50 registration fee.
   static async initiateDuesRenewal(year: number): Promise<{
     totalMembers: number;
     renewalsByType: Record<string, number>;
@@ -2217,9 +2232,9 @@ export class FinanceService {
       const { MembershipDues } = await import('../types');
       const rules = await MembershipConfigService.getRules();
 
-      // Get all members who paid dues in the previous year (renewal members)
-      const previousYearTransactions = await this.getTransactionsByCategory('Membership');
-      const previousYearPaid = previousYearTransactions.filter(t => {
+      // Fetch all Membership transactions once — reused for both renewal-detection and duplicate-check
+      const allMembershipTransactions = await this.getTransactionsByCategory('Membership');
+      const previousYearPaid = allMembershipTransactions.filter(t => {
         const transactionYear = new Date(t.date).getFullYear();
         return transactionYear === year - 1 && t.type === 'Income' && t.status === 'Cleared';
       });
@@ -2228,10 +2243,11 @@ export class FinanceService {
 
       let renewalsByType: Record<string, number> = {
         Probation: 0,
-        Full: 0,
+        Official: 0,
         Honorary: 0,
         Senator: 0,
         Visiting: 0,
+        Associate: 0,
       };
       let notificationsSent = 0;
       const validationErrors: Array<{ memberId: string; error: string }> = [];
@@ -2241,9 +2257,11 @@ export class FinanceService {
           const member = await MembersService.getMemberById(memberId);
           if (!member) continue;
 
-          // Check if renewal already exists
-          const existingTransactions = await this.getTransactionsByCategory('Membership');
-          const alreadyRenewed = existingTransactions.some(t => {
+          // Skip inactive members — they retain historical records but do not renew
+          if ((member.role as string) === 'INACTIVE') continue;
+
+          // Check if renewal already exists — reuse the already-fetched list (M-A: no O(N) inner query)
+          const alreadyRenewed = allMembershipTransactions.some(t => {
             const transactionYear = new Date(t.date).getFullYear();
             return transactionYear === year && t.memberId === memberId && t.type === 'Income';
           });
@@ -2253,22 +2271,14 @@ export class FinanceService {
           // Determine membership type (default to 'Official' if not set)
           const membershipType = member.membershipType || 'Official';
 
-          // Validate membership type eligibility
-          if (membershipType === 'Honorary') {
-            const age = member.dateOfBirth
-              ? Math.floor((new Date().getTime() - new Date(member.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-              : 0;
-            if (age <= 40) {
-              validationErrors.push({
-                memberId,
-                error: `Honorary member ${member.name} must be over 40 years old (current age: ${age})`,
-              });
-              continue;
-            }
-          }
+          // Guest pays a one-time entry fee (RM350) when joining — they have no annual renewal dues.
+          // After paying, they are promoted to Probation and renew as Probation going forward.
+          if (membershipType === 'Guest') continue;
 
+          // Validate membership type eligibility — check nested field first, fall back to flat
           if (membershipType === 'Visiting') {
-            if (member.nationality === 'Malaysia' || !member.nationality) {
+            const nationality = member.general?.nationality ?? member.nationality;
+            if (nationality === 'Malaysia' || !nationality) {
               validationErrors.push({
                 memberId,
                 error: `Visiting member ${member.name} must be a non-Malaysian citizen`,
@@ -2278,8 +2288,8 @@ export class FinanceService {
           }
 
           if (membershipType === 'Senator') {
-            // Senators need certification - check if they have it
-            if (!member.senatorCertified) {
+            const isSenatorCertified = member.jciCareer?.senatorship?.certified ?? member.senatorCertified ?? false;
+            if (!isSenatorCertified) {
               validationErrors.push({
                 memberId,
                 error: `Senator ${member.name} does not have valid senator certification`,
@@ -2288,12 +2298,20 @@ export class FinanceService {
             }
           }
 
-          // Get dues amount for membership type
-          const duesAmount = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType];
+          // Get dues amount for membership type from config (canonical source)
+          const baseDuesAmount = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
+
+          // Skip types with RM0 dues (Honorary, Senator) — no transaction needed
+          if (baseDuesAmount === 0) continue;
+
+          // Add RM50 registration fee if member has never paid it before (first-time non-Guest members)
+          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
+          const registrationFee = hasPaidFee ? 0 : 50;
+          const duesAmount = baseDuesAmount + registrationFee;
 
           // Create renewal transaction
           const renewalDate = new Date(year, 0, 1);
-          const purpose = resolveMembershipPurpose(duesAmount, year, rules);
+          const purpose = resolveMembershipPurpose(duesAmount, year, rules, membershipType);
           await this.createTransaction({
             type: 'Income',
             category: 'Membership',
@@ -2304,7 +2322,7 @@ export class FinanceService {
             status: 'Pending',
             date: renewalDate.toISOString(),
             transactionType: 'dues',
-            projectId: `${year} Membership`,
+            projectId: `${year} membership`,
           });
 
           renewalsByType[membershipType]++;
@@ -2378,8 +2396,8 @@ export class FinanceService {
           const member = await MembersService.getMemberById(transaction.memberId);
           if (!member) continue;
 
-          // Skip senators (they are exempt from dues)
-          if (member.membershipType === 'Senator') continue;
+          // Skip types exempt from annual dues (zero-dues or one-time entry fee only)
+          if (member.membershipType === 'Senator' || member.membershipType === 'Honorary' || member.membershipType === 'Guest') continue;
 
           await CommunicationService.createNotification({
             memberId: transaction.memberId,
@@ -2414,10 +2432,11 @@ export class FinanceService {
         totalMembers: 0,
         byType: {
           Probation: { total: 0, paid: 0, pending: 0, overdue: 0 },
-          Full: { total: 0, paid: 0, pending: 0, overdue: 0 },
+          Official: { total: 0, paid: 0, pending: 0, overdue: 0 },
           Honorary: { total: 0, paid: 0, pending: 0, overdue: 0 },
           Senator: { total: 0, paid: 0, pending: 0, overdue: 0 },
           Visiting: { total: 0, paid: 0, pending: 0, overdue: 0 },
+          Associate: { total: 0, paid: 0, pending: 0, overdue: 0 },
         },
         byCategory: { renewal: 0, new: 0 },
       }),
@@ -2433,11 +2452,17 @@ export class FinanceService {
 
       const byType: Record<string, { total: number; paid: number; pending: number; overdue: number }> = {
         Probation: { total: 0, paid: 0, pending: 0, overdue: 0 },
-        Full: { total: 0, paid: 0, pending: 0, overdue: 0 },
+        Official: { total: 0, paid: 0, pending: 0, overdue: 0 },
         Honorary: { total: 0, paid: 0, pending: 0, overdue: 0 },
         Senator: { total: 0, paid: 0, pending: 0, overdue: 0 },
         Visiting: { total: 0, paid: 0, pending: 0, overdue: 0 },
+        Associate: { total: 0, paid: 0, pending: 0, overdue: 0 },
       };
+
+      // Batch-fetch all relevant members once instead of N+1 reads
+      const uniqueMemberIds = [...new Set(yearTransactions.map(t => t.memberId).filter(Boolean) as string[])];
+      const memberDocs = await Promise.all(uniqueMemberIds.map(id => MembersService.getMemberById(id)));
+      const memberMap = new Map(uniqueMemberIds.map((id, i) => [id, memberDocs[i]]));
 
       let renewalCount = 0;
       let newCount = 0;
@@ -2445,7 +2470,7 @@ export class FinanceService {
       for (const transaction of yearTransactions) {
         if (!transaction.memberId) continue;
 
-        const member = await MembersService.getMemberById(transaction.memberId);
+        const member = memberMap.get(transaction.memberId);
         if (!member) continue;
 
         const membershipType = member.membershipType || 'Official';
@@ -2512,8 +2537,11 @@ export class FinanceService {
     try {
       const { MembersService } = await import('./membersService');
       const { MembershipDues } = await import('../types');
-      const allMembers = await MembersService.getAllMembers();
-      const duesTransactions = await this.getTransactionsByCategory('Membership');
+      const [allMembers, configRules, duesTransactions] = await Promise.all([
+        MembersService.getAllMembers(),
+        MembershipConfigService.getRules(),
+        this.getTransactionsByCategory('Membership'),
+      ]);
 
       const membersDuesList: Array<{
         memberId: string;
@@ -2528,9 +2556,14 @@ export class FinanceService {
 
       for (const member of allMembers) {
         const membershipType = member.membershipType || 'Official';
-        const duesYear = new Date().getFullYear(); // Default to current year or derive from context
-        const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
-        const duesAmount = baseDues + ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50);
+        // Guest pays a one-time entry fee only — no annual renewal dues to list.
+        if (membershipType === 'Guest') continue;
+        const duesYear = filters?.duesYear ?? new Date().getFullYear();
+        const baseDues = configRules[membershipType as keyof typeof configRules]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
+        const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
+        const joinYear = member.joinDate ? new Date(member.joinDate).getFullYear() : null;
+        const isFirstYear = joinYear === duesYear;
+        const duesAmount = baseDues + (isFirstYear && !hasPaidFee ? 50 : 0);
 
         // Find member's dues transaction for the year
         const memberTransactions = duesTransactions.filter(t =>
@@ -2541,14 +2574,20 @@ export class FinanceService {
 
         if (memberTransactions.length === 0) continue;
 
-        const transaction = memberTransactions[0];
+        // Aggregate all transactions for this member+year — a member may have multiple
+        // (e.g. partial + top-up, or duplicate initiateDuesRenewal runs)
+        const clearedTotal = memberTransactions
+          .filter(t => t.status === 'Cleared' || t.status === 'Reconciled')
+          .reduce((s, t) => s + (t.amount ?? 0), 0);
+        const oldestPending = memberTransactions
+          .filter(t => t.status === 'Pending')
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
 
-        // Determine payment status
         let paymentStatus: 'paid' | 'pending' | 'overdue' = 'pending';
-        if (transaction.status === 'Cleared' || transaction.status === 'Reconciled') {
+        if (clearedTotal >= duesAmount) {
           paymentStatus = 'paid';
-        } else if (transaction.status === 'Pending') {
-          const daysSinceDue = Math.floor((new Date().getTime() - new Date(transaction.date).getTime()) / (1000 * 60 * 60 * 24));
+        } else if (oldestPending) {
+          const daysSinceDue = Math.floor((new Date().getTime() - new Date(oldestPending.date).getTime()) / (1000 * 60 * 60 * 24));
           paymentStatus = daysSinceDue > 30 ? 'overdue' : 'pending';
         }
 
@@ -2616,8 +2655,13 @@ export class FinanceService {
       }
 
       const membershipType = member.membershipType || 'Official';
-      const baseDues = MembershipDues[membershipType as keyof typeof MembershipDues] || 0;
-      const expectedAmount = baseDues + ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50);
+      // Same source of truth as initiateDuesRenewal — a configured rule always wins over
+      // the static fallback, otherwise a dues-amount change in config breaks every payment.
+      const rules = await MembershipConfigService.getRules();
+      const baseDues = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
+      const hasPaidFeeFlag = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
+      const surcharge = (!hasPaidFeeFlag && membershipType !== 'Guest') ? 50 : 0;
+      const expectedAmount = baseDues + surcharge;
 
       // Verify payment amount matches membership type dues
       if (Math.abs(paymentAmount - expectedAmount) > 0.01) {
@@ -2881,12 +2925,15 @@ export class FinanceService {
         lastReconciled: reconciliationDate,
       });
 
-      // Mark transactions as reconciled (only if no discrepancies)
+      // Mark transactions as reconciled (only if no discrepancies).
+      // Only `Cleared` transactions qualify — a Pending transaction hasn't actually
+      // cleared the bank yet, so folding it into a balanced reconciliation would
+      // "launder" unconfirmed money as if it had been verified against the statement.
       if (discrepancies.length === 0) {
         const allTransactions = await this.getAllTransactions();
         const accountTransactions = allTransactions.filter(
           t => t.bankAccountId === accountId &&
-            t.status !== 'Reconciled' &&
+            t.status === 'Cleared' &&
             new Date(t.date) <= new Date(reconciliationDate)
         );
 
@@ -2975,18 +3022,30 @@ export class FinanceService {
     return withDevMode(
       () => {
         localMockTransactions = localMockTransactions.map(t => {
-          if (t.id === bankTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [manualTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
-          if (t.id === manualTxId) return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [bankTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString() };
+          if (t.id === bankTxId || t.id === manualTxId) {
+            return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [t.id === bankTxId ? manualTxId : bankTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString(), prevStatus: t.status };
+          }
           return t;
         });
         saveMockTransactions();
       },
       async () => {
         const now = Timestamp.now();
+        // Record the status each side had before matching, so unmatchTransactions can
+        // restore it exactly instead of guessing 'Cleared' for everything (a Pending
+        // event-income transaction must not come back from unmatch as if it were confirmed).
+        const [bankSnap, manualSnap] = await Promise.all([
+          getDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId)),
+          getDoc(doc(db, COLLECTIONS.TRANSACTIONS, manualTxId)),
+        ]);
+        const bankPrevStatus = bankSnap.exists() ? (bankSnap.data() as Transaction).status : 'Cleared';
+        const manualPrevStatus = manualSnap.exists() ? (manualSnap.data() as Transaction).status : 'Cleared';
+
         await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
           matchStatus: 'full',
           matchedBankTxIds: [manualTxId],
           status: 'Reconciled',
+          prevStatus: bankPrevStatus,
           reconciledBy,
           reconciledAt: now,
         });
@@ -2994,6 +3053,7 @@ export class FinanceService {
           matchStatus: 'full',
           matchedBankTxIds: [bankTxId],
           status: 'Reconciled',
+          prevStatus: manualPrevStatus,
           reconciledBy,
           reconciledAt: now,
         });
@@ -3001,27 +3061,44 @@ export class FinanceService {
     );
   }
 
-  // Unmatch a previously matched pair (revert both to Cleared)
+  // Unmatch a previously matched pair — restores each side to the status it had before
+  // matching (tracked via prevStatus), instead of blindly setting both to 'Cleared'.
   static async unmatchTransactions(txId1: string, txId2: string): Promise<void> {
     return withDevMode(
       () => {
         localMockTransactions = localMockTransactions.map(t => {
           if (t.id === txId1 || t.id === txId2) {
-            return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: 'Cleared' as const, reconciledBy: undefined, reconciledAt: undefined };
+            return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: (t.prevStatus ?? 'Cleared') as Transaction['status'], prevStatus: undefined, reconciledBy: undefined, reconciledAt: undefined };
           }
           return t;
         });
         saveMockTransactions();
       },
       async () => {
-        for (const id of [txId1, txId2]) {
-          await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, id), {
+        const snaps = await Promise.all([txId1, txId2].map(id => getDoc(doc(db, COLLECTIONS.TRANSACTIONS, id))));
+        for (const snap of snaps) {
+          if (!snap.exists()) continue;
+          const prevStatus = (snap.data() as Transaction).prevStatus ?? 'Cleared';
+          await updateDoc(snap.ref, {
             matchStatus: null,
             matchedBankTxIds: null,
-            status: 'Cleared',
+            status: prevStatus,
+            prevStatus: null,
             reconciledBy: null,
             reconciledAt: null,
           });
+        }
+        // Revert any PR that was marked paid via this match pair (情景 E — unmatch path)
+        for (const snap of snaps) {
+          if (!snap.exists()) continue;
+          const prId = (snap.data() as Transaction).paymentRequestId;
+          if (prId) {
+            const { PaymentRequestService } = await import('./paymentRequestService');
+            await PaymentRequestService.revertPaid(prId).catch(err =>
+              console.warn('[unmatchTransactions] revertPaid failed for PR', prId, err)
+            );
+            break; // only one tx in a pair links to a PR
+          }
         }
       }
     );
@@ -3816,6 +3893,71 @@ export class FinanceService {
           lastDoc: snapshot.docs[snapshot.docs.length - 1] ?? null,
           hasMore: snapshot.docs.length === pageSize,
         };
+      }
+    );
+  }
+
+  // ── Finance Alerts ────────────────────────────────────────────────────────
+
+  static async getFinanceAlerts(onlyUnresolved = true): Promise<FinanceAlert[]> {
+    return withDevMode(
+      () => [],
+      async () => {
+        const q = onlyUnresolved
+          ? query(collection(db, COLLECTIONS.FINANCE_ALERTS), where('resolved', '==', false))
+          : collection(db, COLLECTIONS.FINANCE_ALERTS);
+        const snap = await getDocs(q);
+        return snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            type: data.type ?? '',
+            message: data.message ?? '',
+            transactionId: data.transactionId,
+            billCode: data.billCode,
+            eventRegistrationId: data.eventRegistrationId,
+            paymentRequestId: data.paymentRequestId,
+            resolved: data.resolved ?? false,
+            resolvedAt: data.resolvedAt?.toDate?.()?.toISOString() ?? data.resolvedAt,
+            resolvedBy: data.resolvedBy,
+            createdAt: data.createdAt?.toDate?.()?.toISOString() ?? data.createdAt ?? new Date().toISOString(),
+          } as FinanceAlert;
+        });
+      }
+    );
+  }
+
+  static async resolveFinanceAlert(alertId: string, resolvedBy: string): Promise<void> {
+    return withDevMode(
+      () => {},
+      () => updateDoc(doc(db, COLLECTIONS.FINANCE_ALERTS, alertId), {
+        resolved: true,
+        resolvedAt: Timestamp.now(),
+        resolvedBy,
+        updatedAt: Timestamp.now(),
+      })
+    );
+  }
+
+  // ── Void Transaction ──────────────────────────────────────────────────────
+
+  static async voidTransaction(transactionId: string, reason: string, voidedBy: string): Promise<void> {
+    return withDevMode(
+      () => {},
+      async () => {
+        const ref = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error('Transaction not found');
+        const tx = snap.data() as Transaction;
+        if (tx.status === 'Voided') throw new Error('Transaction is already voided');
+        await updateDoc(ref, {
+          status: 'Voided',
+          voidedAt: Timestamp.now(),
+          voidedBy,
+          voidReason: reason,
+          prevStatus: tx.status,
+          updatedAt: Timestamp.now(),
+        });
       }
     );
   }

@@ -5,6 +5,7 @@ import { FinanceService } from '../../../services/financeService';
 import { Project, BankAccount, Transaction } from '../../../types';
 import { Select } from '../../ui/Form';
 import { ProjectsService } from '../../../services/projectsService';
+import { EventPaymentMatchingService } from '../../../services/eventPaymentMatchingService';
 
 interface Props {
   isOpen: boolean;
@@ -49,14 +50,27 @@ export const BankTransactionImportModal: React.FC<Props> = ({
       .catch(() => setExistingTransactions([]));
   }, [selectedBankAccountId]);
 
+  // After a bank statement import, try to auto-match any pending event-registration
+  // income transactions against the freshly-imported rows — otherwise runAutoMatch
+  // never gets called and every event payment sits Pending forever (情景 P1-14).
+  const handleImported = React.useCallback(() => {
+    if (selectedBankAccountId) {
+      EventPaymentMatchingService.runAutoMatch(selectedBankAccountId).catch((err) => {
+        console.warn('[BankTransactionImportModal] Auto-match after import failed:', err);
+      });
+    }
+    onImported();
+  }, [selectedBankAccountId, onImported]);
+
   return (
     <BatchImportModal
       isOpen={isOpen}
       onClose={onClose}
       config={bankTransactionImportConfig}
-      onImported={onImported}
+      onImported={handleImported}
       context={{
         bankAccountId: selectedBankAccountId,
+        loId: bankAccounts.find(a => a.id === selectedBankAccountId)?.loId,
         projects: projects,
         existingTransactions: existingTransactions,
       }}

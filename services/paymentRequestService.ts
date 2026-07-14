@@ -233,8 +233,9 @@ export class PaymentRequestService {
   ): Promise<void> {
     const { reviewerBoardTitle, rejectionReason } = opts ?? {};
 
-    // Role gate (情景 25)
-    if (reviewerBoardTitle && !APPROVER_BOARD_TITLES.some(t => reviewerBoardTitle.includes(t))) {
+    // Role gate (情景 25) — reviewerBoardTitle must be present AND be an authorised title.
+    // An absent title (member profile not set) is not a bypass; it's a hard rejection.
+    if (!reviewerBoardTitle || !APPROVER_BOARD_TITLES.some(t => reviewerBoardTitle.includes(t))) {
       throw new Error(`Only ${APPROVER_BOARD_TITLES.join(', ')} may approve or reject payment requests.`);
     }
     if (status === 'rejected' && !rejectionReason?.trim()) {
@@ -245,26 +246,41 @@ export class PaymentRequestService {
       async () => {
         const now = new Date().toISOString();
         const idx = devPaymentRequests.findIndex((p) => p.id === id);
-        if (idx >= 0) {
-          devPaymentRequests = [...devPaymentRequests];
-          devPaymentRequests[idx] = {
-            ...devPaymentRequests[idx],
-            status,
-            reviewedBy,
-            reviewedAt: now,
-            updatedAt: now,
-            ...(status === 'rejected' ? { rejectionReason: rejectionReason ?? null } : {}),
-          };
+        if (idx < 0) throw new Error('Payment request not found');
+        const currentStatus = devPaymentRequests[idx].status;
+        if (currentStatus !== 'submitted') {
+          throw new Error(`Cannot ${status} a payment request with status "${currentStatus}" — only submitted requests can be approved or rejected.`);
         }
+        devPaymentRequests = [...devPaymentRequests];
+        devPaymentRequests[idx] = {
+          ...devPaymentRequests[idx],
+          status,
+          reviewedBy,
+          reviewedAt: now,
+          updatedAt: now,
+          ...(status === 'rejected' ? { rejectionReason: rejectionReason ?? null } : {}),
+        };
         if (status === 'approved') {
           const pr = devPaymentRequests.find((p) => p.id === id);
           if (pr) await this._createExpenseTransaction(pr, reviewedBy);
+        }
+        if (status === 'rejected') {
+          // Defensive: clears any expense tx that may already exist for this PR (情景 KK).
+          await this._deleteExpenseTransactionForPR(id);
         }
         // Notify applicant (AA)
         const pr = devPaymentRequests.find((p) => p.id === id);
         if (pr) await this._notifyApplicant(pr, status, rejectionReason);
       },
       async () => {
+        const ref = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
+        const snap0 = await getDoc(ref);
+        if (!snap0.exists()) throw new Error('Payment request not found');
+        const currentStatus = (snap0.data() as PaymentRequest).status;
+        if (currentStatus !== 'submitted') {
+          throw new Error(`Cannot ${status} a payment request with status "${currentStatus}" — only submitted requests can be approved or rejected.`);
+        }
+
         const now = Timestamp.now();
         const payload: any = {
           status,
@@ -274,17 +290,21 @@ export class PaymentRequestService {
         };
         if (status === 'rejected') payload.rejectionReason = rejectionReason ?? null;
 
-        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
+        await updateDoc(ref, payload);
 
         if (status === 'approved') {
-          const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+          const snap = await getDoc(ref);
           if (snap.exists()) {
             const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
             await this._createExpenseTransaction(pr, reviewedBy);
           }
         }
+        if (status === 'rejected') {
+          // Defensive: clears any expense tx that may already exist for this PR (情景 KK).
+          await this._deleteExpenseTransactionForPR(id);
+        }
         // Notify applicant (AA)
-        const snap2 = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        const snap2 = await getDoc(ref);
         if (snap2.exists()) {
           const pr = { id: snap2.id, ...snap2.data() } as PaymentRequest;
           await this._notifyApplicant(pr, status, rejectionReason);
@@ -424,6 +444,21 @@ export class PaymentRequestService {
         if (!snap.exists()) throw new Error('Payment request not found');
         const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
         if (pr.status !== 'approved') throw new Error('PR is not in approved status');
+
+        // Idempotency: skip if a non-reconciled expense tx already exists for this PR.
+        // Without this check a double-click creates two expense txs and doubles the outgoing amount.
+        const existingQ = query(
+          collection(db, COLLECTIONS.TRANSACTIONS),
+          where('paymentRequestId', '==', prId),
+          where('type', '==', 'Expense'),
+          limit(1)
+        );
+        const existingSnap = await getDocs(existingQ);
+        if (!existingSnap.empty) {
+          await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, prId), { expenseTxFailed: false });
+          return;
+        }
+
         await this._createExpenseTransaction(pr, retriedBy);
       }
     );
@@ -477,13 +512,22 @@ export class PaymentRequestService {
         if (pr) await this._notifyApplicant(pr, 'cancelled');
       },
       async () => {
-        // Delete linked expense transaction before cancelling (情景 G)
-        await this._deleteExpenseTransactionForPR(id);
+        // Attempt to delete linked expense transaction (情景 G).
+        // Non-finance applicants lack the Firestore delete permission on transactions, so we
+        // catch that error, still cancel the PR, and flag expenseTxFailed so finance can clean up.
+        let expenseTxCleanupFailed = false;
+        try {
+          await this._deleteExpenseTransactionForPR(id);
+        } catch (err) {
+          console.warn('[PaymentRequestService.cancel] Could not delete expense tx (permission denied?)', err);
+          expenseTxCleanupFailed = true;
+        }
 
         await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
           status: 'cancelled',
           updatedAt: Timestamp.now(),
           updatedBy: userId,
+          ...(expenseTxCleanupFailed ? { expenseTxFailed: true } : {}),
         });
         // Notify applicant (AA)
         const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
@@ -508,12 +552,27 @@ export class PaymentRequestService {
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
-  /** Delete any expense transaction linked to this PR (情景 G, 23) */
+  /**
+   * Delete any expense transaction linked to this PR (情景 G, 23).
+   * Transactions already Reconciled / Partially Reconciled are left alone —
+   * deleting them would silently break a completed bank reconciliation with
+   * no audit trail. Those must be voided manually by finance instead.
+   */
   private static async _deleteExpenseTransactionForPR(prId: string): Promise<void> {
     try {
-      const allTx = await FinanceService.getAllTransactions();
-      const linked = allTx.filter(t => t.paymentRequestId === prId);
+      // Targeted query instead of full-table scan so this stays fast as data grows.
+      const q = query(
+        collection(db, COLLECTIONS.TRANSACTIONS),
+        where('paymentRequestId', '==', prId),
+        where('type', '==', 'Expense')
+      );
+      const snap = await getDocs(q);
+      const linked = snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').Transaction));
       for (const tx of linked) {
+        if (tx.status === 'Reconciled' || tx.status === 'Partially Reconciled') {
+          console.warn(`[PaymentRequestService] Skipping delete of reconciled transaction ${tx.id} linked to PR ${prId} — reconcile must be reversed manually first`);
+          continue;
+        }
         await FinanceService.deleteTransaction(tx.id);
       }
     } catch (err) {
@@ -524,13 +583,22 @@ export class PaymentRequestService {
   /** Update amount on the expense transaction linked to this PR (情景 R) */
   private static async _syncExpenseTransactionAmount(pr: PaymentRequest): Promise<void> {
     try {
-      const allTx = await FinanceService.getAllTransactions();
-      const linked = allTx.filter(t => t.paymentRequestId === pr.id && t.type === 'Expense');
+      const q = query(
+        collection(db, COLLECTIONS.TRANSACTIONS),
+        where('paymentRequestId', '==', pr.id),
+        where('type', '==', 'Expense')
+      );
+      const snap = await getDocs(q);
+      const linked = snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').Transaction));
       for (const tx of linked) {
         await FinanceService.updateTransaction(tx.id, { amount: pr.totalAmount || pr.amount });
       }
     } catch (err) {
       console.error('[PaymentRequestService] Failed to sync expense transaction amount for PR', pr.id, err);
+      // Surface the failure so finance knows the PR amount and the expense tx are now out of sync.
+      try {
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { amountSyncFailed: true });
+      } catch { /* ignore */ }
     }
   }
 

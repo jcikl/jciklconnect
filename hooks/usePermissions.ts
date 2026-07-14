@@ -33,8 +33,11 @@ export const usePermissions = () => {
 
     // SECONDARY ACCESS: current calendar-year board (synced from boardMembers → member doc)
     const isCurrentBoardMember = isMemberCurrentBoard(member);
+    // Legacy BOARD role (static assignment, pre-dynamic board system) gets the same elevation
+    const effectiveRoleInner = simulatedRole ?? (member.role as UserRole) ?? UserRole.GUEST;
+    const isLegacyBoardRoleInner = effectiveRoleInner === UserRole.BOARD;
 
-    if (isCurrentBoardMember && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN) {
+    if ((isCurrentBoardMember || isLegacyBoardRoleInner) && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN && member.role !== UserRole.INACTIVE) {
       basePermissions = {
         ...basePermissions,
         canViewMembers: true,
@@ -95,21 +98,39 @@ export const usePermissions = () => {
 
   const isCurrentBoardMember = isMemberCurrentBoard(member);
   const isLegacyBoardRole = effectiveRole === UserRole.BOARD;
-  const isBoardUser = isCurrentBoardMember || isLegacyBoardRole;
+  // T-1: INACTIVE is a hard block — never grant board status regardless of flags
+  const isBoardUser = (isCurrentBoardMember || isLegacyBoardRole) && effectiveRole !== UserRole.INACTIVE;
   const isPlainMember =
     effectiveRole === UserRole.MEMBER && !isBoardUser;
 
   /** Workspace modules (Members, Communication, Gamification etc.) — board, admin only; not plain members/guests */
+  // B-7: Honorary and Senator members also get workspace access (they hold special JCI status)
+  // T-2: during simulateRole the real membershipType must not bleed into workspace access
+  const isHonoraryOrSenator =
+    !simulatedRole &&
+    (member?.membershipType === 'Honorary' || member?.membershipType === 'Senator');
   const canAccessWorkspaceModules =
     effectiveRole !== UserRole.GUEST &&
+    effectiveRole !== UserRole.INACTIVE &&
     (isBoardUser ||
       effectiveRole === UserRole.ADMIN ||
-      effectiveRole === UserRole.SUPER_ADMIN);
+      effectiveRole === UserRole.SUPER_ADMIN ||
+      isHonoraryOrSenator);
 
   /** Events management + Payment Requests — open to all active members */
   const canAccessEventsAndPayments =
     effectiveRole !== UserRole.GUEST &&
     effectiveRole !== UserRole.INACTIVE;
+
+  // B-3: Derive board-position flags from currentBoardPosition field
+  const boardPosition = ((member as any)?.currentBoardPosition || '').toLowerCase();
+  const isOrganizationSecretary = isBoardUser && boardPosition.includes('secretary');
+  const isOrganizationFinance =
+    isBoardUser &&
+    (boardPosition.includes('treasurer') ||
+      (boardPosition.includes('finance') && !boardPosition.includes('activity')));
+  const isActivityFinance =
+    isBoardUser && boardPosition.includes('activity') && boardPosition.includes('finance');
 
   return {
     permissions,
@@ -117,7 +138,8 @@ export const usePermissions = () => {
     hasAnyPermission,
     hasAllPermissions,
     isGuest: effectiveRole === UserRole.GUEST,
-    isProbationMember: false,
+    // B-2: Derive from actual membershipType field instead of hardcoded false
+    isProbationMember: member?.membershipType === 'Probation' && effectiveRole !== UserRole.INACTIVE,
     isMember: effectiveRole === UserRole.MEMBER,
     isPlainMember,
     isCurrentBoardMember: isBoardUser,
@@ -125,11 +147,11 @@ export const usePermissions = () => {
     canAccessWorkspaceModules,
     canAccessEventsAndPayments,
     isAdmin: effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN,
-    isOrganizationSecretary: false, // Deprecated - use dynamic assignment
-    isOrganizationFinance: false, // Deprecated - use dynamic assignment
-    isActivityFinance: false, // Deprecated - use dynamic assignment
+    isOrganizationSecretary,
+    isOrganizationFinance,
+    isActivityFinance,
     isDeveloper: devMode || !!simulatedRole,
-    effectiveRole, // Return the effective role being used
+    effectiveRole,
   };
 };
 

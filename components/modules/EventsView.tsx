@@ -493,10 +493,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       const actorName = member?.name ?? member?.id ?? 'Admin';
       const today = now.split('T')[0];
 
-      // Create income transaction (Pending)
+      // Create income transaction (Pending) — only for paid events (amount > 0).
+      // Let createTransaction throw so a DB failure aborts the whole operation
+      // and EventReg is never left in 'paid' state without a finance record.
       let financeTransactionId: string | undefined;
-      try {
-        const amount = event?.price ?? 0;
+      const amount = event?.price ?? 0;
+      if (amount > 0) {
         financeTransactionId = await FinanceService.createTransaction({
           type: 'Income',
           category: 'Projects & Activities',
@@ -510,8 +512,6 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           date: today,
           source: 'manual',
         } as Parameters<typeof FinanceService.createTransaction>[0]);
-      } catch (e) {
-        console.warn('[handleConfirmMarkPaid] Failed to create income tx:', e);
       }
 
       await EventRegistrationService.updateStatus(reg.id, 'paid', {
@@ -533,7 +533,19 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setUpdatingRegId(reg.id);
     const nextStatus = reg.status === 'checked_in' ? 'checked_in' : 'registered';
     try {
-      await EventRegistrationService.updateStatus(reg.id, nextStatus, { paidAt: null, paidByName: null });
+      // Undoing a payment must not leave the Finance income transaction behind —
+      // otherwise revenue is double-counted the next time this registration is marked paid.
+      if (reg.financeTransactionId) {
+        const tx = await FinanceService.getTransactionById(reg.financeTransactionId);
+        if (tx && (tx.status === 'Cleared' || tx.status === 'Reconciled' || tx.status === 'Partially Reconciled')) {
+          showToast('Cannot undo — the linked transaction has already cleared/reconciled. Ask finance to void it first.', 'error');
+          return;
+        }
+        if (tx) {
+          await FinanceService.deleteTransaction(reg.financeTransactionId);
+        }
+      }
+      await EventRegistrationService.updateStatus(reg.id, nextStatus, { paidAt: null, paidByName: null, financeTransactionId: null });
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: nextStatus as EventRegistration['status'], paidAt: null, paidByName: null } : r)));
       showToast('Payment reverted', 'success');
     } catch {

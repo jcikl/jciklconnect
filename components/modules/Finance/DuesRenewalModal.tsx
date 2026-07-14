@@ -1,17 +1,14 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button, Modal, useToast } from '../../ui/Common';
-import { Input, Select } from '../../ui/Form';
-import { formatCurrency } from '../../../utils/formatUtils';
+import { Select } from '../../ui/Form';
 
 // Dues Renewal Modal
 export interface DuesRenewalModalProps {
   isOpen: boolean;
   onClose: () => void;
   year: number;
-  duesAmount: number;
   onYearChange: (year: number) => void;
-  onAmountChange: (amount: number) => void;
   onRenew: () => Promise<void>;
   isRenewing: boolean;
 }
@@ -20,9 +17,7 @@ export const DuesRenewalModal: React.FC<DuesRenewalModalProps> = ({
   isOpen,
   onClose,
   year,
-  duesAmount,
   onYearChange,
-  onAmountChange,
   onRenew,
   isRenewing,
 }) => {
@@ -80,16 +75,6 @@ export const DuesRenewalModal: React.FC<DuesRenewalModalProps> = ({
           required
         />
 
-        <Input
-          label="Dues Amount"
-          type="number"
-          step="0.01"
-          value={duesAmount.toString()}
-          onChange={(e) => onAmountChange(parseFloat(e.target.value) || 0)}
-          placeholder="150.00"
-          required
-        />
-
         <div className="p-4 bg-slate-50 rounded-lg space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-slate-600">Previous Year:</span>
@@ -99,14 +84,10 @@ export const DuesRenewalModal: React.FC<DuesRenewalModalProps> = ({
             <span className="text-slate-600">Renewal Year:</span>
             <span className="font-semibold text-slate-900">{year}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-600">Full Year Dues Amount:</span>
-            <span className="font-semibold text-slate-900">{formatCurrency(duesAmount)}</span>
-          </div>
           <div className="pt-2 border-t border-slate-200 mt-2">
             <p className="text-xs text-slate-500">
-              <strong>Note:</strong> Pro-rata payments will be automatically calculated for members who joined mid-year ({year}).
-              The system calculates: (Full Amount / 12) × Remaining Months.
+              <strong>Note:</strong> Dues amounts are calculated per member type (Probation RM300, Visiting RM500, Associate RM50, Honorary RM0).
+              All first-year members are charged an additional RM50 registration fee. Pro-rata applies for mid-year joiners.
             </p>
           </div>
         </div>

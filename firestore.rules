@@ -197,38 +197,47 @@ service cloud.firestore {
              );
     }
     
+    // Deletion is destructive and irreversible — reserved for org-level finance roles.
+    // ACTIVITY_FINANCE may create/update (their own activity's transactions, enforced
+    // at the app layer) but must never be able to delete any transaction outright.
+    function canDeleteFinance() {
+      return isBoard() || (getUserRole() != null && getUserRole() == 'ORGANIZATION_FINANCE');
+    }
+
     // Transactions: board / finance roles; multi-LO scoped by loId unless isBoard()
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
         (isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
-      allow create, update, delete: if canAccessFinance();
+      allow create, update: if canAccessFinance();
+      allow delete: if canDeleteFinance();
     }
 
     // Transaction Splits: same rules as transactions
     match /transactionSplits/{splitId} {
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
         (isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
-      allow create, update, delete: if canAccessFinance();
+      allow create, update: if canAccessFinance();
+      allow delete: if canDeleteFinance();
     }
 
-    // Project Transactions (Story 4.1): Project-specific financials
-    // Allow read/write for authenticated users involved in the project (simplified for now to match project tasks)
+    // Project Transactions (Story 4.1): Project-specific financials.
+    // These carry the same reconciliation reverse-index (matchedBankAmount etc.) as
+    // `transactions`, so they get the same finance-role gate — not just isAuthenticated().
     match /projectTrx/{transactionId} {
-      allow read, create, update, delete: if isAuthenticated();
+      allow read: if isMember();
+      allow create, update: if canAccessFinance();
+      allow delete: if canDeleteFinance();
     }
     
-    // Dues Renewals: 会费续费记录；组织财政/活动财政/BOARD/ADMIN 可读写
-    match /duesRenewals/{renewalId} {
-      allow read, create, update, delete: if canAccessFinance();
-    }
-    
-    // Bank Accounts: 组织财政/活动财政/BOARD/ADMIN；读/改/删仅本 LO
+
+    // Bank Accounts: create/delete restricted to org-level finance (ORGANIZATION_FINANCE/BOARD);
+    // ACTIVITY_FINANCE can read and update their own LO's accounts but must not create new ones.
     match /bankAccounts/{accountId} {
-      allow read, update, delete: if canAccessFinance() &&
+      allow read, update: if canAccessFinance() &&
         (resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId());
-      allow create: if canAccessFinance();
+      allow create, delete: if canDeleteFinance();
     }
     
     // Payment Requests (Story 2.1): applicantId, amount, purpose, activityRef, referenceNumber, status, loId, 审计; 活动财政仅本活动
@@ -250,9 +259,14 @@ service cloud.firestore {
         request.resource.data.get('loId', null) is string &&
         request.resource.data.get('referenceNumber', null) is string &&
         request.resource.data.get('status', null) is string;
-      allow update: if isAuthenticated() && 
-        (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' || canAccessFinance() && paymentRequestInMyScope());
-      allow delete: if isAuthenticated() && resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft';
+      allow update: if isAuthenticated() &&
+        (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' ||
+         resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) in ['submitted', 'approved'] && request.resource.data.get('status', null) == 'cancelled' ||
+         resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'rejected' && request.resource.data.get('status', null) == 'submitted' ||
+         canAccessFinance() && paymentRequestInMyScope());
+      allow delete: if isAuthenticated() && (
+        (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft') ||
+        isAdmin() || isDeveloper());
     }
 
     // Self-registration pending review records (written by new GUEST users, read by admins)
@@ -269,16 +283,24 @@ service cloud.firestore {
     }
 
     // Story 8.1: 报名/缴费/签到统一名单
+    // Fields a member may self-service on their own registration (non-financial).
+    // Anything payment/status related must go through canReadOrgMembers() (board/finance/committee).
+    function eventRegSelfUpdateOnlyTouchesOwnFields() {
+      let unchanged = ['status', 'paidAt', 'checkedInAt', 'paymentMethod', 'financeTransactionId',
+        'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus', 'billExternalReferenceNo'];
+      return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
+    }
     match /eventRegistrations/{regId} {
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
         (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() &&
         request.resource.data.get('memberId', null) is string &&
         request.resource.data.get('eventId', null) is string &&
         (request.resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
-      allow update: if isAuthenticated() && 
-        (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
-      allow delete: if isAuthenticated() && 
+      allow update: if isAuthenticated() &&
+        (canReadOrgMembers() ||
+         (resource.data.get('memberId', null) == request.auth.uid && eventRegSelfUpdateOnlyTouchesOwnFields()));
+      allow delete: if isAuthenticated() &&
         (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
     }
     
@@ -688,16 +710,9 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
     
-    // Finance: bank accounts (PaymentRequestsView — members read; board manages)
-    match /bankAccounts/{docId} {
-      allow read: if isMember();
-      allow create, update, delete: if isBoard() || canAccessFinance();
-    }
-    
-    // Finance: payment requests (PaymentRequestsView - for members to submit, edit, and view)
-    match /paymentRequests/{docId} {
-      allow read, create, update, delete: if isMember();
-    }
+    // Finance: payment requests — superseded by the scoped rule above (line ~244);
+    // this collection is intentionally NOT re-declared here to avoid re-opening the
+    // isMember()-for-everything hole (see match /paymentRequests/{requestId} above).
 
     // Wolf-like Competition System Collections
     match /bounties/{bountyId} {
@@ -826,6 +841,14 @@ service cloud.firestore {
     match /toyyibBills/{billId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isBoard();
+    }
+
+    // Finance Alerts: written by server-side (Admin SDK / webhook) for issues requiring manual review.
+    // Finance roles can read and mark as resolved; only Admin SDK (no auth) writes them.
+    match /finance_alerts/{alertId} {
+      allow read: if canAccessFinance();
+      allow update: if canAccessFinance();
+      allow create, delete: if false;
     }
 
     // Default: deny all other access

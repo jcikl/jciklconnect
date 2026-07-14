@@ -629,19 +629,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setOriginalRole(null);
     } else {
       setSimulatedRole(role);
+      // B-4: also patch membershipType to match simulated role (Guest→'Guest', else keep current)
+      const membershipTypePatch = role === UserRole.GUEST ? { membershipType: 'Guest' as const } : {};
       // If simulating as a specific member, restore original member first then apply new role
       if (simulatedMemberId) {
         setSimulatedMemberId(null);
         const base = originalMember || member;
-        setMember({ ...base, role });
+        setMember({ ...base, role, ...membershipTypePatch });
         setOriginalMember(null);
       } else {
-        setMember({ ...member, role });
+        setMember({ ...member, role, ...membershipTypePatch });
       }
     }
   };
 
-  const simulateAsMember = async (memberId: string, role: UserRole) => {
+  const simulateAsMember = async (memberId: string, _roleHint: UserRole) => {
     if (!member) return;
 
     // Only allow if in dev mode OR current role is ADMIN
@@ -657,9 +659,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const targetMember = await MembersService.getMemberById(memberId);
     if (!targetMember) return;
 
+    // B-5: use the target member's actual role rather than the label-color-derived hint
+    const effectiveRole = (targetMember.role as UserRole) || _roleHint;
     setSimulatedMemberId(memberId);
-    setSimulatedRole(role);
-    setMember({ ...targetMember, role });
+    setSimulatedRole(effectiveRole);
+    setMember({ ...targetMember, role: effectiveRole });
   };
 
   return (

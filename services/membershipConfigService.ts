@@ -131,7 +131,14 @@ export function roleForMembershipType(
 ): UserRole {
   if (membershipType === 'Guest') return UserRole.GUEST;
   if (membershipType === 'Probation') return UserRole.MEMBER;
-  if (currentRole === UserRole.BOARD || currentRole === UserRole.ADMIN || currentRole === UserRole.SUPER_ADMIN) {
+  // Preserve admin-set roles that are never derived from membershipType
+  if (
+    currentRole === UserRole.BOARD ||
+    currentRole === UserRole.ADMIN ||
+    currentRole === UserRole.SUPER_ADMIN ||
+    currentRole === UserRole.INACTIVE ||
+    (currentRole as string) === 'INACTIVE'
+  ) {
     return currentRole as UserRole;
   }
   return UserRole.MEMBER;
@@ -156,6 +163,14 @@ export function computeMembershipTypeFromMember(
   referenceDate: Date = new Date()
 ): MembershipType {
   if (member.role === UserRole.GUEST || member.role === 'GUEST') return 'Guest';
+
+  // INACTIVE is admin-set — freeze the existing membershipType, never recompute
+  if (member.role === UserRole.INACTIVE || (member.role as string) === 'INACTIVE') {
+    return (member.membershipType as MembershipType) || 'Official';
+  }
+
+  // Honorary is admin-granted (not derivable from profile) — retain if already set
+  if (member.membershipType === 'Honorary') return 'Honorary';
 
   if (member.senatorshipBoardValidated && member.senatorshipId?.trim()) {
     const senatorCheck = validateMembershipTypeEligibility(
@@ -198,7 +213,7 @@ export function computeMembershipTypeFromMember(
   return suggested;
 }
 
-/** Registration fee added to Probation/Full first-year dues */
+/** One-time registration fee paid by ALL new members on their first membership payment (except Guest, who pays a separate entry fee). */
 export const FIRST_YEAR_REGISTRATION_FEE = 50;
 
 /** Target annual dues from membershipType + config (matches Dues Renewal Dashboard). */
@@ -207,8 +222,10 @@ export function getTargetDuesForMembershipType(
   isFirstYear: boolean,
   rules: Record<MembershipType, MembershipRuleConfig>
 ): number {
+  // Guest members pay a one-time RM350 entry fee managed separately; they have no annual dues.
+  if (membershipType === 'Guest') return 0;
   const base = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType] ?? 0;
-  if ((membershipType === 'Probation' || membershipType === 'Official') && isFirstYear) {
+  if (isFirstYear) {
     return base + FIRST_YEAR_REGISTRATION_FEE;
   }
   return base;
@@ -225,11 +242,11 @@ export function resolveMembershipTypeFromDues(
   const exact = Object.entries(rules).find(([, cfg]) => cfg.duesAmount === dues);
   if (exact) return exact[0] as MembershipType;
 
-  const probationBase = rules.Probation?.duesAmount ?? MembershipDues.Probation;
-  const officialBase = rules.Official?.duesAmount ?? MembershipDues.Official;
-  if (dues === probationBase + FIRST_YEAR_REGISTRATION_FEE || dues === officialBase + FIRST_YEAR_REGISTRATION_FEE) {
-    return 'Probation';
-  }
+  // All non-Guest types add FIRST_YEAR_REGISTRATION_FEE on first payment
+  const firstYearMatch = Object.entries(rules).find(
+    ([type, cfg]) => type !== 'Guest' && dues === (cfg.duesAmount ?? 0) + FIRST_YEAR_REGISTRATION_FEE
+  );
+  if (firstYearMatch) return firstYearMatch[0] as MembershipType;
 
   return fallback;
 }
@@ -238,7 +255,7 @@ export const DEFAULT_MEMBERSHIP_RULES: Record<MembershipType, MembershipRuleConf
   Guest: { type: 'Guest', duesAmount: 350, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Probation: { type: 'Probation', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Official: { type: 'Official', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
-  Honorary: { type: 'Honorary', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
+  Honorary: { type: 'Honorary', duesAmount: 0, nationalityLimit: 'Malaysian', ageLimit: {}, requiresSenatorship: false },
   Senator: { type: 'Senator', duesAmount: 0, nationalityLimit: 'Malaysian', ageLimit: {}, requiresSenatorship: true },
   Visiting: { type: 'Visiting', duesAmount: 500, nationalityLimit: 'Non-Malaysian', ageLimit: {}, requiresSenatorship: false },
   Associate: { type: 'Associate', duesAmount: 50, nationalityLimit: 'Malaysian', ageLimit: { min: 41 }, requiresSenatorship: false },
@@ -291,25 +308,28 @@ export const MembershipConfigService = {
 export function resolveMembershipPurpose(
   amount: number,
   year: number,
-  rules: Record<MembershipType, MembershipRuleConfig>
+  rules: Record<MembershipType, MembershipRuleConfig>,
+  membershipType?: string
 ): string {
   const probationDues = rules.Probation?.duesAmount ?? 300;
   const officialDues = rules.Official?.duesAmount ?? 300;
   const visitingDues = rules.Visiting?.duesAmount ?? 500;
   const associateDues = rules.Associate?.duesAmount ?? 50;
 
-  if (amount === visitingDues) {
-    return `${year} Visiting Membership`;
-  }
-  if (amount === associateDues) {
-    return `${year} Associate Membership`;
-  }
+  if (amount === visitingDues) return `${year} Visiting Membership`;
+  if (amount === associateDues) return `${year} Associate Membership`;
+
   if (amount === probationDues + 50 || amount === officialDues + 50) {
+    // First-year — include type when known to aid reconciliation
+    if (membershipType === 'Probation') return `${year} New Probation Membership`;
+    if (membershipType === 'Official') return `${year} New Official Membership`;
     return `${year} New Membership`;
   }
-  if (amount === officialDues || amount === probationDues) {
-    return `${year} Renewed Membership`;
-  }
+
+  // Renewal — use membershipType to disambiguate types sharing the same dues amount (e.g. Probation = Official = RM300)
+  if (membershipType === 'Probation') return `${year} Probation Renewal`;
+  if (membershipType === 'Official') return `${year} Official Renewal`;
+  if (amount === officialDues || amount === probationDues) return `${year} Renewed Membership`;
   return `${year} Membership`;
 }
 

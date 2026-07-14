@@ -2,6 +2,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   addDoc,
   updateDoc,
@@ -182,8 +183,8 @@ export const EventRegistrationService = {
       paidByName?: string | null;
       checkedInByName?: string | null;
       paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
-      financeTransactionId?: string;
-      matchedBankTxId?: string;
+      financeTransactionId?: string | null;
+      matchedBankTxId?: string | null;
     }
   ): Promise<void> {
     return withDevMode(
@@ -208,7 +209,7 @@ export const EventRegistrationService = {
         if (options?.paidByName !== undefined) updateData.paidByName = options.paidByName ?? null;
         if (options?.checkedInByName !== undefined) updateData.checkedInByName = options.checkedInByName ?? null;
         if (options?.paymentMethod !== undefined) updateData.paymentMethod = options.paymentMethod;
-        if (options?.financeTransactionId !== undefined) updateData.financeTransactionId = options.financeTransactionId;
+        if (options?.financeTransactionId !== undefined) updateData.financeTransactionId = options.financeTransactionId ?? null;
         if (options?.matchedBankTxId !== undefined) updateData.matchedBankTxId = options.matchedBankTxId;
         await updateDoc(ref, updateData);
       }
@@ -235,12 +236,35 @@ export const EventRegistrationService = {
       },
       async () => {
         const ref = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);
+        const snap = await getDoc(ref);
+        const financeTransactionId: string | undefined = snap.exists() ? snap.data().financeTransactionId : undefined;
+
+        // Clean up the linked income transaction before cancelling
+        if (financeTransactionId) {
+          try {
+            const { FinanceService } = await import('./financeService');
+            const tx = await FinanceService.getTransactionById(financeTransactionId);
+            if (tx) {
+              if (tx.status === 'Pending' || tx.status === 'Cleared') {
+                // Delete Pending or Cleared income tx — cancellation voids the revenue claim.
+                // A Cleared-then-left-as-Pending orphan would permanently inflate P&A income.
+                await FinanceService.deleteTransaction(financeTransactionId);
+              }
+              // Reconciled/Partially Reconciled — can't safely delete; leave for finance to void manually.
+              // Add a note so finance can trace the cancelled registration.
+            }
+          } catch (err) {
+            console.warn('[EventRegistrationService.cancel] Could not clean up income tx:', err);
+          }
+        }
+
         await updateDoc(ref, {
           status: 'cancelled',
           cancelledAt: Timestamp.now(),
           cancelledBy,
           cancelledByName,
           cancelledByRole,
+          financeTransactionId: null,
           updatedAt: Timestamp.now(),
         });
       }

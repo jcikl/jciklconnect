@@ -461,22 +461,6 @@ export interface MembershipRuleConfig {
   requiresSenatorship: boolean;
 }
 
-export interface DuesRenewalTransaction {
-  id?: string;
-  memberId: string;
-  membershipType: MembershipType;
-  duesYear: number;
-  amount: number;
-  status: MembershipStatus;
-  dueDate: string;
-  paidDate?: string;
-  isRenewal: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  remindersSent?: number;
-  lastReminderDate?: string;
-}
-
 export interface PromotionProgress {
   id: string;
   memberId: string;

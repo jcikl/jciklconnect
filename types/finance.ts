@@ -32,7 +32,7 @@ export interface Transaction {
   amount: number;
   type: 'Income' | 'Expense';
   category: 'Projects & Activities' | 'Membership' | 'Administrative';
-  status: 'Pending' | 'Cleared' | 'Reconciled' | 'Partially Reconciled';
+  status: 'Pending' | 'Cleared' | 'Reconciled' | 'Partially Reconciled' | 'Voided';
   projectId?: string;
   memberId?: string;
   bankAccountId?: string;
@@ -63,6 +63,8 @@ export interface Transaction {
   matchedBankAmount?: number;
   matchedBankTxIds?: string[];
   matchStatus?: 'unmatched' | 'partial' | 'full' | 'over';
+  /** Status held immediately before matchTransactions() set it to Reconciled — lets unmatch restore it exactly. */
+  prevStatus?: Transaction['status'] | null;
   source?: 'bank_import' | 'manual';
   eventRegistrationId?: string;
   paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
@@ -79,6 +81,21 @@ export interface BankAccount {
   accountNumber?: string;
   bankName?: string;
   accountType?: 'Current' | 'Savings' | 'Investment' | 'Fixed Deposit' | 'Cash' | 'Other';
+  loId?: string;
+}
+
+export interface FinanceAlert {
+  id: string;
+  type: string;
+  message: string;
+  transactionId?: string;
+  billCode?: string;
+  eventRegistrationId?: string;
+  paymentRequestId?: string;
+  resolved: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  createdAt: string;
 }
 
 export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'paid';
@@ -121,6 +138,7 @@ export interface PaymentRequest {
   rejectionReason?: string | null;
   paidAt?: string | null;
   expenseTxFailed?: boolean;
+  amountSyncFailed?: boolean;
 }
 
 export interface ReconciliationRecord {
@@ -155,24 +173,3 @@ export interface ReconciliationDiscrepancy {
   resolutionNotes?: string;
 }
 
-export interface DuesRenewalSummary {
-  year: number;
-  totalMembers: number;
-  renewalMembers: number;
-  newMembers: number;
-  byMembershipType: Partial<Record<MembershipType, {
-    total: number;
-    paid: number;
-    pending: number;
-    overdue: number;
-    totalAmount: number;
-    paidAmount: number;
-  }>>;
-  overallStats: {
-    totalAmount: number;
-    paidAmount: number;
-    pendingAmount: number;
-    overdueAmount: number;
-    collectionRate: number;
-  };
-}

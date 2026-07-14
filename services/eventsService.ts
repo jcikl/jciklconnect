@@ -308,6 +308,43 @@ export class EventsService {
     );
   }
 
+  // Cancel entire event — batch-cancels all active registrations and their income transactions
+  static async cancelEvent(
+    eventId: string,
+    cancelledBy: string,
+    cancelledByName: string
+  ): Promise<void> {
+    return withDevMode(
+      () => {
+        const idx = this.mockEvents.findIndex(e => e.id === eventId);
+        if (idx !== -1) this.mockEvents[idx] = { ...this.mockEvents[idx], status: 'Cancelled' };
+      },
+      async () => {
+        const event = await this.getEventById(eventId);
+        if (!event) throw new Error('Event not found');
+        if (event.status === 'Cancelled') return;
+
+        const registrations = await EventRegistrationService.listByEvent(eventId);
+        const active = registrations.filter(r => r.status !== 'cancelled');
+
+        // Sequential to avoid Firestore write conflicts; each cancel handles its own income tx cleanup.
+        for (const reg of active) {
+          try {
+            await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, 'admin');
+          } catch (err) {
+            console.error('[EventsService.cancelEvent] Failed to cancel registration', reg.id, err);
+          }
+        }
+
+        await updateDoc(doc(db, COLLECTIONS.PROJECTS, eventId), {
+          status: 'Cancelled',
+          updatedAt: Timestamp.now(),
+        });
+        this.invalidateEventsCache();
+      }
+    );
+  }
+
   // Mark attendance (check-in)
   static async markAttendance(
     eventId: string,

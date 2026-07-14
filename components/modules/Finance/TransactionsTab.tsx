@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { Search, ChevronDown, Edit, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, Edit, Trash2, Link2Off, Ban } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button, Badge } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
@@ -43,6 +43,8 @@ interface TransactionsTabProps {
   handleSelectAllTransactions: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleEditTransaction: (tx: Transaction) => void;
   handleDeleteTransaction: (id: string) => void;
+  handleUnmatchTransaction: (tx: Transaction) => void;
+  handleVoidTransaction: (tx: Transaction) => void;
   setSelectedTransaction: (tx: Transaction | null) => void;
   setIsSplitModalOpen: (open: boolean) => void;
   members: Member[];
@@ -99,6 +101,8 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
   handleSelectAllTransactions,
   handleEditTransaction,
   handleDeleteTransaction,
+  handleUnmatchTransaction,
+  handleVoidTransaction,
   setSelectedTransaction,
   setIsSplitModalOpen,
   members,
@@ -328,6 +332,8 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             title={`${tx.isSplit ? 'Split' : (tx.category || '—')} | ${getTransactionAccountLabel(tx)} | ${tx.purpose || '—'}`}
           >
             {tx.status === 'Pending' && <span className="shrink-0 inline-flex items-center px-1.5 py-0 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">Pending</span>}
+            {tx.matchStatus === 'full' && <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0 rounded text-[10px] font-semibold bg-teal-100 text-teal-700"><Link2Off size={9} />Matched</span>}
+            {tx.status === 'Voided' && <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0 rounded text-[10px] font-semibold bg-slate-200 text-slate-500"><Ban size={9} />Voided</span>}
             <span className="font-medium text-slate-600">{tx.isSplit ? 'Split' : (tx.category || '—')}</span>
             <span className="text-slate-300">|</span>
             <span>{getTransactionAccountLabel(tx)}</span>
@@ -352,12 +358,24 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="text-slate-600 hover:text-blue-600 p-1" title="Edit transaction">
               <Edit size={16} />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="text-slate-600 hover:text-red-600 p-1" title="Delete transaction">
-              <Trash2 size={16} />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => openSplitModal(tx)} className="text-blue-600 hover:text-blue-700 text-xs px-2" title={tx.isSplit ? 'Edit split' : 'Split transaction'}>
-              {tx.isSplit ? 'Edit Split' : 'Split'}
-            </Button>
+            {tx.status === 'Reconciled' || tx.status === 'Partially Reconciled' ? (
+              <Button variant="ghost" size="sm" onClick={() => handleVoidTransaction(tx)} className="text-slate-400 hover:text-red-600 p-1" title="Void reconciled transaction">
+                <Ban size={16} />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="text-slate-600 hover:text-red-600 p-1" title="Delete transaction">
+                <Trash2 size={16} />
+              </Button>
+            )}
+            {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
+              <Button variant="ghost" size="sm" onClick={() => handleUnmatchTransaction(tx)} className="text-amber-500 hover:text-amber-700 p-1" title="Unmatch bank transaction">
+                <Link2Off size={16} />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => openSplitModal(tx)} className="text-blue-600 hover:text-blue-700 text-xs px-2" title={tx.isSplit ? 'Edit split' : 'Split transaction'}>
+                {tx.isSplit ? 'Edit Split' : 'Split'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -430,12 +448,24 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
                 <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" title="Edit">
                   <Edit size={14} />
                 </button>
-                <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
-                  <Trash2 size={14} />
-                </button>
-                <button onClick={() => openSplitModal(tx)} className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors">
-                  {tx.isSplit ? 'Edit Split' : 'Split'}
-                </button>
+                {tx.status === 'Reconciled' || tx.status === 'Partially Reconciled' ? (
+                  <button onClick={() => handleVoidTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Void reconciled transaction">
+                    <Ban size={14} />
+                  </button>
+                ) : (
+                  <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+                {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
+                  <button onClick={() => handleUnmatchTransaction(tx)} className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Unmatch bank transaction">
+                    <Link2Off size={14} />
+                  </button>
+                ) : (
+                  <button onClick={() => openSplitModal(tx)} className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors">
+                    {tx.isSplit ? 'Edit Split' : 'Split'}
+                  </button>
+                )}
               </div>
             </div>
             {/* Split details */}

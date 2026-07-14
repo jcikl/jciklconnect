@@ -675,34 +675,6 @@
       ]
     },
     {
-      "collectionGroup": "duesRenewals",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "memberId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "duesYear",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "duesRenewals",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "duesYear",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "pointsRules",
       "queryScope": "COLLECTION",
       "fields": [

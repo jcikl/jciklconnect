@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useTransition, lazy, Suspense } from 'react';
-import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal, ChevronDown, ShieldAlert } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
@@ -8,7 +8,7 @@ import { FinanceService } from '../../services/financeService';
 import { PaymentRequestService } from '../../services/paymentRequestService';
 import { formatCurrency } from '../../utils/formatUtils';
 import { formatDate } from '../../utils/dateUtils';
-import { Transaction, BankAccount, ProjectFinancialAccount, TransactionSplit, InventoryItem } from '../../types';
+import { Transaction, BankAccount, ProjectFinancialAccount, TransactionSplit, InventoryItem, FinanceAlert } from '../../types';
 import type { PaymentRequest } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../hooks/useAuth';
@@ -45,6 +45,58 @@ import { ProjectAccountTab } from './Finance/ProjectAccountTab';
 import { TransactionsTab } from './Finance/TransactionsTab';
 import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 
+
+const FinanceAlertsPanel: React.FC<{ userId: string }> = ({ userId }) => {
+  const [alerts, setAlerts] = useState<FinanceAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setAlerts(await FinanceService.getFinanceAlerts(true)); } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!loading && alerts.length === 0) return null;
+
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <ShieldAlert size={16} className="text-red-500 shrink-0" />
+        <span className="text-sm font-semibold text-red-700">
+          Finance Alerts — {loading ? '…' : alerts.length} unresolved
+        </span>
+      </div>
+      {!loading && alerts.map(alert => (
+        <div key={alert.id} className="bg-white border border-red-100 rounded-lg px-3 py-2.5 flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-slate-700 leading-snug">{alert.message}</p>
+            <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-slate-400 font-mono">
+              {alert.type && <span className="bg-slate-100 px-1.5 py-0.5 rounded">{alert.type}</span>}
+              {alert.transactionId && <span>tx: {alert.transactionId.slice(0, 8)}…</span>}
+              {alert.billCode && <span>bill: {alert.billCode}</span>}
+              <span>{alert.createdAt ? new Date(alert.createdAt).toLocaleDateString('en-MY') : ''}</span>
+            </div>
+          </div>
+          <button
+            disabled={resolvingId === alert.id}
+            onClick={async () => {
+              setResolvingId(alert.id);
+              await FinanceService.resolveFinanceAlert(alert.id, userId).catch(() => {});
+              setResolvingId(null);
+              load();
+            }}
+            className="shrink-0 text-[11px] font-semibold text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg px-2 py-1 transition-colors disabled:opacity-50"
+          >
+            {resolvingId === alert.id ? '…' : 'Resolve'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const helpModal = useHelpModal();
@@ -146,7 +198,6 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
     // dues renewal
     renewalYear, setRenewalYear,
-    duesAmount, setDuesAmount,
     isRenewing, setIsRenewing,
 
     // admin
@@ -211,8 +262,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     handleBatchDelete,
     handleBatchApprove,
     handleLinkPrToBankTx,
+    handleRunEventAutoMatch,
     handleReconciliationQuery,
     handleMarkReconciled,
+    handleVoidTransaction,
+    handleUnmatchTransaction,
     handleUpdateTransaction,
     handleSelectAllTransactions,
     handleAddProjectTrx,
@@ -269,6 +323,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       {moduleTab === 'Dashboard' && (
         <div className="space-y-6">
+          {/* Finance Alerts — rendered only when there are unresolved alerts */}
+          {hasPermission('canViewFinance') && user && <FinanceAlertsPanel userId={user.uid} />}
           {/* KPI strip */}
           <LoadingState loading={loading} error={error}>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -568,6 +624,16 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
       {moduleTab === 'Reconciliation' && hasPermission('canViewFinance') && (
         <div className="space-y-4">
+          {/* â”€â”€ Section 0: Event income auto-match â”€â”€ */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-slate-800">Event income auto-match</h3>
+              <p className="text-[11px] text-slate-400">Match Pending event ticket income transactions against imported bank transactions</p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => handleRunEventAutoMatch()}>
+              Run auto-match
+            </Button>
+          </div>
           {/* â”€â”€ Section 1: PR â†’ Bank Transaction â”€â”€ */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {/* Header */}
@@ -853,6 +919,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             handleSelectAllTransactions={handleSelectAllTransactions}
             handleEditTransaction={handleEditTransaction}
             handleDeleteTransaction={handleDeleteTransaction}
+            handleUnmatchTransaction={handleUnmatchTransaction}
+            handleVoidTransaction={handleVoidTransaction}
             setSelectedTransaction={setSelectedTransaction}
             setIsSplitModalOpen={setIsSplitModalOpen}
             members={members}
@@ -1349,9 +1417,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
         isOpen={isDuesRenewalModalOpen}
         onClose={() => setIsDuesRenewalModalOpen(false)}
         year={renewalYear}
-        duesAmount={duesAmount}
         onYearChange={setRenewalYear}
-        onAmountChange={setDuesAmount}
         onRenew={async () => {
           setIsRenewing(true);
           try {

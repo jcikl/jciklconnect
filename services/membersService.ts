@@ -42,6 +42,8 @@ import {
   getTargetDuesForMembershipType,
   resolveMembershipTypeFromDues,
   computeMembershipTypeFromMember,
+  roleForMembershipType,
+  resolveEligibleMembershipType,
 } from './membershipConfigService';
 
 const FIRST_MEMBERSHIP_DUES_TARGET = 350;
@@ -54,20 +56,25 @@ export class MembersService {
   ): Promise<Partial<Member>> {
     const merged = { ...(existing || {}), ...data } as Member;
     const rules = await MembershipConfigService.getRules();
-    const computed = computeMembershipTypeFromMember(
-      {
-        nationality: merged.nationality,
-        dateOfBirth: merged.dateOfBirth,
-        senatorCertified: merged.senatorCertified,
-        senatorshipId: merged.senatorshipId,
-        senatorshipBoardValidated: merged.senatorshipBoardValidated,
-        role: merged.role,
-        membershipType: merged.membershipType,
-      },
-      rules
-    );
-    if (merged.membershipType === computed && !('membershipType' in data)) return data;
-    return { ...data, membershipType: computed };
+    const profileInput = {
+      nationality: merged.nationality,
+      dateOfBirth: merged.dateOfBirth,
+      senatorCertified: merged.senatorCertified,
+      senatorshipId: merged.senatorshipId,
+      senatorshipBoardValidated: merged.senatorshipBoardValidated,
+      role: merged.role,
+      membershipType: merged.membershipType,
+    };
+    // When the caller explicitly passes membershipType (e.g. guest approval → 'Probation'),
+    // validate+honour it rather than silently overriding with the profile-derived value.
+    // resolveEligibleMembershipType keeps the proposed type when eligible; otherwise suggests a valid alternative.
+    const computed = ('membershipType' in data && data.membershipType)
+      ? resolveEligibleMembershipType(data.membershipType as MembershipType, profileInput, rules)
+      : computeMembershipTypeFromMember(profileInput, rules);
+    const newRole = roleForMembershipType(computed as MembershipType, merged.role as UserRole);
+    const roleChanges: Partial<Member> = newRole !== (merged.role as UserRole) ? { role: newRole } : {};
+    if (merged.membershipType === computed && !('membershipType' in data) && !Object.keys(roleChanges).length) return data;
+    return { ...data, membershipType: computed, ...roleChanges };
   }
   /** Invalidate all members cache (call after any write to members collection). */
   static invalidateMembersCache(): void {

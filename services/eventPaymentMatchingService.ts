@@ -51,8 +51,18 @@ function daysDiff(a: string, b: string): number {
   return Math.abs(parseDateStr(a).getTime() - parseDateStr(b).getTime()) / 86_400_000;
 }
 
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[\s\-_]/g, '');
+}
+
 function descriptionContains(description: string, ref: string): boolean {
-  return description.toLowerCase().includes(ref.toLowerCase());
+  if (!description || !ref) return false;
+  // Exact substring first
+  if (description.toLowerCase().includes(ref.toLowerCase())) return true;
+  // Normalized (strip spaces/dashes) — handles "FPX12345" vs "FPX 12345" or "FPX-12345"
+  const normDesc = normalize(description);
+  const normRef = normalize(ref);
+  return normRef.length >= 6 && normDesc.includes(normRef);
 }
 
 export class EventPaymentMatchingService {
@@ -152,11 +162,12 @@ export class EventPaymentMatchingService {
     const bankMatchStatus: Transaction['matchStatus'] =
       newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
 
-    // Update income tx → Cleared
+    // Update income tx → Cleared; record prevStatus so removeMatch can restore exactly
     batch.update(incomeRef, {
       matchStatus: 'full',
       matchedBankTxIds: [...(incomeData?.matchedBankTxIds ?? []), bankTxId],
       status: 'Cleared',
+      prevStatus: incomeData?.status ?? 'Pending',
       updatedAt: Timestamp.now(),
     });
 
@@ -172,6 +183,52 @@ export class EventPaymentMatchingService {
     await batch.commit();
   }
 
+  /**
+   * Remove a previously applied N:1 match.
+   * Restores the income tx to its pre-match status (via prevStatus) and
+   * decreases the bank tx's matchedBankAmount by the income amount.
+   */
+  static async removeMatch(incomeTxId: string, bankTxId: string): Promise<void> {
+    const batch = writeBatch(db);
+
+    const incomeRef = doc(db, COLLECTIONS.TRANSACTIONS, incomeTxId);
+    const bankRef = doc(db, COLLECTIONS.TRANSACTIONS, bankTxId);
+
+    const [incomeSnap, bankSnap] = await Promise.all([getDoc(incomeRef), getDoc(bankRef)]);
+    const incomeData = incomeSnap.exists() ? (incomeSnap.data() as Transaction) : null;
+    const bankData = bankSnap.exists() ? (bankSnap.data() as Transaction) : null;
+
+    if (!incomeData || !bankData) throw new Error('Transaction not found');
+
+    // Restore income tx
+    const newIncomeBankTxIds = (incomeData.matchedBankTxIds ?? []).filter((id) => id !== bankTxId);
+    batch.update(incomeRef, {
+      matchStatus: newIncomeBankTxIds.length > 0 ? 'partial' : null,
+      matchedBankTxIds: newIncomeBankTxIds.length > 0 ? newIncomeBankTxIds : null,
+      status: incomeData.prevStatus ?? 'Pending',
+      prevStatus: null,
+      updatedAt: Timestamp.now(),
+    });
+
+    // Reduce bank tx allocation
+    const removedAmount = Math.abs(incomeData.amount ?? 0);
+    const newAllocated = Math.max(0, (bankData.matchedBankAmount ?? 0) - removedAmount);
+    const bankTotal = Math.abs(bankData.amount ?? 0);
+    const newBankMatchStatus: Transaction['matchStatus'] =
+      newAllocated <= AMOUNT_TOLERANCE ? 'unmatched' :
+      newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
+    const newProjectTxIds = (bankData.projectTransactionIds ?? []).filter((id) => id !== incomeTxId);
+
+    batch.update(bankRef, {
+      matchedBankAmount: newAllocated,
+      matchStatus: newAllocated <= AMOUNT_TOLERANCE ? null : newBankMatchStatus,
+      projectTransactionIds: newProjectTxIds.length > 0 ? newProjectTxIds : null,
+      updatedAt: Timestamp.now(),
+    });
+
+    await batch.commit();
+  }
+
   private static _findBestBankTx(
     income: Transaction,
     bankTxs: Transaction[],
@@ -179,16 +236,20 @@ export class EventPaymentMatchingService {
   ): EventMatchResult | null {
     const ref = income.referenceNumber;
 
-    // Path A — ToyyibPay exact match via billExternalReferenceNo in bank description
-    if (income.paymentMethod === 'toyyib' && ref) {
-      const match = bankTxs.find((b) => {
-        const remaining = Math.abs(b.amount) - (bankAllocated.get(b.id) ?? 0);
-        return remaining >= Math.abs(income.amount) - AMOUNT_TOLERANCE
-          && b.description
-          && descriptionContains(b.description, ref);
-      });
-      if (match) {
-        return { incomeTxId: income.id, bankTxId: match.id, path: 'A', confidence: 'high' };
+    // Path A — ToyyibPay: match via billExternalReferenceNo or toyyibBillCode in bank description.
+    // Tries both identifiers and both normalized and raw forms to handle bank formatting variations.
+    if (income.paymentMethod === 'toyyib') {
+      const candidates = ref ? [ref] : [];
+      if (income.toyyibBillCode && income.toyyibBillCode !== ref) candidates.push(income.toyyibBillCode);
+      if (candidates.length > 0) {
+        const match = bankTxs.find((b) => {
+          const remaining = Math.abs(b.amount) - (bankAllocated.get(b.id) ?? 0);
+          if (remaining < Math.abs(income.amount) - AMOUNT_TOLERANCE) return false;
+          return candidates.some(c => descriptionContains(b.description ?? '', c));
+        });
+        if (match) {
+          return { incomeTxId: income.id, bankTxId: match.id, path: 'A', confidence: 'high' };
+        }
       }
     }
 

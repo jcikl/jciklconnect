@@ -243,6 +243,7 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       projectId: projectId || undefined,
       purpose: row.purpose,
       bankAccountId: context?.bankAccountId,
+      loId: context?.loId,
       status: 'Pending',
       type: type as 'Income' | 'Expense',
       source: 'bank_import',

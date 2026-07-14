@@ -1,7 +1,9 @@
 /**
  * ToyyibPay Webhook Callback (情景 CC)
  * Handles POST callbacks from ToyyibPay after payment.
- * Implements idempotency to prevent duplicate processing.
+ * Implements idempotency to prevent duplicate processing, and verifies every
+ * callback against ToyyibPay's own getBillTransactions API before trusting it —
+ * the raw POST body is untrusted input and must never drive a "paid" write on its own.
  *
  * ToyyibPay sends: status_id, billcode, order_id, msg, transaction_id
  * status_id=1 → success, anything else → failed
@@ -11,6 +13,12 @@
 
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+
+const TOYYIB_SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY || 'tl5be74e-pazq-kti6-xci2-bh6npgb4gcjv';
+const TOYYIB_IS_SANDBOX = process.env.TOYYIBPAY_SANDBOX !== 'false';
+const TOYYIB_BASE_URL = TOYYIB_IS_SANDBOX
+  ? 'https://dev.toyyibpay.com/index.php/api'
+  : 'https://toyyibpay.com/index.php/api';
 
 function getDb() {
   if (!getApps().length) {
@@ -23,6 +31,25 @@ function getDb() {
     });
   }
   return getFirestore();
+}
+
+/**
+ * Server-to-server verification: ask ToyyibPay directly what the real status
+ * of this bill is, instead of trusting the webhook POST body. Returns the
+ * verified transaction record (or null if ToyyibPay reports nothing for this bill).
+ */
+async function verifyBillWithToyyib(billCode) {
+  const params = new URLSearchParams({ userSecretKey: TOYYIB_SECRET_KEY, billCode });
+  const response = await fetch(`${TOYYIB_BASE_URL}/getBillTransactions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  });
+  if (!response.ok) throw new Error(`ToyyibPay verify HTTP ${response.status}`);
+  const records = await response.json();
+  if (!Array.isArray(records) || records.length === 0) return null;
+  // Prefer the record matching this transaction_id; otherwise use the most recent.
+  return records[0];
 }
 
 exports.handler = async (event) => {
@@ -47,21 +74,6 @@ exports.handler = async (event) => {
   const transactionId = data.transaction_id;
   const billCode = data.billcode;
   const orderId = data.order_id;
-  // ToyyibPay sends status_id in callback; billpaymentStatus in getBillTransactions response
-  // status_id: 1=success, others=fail  |  billpaymentStatus: 1=paid, 2=pending, 3=failed, 4=settling
-  const statusId = data.status_id;
-  const billpaymentStatus = data.billpaymentStatus;
-  const billExternalReferenceNo = data.billExternalReferenceNo || null;
-  const isSuccess = statusId === '1';
-
-  // Map billpaymentStatus to our internal status
-  const resolvedStatus =
-    billpaymentStatus === '1' ? 'paid' :
-    billpaymentStatus === '3' ? 'failed' :
-    billpaymentStatus === '4' ? 'settling' :
-    isSuccess ? 'paid' : 'pending';
-
-  const billPaymentDate = data.billPaymentDate || new Date().toISOString();
 
   if (!transactionId || !billCode) {
     return { statusCode: 400, body: 'Missing required fields' };
@@ -70,26 +82,51 @@ exports.handler = async (event) => {
   const db = getDb();
 
   // ── Idempotency check (情景 CC) ──────────────────────────────────────────────
-  // Use a Firestore document keyed by transactionId to deduplicate
+  // Keyed by transactionId. Only skip when a PRIOR attempt fully succeeded
+  // (processed===true) — a record left at processed:false means the last
+  // attempt errored out and must be retried, not silently swallowed.
   const idempotencyRef = db.collection('toyyibpay_webhooks').doc(transactionId);
   const idempotencySnap = await idempotencyRef.get();
 
-  if (idempotencySnap.exists) {
-    // Already processed — return 200 without re-processing
-    console.log(`[toyyibpay-callback] Duplicate webhook for txn ${transactionId}, skipping`);
+  if (idempotencySnap.exists && idempotencySnap.data().processed === true) {
+    console.log(`[toyyibpay-callback] Already processed txn ${transactionId}, skipping`);
     return { statusCode: 200, body: 'OK (duplicate)' };
   }
 
-  // ── Write idempotency record first (before processing) ───────────────────────
   await idempotencyRef.set({
     transactionId,
     billCode,
     orderId,
-    statusId,
-    isSuccess,
     receivedAt: Timestamp.now(),
     processed: false,
-  });
+  }, { merge: true });
+
+  // ── Verify against ToyyibPay's own record before trusting anything ──────────
+  let verified;
+  try {
+    verified = await verifyBillWithToyyib(billCode);
+  } catch (err) {
+    console.error('[toyyibpay-callback] Verification call failed:', err);
+    await idempotencyRef.set({ processed: false, error: `verify failed: ${err}`, failedAt: Timestamp.now() }, { merge: true });
+    return { statusCode: 502, body: 'Verification failed' };
+  }
+  if (!verified) {
+    console.warn(`[toyyibpay-callback] ToyyibPay has no transaction record for billCode=${billCode}; ignoring unverifiable callback`);
+    await idempotencyRef.set({ processed: false, error: 'no matching ToyyibPay record', failedAt: Timestamp.now() }, { merge: true });
+    return { statusCode: 400, body: 'Unverifiable callback' };
+  }
+
+  // billpaymentStatus: 1=paid, 2=pending, 3=failed, 4=settling — from ToyyibPay's own API, not the POST body.
+  const billpaymentStatus = String(verified.billpaymentStatus ?? '');
+  const isSuccess = billpaymentStatus === '1';
+  const resolvedStatus =
+    billpaymentStatus === '1' ? 'paid' :
+    billpaymentStatus === '3' ? 'failed' :
+    billpaymentStatus === '4' ? 'settling' :
+    'pending';
+  const billExternalReferenceNo = verified.billExternalReferenceNo || data.billExternalReferenceNo || null;
+  const billPaymentDate = verified.billpaymentDate || data.billPaymentDate || new Date().toISOString();
+  const paidAmount = verified.billpaymentAmount != null ? Number(verified.billpaymentAmount) : null;
 
   try {
     // ── Always update toyyibBills collection ─────────────────────────────────
@@ -112,7 +149,7 @@ exports.handler = async (event) => {
       if (yearMatch) billYear = yearMatch[1];
 
       const billUpdate = {
-        billpaymentStatus: billpaymentStatus || (isSuccess ? '1' : '3'),
+        billpaymentStatus,
         billPaymentDate,
         updatedAt: Timestamp.now(),
       };
@@ -124,9 +161,80 @@ exports.handler = async (event) => {
     if (billMemberId && billYear && billExternalReferenceNo) {
       await db.collection('members').doc(billMemberId).update({
         [`membership.${billYear}.billExternalReferenceNo`]: billExternalReferenceNo,
-        [`membership.${billYear}.toyyibPaymentStatus`]: billpaymentStatus || (isSuccess ? '1' : '3'),
+        [`membership.${billYear}.toyyibPaymentStatus`]: billpaymentStatus,
         updatedAt: Timestamp.now(),
       });
+    }
+
+    // ── Membership dues paid via ToyyibPay: clear/create the Income transaction ──
+    // Without this, a member who pays dues online has their membership record
+    // updated but the corresponding transactions doc stays Pending forever.
+    if (isSuccess && billMemberId && billYear) {
+      const duesAmount = paidAmount ?? (billData?.billAmount != null ? Number(billData.billAmount) / 100 : 0);
+      const pendingDuesQuery = await db.collection('transactions')
+        .where('memberId', '==', billMemberId)
+        .where('category', '==', 'Membership')
+        .where('type', '==', 'Income')
+        .where('status', '==', 'Pending')
+        .limit(10)
+        .get();
+
+      // Filter matching docs then pick the most recently created one if multiple exist (avoids unordered-query ambiguity)
+      const yearMatchingDocs = pendingDuesQuery.docs.filter((d) => {
+        const rawDate = d.data().date;
+        const txDate = rawDate?.toDate ? rawDate.toDate().toISOString() : String(rawDate || '');
+        return txDate.startsWith(billYear);
+      });
+      const yearMatchTx = yearMatchingDocs.sort((a, b) => {
+        const dateA = a.data().date?.toDate ? a.data().date.toDate().getTime() : 0;
+        const dateB = b.data().date?.toDate ? b.data().date.toDate().getTime() : 0;
+        return dateB - dateA;
+      })[0];
+
+      if (yearMatchTx) {
+        await yearMatchTx.ref.update({
+          status: 'Cleared',
+          paymentMethod: 'toyyib',
+          toyyibBillCode: billCode,
+          referenceNumber: billExternalReferenceNo || transactionId,
+          updatedAt: Timestamp.now(),
+        });
+        // Sync membership status — server-side equivalent of syncMemberMembership
+        const memberSnap = await db.collection('members').doc(billMemberId).get().catch(() => null);
+        const memberData = memberSnap?.exists ? memberSnap.data() : null;
+        const memberUpdate = {
+          [`membership.${billYear}.status`]: 'paid',
+          [`membership.${billYear}.amount`]: duesAmount,
+          [`membership.${billYear}.dues`]: duesAmount,
+          updatedAt: Timestamp.now(),
+        };
+        // Guest entry fee: mark hasPaidInitiationFee so GuestManagementView can show "Fee Paid".
+        // Promotion to Probation still requires explicit board approval via GuestManagementView.
+        if (memberData?.membershipType === 'Guest') {
+          memberUpdate['hasPaidInitiationFee'] = true;
+          memberUpdate['jciCareer.hasPaidInitiationFee'] = true;
+        }
+        await db.collection('members').doc(billMemberId).update(memberUpdate)
+          .catch(err => console.warn('[toyyibpay-callback] Could not sync membership status:', err));
+      } else {
+        await db.collection('transactions').add({
+          type: 'Income',
+          category: 'Membership',
+          status: 'Cleared',
+          paymentMethod: 'toyyib',
+          memberId: billMemberId,
+          year: Number(billYear),
+          projectId: `${billYear} membership`,
+          toyyibBillCode: billCode,
+          amount: duesAmount,
+          description: `Membership dues ${billYear} — ${billData?.billName || billCode}`,
+          date: billPaymentDate ? billPaymentDate.split('T')[0] : new Date().toISOString().split('T')[0],
+          referenceNumber: billExternalReferenceNo || transactionId,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+          source: 'manual',
+        });
+      }
     }
 
     // ── Update eventRegistrations linked to this billCode ────────────────────
@@ -140,7 +248,7 @@ exports.handler = async (event) => {
       const evtRegData = evtRegDoc.data();
 
       const evtUpdate = {
-        toyyibPaymentStatus: billpaymentStatus || (isSuccess ? '1' : '3'),
+        toyyibPaymentStatus: billpaymentStatus,
         updatedAt: Timestamp.now(),
       };
       if (billExternalReferenceNo) evtUpdate.billExternalReferenceNo = billExternalReferenceNo;
@@ -151,10 +259,10 @@ exports.handler = async (event) => {
         evtUpdate.paidAt = billPaymentDate;
 
         // ── Create income transaction (Pending) for this event payment ──────
-        // Resolve ticket price: query event doc for ticketPrice
-        let ticketPrice = 0;
+        // Prefer the amount ToyyibPay actually confirmed; fall back to event ticket price.
+        let ticketPrice = paidAmount ?? 0;
         const eventId = evtRegData.eventId || billProjectId;
-        if (eventId) {
+        if (!ticketPrice && eventId) {
           try {
             const eventSnap = await db.collection('events').doc(eventId).get();
             if (eventSnap.exists) {
@@ -190,6 +298,91 @@ exports.handler = async (event) => {
       }
 
       await evtRegDoc.ref.update(evtUpdate);
+    }
+
+    // ── Rollback branch: payment failed or reversed (status 3) ─────────────
+    // ToyyibPay may send a second callback with billpaymentStatus=3 when a
+    // previously successful payment is reversed/refunded. Revert any records
+    // this webhook wrote on the success path.
+    if (!isSuccess && billpaymentStatus === '3') {
+      // Revert membership dues income tx if it was already Cleared by a prior success callback
+      if (billMemberId && billYear) {
+        const clearedDuesQuery = await db.collection('transactions')
+          .where('toyyibBillCode', '==', billCode)
+          .where('status', '==', 'Cleared')
+          .where('category', '==', 'Membership')
+          .limit(1)
+          .get();
+        if (!clearedDuesQuery.empty) {
+          const duesTxDoc = clearedDuesQuery.docs[0];
+          const duesTxStatus = duesTxDoc.data().status;
+          if (duesTxStatus === 'Reconciled' || duesTxStatus === 'Partially Reconciled') {
+            // Reconciled dues tx — do NOT silently overwrite; raise alert for manual void (mirrors event payment rollback path)
+            await db.collection('finance_alerts').add({
+              type: 'toyyibpay_refund_reconciled_dues_tx',
+              transactionId: duesTxDoc.id,
+              billCode,
+              memberId: billMemberId,
+              year: billYear,
+              message: `ToyyibPay refund received for a Reconciled dues income tx (member ${billMemberId}, year ${billYear}) — manual void required.`,
+              createdAt: Timestamp.now(),
+              resolved: false,
+            });
+          } else {
+            await duesTxDoc.ref.update({
+              status: 'Pending',
+              updatedAt: Timestamp.now(),
+            });
+            // Sync membership status back to pending after refund
+            await db.collection('members').doc(billMemberId).update({
+              [`membership.${billYear}.status`]: 'pending',
+              updatedAt: Timestamp.now(),
+            }).catch(err => console.warn('[toyyibpay-callback] Could not revert membership status:', err));
+          }
+        }
+      }
+
+      // Revert event registration and its linked income tx
+      const evtRegRollbackQuery = await db.collection('eventRegistrations')
+        .where('toyyibBillCode', '==', billCode)
+        .limit(1)
+        .get();
+      if (!evtRegRollbackQuery.empty) {
+        const evtRegDoc = evtRegRollbackQuery.docs[0];
+        const evtRegData = evtRegDoc.data();
+        if (evtRegData.financeTransactionId) {
+          const txRef = db.collection('transactions').doc(evtRegData.financeTransactionId);
+          const txSnap = await txRef.get();
+          if (txSnap.exists) {
+            const txStatus = txSnap.data().status;
+            if (txStatus === 'Pending') {
+              await txRef.delete();
+            } else if (txStatus === 'Cleared') {
+              await txRef.update({ status: 'Pending', updatedAt: Timestamp.now() });
+            } else {
+              // Reconciled / Partially Reconciled — do NOT overwrite; bank reconciliation must not be
+              // silently broken by a webhook. Write a finance_alerts record for manual review instead.
+              await db.collection('finance_alerts').add({
+                type: 'toyyibpay_refund_reconciled_tx',
+                transactionId: evtRegData.financeTransactionId,
+                billCode,
+                eventRegistrationId: evtRegDoc.id,
+                message: `ToyyibPay refund received for a Reconciled income tx — manual void required.`,
+                createdAt: Timestamp.now(),
+                resolved: false,
+              });
+            }
+          }
+        }
+        await evtRegDoc.ref.update({
+          status: 'registered',
+          paidAt: null,
+          paymentMethod: null,
+          financeTransactionId: null,
+          toyyibPaymentStatus: billpaymentStatus,
+          updatedAt: Timestamp.now(),
+        });
+      }
     }
 
     if (isSuccess || resolvedStatus === 'settling') {
@@ -230,14 +423,14 @@ exports.handler = async (event) => {
       }
     }
 
-    // Mark idempotency record as processed
-    await idempotencyRef.update({ processed: true, processedAt: Timestamp.now() });
+    // Mark idempotency record as processed only after every write above succeeded.
+    await idempotencyRef.set({ processed: true, processedAt: Timestamp.now() }, { merge: true });
 
     return { statusCode: 200, body: 'OK' };
   } catch (err) {
     console.error('[toyyibpay-callback] Error processing webhook:', err);
-    // Mark as failed so it can be retried / investigated
-    await idempotencyRef.update({ processed: false, error: String(err), failedAt: Timestamp.now() });
+    // Leave processed:false so the next retry from ToyyibPay reprocesses this transaction.
+    await idempotencyRef.set({ processed: false, error: String(err), failedAt: Timestamp.now() }, { merge: true });
     return { statusCode: 500, body: 'Internal Server Error' };
   }
 };
