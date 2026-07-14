@@ -11,6 +11,7 @@ import {
   Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock, SlidersHorizontal, Handshake
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
+import { PerfMonitor } from './components/ui/PerfMonitor';
 import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
@@ -1637,6 +1638,7 @@ const App: React.FC = () => {
         }}
       >
         <BrowserRouter>
+          <PerfMonitor />
           <AsyncErrorBoundary
             onError={(error) => {
               errorLoggingService.logError(error, {

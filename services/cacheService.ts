@@ -2,7 +2,7 @@
  * 缓存服务 - 提供内存缓存和本地存储缓存功能
  * Cache Service - Provides in-memory and localStorage caching capabilities
  */
-import { logRead } from './firestoreLogger';
+import { logRead, logPerf } from './firestoreLogger';
 
 export interface CacheEntry<T> {
   data: T;
@@ -141,7 +141,10 @@ class CacheService {
     // Cache miss — actual Firestore read will happen inside factory()
     logRead(key, caller ?? 'unknown');
 
+    const fetchStart = performance.now();
     const promise = factory().then(data => {
+      const durationMs = Math.round(performance.now() - fetchStart);
+      logPerf(`fetch:${key}`, caller ?? 'unknown', durationMs);
       this.set(key, data, ttl);
       this.inFlight.delete(key);
       return data;
