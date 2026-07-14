@@ -49,7 +49,7 @@ export class ProjectsService {
           console.error('Error fetching projects:', error);
           throw error;
         }
-      }, PROJECTS_TTL)
+      }, PROJECTS_TTL, 'projectsService.getAllProjects')
     );
   }
 

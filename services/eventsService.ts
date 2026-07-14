@@ -100,7 +100,7 @@ export class EventsService {
           console.error('Error fetching events:', error);
           throw error;
         }
-      }, EVENTS_TTL)
+      }, EVENTS_TTL, 'eventsService.getAllEvents')
     );
   }
 
