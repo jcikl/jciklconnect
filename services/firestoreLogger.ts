@@ -20,7 +20,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode } from '../utils/devMode';
 
-export type LogOperation = 'READ' | 'WRITE' | 'DELETE' | 'LISTENER' | 'PERF';
+export type LogOperation = 'READ' | 'WRITE' | 'DELETE' | 'LISTENER' | 'PERF' | 'ERROR';
 
 export interface FirestoreLogEntry {
   operation: LogOperation;
@@ -150,6 +150,15 @@ export function logListener(source: string, caller: string) {
  */
 export function logPerf(source: string, caller: string, durationMs: number) {
   record('PERF', source, caller, durationMs);
+}
+
+/**
+ * Log a console.error or console.warn captured by the console interceptor.
+ * @param message  Stringified first argument (truncated to 200 chars)
+ * @param level    'error' | 'warn'
+ */
+export function logError(message: string, level: 'error' | 'warn') {
+  record('ERROR', message.slice(0, 200), `console.${level}`);
 }
 
 /**

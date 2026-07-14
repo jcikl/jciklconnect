@@ -18,6 +18,7 @@ import {
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
+import { logWrite, logDelete } from './firestoreLogger';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import {
   Member,
@@ -411,6 +412,7 @@ export class MembersService {
       const normalizedData = this.normalizeMemberData(cleanMemberData);
 
       const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), normalizedData);
+      logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.createMember');
       this.invalidateMembersCache();
 
       const { BusinessDirectoryService } = await import('./businessDirectoryService');
@@ -531,6 +533,12 @@ export class MembersService {
       const normalizedUpdates = this.normalizeMemberData(cleanUpdates, currentData);
 
       await updateDoc(memberRef, normalizedUpdates);
+      const _frames = (new Error().stack ?? '').split('\n').slice(2);
+      const _named = _frames
+        .map(l => l.trim().replace(/^at /, '').replace(/ \(.*\)/, '').trim())
+        .filter(n => n && n !== 'async' && !n.startsWith('Promise') && !n.includes('membersService') && !n.includes('node_modules'));
+      const _caller = _named.slice(0, 3).join(' ← ') || 'membersService.updateMember';
+      logWrite(CACHE_KEY_ALL_MEMBERS, _caller);
       this.invalidateMembersCache();
 
       const mergedMember = { ...(currentData ?? {}), ...normalizedUpdates, id: memberId };
@@ -708,6 +716,7 @@ export class MembersService {
       }
 
       await deleteDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
+      logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.deleteMember');
       this.invalidateMembersCache();
     } catch (error) {
       console.error('Error deleting member:', error, 'memberId=', memberId);
@@ -837,6 +846,7 @@ export class MembersService {
         attendanceYear: year,
         updatedAt: Timestamp.now(),
       });
+      logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.recalculateAttendance');
       this.invalidateMembersCache();
     } catch (error) {
       console.error('Error recalculating attendance:', error);

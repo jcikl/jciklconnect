@@ -460,8 +460,8 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
   ]);
 
   return (
-    <div className={`w-full h-full min-h-[220px] pointer-events-none ${className}`}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
+    <div className={`w-full min-h-[220px] pointer-events-none ${className}`}>
+      <ResponsiveContainer width="100%" height={220} minWidth={0}>
         <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
           <PolarGrid stroke={lightTheme ? '#e2e8f0' : '#ffffff20'} />
           <PolarAngleAxis 

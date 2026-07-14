@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { logPerf } from '../../services/firestoreLogger';
+import { logPerf, logError } from '../../services/firestoreLogger';
 
 export function PerfMonitor() {
   const location = useLocation();
@@ -33,6 +33,28 @@ export function PerfMonitor() {
   useEffect(() => {
     navStart.current = performance.now();
   }, [location.pathname]);
+
+  // Console error/warn interception
+  useEffect(() => {
+    const origError = console.error.bind(console);
+    const origWarn = console.warn.bind(console);
+
+    console.error = (...args: any[]) => {
+      origError(...args);
+      const msg = args.map(a => (a instanceof Error ? a.message : String(a))).join(' ');
+      logError(msg, 'error');
+    };
+    console.warn = (...args: any[]) => {
+      origWarn(...args);
+      const msg = args.map(a => (a instanceof Error ? a.message : String(a))).join(' ');
+      logError(msg, 'warn');
+    };
+
+    return () => {
+      console.error = origError;
+      console.warn = origWarn;
+    };
+  }, []);
 
   // Click interaction timing — global listener
   useEffect(() => {

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, limit, getDocs, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
-import { Activity, RefreshCw, Database, Wifi, Trash2, PenLine, Copy, Check, AlertTriangle, Zap } from 'lucide-react';
+import { Activity, RefreshCw, Database, Wifi, Trash2, PenLine, Copy, Check, AlertTriangle, Zap, XCircle } from 'lucide-react';
 
-type OpType = 'ALL' | 'READ' | 'WRITE' | 'DELETE' | 'LISTENER' | 'PERF';
+type OpType = 'ALL' | 'READ' | 'WRITE' | 'DELETE' | 'LISTENER' | 'PERF' | 'ERROR';
 
 interface LogEntry {
   operation: string;
@@ -31,6 +31,7 @@ const OP_COLORS: Record<string, string> = {
   DELETE:   'bg-red-100 text-red-700',
   LISTENER: 'bg-purple-100 text-purple-700',
   PERF:     'bg-amber-100 text-amber-700',
+  ERROR:    'bg-rose-100 text-rose-700',
 };
 
 const OP_ICONS: Record<string, React.ReactNode> = {
@@ -39,6 +40,7 @@ const OP_ICONS: Record<string, React.ReactNode> = {
   DELETE:   <Trash2 size={11} />,
   LISTENER: <Wifi size={11} />,
   PERF:     <Zap size={11} />,
+  ERROR:    <XCircle size={11} />,
 };
 
 function perfColor(ms: number): string {
@@ -122,16 +124,18 @@ export const SystemLogsView: React.FC = () => {
   const totalReads = logs.reduce((sum, d) => sum + (d.entries?.filter(e => e.operation === 'READ').reduce((s, e) => s + e.count, 0) ?? 0), 0);
   const totalWrites = logs.reduce((sum, d) => sum + (d.entries?.filter(e => e.operation === 'WRITE').reduce((s, e) => s + e.count, 0) ?? 0), 0);
   const totalListeners = logs.reduce((sum, d) => sum + (d.entries?.filter(e => e.operation === 'LISTENER').reduce((s, e) => s + e.count, 0) ?? 0), 0);
+  const totalErrors = logs.reduce((sum, d) => sum + (d.entries?.filter(e => e.operation === 'ERROR').reduce((s, e) => s + e.count, 0) ?? 0), 0);
 
   return (
     <div className="space-y-4">
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-2">
         {[
           { label: 'Reads', value: totalReads, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Writes', value: totalWrites, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Listeners', value: totalListeners, color: 'text-purple-600', bg: 'bg-purple-50' },
           { label: 'Perf', value: logs.reduce((s, d) => s + (d.entries?.filter(e => e.operation === 'PERF').reduce((a, e) => a + e.count, 0) ?? 0), 0), color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Errors', value: totalErrors, color: totalErrors > 0 ? 'text-rose-600' : 'text-slate-400', bg: totalErrors > 0 ? 'bg-rose-50' : 'bg-slate-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl px-3 py-2.5 text-center`}>
             <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
@@ -144,7 +148,7 @@ export const SystemLogsView: React.FC = () => {
       {/* Filter + Refresh */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex gap-1.5 flex-wrap">
-          {(['ALL', 'READ', 'WRITE', 'DELETE', 'LISTENER', 'PERF'] as OpType[]).map(op => (
+          {(['ALL', 'READ', 'WRITE', 'DELETE', 'LISTENER', 'PERF', 'ERROR'] as OpType[]).map(op => (
             <button
               key={op}
               onClick={() => setFilter(op)}
@@ -225,7 +229,7 @@ export const SystemLogsView: React.FC = () => {
                     <span className="text-xs text-slate-400 shrink-0">{doc.totalOps} ops</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    {['READ','WRITE','DELETE','LISTENER','PERF'].map(op => {
+                    {['READ','WRITE','DELETE','LISTENER','PERF','ERROR'].map(op => {
                       const cnt = doc.entries?.filter(e => e.operation === op).reduce((s, e) => s + e.count, 0) ?? 0;
                       if (!cnt) return null;
                       return (
@@ -253,8 +257,12 @@ export const SystemLogsView: React.FC = () => {
                           {OP_ICONS[entry.operation]}{entry.operation}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-slate-700 truncate">{entry.caller}</div>
-                          <div className="text-[11px] text-slate-400 truncate">{entry.source}</div>
+                          <div className="text-xs font-semibold text-slate-700 truncate">
+                            {entry.operation === 'ERROR' ? entry.source : entry.caller}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            {entry.operation === 'ERROR' ? entry.caller : entry.source}
+                          </div>
                         </div>
                         <div className="shrink-0 text-right">
                           {entry.avgDurationMs != null && (

@@ -1357,7 +1357,13 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               <button key={member.id} type="button"
                 className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 onClick={() => { setDetailMember(member); setIsDetailOpen(true); }}>
-                <img src={member.avatarUrl} alt={member.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                {member.avatarUrl ? (
+                  <img src={member.avatarUrl} alt={member.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                ) : (
+                  <div className="w-11 h-11 rounded-full border border-slate-200 flex-shrink-0 bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-400">
+                    {member.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-bold text-slate-900 truncate">{member.name}</span>
