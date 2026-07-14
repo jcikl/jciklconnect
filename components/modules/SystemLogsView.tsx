@@ -200,10 +200,13 @@ export const SystemLogsView: React.FC = () => {
             const visibleEntries = filter === 'ALL' ? doc.entries : doc.entries?.filter(e => e.operation === filter);
             return (
               <div key={doc.id} className="border border-slate-100 rounded-xl overflow-hidden">
-                {/* Row header */}
-                <button
+                {/* Row header — div instead of button to avoid nested button violation */}
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setExpanded(isOpen ? null : doc.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                  onKeyDown={e => e.key === 'Enter' && setExpanded(isOpen ? null : doc.id)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer select-none"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <Activity size={14} className="text-slate-400 shrink-0" />
@@ -228,7 +231,7 @@ export const SystemLogsView: React.FC = () => {
                       {copied === doc.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                     </button>
                   </div>
-                </button>
+                </div>
 
                 {/* Expanded entries */}
                 {isOpen && (

@@ -363,16 +363,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "companyName",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "publicBusinessListings",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "industry",
           "order": "ASCENDING"
         },
@@ -722,7 +712,7 @@
       "fields": [
         {
           "fieldPath": "participants",
-          "order": "ASCENDING"
+          "arrayConfig": "CONTAINS"
         },
         {
           "fieldPath": "lastActivity",
