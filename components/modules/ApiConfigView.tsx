@@ -1,14 +1,16 @@
 // Unified API settings — ToyyibPay + Whapi under one page
 import React, { useState } from 'react';
-import { CreditCard, MessageSquare, Plug } from 'lucide-react';
+import { CreditCard, MessageSquare, Plug, Activity } from 'lucide-react';
 import { ToyyibView } from './ToyyibView';
 import { WhapiConfigView } from './WhapiConfigView';
+import { SystemLogsView } from './SystemLogsView';
 
-type ApiTab = 'toyyib' | 'whapi';
+type ApiTab = 'toyyib' | 'whapi' | 'systemlogs';
 
 const TABS: { key: ApiTab; label: string; sub: string; icon: React.ReactNode }[] = [
   { key: 'toyyib', label: 'ToyyibPay', sub: 'Payment Gateway', icon: <CreditCard size={16} /> },
   { key: 'whapi', label: 'Whapi', sub: 'WhatsApp API', icon: <MessageSquare size={16} /> },
+  { key: 'systemlogs', label: 'System Logs', sub: 'Firestore Audit', icon: <Activity size={16} /> },
 ];
 
 export const ApiConfigView: React.FC = () => {
@@ -55,7 +57,9 @@ export const ApiConfigView: React.FC = () => {
 
       {/* Service panel */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-6">
-        {activeTab === 'toyyib' ? <ToyyibView embedded /> : <WhapiConfigView embedded />}
+        {activeTab === 'toyyib' && <ToyyibView embedded />}
+        {activeTab === 'whapi' && <WhapiConfigView embedded />}
+        {activeTab === 'systemlogs' && <SystemLogsView />}
       </div>
     </div>
   );
