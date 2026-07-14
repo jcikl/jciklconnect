@@ -34,6 +34,15 @@ import {
   buildMembershipProjectId,
   buildCategoryCleanupUpdates,
 } from '../utils/transactionCategoryUtils';
+import { apiCache } from './cacheService';
+
+const FINANCE_CACHE_PREFIX = 'finance:';
+const TX_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+/** Invalidate all finance caches (call after any write to transactions/bankAccounts). */
+function invalidateFinanceCache(): void {
+  apiCache.deleteByPrefix(FINANCE_CACHE_PREFIX);
+}
 
 
 
@@ -91,46 +100,50 @@ export class FinanceService {
         }
         return localMockTransactions;
       },
-      async () => {
-        try {
-          let q;
-          if (year) {
-            const { Timestamp } = await import('firebase/firestore');
-            const start = Timestamp.fromDate(new Date(year, 0, 1, 0, 0, 0, 0));
-            const end = Timestamp.fromDate(new Date(year, 11, 31, 23, 59, 59, 999));
-            q = query(
-              collection(db, COLLECTIONS.TRANSACTIONS),
-              where('date', '>=', start),
-              where('date', '<=', end),
-              orderBy('date', 'desc')
-            );
-          } else {
-            q = query(
-              collection(db, COLLECTIONS.TRANSACTIONS),
-              orderBy('date', 'desc')
-            );
+      () => apiCache.getOrSet(
+        `${FINANCE_CACHE_PREFIX}transactions:${year ?? 'all'}`,
+        async () => {
+          try {
+            let q;
+            if (year) {
+              const { Timestamp } = await import('firebase/firestore');
+              const start = Timestamp.fromDate(new Date(year, 0, 1, 0, 0, 0, 0));
+              const end = Timestamp.fromDate(new Date(year, 11, 31, 23, 59, 59, 999));
+              q = query(
+                collection(db, COLLECTIONS.TRANSACTIONS),
+                where('date', '>=', start),
+                where('date', '<=', end),
+                orderBy('date', 'desc')
+              );
+            } else {
+              q = query(
+                collection(db, COLLECTIONS.TRANSACTIONS),
+                orderBy('date', 'desc')
+              );
+            }
+
+            const snapshot = await getDocs(q);
+            let transactions = snapshot.docs.map(doc => {
+              const data = doc.data() as any;
+              return {
+                id: doc.id,
+                ...data,
+                date: data.date?.toDate?.()?.toISOString() || data.date,
+              } as Transaction;
+            });
+
+            if (year) {
+              transactions = transactions.filter(t => new Date(t.date).getFullYear() === year);
+            }
+
+            return transactions;
+          } catch (error) {
+            console.error('Error fetching transactions:', error);
+            throw error;
           }
-
-          const snapshot = await getDocs(q);
-          let transactions = snapshot.docs.map(doc => {
-            const data = doc.data() as any;
-            return {
-              id: doc.id,
-              ...data,
-              date: data.date?.toDate?.()?.toISOString() || data.date,
-            } as Transaction;
-          });
-
-          if (year) {
-            transactions = transactions.filter(t => new Date(t.date).getFullYear() === year);
-          }
-
-          return transactions;
-        } catch (error) {
-          console.error('Error fetching transactions:', error);
-          throw error;
-        }
-      }
+        },
+        TX_CACHE_TTL
+      )
     );
   }
 
@@ -461,6 +474,7 @@ export class FinanceService {
             await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
           }
 
+          invalidateFinanceCache();
           return docRef.id;
         } catch (error) {
           console.error('Error creating transaction:', error);
@@ -1227,6 +1241,7 @@ export class FinanceService {
         }
       }
 
+      invalidateFinanceCache();
     } catch (error) {
       console.error('Error updating transaction:', error);
       throw error;
@@ -1546,6 +1561,7 @@ export class FinanceService {
           }
 
           await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+          invalidateFinanceCache();
 
           // Sync with Member Membership if category is Membership
           if (transaction && transaction.category === 'Membership' && transaction.memberId) {
@@ -1982,52 +1998,46 @@ export class FinanceService {
   static async getAllBankAccounts(includeBalance: boolean = true): Promise<BankAccount[]> {
     return withDevMode(
       () => MOCK_ACCOUNTS,
-      async () => {
-        try {
-          if (!includeBalance) {
-            const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
-            return accountsSnapshot.docs.map(doc => ({
+      () => apiCache.getOrSet(
+        `${FINANCE_CACHE_PREFIX}bankAccounts:${includeBalance ? 'withBalance' : 'noBalance'}`,
+        async () => {
+          try {
+            if (!includeBalance) {
+              const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
+              return accountsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
+              } as BankAccount));
+            }
+
+            const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
+              getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
+              getDocs(collection(db, COLLECTIONS.TRANSACTIONS))
+            ]);
+
+            const accounts = accountsSnapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data(),
               lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
             } as BankAccount));
+
+            const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
+
+            return accounts.map(account => {
+              const accountTransactions = transactions.filter(t => t.bankAccountId === account.id && !t.isSplitChild);
+              const transactionSum = accountTransactions.reduce((sum, t) => {
+                return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
+              }, 0);
+              return { ...account, balance: (account.initialBalance || 0) + transactionSum };
+            });
+          } catch (error) {
+            console.error('Error fetching bank accounts:', error);
+            throw error;
           }
-
-          const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
-            getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
-            getDocs(collection(db, COLLECTIONS.TRANSACTIONS))
-          ]);
-
-          const accounts = accountsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
-          } as BankAccount));
-
-          const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
-
-          // Calculate dynamic balance for each account
-          // Exclude isSplit parents — their amount is decomposed into splits which are NOT in this collection,
-          // so the parent row's amount still represents the real bank movement. Include it as-is. (情景 T)
-          // isSplit parents ARE the real transaction; no double-count exists. Filter only virtual isSplitChild rows
-          // which are never stored in the transactions collection anyway. So no change needed here — the balance
-          // is correct as long as we don't also count split children (which live in transaction_splits, not transactions).
-          return accounts.map(account => {
-            const accountTransactions = transactions.filter(t => t.bankAccountId === account.id && !t.isSplitChild);
-            const transactionSum = accountTransactions.reduce((sum, t) => {
-              return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
-            }, 0);
-
-            return {
-              ...account,
-              balance: (account.initialBalance || 0) + transactionSum
-            };
-          });
-        } catch (error) {
-          console.error('Error fetching bank accounts:', error);
-          throw error;
-        }
-      }
+        },
+        TX_CACHE_TTL
+      )
     );
   }
 

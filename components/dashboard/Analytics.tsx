@@ -10,6 +10,7 @@ import { PointTransaction, PointsService } from '../../services/pointsService';
 import type { PointRule } from '../../services/pointsService';
 import { BoardManagementService } from '../../services/boardManagementService';
 import { ProjectsService } from '../../services/projectsService';
+import { MembersService } from '../../services/membersService';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -258,14 +259,14 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
           projects,
           sponsorshipsSnap,
           contributionsSnap,
-          allMembersSnap
+          allMembers
         ] = await Promise.all([
           BoardManagementService.getMemberBoardPositions(memberId),
           BoardManagementService.getMemberCommissionDirectorPositions(memberId),
           ProjectsService.getAllProjects(),
           getDocs(query(collection(db, 'sponsorships'), where('memberId', '==', memberId))),
           getDocs(query(collection(db, 'RadarContributions'), where('memberId', '==', memberId))),
-          getDocs(collection(db, COLLECTIONS.MEMBERS))
+          MembersService.getAllMembers()
         ]);
 
         if (cancelled) return;
@@ -331,9 +332,8 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
         const recruitList: any[] = [];
         const memberName = member.name || '';
         const memberFullName = member.fullName || member.general?.name || '';
-        allMembersSnap.forEach((doc) => {
-          const m = doc.data() as any;
-          const intro = (m.introducer || '').trim().toLowerCase();
+        allMembers.forEach((m) => {
+          const intro = ((m as any).introducer || '').trim().toLowerCase();
           if (intro) {
             if (
               intro === memberId.toLowerCase() ||
@@ -341,7 +341,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
               (memberFullName && intro === memberFullName.trim().toLowerCase())
             ) {
               recruitList.push({
-                joinDate: m.joinDate || '',
+                joinDate: (m as any).joinDate || '',
               });
             }
           }

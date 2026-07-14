@@ -16,6 +16,7 @@ import { COLLECTIONS } from '../config/constants';
 import { BusinessProfile } from '../types';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_BUSINESSES } from './mockData';
+import { MembersService } from './membersService';
 
 export function mapMemberToBusinessProfile(id: string, data: Record<string, unknown>): BusinessProfile | null {
   const business = (data.business ?? {}) as Record<string, unknown>;
@@ -128,11 +129,10 @@ export class BusinessDirectoryService {
         }
 
         try {
-          // Authenticated path: read directly from members so all members with a
-          // companyName are included — not just those synced to the public cache.
-          const snapshot = await getDocs(collection(db, COLLECTIONS.MEMBERS));
-          return snapshot.docs
-            .map((docSnap) => mapMemberToBusinessProfile(docSnap.id, docSnap.data() as Record<string, unknown>))
+          // Authenticated path: use cached MembersService to avoid a raw full-collection scan.
+          const members = await MembersService.getAllMembers();
+          return members
+            .map((m) => mapMemberToBusinessProfile(m.id, m as unknown as Record<string, unknown>))
             .filter((profile): profile is BusinessProfile => profile !== null)
             .sort((a, b) => a.companyName.localeCompare(b.companyName));
         } catch (error) {
