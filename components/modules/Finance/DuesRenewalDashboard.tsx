@@ -51,6 +51,7 @@ import {
 import type { Transaction } from '../../../types';
 import { buildCategoryFields } from '../../../utils/transactionCategoryUtils';
 import { PaymentButton } from '../../shared/toyyib/PaymentButton';
+import { Tabs } from '../../ui/Common';
 // Re-scan trigger
 
 /** First-year membership dues (base + registration), shown as "New" in breakdown */
@@ -856,21 +857,17 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       {/* ── Two-column grid: Renewal Members + Membership Payments ── */}
 
       {/* Mobile tab switcher */}
-      <div className="flex md:hidden rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
-        <button
-          type="button"
-          onClick={() => setMobilePanel('members')}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobilePanel === 'members' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Renewal Members
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobilePanel('payments')}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobilePanel === 'payments' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Payments
-        </button>
+      <div className="md:hidden">
+        <Tabs
+          variant="button"
+          fullWidth
+          tabs={[
+            { id: 'members', label: 'Renewal Members' },
+            { id: 'payments', label: 'Payments' },
+          ]}
+          activeTab={mobilePanel}
+          onTabChange={(tab) => setMobilePanel(tab as 'members' | 'payments')}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
