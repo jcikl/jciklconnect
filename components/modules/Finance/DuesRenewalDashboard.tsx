@@ -151,19 +151,16 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   members = [],
   onInitiateRenewal,
 }) => {
-  const availableYears = React.useMemo(() => {
-    const endYear = new Date().getFullYear();
-    return Array.from({ length: endYear - 2000 + 1 }, (_, i) => endYear - i);
-  }, []);
-
-  const [selectedYear, setSelectedYear] = useState(year);
+  const selectedYear = year;
   const [filterType, setFilterType] = useState<MembershipType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<MembershipStatus | 'all'>('all');
+  const [filterPrevYearPaid, setFilterPrevYearPaid] = useState(false);
   const [autoMatching, setAutoMatching] = useState(false);
   const [fixingFirstDues, setFixingFirstDues] = useState(false);
   const [syncingMembershipTypes, setSyncingMembershipTypes] = useState(false);
   const [syncingMembershipRecords, setSyncingMembershipRecords] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'members' | 'payments'>('members');
+  const [mobileStatPanel, setMobileStatPanel] = useState<'stats' | 'breakdown'>('stats');
 
   /** One-click: fuzzy-match all unlinked membership transactions and persist memberId to Firestore */
   const handleAutoMatchMembers = async () => {
@@ -317,11 +314,6 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     fetchConfig();
   }, []);
 
-  useEffect(() => {
-    if (!availableYears.includes(selectedYear)) {
-      setSelectedYear(availableYears[0] ?? new Date().getFullYear());
-    }
-  }, [availableYears]);
 
   const [waCampaign, setWaCampaign] = useState<WhatsAppCampaign | null>(null);
   const [waDismissing, setWaDismissing] = useState(false);
@@ -443,44 +435,25 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       const resolveTypeFromDues = (amt: number, currentType: MembershipType) =>
         resolveMembershipTypeFromDues(amt, rules, currentType);
 
-      if (membershipData) {
-        const rawType = m.membershipType || 'Probation';
-        const duesVal = Number(membershipData.dues) || getTargetDues(rawType);
-        const resolvedType = resolveTypeFromDues(duesVal, rawType);
-        return {
-          id: `summary-${m.id}-${selectedYear}`,
-          memberId: m.id,
-          membershipType: resolvedType,
-          duesYear: selectedYear,
-          amount: membershipData.amount,
-          targetDues: duesVal,
-          status: membershipData.status,
-          dueDate: new Date(selectedYear, 2, 31).toISOString(),
-          isRenewal: !isFirstYear,
-        } as RenewalWithTargetDues;
-      }
+      if (!membershipData) return null;
 
-      const type = (m.membershipType && (membershipRules ?? DEFAULT_MEMBERSHIP_RULES)[m.membershipType])
-        ? m.membershipType
-        : 'Probation';
-
-      const duesVal = getTargetDues(type);
-      const resolvedType = resolveTypeFromDues(duesVal, type);
-
+      const rawType = m.membershipType || 'Probation';
+      const duesVal = Number(membershipData.dues) || getTargetDues(rawType);
+      const resolvedType = resolveTypeFromDues(duesVal, rawType);
       return {
-        id: `virtual-${m.id}`,
+        id: `summary-${m.id}-${selectedYear}`,
         memberId: m.id,
         membershipType: resolvedType,
         duesYear: selectedYear,
-        amount: 0,
+        amount: membershipData.amount,
         targetDues: duesVal,
-        status: 'pending',
+        status: membershipData.status,
         dueDate: new Date(selectedYear, 2, 31).toISOString(),
         isRenewal: !isFirstYear,
       } as RenewalWithTargetDues;
     });
 
-    return merged;
+    return merged.filter((r): r is RenewalWithTargetDues => r !== null);
   }, [members, selectedYear, membershipRules, calculationMode, membershipTransactions]);
 
   const summary = React.useMemo((): DuesRenewalSummary | null => {
@@ -548,6 +521,11 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     return mergedRenewals
       .filter(renewal => {
         if (filterType !== 'all' && renewal.membershipType !== filterType) return false;
+        if (filterPrevYearPaid) {
+          const prevYearRec = members.find(m => m.id === renewal.memberId)?.membership?.[String(selectedYear - 1)];
+          const prevStatus = prevYearRec?.status ?? '';
+          if (prevStatus !== 'paid' && prevStatus !== 'over paid') return false;
+        }
         if (filterStatus === 'all') return true;
 
         // Special case: 'paid' filter also shows 'over paid'
@@ -571,7 +549,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
 
         return nameA.localeCompare(nameB);
       });
-  }, [mergedRenewals, members, filterType, filterStatus]);
+  }, [mergedRenewals, members, filterType, filterStatus, filterPrevYearPaid]);
 
   const membershipTypeColors: Record<MembershipType, string> = {
     Guest: 'bg-blue-100 text-blue-800',
@@ -634,18 +612,6 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           <p className="text-xs text-slate-500 mt-0.5">Annual dues collection and renewal tracking</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {/* Year select + refresh */}
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
-            >
-              {availableYears.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
           {/* Admin buttons (no Auto-match here) */}
           {hasEditPermission && (
             <div className="flex flex-wrap items-center gap-1.5">
@@ -695,9 +661,85 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         </div>
       </div>
 
+      {/* ── Mobile tab switcher: Stats / Breakdown ── */}
+      {summary && (
+        <div className="md:hidden">
+          <Tabs
+            variant="button"
+            fullWidth
+            tabs={[
+              { id: 'stats', label: '指标概览' },
+              { id: 'breakdown', label: '类型明细' },
+            ]}
+            activeTab={mobileStatPanel}
+            onTabChange={(tab) => setMobileStatPanel(tab as 'stats' | 'breakdown')}
+          />
+        </div>
+      )}
+
       {/* ── KPI Summary Strip ── */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <>
+        {/* Mobile: single-card summary table */}
+        <div className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden md:hidden ${mobileStatPanel !== 'stats' ? 'hidden' : ''}`}>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/60">
+                <th className="py-2.5 px-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide">指标</th>
+                <th className="py-2.5 px-2 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wide">人数</th>
+                <th className="py-2.5 px-2 text-center text-[11px] font-semibold text-green-600 uppercase tracking-wide">金额</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              <tr className="hover:bg-slate-50/60">
+                <td className="py-2.5 px-3">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users className="w-3 h-3 text-blue-400" />
+                    <span className="font-semibold text-slate-700">Members</span>
+                  </span>
+                  <span className="block text-[10px] text-slate-400 mt-0.5">
+                    <span className="text-green-600 font-semibold">{summary.renewalMembers}</span> renewal · <span className="text-blue-600 font-semibold">{summary.newMembers}</span> new
+                  </span>
+                </td>
+                <td className="py-2.5 px-2 text-center font-bold text-slate-800 text-sm">{summary.totalMembers}</td>
+                <td className="py-2.5 px-2 text-center text-[11px] text-slate-400">
+                  {summary.overallStats.collectionRate}%
+                </td>
+              </tr>
+              <tr className="hover:bg-slate-50/60">
+                <td className="py-2.5 px-3">
+                  <span className="inline-flex items-center gap-1.5">
+                    <CheckCircle className="w-3 h-3 text-green-500" />
+                    <span className="font-semibold text-green-700">Paid</span>
+                  </span>
+                </td>
+                <td className="py-2.5 px-2 text-center font-bold text-green-600 text-sm">
+                  {Object.values(summary.byMembershipType).reduce((sum, t) => sum + t.paid, 0)}
+                </td>
+                <td className="py-2.5 px-2 text-center font-semibold text-green-600 text-[11px]">
+                  RM{summary.overallStats.paidAmount.toLocaleString()}
+                </td>
+              </tr>
+              <tr className="hover:bg-slate-50/60">
+                <td className="py-2.5 px-3">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-amber-500" />
+                    <span className="font-semibold text-amber-700">Pending</span>
+                  </span>
+                </td>
+                <td className="py-2.5 px-2 text-center font-bold text-amber-600 text-sm">
+                  {Object.values(summary.byMembershipType).reduce((sum, t) => sum + t.pending, 0)}
+                </td>
+                <td className="py-2.5 px-2 text-center font-semibold text-amber-600 text-[11px]">
+                  RM{summary.overallStats.pendingAmount.toLocaleString()}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Desktop: 4-card grid */}
+        <div className="hidden md:grid grid-cols-4 gap-3">
           {/* Members */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3.5">
             <div className="flex items-center gap-2 mb-2">
@@ -755,11 +797,12 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             </p>
           </div>
         </div>
+        </>
       )}
 
       {/* ── Membership Breakdown Table ── */}
       {summary && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${mobileStatPanel !== 'breakdown' ? 'hidden md:block' : ''}`}>
           {/* Card header */}
           <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2.5">
@@ -772,7 +815,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             </div>
           </div>
           {/* Mobile: single-card table */}
-          <div className="md:hidden overflow-x-auto">
+          <div className="overflow-x-auto md:hidden">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60">
@@ -791,10 +834,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                   return (
                     <tr key={type} className="hover:bg-slate-50/60">
                       <td className="py-2.5 px-3">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${membershipTypeColors[type as MembershipType] || 'bg-slate-100 text-slate-700'}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${membershipTypeColors[type as MembershipType] || 'bg-slate-100 text-slate-700'}`}>
                           {type}
+                          <span className="opacity-60 font-normal">/ RM{standardDues}</span>
                         </span>
-                        <span className="block text-[10px] text-slate-400 mt-0.5 pl-0.5">RM{standardDues}</span>
                       </td>
                       <td className="py-2.5 px-2 text-center font-bold text-slate-800">{s.total}</td>
                       <td className="py-2.5 px-2 text-center font-bold text-green-600">{s.paid}</td>
@@ -875,7 +918,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         {/* Left: Renewal Members */}
         <div className={`lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${mobilePanel !== 'members' ? 'hidden md:block' : ''}`}>
           {/* Card header */}
-          <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 pt-3.5 pb-3 border-b border-slate-100 gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
                 <Calendar className="w-3.5 h-3.5 text-indigo-500" />
@@ -916,6 +959,19 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               >
                 <MessageCircle className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">WhatsApp</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterPrevYearPaid(v => !v)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${
+                  filterPrevYearPaid
+                    ? 'bg-jci-blue text-white border-jci-blue'
+                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                }`}
+                title={`${filterPrevYearPaid ? '取消' : '仅显示'}上一年已缴费会员（续费会员）`}
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{selectedYear - 1} 已缴</span>
               </button>
             </div>
           </div>

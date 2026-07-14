@@ -519,6 +519,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       {moduleTab === 'Membership' && hasPermission('canViewFinance') && (
         <Suspense fallback={<div className="py-12 text-center text-slate-400 text-sm">Loading...</div>}>
         <DuesRenewalDashboard
+          year={detailYear}
           membershipTransactions={membershipTransactions}
           onEditMembershipTransaction={(tx, filterYear) => {
             setEditingTransaction(tx);

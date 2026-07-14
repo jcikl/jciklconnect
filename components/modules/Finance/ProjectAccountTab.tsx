@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Briefcase, CheckCircle, AlertCircle, Edit, Trash2, Settings } from 'lucide-react';
-import { Button, Badge, Card } from '../../ui/Common';
+import { Button, Badge, Card, Tabs } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
@@ -52,6 +52,8 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
   setIsProjectTrxModalOpen,
   projects,
 }) => {
+  const [mobileTab, setMobileTab] = useState<'projects' | 'stats'>('projects');
+
   const cardList = [
     ...(uncategorizedProjectTxCount > 0 ? [{
       id: 'uncategorized',
@@ -146,10 +148,24 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Mobile tab switcher */}
+      <div className="md:hidden">
+        <Tabs
+          variant="button"
+          fullWidth
+          tabs={[
+            { id: 'projects', label: 'Projects' },
+            { id: 'stats', label: 'Statistics' },
+          ]}
+          activeTab={mobileTab}
+          onTabChange={(tab) => setMobileTab(tab as 'projects' | 'stats')}
+        />
+      </div>
+
       {/* Project Account Cards */}
       <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
         {/* Mobile: horizontal scroll */}
-        <div className="md:hidden flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
+        <div className={`md:hidden flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1 ${mobileTab !== 'projects' ? 'hidden' : ''}`}>
           {cardList.map(renderCard)}
         </div>
         {/* Desktop: horizontal scroll */}
@@ -161,7 +177,7 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
       {/* Stats strip + Transactions */}
       <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
         {/* Left: Project Statistics */}
-        <div className="md:col-span-2">
+        <div className={`md:col-span-2 ${mobileTab !== 'stats' ? 'hidden md:block' : ''}`}>
           <Card title="Project Statistics">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -196,38 +212,12 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
                   <span className="font-semibold text-amber-600">{uncategorizedProjectTxCount}</span>
                 </div>
               </div>
-              {selectedProjectInfo && (
-                <div className="border-t border-slate-100 pt-3">
-                  <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Selected Project</h4>
-                  <div className="bg-slate-50 rounded-lg p-3 space-y-2 border border-slate-100">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-500 font-medium">Project Name:</span>
-                      <span className="font-semibold text-slate-800 truncate max-w-[120px]" title={selectedProjectInfo.name || selectedProjectInfo.title}>
-                        {selectedProjectInfo.name || selectedProjectInfo.title}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-500 font-medium">LO Budget:</span>
-                      <span className="font-semibold text-slate-800">
-                        {formatCurrency(selectedProjectInfo.budget || selectedProjectInfo.proposedBudget || 0)}
-                      </span>
-                    </div>
-                    <Button
-                      className="w-full mt-2"
-                      size="sm"
-                      onClick={() => { loadProjectTrxList(selectedProjectFilter); setIsProjectTrxModalOpen(true); }}
-                    >
-                      <Settings size={14} className="mr-1.5" />Configure PT
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
           </Card>
         </div>
 
         {/* Right: Transactions */}
-        <div className="md:col-span-5">
+        <div className={`md:col-span-5 ${mobileTab === 'stats' ? 'hidden md:block' : ''}`}>
           {/* Title row */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 min-w-0">
