@@ -128,14 +128,30 @@ export const SystemLogsView: React.FC = () => {
             </button>
           ))}
         </div>
-        <button
-          onClick={fetchLogs}
-          disabled={loading}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-jci-blue transition-colors"
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-          刷新
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const text = filtered.map(copyDocAsText).join('\n\n');
+              navigator.clipboard.writeText(text).then(() => {
+                setCopied('__all__');
+                setTimeout(() => setCopied(null), 2000);
+              });
+            }}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-jci-blue transition-colors disabled:opacity-40"
+          >
+            {copied === '__all__' ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+            {copied === '__all__' ? '已复制' : '复制全部'}
+          </button>
+          <button
+            onClick={fetchLogs}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-jci-blue transition-colors"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            刷新
+          </button>
+        </div>
       </div>
 
       {/* Error */}
