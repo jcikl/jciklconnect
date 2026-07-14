@@ -90,24 +90,19 @@ export const MembershipConfigView: React.FC = () => {
     <div className="space-y-4">
 
       {/* Toolbar */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="flex-1" />
-          <Button size="sm" onClick={handleSave} disabled={isBusy} className="flex items-center gap-1.5 shrink-0">
-            <Save size={12} />
-            {saving ? 'Saving…' : 'Save Changes'}
-          </Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleBatchSyncMembershipTypes} disabled={isBusy} className="flex items-center gap-1.5">
-            <RefreshCw size={11} className={syncingTypes ? 'animate-spin' : ''} />
-            Sync Type
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleBatchSyncMembershipRecords} disabled={isBusy} className="flex items-center gap-1.5">
-            <RefreshCw size={11} className={syncingRecords ? 'animate-spin' : ''} />
-            Sync Records
-          </Button>
-        </div>
+      <div className="flex items-center gap-2 justify-end">
+        <Button variant="outline" size="sm" onClick={handleBatchSyncMembershipTypes} disabled={isBusy} className="flex items-center gap-1.5">
+          <RefreshCw size={11} className={syncingTypes ? 'animate-spin' : ''} />
+          Sync Type
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleBatchSyncMembershipRecords} disabled={isBusy} className="flex items-center gap-1.5">
+          <RefreshCw size={11} className={syncingRecords ? 'animate-spin' : ''} />
+          Sync Records
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={isBusy} className="flex items-center gap-1.5">
+          <Save size={12} />
+          {saving ? 'Saving…' : 'Save Changes'}
+        </Button>
       </div>
 
       {/* ── Mobile: compact cards ── */}
