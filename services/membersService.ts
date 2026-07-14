@@ -472,7 +472,7 @@ export class MembersService {
             if (!membership[yearStr]) {
               membership[yearStr] = {
                 year: parseInt(yearStr),
-                dues: MembershipDues.Probation, // 350
+                dues: (await MembershipConfigService.getRules()).Probation?.duesAmount ?? MembershipDues.Probation,
                 type: 'Probation',
                 amount: 0,
                 status: 'pending',

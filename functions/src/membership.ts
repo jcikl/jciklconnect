@@ -165,7 +165,187 @@ export const generateDuesRenewal = functions.https.onCall(async (data, context) 
   };
 });
 
+// ─── Scheduled: Oct 1 — auto-initiate dues renewal for next year ─────────────
+
+export const autoInitiateDuesRenewal = functions.pubsub
+  .schedule('0 0 1 10 *')
+  .timeZone('Asia/Kuala_Lumpur')
+  .onRun(async () => {
+    const targetYear = new Date().getFullYear() + 1;
+    const prevYear = targetYear - 1;
+    console.log(`[autoInitiateDuesRenewal] Initiating dues renewal for ${targetYear}`);
+
+    // Load membership config rules
+    const configSnap = await db.collection('systemSettings').doc('membershipRules').get();
+    const configRules: Record<string, { duesAmount: number }> = configSnap.exists
+      ? (configSnap.data()?.rules ?? {})
+      : {};
+    const DEFAULT_DUES: Record<string, number> = {
+      Probation: 300, Official: 300, Visiting: 500, Associate: 50, Honorary: 0, Senator: 0,
+    };
+    const getDues = (type: string) =>
+      configRules[type]?.duesAmount ?? DEFAULT_DUES[type] ?? 0;
+
+    // Find all Cleared Membership Income transactions from prevYear
+    const txSnap = await db.collection('transactions')
+      .where('category', '==', 'Membership')
+      .where('type', '==', 'Income')
+      .where('status', '==', 'Cleared')
+      .get();
+
+    const eligibleMemberIds = new Set<string>();
+    for (const doc of txSnap.docs) {
+      const d = doc.data();
+      const txYear = d.projectId ? parseInt((d.projectId as string).split(' ')[0]) : 0;
+      if (txYear === prevYear && d.memberId) eligibleMemberIds.add(d.memberId as string);
+    }
+
+    // Find already-initiated transactions for targetYear (idempotency)
+    const existingSnap = await db.collection('transactions')
+      .where('category', '==', 'Membership')
+      .where('type', '==', 'Income')
+      .get();
+    const alreadyInitiated = new Set<string>();
+    for (const doc of existingSnap.docs) {
+      const d = doc.data();
+      const txYear = d.projectId ? parseInt((d.projectId as string).split(' ')[0]) : 0;
+      if (txYear === targetYear && d.memberId) alreadyInitiated.add(d.memberId as string);
+    }
+
+    let created = 0;
+    const batchLimit = 490;
+    let batch = db.batch();
+    let batchCount = 0;
+
+    const flush = async () => { await batch.commit(); batch = db.batch(); batchCount = 0; };
+
+    for (const memberId of eligibleMemberIds) {
+      if (alreadyInitiated.has(memberId)) continue;
+
+      const memberSnap = await db.collection('members').doc(memberId).get();
+      if (!memberSnap.exists) continue;
+      const m = memberSnap.data()!;
+      if (m.status === 'Inactive' || m.membershipType === 'Guest') continue;
+
+      const type: string = m.membershipType ?? 'Probation';
+      const baseDues = getDues(type);
+      if (baseDues === 0) continue; // Honorary / Senator
+
+      const initFee = (m.hasPaidInitiationFee || m.jciCareer?.hasPaidInitiationFee) ? 0 : 50;
+      const totalDues = baseDues + initFee;
+
+      const txRef = db.collection('transactions').doc();
+      batch.set(txRef, {
+        memberId,
+        type: 'Income',
+        category: 'Membership',
+        status: 'Pending',
+        amount: totalDues,
+        projectId: `${targetYear} membership`,
+        transactionType: 'dues',
+        description: `${targetYear} ${type} Dues Renewal`,
+        date: `${targetYear}-01-01`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Write membership record on member document
+      batch.update(db.collection('members').doc(memberId), {
+        [`membership.${targetYear}`]: {
+          year: targetYear,
+          dues: totalDues,
+          amount: 0,
+          status: 'pending',
+          transactionId: [txRef.id],
+          purpose: `${targetYear} ${type} Renewal`,
+        },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // In-app notification
+      const notifRef = db.collection('notifications').doc();
+      batch.set(notifRef, {
+        memberId,
+        type: 'dues_renewal',
+        title: `${targetYear} 年度会费通知`,
+        message: `您的 ${targetYear} 年度 ${type} 会费为 RM${totalDues}，请尽快完成缴费。`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      created++;
+      batchCount += 3;
+      if (batchCount >= batchLimit) await flush();
+    }
+
+    if (batchCount > 0) await flush();
+    console.log(`[autoInitiateDuesRenewal] Done. Created ${created} renewal records for ${targetYear}.`);
+    return null;
+  });
+
+// ─── Scheduled: Jan 1 — send dues reminders (in-app + WhatsApp campaign flag) ─
+
+export const sendAnnualDuesReminders = functions.pubsub
+  .schedule('0 10 1 1 *')
+  .timeZone('Asia/Kuala_Lumpur')
+  .onRun(async () => {
+    const year = new Date().getFullYear();
+    console.log(`[sendAnnualDuesReminders] Sending dues reminders for ${year}`);
+
+    const membersSnap = await db.collection('members')
+      .where('status', '==', 'Active')
+      .get();
+
+    const pendingMemberIds: string[] = [];
+    let batch = db.batch();
+    let batchCount = 0;
+    const flush = async () => { await batch.commit(); batch = db.batch(); batchCount = 0; };
+
+    for (const doc of membersSnap.docs) {
+      const m = doc.data();
+      const memberId = doc.id;
+      const rec = m.membership?.[String(year)];
+      if (!rec) continue;
+      const status: string = rec.status ?? '';
+      if (!['pending', 'partial', 'overdue'].includes(status)) continue;
+      if (m.membershipType === 'Guest' || m.membershipType === 'Honorary' || m.membershipType === 'Senator') continue;
+
+      const outstanding = Math.max(0, (rec.dues ?? 0) - (rec.amount ?? 0));
+
+      const notifRef = db.collection('notifications').doc();
+      batch.set(notifRef, {
+        memberId,
+        type: 'dues_reminder',
+        title: `${year} 年度会费提醒`,
+        message: `温馨提醒：您 ${year} 年度的 ${m.membershipType ?? ''} 会费 RM${outstanding} 尚未缴清。请尽快完成缴费以维持您的会籍权益。`,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      pendingMemberIds.push(memberId);
+      batchCount++;
+      if (batchCount >= 490) await flush();
+    }
+
+    if (batchCount > 0) await flush();
+
+    // Write WhatsApp campaign flag — Dashboard picks this up and prompts admin to run bulk WA
+    if (pendingMemberIds.length > 0) {
+      await db.collection('systemSettings').doc('pendingWhatsAppCampaign').set({
+        year,
+        memberIds: pendingMemberIds,
+        triggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+        dismissed: false,
+      });
+    }
+
+    console.log(`[sendAnnualDuesReminders] Sent ${pendingMemberIds.length} in-app reminders for ${year}.`);
+    return null;
+  });
+
 export const membershipFunctions = {
   checkMemberPromotion,
-  generateDuesRenewal
+  generateDuesRenewal,
+  autoInitiateDuesRenewal,
+  sendAnnualDuesReminders,
 };

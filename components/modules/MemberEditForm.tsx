@@ -315,7 +315,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         ...(member.membership || {}),
         [yearStr]: {
           year: formValues.membershipYear,
-          dues: ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50) + MembershipDues.Probation, // 300 + 50 = 350
+          dues: ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50) + (membershipRules?.Probation?.duesAmount ?? MembershipDues.Probation),
           amount: 0,
           status: 'pending',
           transactionId: []

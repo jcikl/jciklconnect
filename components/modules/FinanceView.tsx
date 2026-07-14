@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useTransition, lazy, Suspense } from 'react';
-import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, Calendar, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal, ChevronDown, ShieldAlert } from 'lucide-react';
-import { Card, Button, Badge, ProgressBar, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
+import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal, ChevronDown, ShieldAlert } from 'lucide-react';
+import { Card, Button, Badge, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { LoadingState } from '../ui/Loading';
@@ -439,62 +439,6 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 </LoadingState>
               </Card>
 
-              {/* Automated Dues Section */}
-              <Card title="Membership Dues Automation" action={
-                hasPermission('canEditFinance') && (
-                  <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)}>
-                    <Calendar size={14} className="mr-1" />
-                    Initiate Renewal
-                  </Button>
-                )
-              }>
-                {(() => {
-                  const currentYear = new Date().getFullYear();
-                  const duesTxs = membershipTransactions.filter(t => {
-                    const txYear = new Date(t.date).getFullYear();
-                    return txYear === currentYear;
-                  });
-                  const duesPendingCount = duesTxs.filter(t => t.status === 'Pending').length;
-                  const duesClearedCount = duesTxs.filter(t => t.status === 'Cleared').length;
-                  const incomeTxs = duesTxs.filter(t => t.type === 'Income');
-                  const clearedDues = incomeTxs.filter(t => t.status === 'Cleared').reduce((sum, t) => sum + t.amount, 0);
-                  const target = incomeTxs.length * 150;
-                  const progress = target > 0 ? (clearedDues / target) * 100 : 0;
-                  return (
-                    <>
-                      <div className="grid grid-cols-3 gap-2 mb-3">
-                        <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 text-center">
-                          <p className="text-xl font-bold text-amber-600 tabular-nums">{duesPendingCount}</p>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Pending</p>
-                        </div>
-                        <div className="bg-green-50 border border-green-100 rounded-lg p-2.5 text-center">
-                          <p className="text-xl font-bold text-green-600 tabular-nums">{duesClearedCount}</p>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Paid</p>
-                        </div>
-                        <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-center">
-                          <p className="text-xl font-bold text-slate-700 tabular-nums">{Math.round(progress)}%</p>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-0.5">Collected</p>
-                        </div>
-                      </div>
-                      <ProgressBar progress={progress} label="Collection Progress" />
-                      <p className="text-xs text-slate-400 text-right mt-1 tabular-nums">
-                        {formatCurrency(clearedDues)} / {formatCurrency(target)}
-                      </p>
-                      <div className="mt-3 flex gap-2">
-                        <Button variant="outline" size="sm" onClick={async () => {
-                          try {
-                            const remindersSent = await FinanceService.sendDuesReminders(currentYear, 30);
-                            showToast(`${remindersSent} reminder notifications sent`, 'success');
-                          } catch (err) {
-                            showToast('Failed to send reminders', 'error');
-                          }
-                        }}>Send Reminders</Button>
-                        <Button variant="outline" size="sm" onClick={() => setIsDuesRenewalModalOpen(true)}>Configure</Button>
-                      </div>
-                    </>
-                  );
-                })()}
-              </Card>
             </div>
 
             {/* Sidebar: Accounts */}
@@ -589,6 +533,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
           formatDate={(d) => formatDate(d)}
           onMembershipDataChanged={loadData}
           members={members}
+          onInitiateRenewal={() => setIsDuesRenewalModalOpen(true)}
         />
         </Suspense>
       )}

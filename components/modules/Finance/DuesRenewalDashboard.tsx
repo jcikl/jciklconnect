@@ -44,6 +44,9 @@ import {
   DEFAULT_MEMBERSHIP_RULES,
   getTargetDuesForMembershipType,
   resolveMembershipTypeFromDues,
+  getPendingWhatsAppCampaign,
+  dismissWhatsAppCampaign,
+  type WhatsAppCampaign,
 } from '../../../services/membershipConfigService';
 import type { Transaction } from '../../../types';
 import { buildCategoryFields } from '../../../utils/transactionCategoryUtils';
@@ -118,6 +121,8 @@ interface DuesRenewalDashboardProps {
   formatDate?: (date: string) => string;
   /** 批量修复会员首次会费后刷新父级数据 */
   onMembershipDataChanged?: () => void | Promise<void>;
+  /** 手动触发年度续费（Cloud Function 自动跑，此为备用入口） */
+  onInitiateRenewal?: () => void;
   /** 会员列表，用于显示 memberId 对应的姓名 */
   members?: Array<{
     id: string;
@@ -143,6 +148,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   formatDate: fmtDate = (d) => new Date(d).toLocaleDateString(),
   onMembershipDataChanged,
   members = [],
+  onInitiateRenewal,
 }) => {
   const availableYears = React.useMemo(() => {
     const endYear = new Date().getFullYear();
@@ -156,6 +162,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   const [fixingFirstDues, setFixingFirstDues] = useState(false);
   const [syncingMembershipTypes, setSyncingMembershipTypes] = useState(false);
   const [syncingMembershipRecords, setSyncingMembershipRecords] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'members' | 'payments'>('members');
 
   /** One-click: fuzzy-match all unlinked membership transactions and persist memberId to Firestore */
   const handleAutoMatchMembers = async () => {
@@ -315,6 +322,45 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     }
   }, [availableYears]);
 
+  const [waCampaign, setWaCampaign] = useState<WhatsAppCampaign | null>(null);
+  const [waDismissing, setWaDismissing] = useState(false);
+
+  useEffect(() => {
+    getPendingWhatsAppCampaign().then(setWaCampaign);
+  }, []);
+
+  const handleDismissWaCampaign = async () => {
+    setWaDismissing(true);
+    await dismissWhatsAppCampaign();
+    setWaCampaign(null);
+    setWaDismissing(false);
+  };
+
+  const handleRunWaCampaign = async () => {
+    if (!waCampaign) return;
+    const targets = waCampaign.memberIds
+      .map(id => members.find(m => m.id === id))
+      .filter(Boolean) as typeof members;
+
+    const confirmed = window.confirm(
+      `将为 ${targets.length} 位未缴会费会员逐一打开 WhatsApp 提醒。\n浏览器可能拦截弹出窗口，请确保已允许此页面弹窗。\n\n继续？`
+    );
+    if (!confirmed) return;
+
+    let sent = 0;
+    for (const m of targets) {
+      if (!m?.phone) continue;
+      const rec = (m as any).membership?.[String(waCampaign.year)];
+      const outstanding = Math.max(0, (rec?.dues ?? 0) - (rec?.amount ?? 0));
+      sendWhatsAppDuesReminder(m.name, m.phone, waCampaign.year, outstanding);
+      sent++;
+      await new Promise(r => setTimeout(r, 600));
+    }
+
+    alert(`已打开 ${sent} 个 WhatsApp 会话。`);
+    await handleDismissWaCampaign();
+  };
+
   /** Bulk WhatsApp: open wa.me links for all overdue/pending members in current view */
   const handleBulkWhatsApp = async () => {
     const targets = mergedRenewals.filter(r =>
@@ -413,7 +459,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         } as RenewalWithTargetDues;
       }
 
-      const type = (m.membershipType && MembershipDues[m.membershipType])
+      const type = (m.membershipType && (membershipRules ?? DEFAULT_MEMBERSHIP_RULES)[m.membershipType])
         ? m.membershipType
         : 'Probation';
 
@@ -451,7 +497,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     mergedRenewals.forEach(r => {
       const type = (r.membershipType && byMembershipType[r.membershipType]) ? r.membershipType : 'Probation';
       const t = byMembershipType[type]!;
-      const dues = (r as RenewalWithTargetDues).targetDues || MembershipDues[type] || 0;
+      const dues = (r as RenewalWithTargetDues).targetDues || (membershipRules ?? DEFAULT_MEMBERSHIP_RULES)[type]?.duesAmount || 0;
       t.total++; t.totalAmount += dues; totalAmount += dues;
       const s = (r.status || '').toLowerCase();
       if (s === 'paid' || s === 'over paid') {
@@ -547,6 +593,39 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   return (
     <div className="space-y-4">
 
+      {/* ── WhatsApp campaign banner (triggered by Jan 1 Cloud Function) ── */}
+      {waCampaign && hasEditPermission && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-green-50 border border-green-200">
+          <MessageCircle className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-green-800">
+              {waCampaign.year} 年度 WhatsApp 会费提醒待发送
+            </p>
+            <p className="text-xs text-green-700 mt-0.5">
+              系统已于 1 月 1 日自动发送站内通知，共 {waCampaign.memberIds.length} 位会员待缴费。点击下方按钮逐一打开 WhatsApp 发送催缴短信。
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleRunWaCampaign}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              发送 WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={handleDismissWaCampaign}
+              disabled={waDismissing}
+              className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+            >
+              忽略
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Header row ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
@@ -599,6 +678,17 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 {fixingFirstDues ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
                 {fixingFirstDues ? 'Fixing...' : 'Fix 1st Dues'}
               </button>
+              {onInitiateRenewal && (
+                <button
+                  type="button"
+                  onClick={onInitiateRenewal}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-jci-blue text-white hover:bg-jci-blue/90 transition-colors"
+                  title="手动触发年度续费（自动化在 10 月 1 日运行）"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Initiate Renewal
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -680,7 +770,44 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               </span>
             </div>
           </div>
-          <div className="p-4 overflow-x-auto">
+          {/* Mobile: single-card table */}
+          <div className="md:hidden overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60">
+                  <th className="py-2.5 px-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+                  <th className="py-2.5 px-2 text-center text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+                  <th className="py-2.5 px-2 text-center text-[11px] font-semibold text-green-600 uppercase tracking-wide">Paid</th>
+                  <th className="py-2.5 px-2 text-center text-[11px] font-semibold text-amber-600 uppercase tracking-wide">Pending</th>
+                  <th className="py-2.5 px-2 text-center text-[11px] font-semibold text-red-500 uppercase tracking-wide">Overdue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {Object.entries(summary.byMembershipType).map(([type, stats]) => {
+                  const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
+                  const standardDues = rules[type as MembershipType]?.duesAmount ?? MembershipDues[type as MembershipType] ?? 0;
+                  const s = stats as any;
+                  return (
+                    <tr key={type} className="hover:bg-slate-50/60">
+                      <td className="py-2.5 px-3">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${membershipTypeColors[type as MembershipType] || 'bg-slate-100 text-slate-700'}`}>
+                          {type}
+                        </span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5 pl-0.5">RM{standardDues}</span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-slate-800">{s.total}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-green-600">{s.paid}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-amber-600">{s.pending}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-red-500">{s.overdue}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden md:block p-4 overflow-x-auto">
             <table className="w-full min-w-[600px] text-sm border-collapse">
               <thead>
                 <tr className="border-b border-slate-100">
@@ -697,7 +824,6 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-xs">
-                {/* Standard Dues row */}
                 <tr>
                   <td className="py-2.5 font-medium text-slate-500 sticky left-0 bg-white pr-4 z-10">Standard Dues</td>
                   {Object.entries(summary.byMembershipType).map(([type]) => {
@@ -708,7 +834,6 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                     );
                   })}
                 </tr>
-                {/* Total / Paid / Pending / Overdue rows — DRY map */}
                 {[
                   { label: 'Total',   key: 'total',   color: 'text-slate-900', newVal: newMembershipBreakdown.total },
                   { label: 'Paid',    key: 'paid',    color: 'text-green-600', newVal: newMembershipBreakdown.paid },
@@ -729,10 +854,29 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       )}
 
       {/* ── Two-column grid: Renewal Members + Membership Payments ── */}
+
+      {/* Mobile tab switcher */}
+      <div className="flex md:hidden rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => setMobilePanel('members')}
+          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobilePanel === 'members' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Renewal Members
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePanel('payments')}
+          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mobilePanel === 'payments' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Payments
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Left: Renewal Members */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className={`lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${mobilePanel !== 'members' ? 'hidden md:block' : ''}`}>
           {/* Card header */}
           <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -780,7 +924,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[520px]">
             {displayRenewals.length === 0 ? (
               <div className="text-center py-12">
                 <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -873,7 +1017,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           </div>
 
           {/* Mobile cards */}
-          <div className="md:hidden space-y-2 p-3">
+          <div className="md:hidden space-y-2 p-3 overflow-y-auto max-h-[520px]">
             {displayRenewals.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-slate-400 text-sm italic">No records found</p>
@@ -948,7 +1092,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         </div>
 
         {/* Right: Membership Payments */}
-        <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className={`lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col ${mobilePanel !== 'payments' ? 'hidden md:flex' : ''}`}>
           {/* Card header */}
           <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">

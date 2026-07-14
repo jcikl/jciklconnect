@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { MembershipDues, MembershipRuleConfig, MembershipType, UserRole } from '../types';
 
@@ -336,5 +336,34 @@ export function resolveMembershipPurpose(
 export async function getMembershipPurpose(amount: number, year: number): Promise<string> {
   const rules = await MembershipConfigService.getRules();
   return resolveMembershipPurpose(amount, year, rules);
+}
+
+// ─── WhatsApp campaign flag (written by Jan 1 Cloud Function) ─────────────────
+
+const WA_CAMPAIGN_DOC = doc(db, 'systemSettings', 'pendingWhatsAppCampaign');
+
+export interface WhatsAppCampaign {
+  year: number;
+  memberIds: string[];
+  triggeredAt: any;
+  dismissed: boolean;
+}
+
+export async function getPendingWhatsAppCampaign(): Promise<WhatsAppCampaign | null> {
+  try {
+    const snap = await getDoc(WA_CAMPAIGN_DOC);
+    if (!snap.exists()) return null;
+    const data = snap.data() as WhatsAppCampaign;
+    if (data.dismissed) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export async function dismissWhatsAppCampaign(): Promise<void> {
+  try {
+    await updateDoc(WA_CAMPAIGN_DOC, { dismissed: true });
+  } catch { /* ignore */ }
 }
 
