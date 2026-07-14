@@ -851,6 +851,13 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // Firestore audit log — written by firestoreLogger, read by admins only
+    match /systemLogs/{logId} {
+      allow read: if isAdmin() || isDeveloper();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
