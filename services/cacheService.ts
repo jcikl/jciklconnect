@@ -18,6 +18,7 @@ export interface CacheOptions {
 
 class CacheService {
   private memoryCache = new Map<string, CacheEntry<any>>();
+  private inFlight = new Map<string, Promise<any>>();
   private defaultTTL = 5 * 60 * 1000; // 5 minutes
   private maxSize = 100;
   private useLocalStorage = false;
@@ -132,12 +133,25 @@ class CacheService {
       return cached;
     }
 
+    // If an identical request is already in-flight, reuse its Promise
+    // instead of firing a second Firestore read (thundering herd fix).
+    const existing = this.inFlight.get(key);
+    if (existing) return existing as Promise<T>;
+
     // Cache miss — actual Firestore read will happen inside factory()
     logRead(key, caller ?? 'unknown');
 
-    const data = await factory();
-    this.set(key, data, ttl);
-    return data;
+    const promise = factory().then(data => {
+      this.set(key, data, ttl);
+      this.inFlight.delete(key);
+      return data;
+    }).catch(err => {
+      this.inFlight.delete(key);
+      throw err;
+    });
+
+    this.inFlight.set(key, promise);
+    return promise;
   }
 
   /**

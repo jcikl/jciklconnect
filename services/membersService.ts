@@ -84,15 +84,17 @@ export class MembersService {
 
   /** Get all members, optionally filtered by loId (for multi-LO). */
   static async getAllMembers(loIdFilter?: string | null): Promise<Member[]> {
-    const cacheKey = loIdFilter ? CACHE_KEY_LO(loIdFilter) : CACHE_KEY_ALL_MEMBERS;
+    // Treat default-lo same as "all" — single-LO deployments should share one cache entry.
+    const normalised = (!loIdFilter || loIdFilter === DEFAULT_LO_ID) ? null : loIdFilter;
+    const cacheKey = normalised ? CACHE_KEY_LO(normalised) : CACHE_KEY_ALL_MEMBERS;
 
     return apiCache.getOrSet(cacheKey, async () => {
       try {
         let q;
-        if (loIdFilter != null && loIdFilter !== '') {
+        if (normalised != null) {
           q = query(
             collection(db, COLLECTIONS.MEMBERS),
-            where('loId', '==', loIdFilter),
+            where('loId', '==', normalised),
             orderBy('updatedAt', 'desc')
           );
         } else {
@@ -102,16 +104,16 @@ export class MembersService {
         const docs = snapshot.docs.map(d => ({ ...(d.data() as any), id: d.id } as Member));
 
         if (docs.length === 0 && isDevMode()) {
-          const list = loIdFilter
-            ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
+          const list = normalised
+            ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === normalised || !(m as any).loId)
             : MOCK_MEMBERS;
           return list;
         }
         return docs;
       } catch (error) {
         if (isDevMode()) {
-          const list = loIdFilter
-            ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === loIdFilter || !(m as any).loId)
+          const list = normalised
+            ? MOCK_MEMBERS.filter((m: Member) => (m as any).loId === normalised || !(m as any).loId)
             : MOCK_MEMBERS;
           return list;
         }
