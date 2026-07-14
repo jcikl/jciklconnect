@@ -125,6 +125,7 @@ export const usePermissions = () => {
   // B-3: Derive board-position flags from currentBoardPosition field
   const boardPosition = ((member as any)?.currentBoardPosition || '').toLowerCase();
   const isOrganizationSecretary = isBoardUser && boardPosition.includes('secretary');
+  const isPresident = isBoardUser && boardPosition.includes('president') && !boardPosition.includes('vice');
   const isOrganizationFinance =
     isBoardUser &&
     (boardPosition.includes('treasurer') ||
@@ -148,6 +149,7 @@ export const usePermissions = () => {
     canAccessEventsAndPayments,
     isAdmin: effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN,
     isOrganizationSecretary,
+    isPresident,
     isOrganizationFinance,
     isActivityFinance,
     isDeveloper: devMode || !!simulatedRole,

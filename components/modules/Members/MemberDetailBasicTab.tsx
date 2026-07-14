@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Phone, Mail, MessageCircle, MapPin, Linkedin, Facebook, Instagram } from 'lucide-react';
+import { Phone, Mail, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock } from 'lucide-react';
 import { Button, Card, Badge } from '../../ui/Common';
 import { Input } from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
@@ -25,6 +25,7 @@ interface MemberDetailBasicTabProps {
   setInlineValues: React.Dispatch<React.SetStateAction<any>>;
   isAdmin: boolean;
   isDeveloper: boolean;
+  canViewSensitiveFields: boolean;
   loadingClubs: boolean;
   memberClubs: HobbyClub[];
   members: Member[];
@@ -35,10 +36,16 @@ interface MemberDetailBasicTabProps {
   resolveIntroducerDisplay: (introVal?: string) => string;
 }
 
+const RestrictedField: React.FC = () => (
+  <span className="inline-flex items-center gap-1 text-slate-400 text-xs italic select-none">
+    <Lock size={11} /> Restricted
+  </span>
+);
+
 const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) => {
   const {
     member, isEditMode, inlineValues, setInlineValues,
-    isAdmin, isDeveloper,
+    isAdmin, isDeveloper, canViewSensitiveFields,
     loadingClubs, memberClubs, members, allProjects,
     avatarUploading, avatarUploadProgress, handleInlineAvatarUpload,
     resolveIntroducerDisplay,
@@ -101,21 +108,25 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 </div>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
-                  <input
-                    type="text"
-                    value={inlineValues.idNumber}
-                    onChange={e => {
-                      const ic = e.target.value;
-                      const updates: any = { idNumber: ic };
-                      if (isMalaysianIC(ic)) {
-                        const bp = getBirthPlaceFromIC(ic); if (bp) updates.birthPlace = bp;
-                        const dob = getDateOfBirthFromIC(ic); if (dob) updates.dateOfBirth = dob;
-                        const gender = getGenderFromIC(ic); if (gender) updates.gender = gender;
-                      }
-                      setInlineValues({ ...inlineValues, ...updates });
-                    }}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                  />
+                  {canViewSensitiveFields ? (
+                    <input
+                      type="text"
+                      value={inlineValues.idNumber}
+                      onChange={e => {
+                        const ic = e.target.value;
+                        const updates: any = { idNumber: ic };
+                        if (isMalaysianIC(ic)) {
+                          const bp = getBirthPlaceFromIC(ic); if (bp) updates.birthPlace = bp;
+                          const dob = getDateOfBirthFromIC(ic); if (dob) updates.dateOfBirth = dob;
+                          const gender = getGenderFromIC(ic); if (gender) updates.gender = gender;
+                        }
+                        setInlineValues({ ...inlineValues, ...updates });
+                      }}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                    />
+                  ) : (
+                    <RestrictedField />
+                  )}
                 </div>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
@@ -251,7 +262,9 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-xs uppercase font-medium">ID Number</span>
-                  <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
+                  {canViewSensitiveFields
+                    ? <p className="font-medium text-slate-900 uppercase">{member.idNumber || 'Not provided'}</p>
+                    : <RestrictedField />}
                 </div>
                 <div>
                   <span className="text-slate-500 block text-xs uppercase font-medium">Date of Birth</span>
@@ -398,12 +411,16 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 </div>
                 <div className="col-span-2">
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
-                  <textarea
-                    value={inlineValues.address}
-                    onChange={e => setInlineValues({ ...inlineValues, address: e.target.value })}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
-                  />
+                  {canViewSensitiveFields ? (
+                    <textarea
+                      value={inlineValues.address}
+                      onChange={e => setInlineValues({ ...inlineValues, address: e.target.value })}
+                      rows={2}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
+                    />
+                  ) : (
+                    <RestrictedField />
+                  )}
                 </div>
               </div>
 
@@ -518,7 +535,9 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 uppercase font-medium">Address</p>
-                    <p className="text-sm text-slate-700">{member.address || 'No address on file'}</p>
+                    {canViewSensitiveFields
+                      ? <p className="text-sm text-slate-700">{member.address || 'No address on file'}</p>
+                      : <RestrictedField />}
                   </div>
                 </div>
               </div>

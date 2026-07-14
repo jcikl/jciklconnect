@@ -45,15 +45,14 @@ import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
   const { resetPassword, member: currentAuthMember, simulatedRole } = useAuth();
-  // Points columns in the Activities Log are visible to the President only
-  const isPresident = (currentAuthMember?.jciCareer?.currentBoardPosition || currentAuthMember?.currentBoardPosition) === 'President';
   // Always derive the latest member data from the live members array so the UI
   // updates automatically after every save (without a page reload).
   const member = useMemo(
     () => members.find(m => m.id === memberProp.id) ?? memberProp,
     [members, memberProp]
   );
-  const { isAdmin, isDeveloper, hasPermission, effectiveRole } = usePermissions();
+  const { isAdmin, isDeveloper, hasPermission, effectiveRole, isOrganizationSecretary, isPresident } = usePermissions();
+  const canViewSensitiveFields = isSelfView || isAdmin || isDeveloper || isOrganizationSecretary || isPresident;
   const canEditMembers = hasPermission('canEditMembers');
   const { showToast } = useToast();
   const [showMentorMatchModal, setShowMentorMatchModal] = useState(false);
@@ -1154,6 +1153,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             setInlineValues={setInlineValues}
             isAdmin={isAdmin}
             isDeveloper={isDeveloper}
+            canViewSensitiveFields={canViewSensitiveFields}
             loadingClubs={loadingClubs}
             memberClubs={memberClubs}
             members={members}
