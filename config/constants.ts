@@ -82,6 +82,8 @@ export const COLLECTIONS = {
   TOYYIB_BILLS: 'toyyibBills',
   /** Finance alerts written by server-side processes (webhook, auto-match) for manual review */
   FINANCE_ALERTS: 'finance_alerts',
+  /** Firestore read/write audit log — written by firestoreLogger */
+  SYSTEM_LOGS: 'systemLogs',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

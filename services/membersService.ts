@@ -118,7 +118,7 @@ export class MembersService {
         console.error('Error fetching members:', error);
         throw error;
       }
-    }, MEMBERS_TTL);
+    }, MEMBERS_TTL, 'membersService.getAllMembers');
   }
 
   // Get member by ID

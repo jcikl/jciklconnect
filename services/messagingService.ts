@@ -16,6 +16,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode, withDevMode } from '../utils/devMode';
+import { logListener } from './firestoreLogger';
 
 export interface Message {
   id?: string;
@@ -311,6 +312,7 @@ export class MessagingService {
       orderBy('createdAt', 'asc')
     );
 
+    logListener('messages', 'messagingService.subscribeToMessages');
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messages = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -342,6 +344,7 @@ export class MessagingService {
       orderBy('lastActivity', 'desc')
     );
 
+    logListener('conversations', 'messagingService.subscribeToConversations');
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const conversations = snapshot.docs.map(doc => ({
         id: doc.id,

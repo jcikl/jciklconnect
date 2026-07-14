@@ -105,6 +105,7 @@ export class FinanceService {
         async () => {
           try {
             let q;
+
             if (year) {
               const { Timestamp } = await import('firebase/firestore');
               const start = Timestamp.fromDate(new Date(year, 0, 1, 0, 0, 0, 0));
@@ -142,7 +143,8 @@ export class FinanceService {
             throw error;
           }
         },
-        TX_CACHE_TTL
+        TX_CACHE_TTL,
+        'financeService.getAllTransactions'
       )
     );
   }
@@ -2036,7 +2038,8 @@ export class FinanceService {
             throw error;
           }
         },
-        TX_CACHE_TTL
+        TX_CACHE_TTL,
+        'financeService.getAllBankAccounts'
       )
     );
   }
