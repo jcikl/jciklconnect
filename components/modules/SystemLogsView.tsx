@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
-import { Activity, RefreshCw, Database, Wifi, Trash2, PenLine } from 'lucide-react';
+import { Activity, RefreshCw, Database, Wifi, Trash2, PenLine, Copy, Check } from 'lucide-react';
 
 type OpType = 'ALL' | 'READ' | 'WRITE' | 'DELETE' | 'LISTENER';
 
@@ -43,12 +43,29 @@ function fmtTime(ts: Timestamp | undefined): string {
   return d.toLocaleString('zh-MY', { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function copyDocAsText(doc: LogDoc): string {
+  const lines = [`[${fmtTime(doc.flushedAt)}] totalOps=${doc.totalOps}`];
+  doc.entries?.forEach(e => {
+    lines.push(`  ${e.operation.padEnd(8)} x${e.count}  ${e.caller}  →  ${e.source}`);
+  });
+  return lines.join('\n');
+}
+
 export const SystemLogsView: React.FC = () => {
   const [logs, setLogs] = useState<LogDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<OpType>('ALL');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  function handleCopy(doc: LogDoc, e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(copyDocAsText(doc)).then(() => {
+      setCopied(doc.id);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  }
 
   async function fetchLogs() {
     setLoading(true);
@@ -150,7 +167,7 @@ export const SystemLogsView: React.FC = () => {
                     <span className="text-xs font-mono text-slate-600 truncate">{fmtTime(doc.flushedAt)}</span>
                     <span className="text-xs text-slate-400 shrink-0">{doc.totalOps} ops</span>
                   </div>
-                  <div className="flex gap-1 shrink-0 ml-2">
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
                     {['READ','WRITE','DELETE','LISTENER'].map(op => {
                       const cnt = doc.entries?.filter(e => e.operation === op).reduce((s, e) => s + e.count, 0) ?? 0;
                       if (!cnt) return null;
@@ -160,6 +177,13 @@ export const SystemLogsView: React.FC = () => {
                         </span>
                       );
                     })}
+                    <button
+                      onClick={(e) => handleCopy(doc, e)}
+                      className="ml-1 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                      title="复制日志"
+                    >
+                      {copied === doc.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    </button>
                   </div>
                 </button>
 
