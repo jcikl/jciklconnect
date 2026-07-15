@@ -207,7 +207,8 @@ service cloud.firestore {
     // Transactions: board / finance roles; multi-LO scoped by loId unless isBoard()
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() &&
-        (isBoard() ||
+        (isAdmin() ||
+         isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
       allow create, update: if canAccessFinance();
       allow delete: if canDeleteFinance();
@@ -236,7 +237,9 @@ service cloud.firestore {
     // ACTIVITY_FINANCE can read and update their own LO's accounts but must not create new ones.
     match /bankAccounts/{accountId} {
       allow read, update: if canAccessFinance() &&
-        (resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId());
+        (isAdmin() ||
+         resource.data.get('loId', null) == null ||
+         resource.data.get('loId', null) == getMyLoId());
       allow create, delete: if canDeleteFinance();
     }
     
