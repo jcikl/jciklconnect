@@ -363,7 +363,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
       const fields = template.requiredFields.concat(template.optionalFields);
       const filters: { field: string; operator: 'equals'; value: string }[] = [];
       if (exportType === 'members') {
-        const loId = loIdFilter ?? (currentMember as { loId?: string })?.loId ?? 'default-lo';
+        const loId = loIdFilter ?? (currentMember as { loId?: string })?.loId ?? 'jcikl';
         filters.push({ field: 'loId', operator: 'equals', value: loId });
       }
       const userId = currentMember?.id || 'current_user_id';

@@ -704,11 +704,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             {/* Search bar */}
             <div className="px-4 pt-3 pb-3 border-b border-slate-100 bg-slate-50/40">
               <FirstUseBanner flowId="reconciliation" dismissLabel="Got it" variant="teal" onHelpClick={helpModal?.openHelp}>
-                Enter a reference number (e.g. PR-default-lo-20250216-001) to search both bank transactions and payment requests. Once verified, click "Mark Reconciled" to record the action.
+                Enter a reference number (e.g. PR-jcikl-20250216-001) to search both bank transactions and payment requests. Once verified, click "Mark Reconciled" to record the action.
               </FirstUseBanner>
               <div className="flex gap-2 mt-2">
                 <Input
-                  placeholder="e.g. PR-default-lo-20250216-001"
+                  placeholder="e.g. PR-jcikl-20250216-001"
                   value={refNumberQuery}
                   onChange={(e) => setRefNumberQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleReconciliationQuery()}

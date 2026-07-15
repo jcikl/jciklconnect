@@ -213,7 +213,7 @@ export const TransactionForm: React.FC<Props> = ({
         {isEdit ? (
           <Input name="referenceNumber" label="Reference Number (Optional)" defaultValue={(getVal('referenceNumber') as string) || ''} onChange={(e: any) => handleEditChange('referenceNumber', e.target.value)} />
         ) : (
-          <Input name="referenceNumber" label="Reference Number (Optional)" placeholder="e.g. PR-default-lo-20250216-001" />
+          <Input name="referenceNumber" label="Reference Number (Optional)" placeholder="e.g. PR-jcikl-20250216-001" />
         )}
       </div>
 

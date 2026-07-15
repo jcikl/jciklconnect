@@ -1,6 +1,6 @@
 // Application Constants
 /** Default LO id when single-LO (MVP). Override via env or auth for multi-LO. */
-export const DEFAULT_LO_ID = 'default-lo';
+export const DEFAULT_LO_ID = 'jcikl';
 
 export const COLLECTIONS = {
   MEMBERS: 'members',
@@ -84,6 +84,14 @@ export const COLLECTIONS = {
   FINANCE_ALERTS: 'finance_alerts',
   /** Firestore read/write audit log — written by firestoreLogger */
   SYSTEM_LOGS: 'systemLogs',
+  /** Governance: motions / resolutions voted on by board */
+  VOTES: 'votes',
+  /** Governance: board elections with candidates and ballots */
+  ELECTIONS: 'elections',
+  /** Project sub-tasks assigned to committee members */
+  TASKS: 'tasks',
+  /** Mentor–mentee pairings */
+  MENTOR_MATCHES: 'mentorMatches',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

@@ -308,7 +308,7 @@ export const IncentiveProgramManager: React.FC = () => {
         setIsCalculating(true);
         try {
             // In recruitment MVP, we use DEFAULT_LO_ID
-            const loId = (window as any).currentUserMember?.loId || 'default-lo';
+            const loId = (window as any).currentUserMember?.loId || 'jcikl';
             await IncentiveCalculatorService.calculateAll(loId, program.id);
             showToast('Automated scores recalculated successfully!', 'success');
             loadActiveProgram();

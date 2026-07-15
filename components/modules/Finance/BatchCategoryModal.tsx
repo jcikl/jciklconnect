@@ -439,7 +439,7 @@ export function BatchCategoryModal({
                             value={paymentRequestId}
                             onChange={(e) => setPaymentRequestId(e.target.value)}
                             disabled={!enablePaymentRequestId}
-                            placeholder="e.g. PR-default-lo-20250216-001"
+                            placeholder="e.g. PR-jcikl-20250216-001"
                         />
                     </div>
                 </div>

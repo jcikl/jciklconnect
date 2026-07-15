@@ -248,7 +248,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     category: 'Membership',
     status: 'Cleared',
     bankAccountId: 'ba1',
-    referenceNumber: 'PR-default-lo-20231201-001',
+    referenceNumber: 'PR-jcikl-20231201-001',
     paymentRequestId: 'pr-mock-001',
     memberId: 'u1',
   },
@@ -262,7 +262,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     category: 'Administrative',
     status: 'Cleared',
     bankAccountId: 'ba1',
-    referenceNumber: 'PR-default-lo-20231202-001',
+    referenceNumber: 'PR-jcikl-20231202-001',
     paymentRequestId: 'pr-mock-002',
   },
   {
@@ -274,7 +274,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     category: 'Projects & Activities',
     status: 'Pending',
     bankAccountId: 'ba1',
-    referenceNumber: 'PR-default-lo-20231203-001',
+    referenceNumber: 'PR-jcikl-20231203-001',
   },
   {
     id: 't4',
@@ -286,7 +286,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     category: 'Projects & Activities',
     status: 'Cleared',
     bankAccountId: 'ba2',
-    referenceNumber: 'PR-default-lo-20231205-001',
+    referenceNumber: 'PR-jcikl-20231205-001',
     paymentRequestId: 'pr-mock-003',
   },
   {
@@ -298,7 +298,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     category: 'Membership',
     status: 'Reconciled',
     bankAccountId: 'ba1',
-    referenceNumber: 'PR-default-lo-20231206-002',
+    referenceNumber: 'PR-jcikl-20231206-002',
     paymentRequestId: 'pr-mock-004',
     memberId: 'u2',
     reconciledAt: '2023-12-07',
@@ -331,7 +331,7 @@ export const MOCK_ACCOUNTS: BankAccount[] = [
   },
 ];
 
-const DEFAULT_LO_ID = 'default-lo';
+const DEFAULT_LO_ID = 'jcikl';
 
 /** Payment Requests mock – references MOCK_MEMBERS (applicantId/applicantName) and aligns with MOCK_TRANSACTIONS (referenceNumber / paymentRequestId). */
 export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
@@ -347,7 +347,7 @@ export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
     amount: 4500,
     purpose: 'Membership Dues - Batch 1',
     activityRef: null,
-    referenceNumber: 'PR-default-lo-20231201-001',
+    referenceNumber: 'PR-jcikl-20231201-001',
     status: 'approved',
     loId: DEFAULT_LO_ID,
     createdAt: '2023-12-01T09:00:00.000Z',
@@ -368,7 +368,7 @@ export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
     amount: 1200,
     purpose: 'Venue Deposit - AGM',
     activityRef: 'evt-agm-2023',
-    referenceNumber: 'PR-default-lo-20231202-001',
+    referenceNumber: 'PR-jcikl-20231202-001',
     status: 'approved',
     loId: DEFAULT_LO_ID,
     createdAt: '2023-12-02T08:00:00.000Z',
@@ -389,7 +389,7 @@ export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
     amount: 2000,
     purpose: 'Sponsorship - Tech Corp',
     activityRef: 'Business Expo 2023',
-    referenceNumber: 'PR-default-lo-20231203-001',
+    referenceNumber: 'PR-jcikl-20231203-001',
     status: 'submitted',
     loId: DEFAULT_LO_ID,
     createdAt: '2023-12-03T11:00:00.000Z',
@@ -410,7 +410,7 @@ export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
     amount: 350,
     purpose: 'Marketing Materials',
     activityRef: 'Green City Project',
-    referenceNumber: 'PR-default-lo-20231205-001',
+    referenceNumber: 'PR-jcikl-20231205-001',
     status: 'approved',
     loId: DEFAULT_LO_ID,
     createdAt: '2023-12-05T09:30:00.000Z',
@@ -431,7 +431,7 @@ export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
     amount: 300,
     purpose: 'Dues - Sarah Chen',
     activityRef: null,
-    referenceNumber: 'PR-default-lo-20231206-002',
+    referenceNumber: 'PR-jcikl-20231206-002',
     status: 'approved',
     loId: DEFAULT_LO_ID,
     createdAt: '2025-12-06T10:00:00.000Z',
@@ -452,7 +452,7 @@ export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
     amount: 500,
     purpose: 'Workshop materials - Leadership 101',
     activityRef: 'Leadership 101 Workshop',
-    referenceNumber: 'PR-default-lo-20231210-001',
+    referenceNumber: 'PR-jcikl-20231210-001',
     status: 'submitted',
     loId: DEFAULT_LO_ID,
     createdAt: '2023-12-10T14:00:00.000Z',
@@ -473,7 +473,7 @@ export const MOCK_PAYMENT_REQUESTS: PaymentRequest[] = [
     amount: 800,
     purpose: 'Catering - Board dinner',
     activityRef: null,
-    referenceNumber: 'PR-default-lo-20231208-001',
+    referenceNumber: 'PR-jcikl-20231208-001',
     status: 'rejected',
     loId: DEFAULT_LO_ID,
     createdAt: '2023-12-08T12:00:00.000Z',
