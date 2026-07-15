@@ -264,7 +264,8 @@ service cloud.firestore {
         request.resource.data.get('referenceNumber', null) is string &&
         request.resource.data.get('status', null) is string;
       allow update: if isAuthenticated() &&
-        (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' ||
+        (isAdmin() ||
+         resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' ||
          resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) in ['submitted', 'approved'] && request.resource.data.get('status', null) == 'cancelled' ||
          resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'rejected' && request.resource.data.get('status', null) == 'submitted' ||
          canAccessFinance() && paymentRequestInMyScope());
