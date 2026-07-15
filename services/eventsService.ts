@@ -292,15 +292,17 @@ export class EventsService {
           const event = await this.getEventById(eventId);
           if (!event) throw new Error('Event not found');
 
-          await updateDoc(eventRef, {
-            attendees: Math.max(0, event.attendees - 1),
-            registeredMembers: arrayRemove(memberId),
-          });
-
+          // N-1: cancel reg doc first, then decrement event counter — consistent with registerForEvent.
+          // If updateDoc fails after cancel, counter is high by 1 (minor) vs the previous order where
+          // counter was already decremented but the reg doc remained active (worse: appears to have free slot).
           const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
           if (reg) {
             await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, cancelledByRole);
           }
+          await updateDoc(eventRef, {
+            attendees: Math.max(0, event.attendees - 1),
+            registeredMembers: arrayRemove(memberId),
+          });
         } catch (error) {
           console.error('Error canceling registration:', error);
           throw error;
@@ -390,19 +392,21 @@ export class EventsService {
 
           if (!event) throw new Error('Event not found');
 
-          // Add to attendance list
+          // N-2: update EventRegistration status first, then write attendanceList.
+          // If arrayUnion fails after updateStatus, attendanceList is low by 1 (minor display desync)
+          // vs the previous order where attendanceList had the member but status stayed 'registered'.
+          const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
+          if (reg) {
+            const at = (checkInTime ?? new Date()).toISOString();
+            await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
+          }
+          // 报名/缴费/签到一致：同步签到记录到 events.attendanceList（Story 8.1）
           await updateDoc(eventRef, {
             attendanceList: arrayUnion({
               memberId,
               checkInTime: checkInTime ? Timestamp.fromDate(checkInTime) : Timestamp.now(),
             }),
           });
-          // 报名/缴费/签到一致：更新 EventRegistration 为已签到（Story 8.1）
-          const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
-          if (reg) {
-            const at = (checkInTime ?? new Date()).toISOString();
-            await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
-          }
 
           // E-3: PointsService.awardEventAttendancePoints removed — the Cloud Function
           // onEventRegistrationUpdate (functions/gamificationLogic.ts) fires on checked_in status
