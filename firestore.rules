@@ -234,9 +234,12 @@ service cloud.firestore {
          isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
       allow create, update: if canAccessFinance() &&
-        (resource == null || resource.data.get('status', '') != 'Reconciled');
+        (resource == null ||
+          (resource.data.get('status', '') != 'Reconciled' &&
+           resource.data.get('status', '') != 'Partially Reconciled'));
       allow delete: if canDeleteFinance() &&
-        resource.data.get('status', '') != 'Reconciled';
+        resource.data.get('status', '') != 'Reconciled' &&
+        resource.data.get('status', '') != 'Partially Reconciled';
     }
 
     // Transaction Splits: same rules as transactions; update/delete blocked on Reconciled parent

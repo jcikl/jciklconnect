@@ -3088,6 +3088,7 @@ export class FinanceService {
         for (const transaction of accountTransactions) {
           if (!transaction.id) continue;
           markBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, transaction.id), {
+            prevStatus: transaction.status,
             status: 'Reconciled',
             reconciledAt: Timestamp.now(),
             reconciledBy,
