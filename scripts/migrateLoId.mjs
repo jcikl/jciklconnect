@@ -59,8 +59,6 @@ const FLAT_COLLECTIONS = [
   'loStarProgress',
   'nonMemberLeads',
   'events',
-  'points',
-  'transactions',
   'bankAccounts',
   'publications',
 ];

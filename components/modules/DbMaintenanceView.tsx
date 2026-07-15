@@ -21,8 +21,6 @@ const MIGRATE_COLLECTIONS: { name: string; label: string; kind: ColKind; nestedF
   { name: 'loStarProgress',       label: 'LO Star Progress',       kind: 'flat' },
   { name: 'nonMemberLeads',       label: 'Non-Member Leads',       kind: 'flat' },
   { name: 'events',               label: 'Events',                 kind: 'flat' },
-  { name: 'points',               label: 'Points',                 kind: 'flat' },
-  { name: 'transactions',         label: 'Transactions',           kind: 'flat' },
   { name: 'bankAccounts',         label: 'Bank Accounts',          kind: 'flat' },
   { name: 'publications',         label: 'Publications',           kind: 'flat' },
   // nested: members.boardHistory[].loId — separate pass over all member docs
