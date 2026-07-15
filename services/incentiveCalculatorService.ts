@@ -124,17 +124,34 @@ export class IncentiveCalculatorService {
 
     /**
      * Logic: Dues payment before deadline
+     * Transactions carry no loId — resolve via bankAccounts.loId → bankAccountId.
      */
     private static async calcDuesPayment(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number }> {
-        const q = query(
-            collection(db, COLLECTIONS.TRANSACTIONS),
-            where('loId', '==', loId),
-            where('category', '==', 'Membership'),
-            where('purpose', '==', 'National Due')
+        // Step 1: get all bank account IDs that belong to this LO
+        const accountSnap = await getDocs(
+            query(collection(db, COLLECTIONS.BANK_ACCOUNTS), where('loId', '==', loId))
         );
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) return { quantity: 0, score: 0 };
+        const accountIds = accountSnap.docs.map(d => d.id);
+        if (accountIds.length === 0) return { quantity: 0, score: 0 };
 
+        // Step 2: query transactions for those accounts (Firestore 'in' supports up to 30 items)
+        const chunks: string[][] = [];
+        for (let i = 0; i < accountIds.length; i += 30) chunks.push(accountIds.slice(i, i + 30));
+
+        let found = false;
+        for (const chunk of chunks) {
+            const txSnap = await getDocs(
+                query(
+                    collection(db, COLLECTIONS.TRANSACTIONS),
+                    where('bankAccountId', 'in', chunk),
+                    where('category', '==', 'Membership'),
+                    where('purpose', '==', 'National Due')
+                )
+            );
+            if (!txSnap.empty) { found = true; break; }
+        }
+
+        if (!found) return { quantity: 0, score: 0 };
         const fallbackPoints = standard.milestones?.[0]?.points || 0;
         return { quantity: 1, score: fallbackPoints };
     }
