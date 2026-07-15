@@ -709,6 +709,14 @@ export class ReconciliationService {
             }
           }
         }
+        // Full unlink (no specific projectTxId) — restore parent tx status so it re-enters the reconciliation candidate pool
+        if (!projectTxId) {
+          await FinanceService.updateTransaction(bankTxId, {
+            status: (bankTx as any).prevStatus ?? 'Cleared',
+            projectTransactionIds: [],
+            projectTransactionId: null,
+          });
+        }
       }
     } else {
       // Non-split bank tx — simple clear

@@ -962,7 +962,7 @@ export class FinanceService {
             ...(remainingIds.length === 0 ? {
               projectTransactionIds: [],
               projectTransactionId: null,
-              status: 'Cleared',
+              status: (parentTx as any).prevStatus ?? 'Cleared',
               purpose: '',
             } : {}),
           };
@@ -998,7 +998,7 @@ export class FinanceService {
           if (remainingIds.length === 0) {
             updateData.projectTransactionIds = [];
             updateData.projectTransactionId = null;
-            updateData.status = 'Cleared';
+            updateData.status = parentTx?.prevStatus ?? 'Cleared';
             updateData.purpose = '';
           }
 
