@@ -13,6 +13,7 @@ import {
   Timestamp,
   orderBy,
   deleteField,
+  writeBatch,
 } from 'firebase/firestore';
 import {
   getCurrentBoardCalendarYear,
@@ -493,14 +494,18 @@ export class BoardManagementService {
     );
 
     if (isCurrentTerm) {
+      const now = new Date().toISOString();
+      const batch = writeBatch(db);
+
       // Update board member docs
       for (const { memberId, position } of assignments) {
         if (!memberId) continue;
-        await MembersService.updateMember(memberId, {
+        batch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
           currentBoardYear: yearNum,
           currentBoardPosition: position,
           isCurrentBoardMember: true,
           isCurrentCommissionDirector: false,
+          updatedAt: now,
         });
       }
 
@@ -508,7 +513,13 @@ export class BoardManagementService {
       const previousIds = new Set(previousBoardRecords.map((b) => b.memberId));
       for (const memberId of previousIds) {
         if (!newMemberIds.has(memberId)) {
-          await this.clearMemberCurrentBoardStatus(memberId);
+          batch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+            currentBoardYear: deleteField(),
+            currentBoardPosition: deleteField(),
+            isCurrentBoardMember: false,
+            isCurrentCommissionDirector: false,
+            updatedAt: now,
+          });
         }
       }
 
@@ -524,13 +535,22 @@ export class BoardManagementService {
       );
 
       for (const id of newCommDirIds) {
-        await MembersService.updateMember(id, { isCurrentCommissionDirector: true });
+        batch.update(doc(db, COLLECTIONS.MEMBERS, id), {
+          isCurrentCommissionDirector: true,
+          updatedAt: now,
+        });
       }
       for (const id of prevCommDirIds) {
         if (!newCommDirIds.has(id)) {
-          await this.clearCommissionDirectorStatus(id);
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), {
+            isCurrentCommissionDirector: false,
+            updatedAt: now,
+          });
         }
       }
+
+      await batch.commit();
+      MembersService.invalidateMembersCache();
       return;
     }
 

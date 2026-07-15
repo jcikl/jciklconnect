@@ -265,7 +265,7 @@ class CacheService {
 export const apiCache = new CacheService({
   ttl: 5 * 60 * 1000, // 5 minutes for API responses
   maxSize: 50,
-  useLocalStorage: false
+  useLocalStorage: true
 });
 
 export const userDataCache = new CacheService({
