@@ -327,9 +327,12 @@ service cloud.firestore {
     // Story 8.1: 报名/缴费/签到统一名单
     // Fields a member may self-service on their own registration (non-financial).
     // Anything payment/status related must go through canReadOrgMembers() (board/finance/committee).
+    // E-4: protect audit fields (cancelledBy*, registeredBy*, memberName) from self-write
     function eventRegSelfUpdateOnlyTouchesOwnFields() {
       let unchanged = ['status', 'paidAt', 'checkedInAt', 'paymentMethod', 'financeTransactionId',
-        'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus', 'billExternalReferenceNo'];
+        'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus', 'billExternalReferenceNo',
+        'cancelledAt', 'cancelledBy', 'cancelledByName', 'cancelledByRole',
+        'registeredBy', 'registeredByName', 'memberName'];
       return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
     }
     match /eventRegistrations/{regId} {
@@ -342,8 +345,8 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
         (canReadOrgMembers() ||
          (resource.data.get('memberId', null) == request.auth.uid && eventRegSelfUpdateOnlyTouchesOwnFields()));
-      allow delete: if isAuthenticated() &&
-        (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+      // E-1: members may NOT hard-delete their own registration (bypasses finance tx cleanup); only board+ can delete
+      allow delete: if isAuthenticated() && canReadOrgMembers();
     }
     
     // Points collection

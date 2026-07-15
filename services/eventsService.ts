@@ -7,6 +7,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   limit,
@@ -18,7 +19,6 @@ import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Event } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
-import { PointsService } from './pointsService';
 import { withDevMode } from '../utils/devMode';
 import { apiCache } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
@@ -253,12 +253,9 @@ export class EventsService {
             throw new Error('Event is full');
           }
 
-          // Add member to attendees list
-          await updateDoc(eventRef, {
-            attendees: event.attendees + 1,
-            registeredMembers: arrayUnion(memberId),
-          });
-          // Re-register: reset existing cancelled doc; otherwise create new
+          // E-5: write registration doc first, then update event counter.
+          // If events update fails, the reg exists but the counter is low — a minor desync.
+          // The previous order (events update first) was worse: incremented counter with no registration doc.
           if (existing && existing.status === 'cancelled') {
             await EventRegistrationService.updateStatus(existing.id, 'registered', {
               registeredBy: extraFields?.registeredBy,
@@ -267,6 +264,10 @@ export class EventsService {
           } else {
             await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID, extraFields);
           }
+          await updateDoc(eventRef, {
+            attendees: event.attendees + 1,
+            registeredMembers: arrayUnion(memberId),
+          });
         } catch (error) {
           console.error('Error registering for event:', error);
           throw error;
@@ -327,12 +328,41 @@ export class EventsService {
         const registrations = await EventRegistrationService.listByEvent(eventId);
         const active = registrations.filter(r => r.status !== 'cancelled');
 
-        // Sequential to avoid Firestore write conflicts; each cancel handles its own income tx cleanup.
-        for (const reg of active) {
-          try {
-            await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, 'admin');
-          } catch (err) {
-            console.error('[EventsService.cancelEvent] Failed to cancel registration', reg.id, err);
+        if (active.length > 0) {
+          const cancelledAt = new Date().toISOString();
+          const now = Timestamp.now();
+          // E-2: batch all reg status updates (max 490 per Firestore batch)
+          const BATCH_SIZE = 490;
+          for (let i = 0; i < active.length; i += BATCH_SIZE) {
+            const chunk = active.slice(i, i + BATCH_SIZE);
+            const batch = writeBatch(db);
+            for (const reg of chunk) {
+              batch.update(doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id), {
+                status: 'cancelled',
+                cancelledAt,
+                cancelledBy,
+                cancelledByName,
+                cancelledByRole: 'admin',
+                financeTransactionId: null,
+                updatedAt: now,
+              });
+            }
+            await batch.commit();
+          }
+
+          // After batch succeeds, clean up linked finance txs (best effort — Reconciled txs are skipped)
+          for (const reg of active) {
+            if (reg.financeTransactionId) {
+              try {
+                const { FinanceService } = await import('./financeService');
+                const tx = await FinanceService.getTransactionById(reg.financeTransactionId);
+                if (tx && (tx.status === 'Pending' || tx.status === 'Cleared')) {
+                  await FinanceService.deleteTransaction(reg.financeTransactionId);
+                }
+              } catch (err) {
+                console.warn('[EventsService.cancelEvent] Could not clean up tx for', reg.id, err);
+              }
+            }
           }
         }
 
@@ -374,13 +404,10 @@ export class EventsService {
             await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
           }
 
-          // Award points for attendance
-          await PointsService.awardEventAttendancePoints(
-            memberId,
-            eventId,
-            event.type,
-            undefined // Duration can be calculated later
-          );
+          // E-3: PointsService.awardEventAttendancePoints removed — the Cloud Function
+          // onEventRegistrationUpdate (functions/gamificationLogic.ts) fires on checked_in status
+          // and writes both points and incentiveSubmissions server-side. Calling PointsService here
+          // in addition caused duplicate points records.
 
           // 按当年签到记录重算出席对比（签到次数 vs 已过月份）
           const { MembersService } = await import('./membersService');
