@@ -1,16 +1,18 @@
 // Unified API settings — ToyyibPay + Whapi under one page
 import React, { useState } from 'react';
-import { CreditCard, MessageSquare, Plug, Activity } from 'lucide-react';
+import { CreditCard, MessageSquare, Plug, Activity, Wrench } from 'lucide-react';
 import { ToyyibView } from './ToyyibView';
 import { WhapiConfigView } from './WhapiConfigView';
 import { SystemLogsView } from './SystemLogsView';
+import { DbMaintenanceView } from './DbMaintenanceView';
 
-type ApiTab = 'toyyib' | 'whapi' | 'systemlogs';
+type ApiTab = 'toyyib' | 'whapi' | 'systemlogs' | 'maintenance';
 
 const TABS: { key: ApiTab; label: string; sub: string; icon: React.ReactNode }[] = [
-  { key: 'toyyib', label: 'ToyyibPay', sub: 'Payment Gateway', icon: <CreditCard size={16} /> },
-  { key: 'whapi', label: 'Whapi', sub: 'WhatsApp API', icon: <MessageSquare size={16} /> },
-  { key: 'systemlogs', label: 'System Logs', sub: 'Firestore Audit', icon: <Activity size={16} /> },
+  { key: 'toyyib',       label: 'ToyyibPay',   sub: 'Payment Gateway', icon: <CreditCard size={16} /> },
+  { key: 'whapi',        label: 'Whapi',        sub: 'WhatsApp API',    icon: <MessageSquare size={16} /> },
+  { key: 'systemlogs',   label: 'System Logs',  sub: 'Firestore Audit', icon: <Activity size={16} /> },
+  { key: 'maintenance',  label: 'Maintenance',  sub: 'DB Migration',    icon: <Wrench size={16} /> },
 ];
 
 export const ApiConfigView: React.FC = () => {
@@ -30,7 +32,7 @@ export const ApiConfigView: React.FC = () => {
       </div>
 
       {/* Service switcher */}
-      <div className="grid grid-cols-2 gap-2 md:flex md:gap-3">
+      <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-3">
         {TABS.map(tab => {
           const active = activeTab === tab.key;
           return (
@@ -57,9 +59,10 @@ export const ApiConfigView: React.FC = () => {
 
       {/* Service panel */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-6">
-        {activeTab === 'toyyib' && <ToyyibView embedded />}
-        {activeTab === 'whapi' && <WhapiConfigView embedded />}
-        {activeTab === 'systemlogs' && <SystemLogsView />}
+        {activeTab === 'toyyib'      && <ToyyibView embedded />}
+        {activeTab === 'whapi'       && <WhapiConfigView embedded />}
+        {activeTab === 'systemlogs'  && <SystemLogsView />}
+        {activeTab === 'maintenance' && <DbMaintenanceView />}
       </div>
     </div>
   );
