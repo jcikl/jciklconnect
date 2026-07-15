@@ -11,7 +11,8 @@ import {
   computeMembershipTypeFromMember,
 } from '../../services/membershipConfigService';
 import { MembershipTypeDisplay } from '../shared/MembershipTypeDisplay';
-import { deleteFromCloudinary, uploadMemberAvatarToCloudinary } from '../../services/cloudinaryService';
+import { deleteFromCloudinary } from '../../services/cloudinaryService';
+import { AvatarUploader } from '../ui/AvatarUploader';
 import { getBirthPlaceFromIC, isMalaysianIC, getGenderFromIC, getDateOfBirthFromIC } from '../../utils/malaysianIdUtils';
 import { IntroducerSelector } from '../ui/IntroducerSelector';
 import { MembersService } from '../../services/membersService';
@@ -183,31 +184,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   const currentAvatar = formValues.avatar;
   const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      window.alert('Please upload an image file.');
-      return;
-    }
-
-    setAvatarUploading(true);
-    setAvatarUploadProgress(0);
-    try {
-      const uploadedUrl = await uploadMemberAvatarToCloudinary(file, member, setAvatarUploadProgress);
-      sessionUploads.current.push(uploadedUrl);
-      handleChange('avatar', uploadedUrl);
-      setAvatarTs(Date.now());
-    } catch (err) {
-      console.error('Failed to upload member avatar:', err);
-      window.alert(err instanceof Error ? err.message : 'Failed to upload avatar.');
-    } finally {
-      setAvatarUploading(false);
-      setAvatarUploadProgress(0);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -372,31 +348,18 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 md:pr-2 py-4 md:py-6">
         {activeTab === 'basic' && (
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-slate-200 shadow-sm shrink-0">
-                {currentAvatar ? (
-                  <img src={avatarTs ? `${currentAvatar}?v=${avatarTs}` : currentAvatar} alt={formValues.name || member.name || 'Member avatar'} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xl font-black text-jci-blue bg-blue-50">
-                    {(formValues.name || member.name || 'M').charAt(0)}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-900">Member Avatar</p>
-                <p className="text-xs text-slate-500 mt-0.5">Upload a square profile photo for member directory, dashboard, and public board display.</p>
-                {avatarUploading && (
-                  <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                    <div className="h-full bg-jci-blue transition-all" style={{ width: `${avatarUploadProgress}%` }} />
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                <label className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-bold transition-colors ${avatarUploading ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-jci-blue text-white hover:bg-jci-navy cursor-pointer'}`}>
-                  {avatarUploading ? 'Uploading...' : 'Upload Photo'}
-                  <input type="file" accept="image/*" className="hidden" disabled={avatarUploading} onChange={handleAvatarUpload} />
-                </label>
-              </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <AvatarUploader
+                currentUrl={avatarTs ? `${currentAvatar}?v=${avatarTs}` : currentAvatar}
+                member={member}
+                uploading={avatarUploading}
+                progress={avatarUploadProgress}
+                onUploadStart={() => { setAvatarUploading(true); setAvatarUploadProgress(0); }}
+                onUploadEnd={() => { setAvatarUploading(false); setAvatarUploadProgress(0); setAvatarTs(Date.now()); }}
+                onProgress={setAvatarUploadProgress}
+                onUrlChange={url => handleChange('avatar', url)}
+                sessionUploadsRef={sessionUploads}
+              />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-6 md:gap-y-4">
               <div>

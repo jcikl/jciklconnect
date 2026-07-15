@@ -21,7 +21,7 @@ service cloud.firestore {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              getUserRole() != null &&
-             getUserRole() in ['GUEST', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE', 'INACTIVE'];
+             getUserRole() in ['GUEST', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN', 'INACTIVE'];
     }
     
     function memberData() {
@@ -62,24 +62,24 @@ service cloud.firestore {
       );
     }
     
-    // Roles that can read members at org/LO level (组织财政、活动财政、管理员、组织秘书、BOARD)
+    // Roles that can read members at org/LO level (board members and admins)
     function canReadOrgMembers() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              (
                (getUserRole() != null &&
-                getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE']) ||
+                getUserRole() in ['ADMIN', 'BOARD']) ||
                isCurrentBoardMember()
              );
     }
 
     // Roles that can edit members
     function canEditMembers() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              (
                (getUserRole() != null &&
-                getUserRole() in ['ADMIN', 'BOARD', 'ORGANIZATION_SECRETARY']) ||
+                getUserRole() in ['ADMIN', 'BOARD']) ||
                isCurrentBoardMember()
              );
     }
@@ -103,39 +103,61 @@ service cloud.firestore {
     // Members collection: 组织财政/活动财政/会员 boundary; multi-LO: read by same loId or self.
     match /members/{memberId} {
       // 1. Basic Read Access (Get and List)
-      // Allow if: own linked record, own email match (for linking), or authorized role
-      // OR if it's a public business profile (has companyName)
-      allow get, read: if (isAuthenticated() && (
-        request.auth.uid == memberId || 
+      // Public business profiles are served from the businessDirectory subcollection — not here.
+      allow get, read: if isAuthenticated() && (
+        request.auth.uid == memberId ||
         (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
-        isMember() || 
+        isMember() ||
         canReadOrgMembers()
-      )) || (resource != null && resource.data.get('companyName', '') != '');
-      
-      // Allow listing specifically for email search during linking
-      // OR for the public business directory (where companyName filter is used)
-      allow list: if (isAuthenticated() && (
-        isMember() || 
+      );
+
+      // Allow listing for email search during linking only (business directory uses businessDirectory subcollection)
+      allow list: if isAuthenticated() && (
+        isMember() ||
         canReadOrgMembers() ||
         (request.query.filters.get('email', []) == [request.auth.token.get('email', '')]) ||
         (request.query.filters.email == [request.auth.token.get('email', '')])
-      )) || (request.query.filters.get('companyName', null) != null);
+      );
 
       // 2. Create/Update/Delete Access
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() &&
                        (request.auth.uid == memberId || isBoard()) &&
                        request.resource.data.name is string &&
                        request.resource.data.email is string &&
                        request.resource.data.role is string;
-      
-      allow update: if isAuthenticated() && 
-        (request.auth.uid == memberId || 
-         (canEditMembers() && (resource == null || resourceInMyLo(resource.data))));
-      
-      allow delete: if isAdmin() || (isAuthenticated() && (
-        (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
-        (memberId == request.auth.uid)
-      ));
+
+      // Self-write: members may update any profile field EXCEPT the locked list below.
+      // GUEST may also set nationality/dob/idNumber; once promoted to MEMBER+ those three are locked.
+      // BOARD+ edits: senatorshipId is immutable once board-validated; only Admin can override (E2 fix).
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == memberId &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'role', 'loId', 'membership', 'membershipType',
+           'senatorCertified', 'senatorshipBoardValidated', 'senatorshipId',
+           'senatorshipValidatedAt', 'senatorshipValidatedBy',
+           'jciCareer', 'menteeIds', 'mentorId',
+           'deletedAt', 'deletedBy', 'createdAt', 'createdBy',
+           'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
+           'leaderboardScore', 'points'
+         ]) &&
+         (resource.data.get('role', 'GUEST') == 'GUEST' ||
+          (request.resource.data.get('general', {}).get('nationality', null) == resource.data.get('general', {}).get('nationality', null) &&
+           request.resource.data.get('general', {}).get('dob', null)         == resource.data.get('general', {}).get('dob', null) &&
+           request.resource.data.get('general', {}).get('idNumber', null)    == resource.data.get('general', {}).get('idNumber', null)))
+        ) ||
+        (canEditMembers() && (resource == null || resourceInMyLo(resource.data)) &&
+         // BOARD members cannot elevate anyone to ADMIN / SUPER_ADMIN (E13 fix)
+         (isAdmin() ||
+          !(request.resource.data.get('role', resource.data.get('role', '')) in ['ADMIN', 'SUPER_ADMIN'])) &&
+         (isAdmin() ||
+          !resource.data.get('senatorshipBoardValidated', false) ||
+          request.resource.data.get('senatorshipId', resource.data.get('senatorshipId', null))
+            == resource.data.get('senatorshipId', null))
+        )
+      );
+
+      // Only admins may delete; self-delete removed to prevent orphan data (E07)
+      allow delete: if isAdmin() && resourceInMyLo(resource.data);
     }
     
     // Communication/Posts collection
@@ -164,7 +186,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated() && 
                                        exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'ACTIVITY_FINANCE'];
+                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
     }
     
     // Projects collection
@@ -186,41 +208,50 @@ service cloud.firestore {
       allow read, create, update, delete: if isAuthenticated();
     }
     
-    // Finance roles: org-level, activity-level, and current-calendar-year board (dynamic)
-    function canAccessFinance() {
-      return isAuthenticated() && 
+    // Treasurer: current board member whose position title contains "Treasurer", plus Admin override
+    function isTreasurer() {
+      return isAuthenticated() &&
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-             (
-               isCurrentBoardMember() ||
-               (getUserRole() != null &&
-                getUserRole() in ['BOARD', 'ADMIN', 'ORGANIZATION_FINANCE', 'ACTIVITY_FINANCE'])
-             );
-    }
-    
-    // Deletion is destructive and irreversible — reserved for org-level finance roles.
-    // ACTIVITY_FINANCE may create/update (their own activity's transactions, enforced
-    // at the app layer) but must never be able to delete any transaction outright.
-    function canDeleteFinance() {
-      return isBoard() || (getUserRole() != null && getUserRole() == 'ORGANIZATION_FINANCE');
+             (isAdmin() ||
+              (isCurrentBoardMember() &&
+               memberData().get('currentBoardPosition', '').matches('.*[Tt]reasurer.*')));
     }
 
-    // Transactions: board / finance roles; multi-LO scoped by loId unless isBoard()
+    // Finance access: current-calendar-year board members and admins
+    function canAccessFinance() {
+      return isBoard();
+    }
+
+    // Deletion is destructive and irreversible — reserved for board members and admins.
+    function canDeleteFinance() {
+      return isBoard();
+    }
+
+    // Transactions: board / finance roles; multi-LO scoped by loId unless isAdmin/Board()
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() &&
         (isAdmin() ||
          isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
-      allow create, update: if canAccessFinance();
-      allow delete: if canDeleteFinance();
+      allow create, update: if canAccessFinance() &&
+        (resource == null || resource.data.get('status', '') != 'Reconciled');
+      allow delete: if canDeleteFinance() &&
+        resource.data.get('status', '') != 'Reconciled';
     }
 
-    // Transaction Splits: same rules as transactions
+    // Transaction Splits: same rules as transactions; update/delete blocked on Reconciled parent
     match /transactionSplits/{splitId} {
       allow read: if isAuthenticated() &&
-        (isBoard() ||
+        (isAdmin() ||
+         isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
-      allow create, update: if canAccessFinance();
-      allow delete: if canDeleteFinance();
+      allow create: if canAccessFinance();
+      allow update: if canAccessFinance() &&
+        (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
+         get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled');
+      allow delete: if canDeleteFinance() &&
+        (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
+         get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled');
     }
 
     // Project Transactions (Story 4.1): Project-specific financials.
@@ -233,25 +264,22 @@ service cloud.firestore {
     }
     
 
-    // Bank Accounts: create/delete restricted to org-level finance (ORGANIZATION_FINANCE/BOARD);
-    // ACTIVITY_FINANCE can read and update their own LO's accounts but must not create new ones.
+    // Bank Accounts: Board+ can view; only Honorary Treasurer (or Admin) can create/update/delete.
     match /bankAccounts/{accountId} {
-      allow read, update: if canAccessFinance() &&
+      allow get: if canAccessFinance() &&
         (isAdmin() ||
          resource.data.get('loId', null) == null ||
          resource.data.get('loId', null) == getMyLoId());
-      allow create, delete: if canDeleteFinance();
+      allow list: if isAdmin() || canAccessFinance();
+      allow create, update, delete: if isTreasurer();
     }
     
-    // Payment Requests (Story 2.1): applicantId, amount, purpose, activityRef, referenceNumber, status, loId, 审计; 活动财政仅本活动
+    // Payment Requests (Story 2.1): applicantId, amount, purpose, activityRef, referenceNumber, status, loId, 审计
     function paymentRequestInMyScope() {
       let myLo = getMyLoId();
       let docLo = resource.data.get('loId', null);
       // 财政可见：同 LO，或文档无 loId（兼容旧数据），或本人无 loId 视为单 LO 可见全部
-      let loMatch = docLo == myLo || docLo == null || myLo == null;
-      let activityOk = getUserRole() != 'ACTIVITY_FINANCE' ||
-        resource.data.get('activityRef', null) == get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get('activityFinanceActivityId', null);
-      return loMatch && activityOk;
+      return docLo == myLo || docLo == null || myLo == null;
     }
     match /paymentRequests/{requestId} {
       allow read: if isAuthenticated() &&

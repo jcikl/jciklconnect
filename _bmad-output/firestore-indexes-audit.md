@@ -26,7 +26,7 @@
 | **achievements** | 有效成就依 tier/name（achievementService） | `active` ASC, `tier` ASC, `name` ASC |
 | **achievementAwards** | 會員成就依獲得時間 | `memberId` ASC, `earnedAt` DESC |
 | **webhook_logs** | 依 webhook 與觸發時間（webhookService） | `webhookId` ASC, `triggeredAt` DESC |
-| **duesRenewals** | 依會員/年度、依年度與建立時間（duesRenewalService） | `memberId` ASC, `duesYear` ASC；`duesYear` ASC, `createdAt` DESC |
+| ~~**duesRenewals**~~ | ⚠️ **已廢棄規劃，從未落地。** 會費續費數據實際存於 `transactions`（`category: 'Membership'`），無需此集合索引。 | — |
 
 ## 與程式碼欄位不一致的既有索引（僅供參考）
 

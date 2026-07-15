@@ -15,7 +15,9 @@ import {
   Timestamp,
   writeBatch,
   deleteField,
+  arrayRemove,
   DocumentSnapshot,
+  WriteBatch,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { logWrite, logDelete } from './firestoreLogger';
@@ -50,6 +52,26 @@ import {
 const FIRST_MEMBERSHIP_DUES_TARGET = 350;
 
 export class MembersService {
+  /**
+   * Commit a WriteBatch with exponential-backoff retry (1 s → 2 s → 4 s).
+   * Throws the last error if all attempts fail.
+   */
+  private static async commitWithRetry(batch: WriteBatch, maxRetries = 3): Promise<void> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await batch.commit();
+        return;
+      } catch (err) {
+        lastError = err;
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+        }
+      }
+    }
+    throw lastError;
+  }
+
   /** Recompute membershipType from profile + promotion (Full); always persisted on save. */
   static async syncComputedMembershipType(
     data: Partial<Member>,
@@ -325,7 +347,7 @@ export class MembersService {
       senatorship: { ...(existing?.jciCareer?.senatorship || {}) }
     } as any;
     if (data.membershipType !== undefined) jciCareer.membershipType = data.membershipType;
-    if (data.membershipStatus !== undefined) jciCareer.membershipStatus = data.membershipStatus;
+    // membershipStatus legacy field removed (E5) — use membership[year].status instead
     if (data.joinDate !== undefined) jciCareer.joinDate = data.joinDate;
     else if (data.joinedDate !== undefined) jciCareer.joinDate = data.joinedDate;
     if (data.introducer !== undefined) jciCareer.introducer = data.introducer;
@@ -340,7 +362,7 @@ export class MembersService {
     if (data.boardHistory !== undefined) jciCareer.boardHistory = data.boardHistory;
 
     if (data.points !== undefined) jciCareer.points = data.points;
-    if (data.attendanceRate !== undefined) jciCareer.attendanceRate = data.attendanceRate;
+    // attendanceRate deprecated (E6) — use attendanceCheckins/attendanceMonths/attendanceYear instead
     if (data.badgesCount !== undefined) jciCareer.badgesCount = data.badgesCount;
     if (data.projectsCount !== undefined) jciCareer.projectsCount = data.projectsCount;
     if (data.trainingsCount !== undefined) jciCareer.trainingsCount = data.trainingsCount;
@@ -437,6 +459,14 @@ export class MembersService {
       const currentData = currentSnap.exists()
         ? ({ ...currentSnap.data(), id: memberId } as Member)
         : null;
+
+      // Shallow-copy to avoid mutating the caller's object (E11)
+      updates = { ...updates };
+
+      // mentorId must go through assignMentor() to keep menteeIds bidirectionally in sync (N2 fix)
+      if ('mentorId' in updates) {
+        throw new Error('Use assignMentor() to change mentorId — updateMember does not sync menteeIds on mentor documents.');
+      }
 
       if (currentData?.senatorshipBoardValidated) {
         if (
@@ -598,6 +628,11 @@ export class MembersService {
       throw new Error('Senatorship is not validated');
     }
 
+    // Compute new membershipType BEFORE writing, using simulated post-revocation state (E3 fix:
+    // eliminates second updateDoc so revoke is a single atomic write — no partial failure risk).
+    const simulatedMember = { ...member, senatorCertified: false, senatorshipBoardValidated: false } as Member;
+    const typePatch = await this.syncComputedMembershipType({}, simulatedMember);
+
     const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
     await updateDoc(memberRef, {
       senatorshipBoardValidated: false,
@@ -606,19 +641,12 @@ export class MembersService {
       senatorshipValidatedBy: deleteField(),
       'jciCareer.senatorshipValidatedAt': deleteField(),
       'jciCareer.senatorshipValidatedBy': deleteField(),
+      ...(typePatch.membershipType ? { membershipType: typePatch.membershipType } : {}),
+      ...(typePatch.role ? { role: typePatch.role } : {}),
       updatedAt: Timestamp.now(),
       ...(revokedBy ? { updatedBy: revokedBy } : {}),
     });
-    const refreshed = await this.getMemberById(memberId);
-    if (refreshed) {
-      const typePatch = await this.syncComputedMembershipType({}, refreshed);
-      if (typePatch.membershipType) {
-        await updateDoc(memberRef, {
-          membershipType: typePatch.membershipType,
-          updatedAt: Timestamp.now(),
-        });
-      }
-    }
+    this.invalidateMembersCache();
   }
 
   private static async syncBoardMemberDisplayFields(memberId: string, member: Member): Promise<void> {
@@ -695,8 +723,8 @@ export class MembersService {
       const currentMemberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));
       const currentRole = currentMemberDoc.exists() ? (currentMemberDoc.data() as any).role : null;
       const myLoId = currentMemberDoc.exists() ? (currentMemberDoc.data() as any).loId ?? null : null;
-      if (currentRole !== 'ADMIN') {
-        const e: any = new Error('User lacks ADMIN role for deletion');
+      if (!['ADMIN', 'SUPER_ADMIN'].includes(currentRole)) {
+        const e: any = new Error('User lacks ADMIN / SUPER_ADMIN role for deletion');
         e.code = 'permission-denied';
         console.warn(`Delete blocked: user ${currentUid} with role=${currentRole} attempted to delete member ${memberId}`);
         throw e;
@@ -715,7 +743,24 @@ export class MembersService {
         throw e;
       }
 
-      await deleteDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
+      // Soft-delete: mark INACTIVE + clean up mentor's menteeIds in one batch (E4 fix)
+      const mentorId: string | undefined = targetDoc.exists()
+        ? (targetDoc.data() as any).mentorId
+        : undefined;
+      const deleteBatch = writeBatch(db);
+      deleteBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+        role: 'INACTIVE',
+        deletedAt: Timestamp.now(),
+        deletedBy: currentUid,
+        updatedAt: Timestamp.now(),
+      });
+      if (mentorId) {
+        deleteBatch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
+          menteeIds: arrayRemove(memberId),
+          updatedAt: Timestamp.now(),
+        });
+      }
+      await this.commitWithRetry(deleteBatch);
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.deleteMember');
       this.invalidateMembersCache();
     } catch (error) {
@@ -733,9 +778,9 @@ export class MembersService {
       const term = searchTerm.toLowerCase();
 
       return allMembers.filter(member =>
-        member.name.toLowerCase().includes(term) ||
-        member.email.toLowerCase().includes(term) ||
-        member.skills.some(skill => skill.toLowerCase().includes(term))
+        (member.name ?? '').toLowerCase().includes(term) ||
+        (member.email ?? '').toLowerCase().includes(term) ||
+        (member.skills ?? []).some(skill => skill.toLowerCase().includes(term))
       );
     } catch (error) {
       console.error('Error searching members:', error);
@@ -855,6 +900,20 @@ export class MembersService {
 
   static async updateMemberRole(memberId: string, newRole: UserRole): Promise<void> {
     try {
+      // Promoting to ADMIN / SUPER_ADMIN requires the caller to also be ADMIN+ (E13 fix)
+      const adminOnlyRoles: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
+      if (adminOnlyRoles.includes(newRole)) {
+        const currentUid = auth?.currentUser?.uid;
+        if (!currentUid) {
+          const e: any = new Error('User not authenticated'); e.code = 'permission-denied'; throw e;
+        }
+        const callerDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));
+        const callerRole = callerDoc.exists() ? (callerDoc.data() as any).role : null;
+        if (!adminOnlyRoles.includes(callerRole as UserRole)) {
+          const e: any = new Error(`Only ADMIN / SUPER_ADMIN may assign the ${newRole} role`);
+          e.code = 'permission-denied'; throw e;
+        }
+      }
       await this.updateMember(memberId, { role: newRole });
     } catch (error) {
       console.error('Error updating member role:', error);
@@ -865,38 +924,164 @@ export class MembersService {
   // Assign mentor
   static async assignMentor(memberId: string, mentorId: string): Promise<void> {
     try {
-      await this.updateMember(memberId, { mentorId });
-
-      // Also update mentor's menteeIds
       const mentor = await this.getMemberById(mentorId);
-      if (mentor) {
-        const menteeIds = mentor.menteeIds || [];
-        if (!menteeIds.includes(memberId)) {
-          await this.updateMember(mentorId, {
-            menteeIds: [...menteeIds, memberId],
-          });
-        }
+      const menteeIds = mentor?.menteeIds || [];
+
+      // Both sides of the relationship written atomically (E03)
+      const batch = writeBatch(db);
+      batch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+        mentorId,
+        updatedAt: Timestamp.now(),
+      });
+      if (!menteeIds.includes(memberId)) {
+        batch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
+          menteeIds: [...menteeIds, memberId],
+          updatedAt: Timestamp.now(),
+        });
       }
+      await this.commitWithRetry(batch);
+      this.invalidateMembersCache();
     } catch (error) {
       console.error('Error assigning mentor:', error);
       throw error;
     }
   }
 
-  /** Batch update members */
+  /** Batch update members — uses writeBatch for atomicity (E01) */
   static async batchUpdateMembers(memberIds: string[], updates: Partial<Member>): Promise<void> {
-    try {
+    if (isDevMode()) {
       await Promise.all(memberIds.map(id => this.updateMember(id, updates)));
+      return;
+    }
+    try {
+      // mentorId changes must go through assignMentor to keep menteeIds in sync (E12 fix)
+      if ('mentorId' in updates) {
+        throw new Error('Use assignMentor() to change mentorId — batchUpdateMembers does not sync menteeIds on mentor documents.');
+      }
+      const normalized = this.normalizeMemberData(updates as Record<string, any>);
+      const now = Timestamp.now();
+
+      // If introducer is changing, snapshot old values before writing so we can
+      // recalculate both old and new introducers' stats after the batch (M2 fix).
+      const introducerChanging = 'introducer' in normalized;
+      const oldIntroducerMap = new Map<string, string | undefined>();
+      if (introducerChanging) {
+        const snaps = await Promise.all(memberIds.map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id))));
+        snaps.forEach((snap, i) => {
+          if (snap.exists()) oldIntroducerMap.set(memberIds[i], (snap.data() as any).introducer as string | undefined);
+        });
+      }
+
+      // Firestore writeBatch limit is 500; flush every 400 to stay safe
+      for (let i = 0; i < memberIds.length; i += 400) {
+        const batch = writeBatch(db);
+        memberIds.slice(i, i + 400).forEach(id => {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...normalized, updatedAt: now });
+        });
+        await this.commitWithRetry(batch);
+      }
+      this.invalidateMembersCache();
+
+      // Sync display side effects when any display-affecting field is updated (N1 fix).
+      // Mirrors updateMember behaviour. Fires concurrently; failures are silent.
+      const DISPLAY_FIELDS = new Set(['name','email','avatar','avatarUrl','companyName','general','business','contact']);
+      if (Object.keys(normalized).some(k => DISPLAY_FIELDS.has(k))) {
+        const { BusinessDirectoryService } = await import('./businessDirectoryService');
+        await Promise.allSettled(
+          memberIds.map(id =>
+            Promise.allSettled([
+              BusinessDirectoryService.syncPublicListing(id, { ...normalized, id }),
+              this.syncBoardMemberDisplayFields(id, { ...normalized, id } as Member),
+            ])
+          )
+        );
+      }
+
+      // Recalculate introducer stats for all affected old + new introducers (M2 fix).
+      // Mirrors updateMember behaviour. Fires concurrently; failures are silent.
+      if (introducerChanging) {
+        const newIntroducer = normalized.introducer as string | undefined;
+        const affectedIntroducers = new Set<string>();
+        oldIntroducerMap.forEach(oldId => { if (oldId) affectedIntroducers.add(oldId); });
+        if (newIntroducer) affectedIntroducers.add(newIntroducer);
+        await Promise.allSettled(
+          [...affectedIntroducers].map(id => this.recalculateIntroducerStats(id))
+        );
+      }
     } catch (error) {
       console.error('Error in batch update:', error);
       throw error;
     }
   }
 
-  /** Batch delete members */
+  /** Batch delete members — uses writeBatch for atomicity (E02) */
   static async batchDeleteMembers(memberIds: string[]): Promise<void> {
+    if (isDevMode()) {
+      memberIds.forEach(id => {
+        const idx = MOCK_MEMBERS.findIndex(m => m.id === id);
+        if (idx !== -1) MOCK_MEMBERS.splice(idx, 1);
+      });
+      return;
+    }
     try {
-      await Promise.all(memberIds.map(id => this.deleteMember(id)));
+      // Verify caller is ADMIN before building the batch
+      const currentUid = auth?.currentUser?.uid;
+      if (!currentUid) {
+        const e: any = new Error('User not authenticated'); e.code = 'permission-denied'; throw e;
+      }
+      const callerDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));
+      if (!callerDoc.exists() || !['ADMIN', 'SUPER_ADMIN'].includes((callerDoc.data() as any).role)) {
+        const e: any = new Error('User lacks ADMIN / SUPER_ADMIN role for deletion'); e.code = 'permission-denied'; throw e;
+      }
+
+      // Fetch all target docs to find mentorIds for menteeIds cleanup
+      const targetDocs = await Promise.all(
+        memberIds.map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id)))
+      );
+
+      // Group menteeIds to remove per mentor (skip mentors who are also being deleted)
+      const mentorCleanup = new Map<string, string[]>();
+      const deletingSet = new Set(memberIds);
+      targetDocs.forEach((d, i) => {
+        if (!d.exists()) return;
+        const mentorId = (d.data() as any).mentorId as string | undefined;
+        if (mentorId && !deletingSet.has(mentorId)) {
+          if (!mentorCleanup.has(mentorId)) mentorCleanup.set(mentorId, []);
+          mentorCleanup.get(mentorId)!.push(memberIds[i]);
+        }
+      });
+
+      const now = Timestamp.now();
+
+      // Soft-delete in chunks of 400 (matches Firestore batch limit)
+      for (let i = 0; i < memberIds.length; i += 400) {
+        const batch = writeBatch(db);
+        memberIds.slice(i, i + 400).forEach(id => {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), {
+            role: 'INACTIVE',
+            deletedAt: now,
+            deletedBy: currentUid,
+            updatedAt: now,
+          });
+        });
+        await batch.commit();
+      }
+
+      // Clean up menteeIds on affected mentor docs (one update per mentor, all ids at once)
+      const mentorEntries = [...mentorCleanup.entries()];
+      for (let i = 0; i < mentorEntries.length; i += 400) {
+        const batch = writeBatch(db);
+        mentorEntries.slice(i, i + 400).forEach(([mentorId, ids]) => {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
+            menteeIds: arrayRemove(...ids),
+            updatedAt: now,
+          });
+        });
+        await this.commitWithRetry(batch);
+      }
+
+      logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.batchDeleteMembers');
+      this.invalidateMembersCache();
     } catch (error) {
       console.error('Error in batch delete:', error);
       throw error;
@@ -1137,12 +1322,23 @@ export class MembersService {
     const members = await this.getAllMembers(loIdFilter);
     let batch = writeBatch(db);
     let batchOps = 0;
+    // Track which member IDs are in the current pending batch for error attribution
+    let batchIds: string[] = [];
 
     const flushBatch = async () => {
       if (batchOps === 0) return;
-      await batch.commit();
+      const idsInBatch = batchIds;
+      try {
+        await this.commitWithRetry(batch);
+      } catch (err) {
+        idsInBatch.forEach(id =>
+          result.errors.push(`${id}: ${err instanceof Error ? err.message : String(err)}`)
+        );
+        result.updated -= idsInBatch.length;
+      }
       batch = writeBatch(db);
       batchOps = 0;
+      batchIds = [];
     };
 
     for (const member of members) {
@@ -1156,6 +1352,7 @@ export class MembersService {
           membershipType: nextType,
           updatedAt: Timestamp.now(),
         });
+        batchIds.push(member.id);
         batchOps += 1;
 
         if (batchOps >= 400) {
@@ -1320,12 +1517,24 @@ export class MembersService {
     const members = await this.getAllMembers(loIdFilter);
     let batch = writeBatch(db);
     let batchOps = 0;
+    let batchIds: string[] = [];
 
     const flushBatch = async () => {
       if (batchOps === 0) return;
-      await batch.commit();
+      const idsInBatch = batchIds;
+      try {
+        await this.commitWithRetry(batch);
+      } catch (err) {
+        idsInBatch.forEach(id =>
+          result.errors.push(`${id}: ${err instanceof Error ? err.message : String(err)}`)
+        );
+        // Roll back the optimistic counters for members in this failed batch
+        result.updated -= idsInBatch.filter(id => members.find(m => m.id === id)?.membership).length;
+        result.created -= idsInBatch.filter(id => !members.find(m => m.id === id)?.membership).length;
+      }
       batch = writeBatch(db);
       batchOps = 0;
+      batchIds = [];
     };
 
     for (const member of members) {
@@ -1339,6 +1548,7 @@ export class MembersService {
           membership: memberWorking.membership,
           updatedAt: Timestamp.now(),
         });
+        batchIds.push(member.id);
         batchOps += 1;
 
         if (batchOps >= 400) {

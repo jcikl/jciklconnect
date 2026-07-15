@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
 import {
-  Mail, Phone, Calendar, Users, UserCheck, FileText, CreditCard, CheckCircle, AlertCircle
+  Mail, Phone, Calendar, Users, UserCheck, FileText, CheckCircle, AlertCircle
 } from 'lucide-react';
 import { Button, Badge, Modal, useToast } from '../../ui/Common';
 import type { Member, ProbationTask, Transaction } from '../../../types';
@@ -12,8 +12,8 @@ import { usePermissions } from '../../../hooks/usePermissions';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 import { FinanceService } from '../../../services/financeService';
 import { MembershipConfigService } from '../../../services/membershipConfigService';
+import { GuestApprovalModal } from './GuestApprovalModal';
 
-// Normalize string for fuzzy name matching (same logic as DuesRenewalDashboard)
 const norm = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const findMatchingTransaction = (guest: Member, txs: Transaction[]): Transaction | null => {
@@ -31,6 +31,12 @@ const findMatchingTransaction = (guest: Member, txs: Transaction[]): Transaction
 const hasPaidFee = (guest: Member) =>
   !!(guest.jciCareer?.hasPaidInitiationFee ?? guest.hasPaidInitiationFee);
 
+const makeDefaultTasks = (): ProbationTask[] => [
+  { id: `task-${Date.now()}-1`, title: 'Attend Orientation Session', description: 'Attend the new member orientation session', status: 'Pending', assignedAt: new Date().toISOString(), category: 'Training' },
+  { id: `task-${Date.now()}-2`, title: 'Complete Member Profile', description: 'Complete your member profile with all required information', status: 'Pending', assignedAt: new Date().toISOString(), category: 'Documentation' },
+  { id: `task-${Date.now()}-3`, title: 'Attend First Event', description: 'Attend at least one JCI event', status: 'Pending', assignedAt: new Date().toISOString(), category: 'Event' },
+];
+
 // Guest Management View Component
 export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id: string) => void }> = ({ searchQuery, onSelect }) => {
   const { members, updateMember } = useMembers();
@@ -39,23 +45,14 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
   const { showToast } = useToast();
   const [guests, setGuests] = useState<Member[]>([]);
   const [selectedGuest, setSelectedGuest] = useState<Member | null>(null);
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-
-  // Payment matching state
-  const [matchedTx, setMatchedTx] = useState<Transaction | null>(null);
-  const [txLoading, setTxLoading] = useState(false);
-  const [unlinkedMembershipTxs, setUnlinkedMembershipTxs] = useState<Transaction[]>([]);
-  const [showTxPicker, setShowTxPicker] = useState(false);
 
   const getInitiationYear = (dateStr?: string | null) => {
     if (!dateStr) return new Date().getFullYear();
     const date = new Date(dateStr);
     const year = date.getFullYear();
-    const month = date.getMonth(); // 0-indexed: 9 is October
+    const month = date.getMonth();
     return month >= 9 ? year + 1 : year;
   };
-
-  const [approvalYear, setApprovalYear] = useState(getInitiationYear(new Date().toISOString()));
 
   // Batch approval states
   const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
@@ -85,120 +82,17 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
     setGuests(guestList);
   }, [members, searchQuery]);
 
-  useEffect(() => {
-    if (selectedGuest) {
-      setApprovalYear(getInitiationYear(selectedGuest.joinDate));
+  const handleGuestApproved = async (
+    guestId: string,
+    memberUpdates: Partial<Member>,
+    linkedTxId?: string,
+    linkedTxUpdates?: Partial<Transaction>
+  ) => {
+    await updateMember(guestId, memberUpdates);
+    if (linkedTxId && linkedTxUpdates) {
+      await FinanceService.updateTransaction(linkedTxId, linkedTxUpdates);
     }
-  }, [selectedGuest]);
-
-  // Search for matching payment transaction when approval modal opens
-  useEffect(() => {
-    if (!showApprovalModal || !selectedGuest) return;
-    setTxLoading(true);
-    setMatchedTx(null);
-    setShowTxPicker(false);
-    FinanceService.getAllTransactions()
-      .then(all => {
-        const unlinked = all.filter(t =>
-          t.type === 'Income' &&
-          t.category === 'Membership' &&
-          !t.memberId &&
-          !t.isSplitChild
-        );
-        setUnlinkedMembershipTxs(unlinked);
-        setMatchedTx(findMatchingTransaction(selectedGuest, unlinked));
-      })
-      .catch(() => {
-        setUnlinkedMembershipTxs([]);
-      })
-      .finally(() => setTxLoading(false));
-  }, [showApprovalModal, selectedGuest]);
-
-  const closeApprovalModal = () => {
-    setShowApprovalModal(false);
     setSelectedGuest(null);
-    setMatchedTx(null);
-    setUnlinkedMembershipTxs([]);
-    setShowTxPicker(false);
-  };
-
-  const makeDefaultTasks = (): ProbationTask[] => [
-    {
-      id: `task-${Date.now()}-1`,
-      title: 'Attend Orientation Session',
-      description: 'Attend the new member orientation session',
-      status: 'Pending',
-      assignedAt: new Date().toISOString(),
-      category: 'Training',
-    },
-    {
-      id: `task-${Date.now()}-2`,
-      title: 'Complete Member Profile',
-      description: 'Complete your member profile with all required information',
-      status: 'Pending',
-      assignedAt: new Date().toISOString(),
-      category: 'Documentation',
-    },
-    {
-      id: `task-${Date.now()}-3`,
-      title: 'Attend First Event',
-      description: 'Attend at least one JCI event',
-      status: 'Pending',
-      assignedAt: new Date().toISOString(),
-      category: 'Event',
-    },
-  ];
-
-  const handleApproveGuest = async (guestId: string) => {
-    if (!canApprove) {
-      showToast('Only President, Secretary or Honorary Treasurer may approve guests', 'error');
-      return;
-    }
-
-    try {
-      const yearStr = String(approvalYear);
-      const configRules = await MembershipConfigService.getRules();
-      const dues = (hasPaidFee(selectedGuest!) ? 0 : 50) + (configRules.Probation?.duesAmount ?? MembershipDues.Probation);
-      const paidAmount = matchedTx?.amount ?? 0;
-      const membershipStatus = paidAmount >= dues ? 'paid' : paidAmount > 0 ? 'partial' : 'pending';
-
-      await updateMember(guestId, {
-        role: UserRole.MEMBER,
-        membershipType: 'Probation' as any,
-        probationTasks: makeDefaultTasks(),
-        probationApprovedBy: currentMember?.id,
-        probationApprovedAt: new Date().toISOString(),
-        membership: {
-          ...(selectedGuest?.membership || {}),
-          [yearStr]: {
-            year: approvalYear,
-            dues,
-            amount: paidAmount,
-            status: membershipStatus,
-            transactionId: matchedTx ? [matchedTx.id] : []
-          }
-        }
-      });
-
-      // Link the matched transaction to this member
-      if (matchedTx) {
-        const purpose = paidAmount >= dues
-          ? `${approvalYear} New Membership`
-          : `${approvalYear} Membership`;
-        await FinanceService.updateTransaction(matchedTx.id, {
-          memberId: guestId,
-          projectId: `${approvalYear} membership`,
-          category: 'Membership',
-          purpose,
-          status: paidAmount >= dues ? 'Cleared' : matchedTx.status,
-        });
-      }
-
-      showToast('Guest approved and moved to probation member', 'success');
-      closeApprovalModal();
-    } catch (err) {
-      showToast('Failed to approve guest', 'error');
-    }
   };
 
   const handleBatchApproveGuests = async () => {
@@ -251,7 +145,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         const paidAmount = tx.amount;
         const membershipStatus = paidAmount >= dues ? 'paid' : 'partial';
 
-        await updateMember(id, {
+        const memberUpdates: Partial<Member> = {
           role: UserRole.MEMBER,
           membershipType: 'Probation' as any,
           probationTasks: makeDefaultTasks(),
@@ -267,15 +161,26 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
               transactionId: [tx.id]
             }
           }
-        } as Partial<Member>);
+        };
 
-        await FinanceService.updateTransaction(tx.id, {
-          memberId: id,
-          projectId: `${guestYear} membership`,
-          category: 'Membership',
-          purpose: paidAmount >= dues ? `${guestYear} New Membership` : `${guestYear} Membership`,
-          status: paidAmount >= dues ? 'Cleared' : tx.status,
-        });
+        await updateMember(id, memberUpdates);
+
+        try {
+          await FinanceService.updateTransaction(tx.id, {
+            memberId: id,
+            projectId: `${guestYear} membership`,
+            category: 'Membership',
+            purpose: paidAmount >= dues ? `${guestYear} New Membership` : `${guestYear} Membership`,
+            status: paidAmount >= dues ? 'Cleared' : tx.status,
+          });
+        } catch (txErr) {
+          // Roll back the member role change so data stays consistent (E10)
+          await updateMember(id, { role: UserRole.GUEST, membershipType: 'Guest' as any });
+          console.error(`Batch approve: tx update failed for guest ${id}, rolled back`, txErr);
+          skippedCount++;
+          usedTxIds.delete(tx.id);
+          continue;
+        }
 
         approvedCount++;
       }
@@ -397,11 +302,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
                     {canApprove && guest.role === UserRole.GUEST && (
                       <Button
                         size="sm"
-                        onClick={() => {
-                          setSelectedGuest(guest);
-                          setApprovalYear(getInitiationYear(guest.joinDate));
-                          setShowApprovalModal(true);
-                        }}
+                        onClick={() => setSelectedGuest(guest)}
                         className="flex-1 sm:flex-none h-9 px-4 rounded-lg font-bold bg-jci-blue hover:bg-jci-navy text-white shadow-sm shadow-jci-blue/20 transition-colors"
                       >
                         <UserCheck size={14} className="mr-2" />
@@ -421,127 +322,13 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         )}
       </div>
 
-      {/* Single Approval Modal */}
-      {showApprovalModal && selectedGuest && (
-        <Modal
-          isOpen={showApprovalModal}
-          onClose={closeApprovalModal}
-          title={`Approve Guest: ${selectedGuest.name}`}
-        >
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Approving this guest will move them to probation member status. They will need to complete probation tasks before becoming an official member.
-            </p>
-
-            {/* Payment Matching */}
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-              <h4 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
-                <CreditCard size={14} />
-                Payment Record
-                {hasPaidFee(selectedGuest) && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-1">
-                    Entry fee previously confirmed
-                  </span>
-                )}
-              </h4>
-              {txLoading ? (
-                <p className="text-xs text-slate-500 animate-pulse">Searching for matching payment...</p>
-              ) : matchedTx ? (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-green-700">
-                    <CheckCircle size={13} />
-                    <span className="text-xs font-bold">Matched Payment Found</span>
-                  </div>
-                  <div className="text-xs text-slate-600 space-y-0.5 pl-5">
-                    <div className="font-medium">{formatDateToDDMMMYYYY(matchedTx.date)} · RM {matchedTx.amount.toFixed(2)}</div>
-                    <div className="truncate text-slate-500">{matchedTx.description}</div>
-                    {matchedTx.referenceNumber && (
-                      <div className="text-slate-400">Ref: {matchedTx.referenceNumber}</div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setShowTxPicker(v => !v)}
-                    className="text-xs text-jci-blue underline pl-5"
-                  >
-                    {showTxPicker ? 'Hide' : 'Change'}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-amber-600">
-                    <AlertCircle size={13} />
-                    <span className="text-xs font-medium">No matching payment found</span>
-                  </div>
-                  <p className="text-xs text-slate-500 pl-5">Please locate the payment record before approving.</p>
-                  {unlinkedMembershipTxs.length > 0 && (
-                    <button
-                      onClick={() => setShowTxPicker(v => !v)}
-                      className="text-xs text-jci-blue underline pl-5"
-                    >
-                      {showTxPicker ? 'Hide' : 'Select manually'}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Transaction picker */}
-              {showTxPicker && (
-                <div className="border border-slate-200 rounded-lg overflow-hidden mt-2">
-                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100">
-                    <button
-                      onClick={() => { setMatchedTx(null); setShowTxPicker(false); }}
-                      className="w-full px-3 py-2 text-left text-xs text-slate-400 italic hover:bg-slate-50"
-                    >
-                      No payment — set as pending
-                    </button>
-                    {unlinkedMembershipTxs.map(tx => (
-                      <button
-                        key={tx.id}
-                        onClick={() => { setMatchedTx(tx); setShowTxPicker(false); }}
-                        className={`w-full px-3 py-2 text-left text-xs hover:bg-blue-50 transition-colors ${matchedTx?.id === tx.id ? 'bg-blue-50 text-jci-blue' : 'text-slate-700'}`}
-                      >
-                        <div className="font-medium">{formatDateToDDMMMYYYY(tx.date)} · RM {tx.amount.toFixed(2)}</div>
-                        <div className="text-slate-500 truncate">{tx.description}</div>
-                        {tx.referenceNumber && <div className="text-slate-400">Ref: {tx.referenceNumber}</div>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <label className="block text-sm font-bold text-amber-700 mb-1">Set Initiation Year:</label>
-              <select
-                value={approvalYear}
-                onChange={(e) => setApprovalYear(parseInt(e.target.value))}
-                className="w-full rounded-lg border-2 border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900 focus:border-amber-500"
-              >
-                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + 2 - i).map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <p className="text-[10px] text-amber-600 italic">This will set the year for the initial membership record.</p>
-            </div>
-
-            {!matchedTx && !txLoading && (
-              <p className="text-xs text-red-600 font-medium flex items-center gap-1.5">
-                <AlertCircle size={13} />
-                A matched payment record is required before approving.
-              </p>
-            )}
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={closeApprovalModal}>Cancel</Button>
-              <Button
-                onClick={() => handleApproveGuest(selectedGuest.id)}
-                disabled={!matchedTx || txLoading}
-              >
-                <UserCheck size={16} className="mr-2" />
-                Approve as Probation Member
-              </Button>
-            </div>
-          </div>
-        </Modal>
+      {selectedGuest && (
+        <GuestApprovalModal
+          guest={selectedGuest}
+          approverId={currentMember?.id ?? ''}
+          onClose={() => setSelectedGuest(null)}
+          onApproved={handleGuestApproved}
+        />
       )}
 
       {/* Batch Approval Modal */}

@@ -9,6 +9,7 @@ import { useAuth } from '../../../hooks/useAuth';
 interface Props {
   members: Member[];
   canValidate: boolean;
+  canRevoke?: boolean; // ADMIN only — separate from validate (BOARD+)
   searchQuery?: string;
   onMembersChanged?: () => void;
 }
@@ -16,6 +17,7 @@ interface Props {
 export const SenatorshipManagement: React.FC<Props> = ({
   members,
   canValidate,
+  canRevoke = false,
   searchQuery = '',
   onMembersChanged,
 }) => {
@@ -70,7 +72,7 @@ export const SenatorshipManagement: React.FC<Props> = ({
   };
 
   const handleRevoke = async (member: Member) => {
-    if (!canValidate) return;
+    if (!canRevoke) return;
     if (!window.confirm(`Revoke board validation for ${member.name}? The senatorship number will become editable again.`)) {
       return;
     }
@@ -124,9 +126,9 @@ export const SenatorshipManagement: React.FC<Props> = ({
           )}
         </div>
       </div>
-      {canValidate && (
+      {(canValidate || canRevoke) && (
         <div className="flex gap-2 shrink-0">
-          {mode === 'pending' ? (
+          {mode === 'pending' && canValidate && (
             <Button
               size="sm"
               onClick={() => handleValidate(member)}
@@ -139,7 +141,8 @@ export const SenatorshipManagement: React.FC<Props> = ({
               )}
               Validate
             </Button>
-          ) : (
+          )}
+          {mode === 'validated' && canRevoke && (
             <Button
               size="sm"
               variant="outline"

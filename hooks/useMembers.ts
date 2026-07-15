@@ -25,7 +25,7 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
   const { user, member: currentMember, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
 
   const inDevMode = isDevMode() || isDevModeFromAuth;
-  const isFullMember = !!(currentMember && ['MEMBER', 'BOARD', 'ADMIN'].includes(currentMember.role as string));
+  const isFullMember = !!(currentMember && ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(currentMember.role as string));
   const enabled = !authLoading && (inDevMode || isFullMember);
 
   const { data: members, loading, error, reload: loadMembers } = useFirestoreCollection<Member>({

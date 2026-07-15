@@ -7,8 +7,9 @@ const BatchActionBarBase: React.FC<{
   onClear: () => void,
   onBatchDelete: () => void,
   onBatchSet: () => void,
-  isDeveloper: boolean
-}> = ({ selectedCount, onClear, onBatchDelete, onBatchSet, isDeveloper }) => {
+  isDeveloper: boolean,
+  isAdmin: boolean,
+}> = ({ selectedCount, onClear, onBatchDelete, onBatchSet, isDeveloper, isAdmin }) => {
   return (
     <div className="fixed bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[40] animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="bg-slate-900 text-white px-2 md:px-6 py-3 md:py-4 rounded-[40px] md:rounded-2xl shadow-2xl flex items-center justify-around md:justify-start gap-0 md:gap-6 border border-white/10 backdrop-blur-md h-20 md:h-auto">
@@ -29,7 +30,7 @@ const BatchActionBarBase: React.FC<{
           <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Batch Set</span>
         </button>
 
-        {isDeveloper && (
+        {(isDeveloper || isAdmin) && (
           <button
             onClick={onBatchDelete}
             className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"

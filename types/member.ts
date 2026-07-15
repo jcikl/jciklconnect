@@ -23,7 +23,7 @@ export interface MembershipRecord {
   dues?: number | string;
   type?: MembershipType | string;
   amount?: number | string;
-  status?: 'paid' | 'overdue' | 'partial' | 'pending' | string;
+  status?: 'paid' | 'over paid' | 'overdue' | 'partial' | 'pending' | string;
   transactionId?: string[];
   purpose?: string;
   paymentDate?: string;

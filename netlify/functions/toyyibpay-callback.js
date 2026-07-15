@@ -202,10 +202,14 @@ exports.handler = async (event) => {
         // Sync membership status — server-side equivalent of syncMemberMembership
         const memberSnap = await db.collection('members').doc(billMemberId).get().catch(() => null);
         const memberData = memberSnap?.exists ? memberSnap.data() : null;
+        const txDescription = yearMatchTx.data().description || yearMatchTx.data().purpose || '';
         const memberUpdate = {
           [`membership.${billYear}.status`]: 'paid',
           [`membership.${billYear}.amount`]: duesAmount,
           [`membership.${billYear}.dues`]: duesAmount,
+          [`membership.${billYear}.transactionId`]: [yearMatchTx.id],
+          [`membership.${billYear}.paymentDate`]: billPaymentDate || new Date().toISOString(),
+          [`membership.${billYear}.purpose`]: txDescription,
           updatedAt: Timestamp.now(),
         };
         // Guest entry fee: mark hasPaidInitiationFee so GuestManagementView can show "Fee Paid".
@@ -217,7 +221,8 @@ exports.handler = async (event) => {
         await db.collection('members').doc(billMemberId).update(memberUpdate)
           .catch(err => console.warn('[toyyibpay-callback] Could not sync membership status:', err));
       } else {
-        await db.collection('transactions').add({
+        const txDescription = `Membership dues ${billYear} — ${billData?.billName || billCode}`;
+        const newTxRef = await db.collection('transactions').add({
           type: 'Income',
           category: 'Membership',
           status: 'Cleared',
@@ -227,13 +232,24 @@ exports.handler = async (event) => {
           projectId: `${billYear} membership`,
           toyyibBillCode: billCode,
           amount: duesAmount,
-          description: `Membership dues ${billYear} — ${billData?.billName || billCode}`,
+          description: txDescription,
           date: billPaymentDate ? billPaymentDate.split('T')[0] : new Date().toISOString().split('T')[0],
           referenceNumber: billExternalReferenceNo || transactionId,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
           source: 'manual',
         });
+        // Sync membership status for the newly created transaction
+        const elsePaymentDate = billPaymentDate || new Date().toISOString();
+        await db.collection('members').doc(billMemberId).update({
+          [`membership.${billYear}.status`]: 'paid',
+          [`membership.${billYear}.amount`]: duesAmount,
+          [`membership.${billYear}.dues`]: duesAmount,
+          [`membership.${billYear}.transactionId`]: [newTxRef.id],
+          [`membership.${billYear}.paymentDate`]: elsePaymentDate,
+          [`membership.${billYear}.purpose`]: txDescription,
+          updatedAt: Timestamp.now(),
+        }).catch(err => console.warn('[toyyibpay-callback] Could not sync membership status (fallback tx):', err));
       }
     }
 

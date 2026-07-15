@@ -87,6 +87,9 @@ import { MemberTable } from './Members/MemberTable';
 import { MyProfileSelfView } from './Members/MyProfileSelfView';
 import { MemberDetail } from './Members/MemberDetail';
 import { MentorMatchingModal } from './Members/MentorMatchingModal';
+import { MemberCreateModal } from './Members/MemberCreateModal';
+import { BatchFieldUpdateModal } from './Members/BatchFieldUpdateModal';
+import { useMemberSearch } from '../../hooks/useMemberSearch';
 const HOBBY_OPTIONS = [
   "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
   "Cigar", "Cooking", "Cycling", "Dancing", "Diving",
@@ -120,9 +123,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [statistics, setStatistics] = useState<MemberStatistics | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [lastImportResult, setLastImportResult] = useState<any | null>(null);
-  const [addModalHobbies, setAddModalHobbies] = useState<string[]>([]);
-  const [addModalInterestedIndustries, setAddModalInterestedIndustries] = useState<string[]>([]);
-  const [addModalIntroducer, setAddModalIntroducer] = useState('');
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
   const [showTabSheet, setShowTabSheet] = useState(false);
@@ -162,8 +162,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
   const [isBatchActionModalOpen, setIsBatchActionModalOpen] = useState(false);
   const [batchActionType, setBatchActionType] = useState<'delete' | 'set' | null>(null);
-  const [batchSetField, setBatchSetField] = useState<string>('');
-  const [batchSetValue, setBatchSetValue] = useState<any>('');
 
   const { member: currentMember } = useAuth();
   const { isAdmin, isBoard, isDeveloper } = usePermissions();
@@ -215,33 +213,14 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   }, [members]);
 
   // Filter members based on search + column filters
-  const filteredMembers = useMemo(() => {
-    const term = (searchQuery || searchTerm).toLowerCase();
-    let list = members;
-
-    if (term) {
-      list = list.filter(
-        (m) =>
-          (m.name ?? '').toLowerCase().includes(term) ||
-          (m.email ?? '').toLowerCase().includes(term) ||
-          (m.phone ?? '').toLowerCase().includes(term) ||
-          (m.fullName ?? '').toLowerCase().includes(term) ||
-          (m.address ?? '').toLowerCase().includes(term)
-      );
-    }
-
-    if (roleFilters.length > 0) {
-      list = list.filter((m) => roleFilters.includes(m.role as UserRole));
-    }
-
-    if (membershipTypeFilters.length > 0) {
-      list = list.filter((m) =>
-        membershipTypeFilters.includes(getMemberDisplayMembershipType(m))
-      );
-    }
-
-    return list;
-  }, [members, searchTerm, searchQuery, roleFilters, membershipTypeFilters, membershipRules]);
+  const filteredMembers = useMemberSearch({
+    members,
+    searchTerm,
+    searchQuery,
+    roleFilters,
+    membershipTypeFilters,
+    getMemberDisplayMembershipType,
+  });
 
   // Paginate filtered members
   const paginatedMembers = useMemo(() => {
@@ -424,108 +403,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     }
   };
 
-  const handleCloseAddModal = () => {
-    setAddModalOpen(false);
-    setAddModalHobbies([]);
-    setAddModalInterestedIndustries([]);
-    setAddModalIntroducer('');
-  };
-
-  const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const firstName = formData.get('firstName') as string;
-    const lastName = formData.get('lastName') as string;
-    const name = `${firstName} ${lastName}`.trim();
-    const email = formData.get('email') as string;
-
-    try {
-      const formNationality = formData.get('nationality') as string || 'Malaysia';
-      const formDateOfBirth = formData.get('dateOfBirth') as string || undefined;
-      const formSenatorshipId = formData.get('senatorshipId') as string || undefined;
-      const formRole = (formData.get('role') as UserRole) || UserRole.MEMBER;
-
-      const skillsInput = formData.get('skills') as string;
-      const skills = skillsInput ? skillsInput.split(',').map(s => s.trim()).filter(s => s.length > 0) : [];
-
-      const hobbies = addModalHobbies.length > 0 ? addModalHobbies : undefined;
-
-      const interestedIndustries = addModalInterestedIndustries.length > 0 ? addModalInterestedIndustries : undefined;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const newMember: MemberCreateInput & Record<string, any> = {
-        name,
-        email,
-        phone: formData.get('phone') as string || '',
-        role: formRole,
-        tier: (formData.get('tier') as MemberTier) || MemberTier.BRONZE,
-        points: 0,
-        joinDate: new Date().toISOString().split('T')[0],
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`,
-        churnRisk: (formData.get('churnRisk') as any) || 'Low',
-        attendanceRate: parseInt(formData.get('attendanceRate') as string) || 100,
-        badges: [],
-        skills,
-        hobbies,
-        interestedIndustries,
-        'business.interestedIndustries': interestedIndustries,
-        businessCategory: formData.getAll('businessCategory').length > 0 ? (formData.getAll('businessCategory') as string[]) : undefined,
-
-        // Basic Info
-        fullName: formData.get('fullName') as string || undefined,
-        idNumber: formData.get('idNumber') as string || undefined,
-        gender: (formData.get('gender') as any) || undefined,
-        ethnicity: (formData.get('ethnicity') as any) || undefined,
-        'general.ethnicity': (formData.get('ethnicity') as any) || undefined,
-        nationality: formData.get('nationality') as string || 'Malaysia',
-        dateOfBirth: formData.get('dateOfBirth') as string || undefined,
-        'general.birthPlace': (formData.get('birthPlace') as string) || undefined,
-        introducer: formData.get('introducer') as string || undefined,
-        bio: formData.get('bio') as string || undefined,
-        dietaryPreference: (formData.get('dietaryPreference') as any) || undefined,
-        'general.dietaryPreference': (formData.get('dietaryPreference') as any) || undefined,
-
-        senatorshipId: formSenatorshipId,
-
-        // Professional
-        companyName: formData.get('companyName') as string || undefined,
-        companyWebsite: formData.get('companyWebsite') as string || undefined,
-        companyDescription: formData.get('companyDescription') as string || undefined,
-        'business.companyDescription': (formData.get('companyDescription') as string) || undefined,
-        departmentAndPosition: formData.get('departmentAndPosition') as string || undefined,
-        'business.departmentAndPosition': (formData.get('departmentAndPosition') as string) || undefined,
-        industry: formData.get('industry') as string || undefined,
-        companyLogoUrl: formData.get('companyLogoUrl') as string || undefined,
-        specialOffer: formData.get('specialOffer') as string || undefined,
-        acceptInternationalBusiness: (formData.get('acceptInternationalBusiness') as any) || undefined,
-
-        // Contact
-        alternatePhone: formData.get('alternatePhone') as string || undefined,
-        whatsappGroup: false, // Managed by API
-        address: formData.get('address') as string || undefined,
-        linkedin: formData.get('linkedin') as string || undefined,
-        facebook: formData.get('facebook') as string || undefined,
-        instagram: formData.get('instagram') as string || undefined,
-        wechat: formData.get('wechat') as string || undefined,
-        emergencyContactName: formData.get('emergencyContactName') as string || undefined,
-        emergencyContactPhone: formData.get('emergencyContactPhone') as string || undefined,
-        emergencyContactRelationship: formData.get('emergencyContactRelationship') as string || undefined,
-
-        // Apparel
-        cutStyle: (formData.get('cutStyle') as any) || undefined,
-        tshirtSize: (formData.get('tshirtSize') as any) || undefined,
-        jacketSize: (formData.get('jacketSize') as any) || undefined,
-        embroideredName: formData.get('embroideredName') as string || undefined,
-        tshirtStatus: (formData.get('tshirtStatus') as any) || 'NA',
-      };
-
-      await createMember(newMember);
-      handleCloseAddModal();
-      showToast('Member registered successfully', 'success');
-      e.currentTarget.reset();
-    } catch (error) {
-      // Error is already handled in the hook
-    }
+  const handleAddMember = async (data: MemberCreateInput & Record<string, any>) => {
+    await createMember(data);
   };
 
   // Self-view or Guest view: only show profile detail
@@ -755,6 +634,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               <SenatorshipManagement
                 members={members}
                 canValidate={canManageMembers}
+                canRevoke={canManageMembers}
                 searchQuery={searchQuery}
                 onMembersChanged={loadMembers}
               />
@@ -781,7 +661,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} />
       )}
 
-      {selectedIds.size > 1 && (
+      {selectedIds.size > 1 && isAdmin && (
         <BatchActionBar
           selectedCount={selectedIds.size}
           onClear={() => setSelectedIds(new Set())}
@@ -794,257 +674,46 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             setIsBatchActionModalOpen(true);
           }}
           isDeveloper={isDeveloper}
+          isAdmin={isAdmin}
         />
       )}
 
-      {/* Batch Action Modal */}
+      {/* Batch delete confirm modal */}
       <Modal
-        isOpen={isBatchActionModalOpen}
+        isOpen={isBatchActionModalOpen && batchActionType === 'delete'}
         onClose={() => setIsBatchActionModalOpen(false)}
-        title={batchActionType === 'delete' ? 'Confirm Batch Delete' : 'Batch Set Fields'}
+        title="Confirm Batch Delete"
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button variant="outline" onClick={() => setIsBatchActionModalOpen(false)}>Cancel</Button>
-            {batchActionType === 'delete' ? (
-              <Button variant="danger" onClick={async () => {
-                await batchDeleteMembers(Array.from(selectedIds));
-                setSelectedIds(new Set());
-                setIsBatchActionModalOpen(false);
-              }}>Delete Members</Button>
-            ) : (
-              <Button disabled={!batchSetField || !batchSetValue} onClick={async () => {
-                const updates: Partial<Member> = { [batchSetField]: batchSetValue };
-                await batchUpdateMembers(Array.from(selectedIds), updates);
-                setSelectedIds(new Set());
-                setIsBatchActionModalOpen(false);
-              }}>Apply Changes</Button>
-            )}
+            <Button variant="danger" onClick={async () => {
+              await batchDeleteMembers(Array.from(selectedIds));
+              setSelectedIds(new Set());
+              setIsBatchActionModalOpen(false);
+            }}>Delete Members</Button>
           </div>
         }
       >
-        <div className="space-y-4">
-          {batchActionType === 'delete' ? (
-            <p className="text-slate-600">Are you sure you want to delete <span className="font-bold text-red-600">{selectedIds.size}</span> members? This action cannot be undone.</p>
-          ) : (
-            <>
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-slate-700">Field to Set</label>
-                <Select
-                  options={[
-                    { label: 'Select field...', value: '' },
-                    { label: 'Introducer', value: 'introducer' },
-                    { label: 'Cut Style', value: 'cutStyle' },
-                    { label: 'T-Shirt Size', value: 'tshirtSize' },
-                    { label: 'Jacket Size', value: 'jacketSize' },
-                    { label: 'Role', value: 'role' },
-                  ]}
-                  value={batchSetField}
-                  onChange={(e) => {
-                    setBatchSetField(e.target.value);
-                    setBatchSetValue('');
-                  }}
-                />
-              </div>
-
-              {batchSetField && (
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-slate-700">Value</label>
-                  {batchSetField === 'introducer' ? (
-                    <Input value={batchSetValue} onChange={(e) => setBatchSetValue(e.target.value)} placeholder="Enter introducer name" />
-                  ) : batchSetField === 'role' ? (
-                    <Select
-                      options={[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => ({ label: r, value: r }))}
-                      value={batchSetValue}
-                      onChange={(e) => setBatchSetValue(e.target.value)}
-                    />
-                  ) : batchSetField === 'cutStyle' ? (
-                    <Select
-                      options={['Unisex', 'Lady Cut'].map(v => ({ label: v, value: v }))}
-                      value={batchSetValue}
-                      onChange={(e) => setBatchSetValue(e.target.value)}
-                    />
-                  ) : (
-                    <Select
-                      options={['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(v => ({ label: v, value: v }))}
-                      value={batchSetValue}
-                      onChange={(e) => setBatchSetValue(e.target.value)}
-                    />
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <p className="text-slate-600">Are you sure you want to deactivate <span className="font-bold text-red-600">{selectedIds.size}</span> members? They will be marked as inactive and can be restored by an admin if needed.</p>
       </Modal>
 
-      <Modal
+      <BatchFieldUpdateModal
+        isOpen={isBatchActionModalOpen && batchActionType === 'set'}
+        onClose={() => setIsBatchActionModalOpen(false)}
+        selectedCount={selectedIds.size}
+        onApply={async (updates) => {
+          await batchUpdateMembers(Array.from(selectedIds), updates);
+          setSelectedIds(new Set());
+        }}
+      />
+
+      <MemberCreateModal
         isOpen={isAddModalOpen}
-        onClose={handleCloseAddModal}
-        title="Register New Member"
-        size="xl"
-        drawerOnMobile
-        footer={
-          <div className="flex gap-3 w-full">
-            <Button variant="outline" className="flex-1" type="button" onClick={handleCloseAddModal}>Cancel</Button>
-            <Button className="flex-1" type="submit" form="add-member-form">Register Member</Button>
-          </div>
-        }
-      >
-        <form id="add-member-form" onSubmit={handleAddMember} className="space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg mb-4">
-            <p className="text-xs text-blue-700 flex items-start gap-2">
-              <Sparkles size={14} className="shrink-0 mt-0.5" />
-              Fill in as much information as possible to create a complete member profile. You can also import members from CSV for bulk registration.
-            </p>
-          </div>
-
-          <div className="max-h-[60vh] overflow-y-auto pr-2">
-            <div className="space-y-6">
-              <section>
-                <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Identity & Account</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input name="firstName" label="First Name" placeholder="John" required />
-                  <Input name="lastName" label="Last Name" placeholder="Doe" required />
-                  <Input name="email" label="Email Address" type="email" placeholder="john@example.com" required />
-                  <Input name="phone" label="Phone" type="tel" placeholder="+60..." />
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Identity Verification</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input name="fullName" label="Full Name (ID Card)" />
-                  <Input name="idNumber" label="ID Number" />
-                  <Input name="dateOfBirth" label="Date of Birth" type="date" />
-                  <Select name="nationality" label="Nationality" defaultValue="Malaysia" options={NATIONALITY_OPTIONS.map(c => ({ label: c, value: c }))} />
-
-                  <div className="col-span-2 grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Gender</label>
-                      <div className="flex gap-2">
-                        {['Male', 'Female'].map(opt => (
-                          <label key={opt} className="cursor-pointer flex-1 text-center">
-                            <input type="radio" name="gender" value={opt} className="hidden peer" />
-                            <span className="block px-3 py-2 rounded-lg text-xs font-medium border-2 border-slate-200 peer-checked:border-jci-blue peer-checked:bg-jci-blue/5 peer-checked:text-jci-blue transition-all">
-                              {opt}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Ethnicity</label>
-                      <div className="flex gap-2">
-                        {['Chinese', 'Malay', 'Indian', 'Others'].map(opt => (
-                          <label key={opt} className="cursor-pointer flex-1 text-center">
-                            <input type="radio" name="ethnicity" value={opt} className="hidden peer" />
-                            <span className="block px-2 py-2 rounded-lg text-[10px] font-medium border-2 border-slate-200 peer-checked:border-jci-blue peer-checked:bg-jci-blue/5 peer-checked:text-jci-blue transition-all">
-                              {opt}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Internal Profile</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <Select name="role" label="System Role" defaultValue={UserRole.MEMBER} options={[UserRole.GUEST, UserRole.MEMBER, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => ({ label: r, value: r }))} />
-                  <p className="col-span-2 text-xs text-slate-500 -mt-2">
-                    Membership type is computed from profile. Senatorship numbers are validated under the Senatorship tab.
-                  </p>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Introducer</label>
-                    <IntroducerSelector
-                      value={addModalIntroducer}
-                      onChange={setAddModalIntroducer}
-                      members={members}
-                      projects={allProjects}
-                    />
-                    <input type="hidden" name="introducer" value={addModalIntroducer} />
-                  </div>
-                  <Input name="senatorshipId" label="Senatorship Number (optional)" placeholder="e.g. 12345" />
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Professional Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input name="companyName" label="Company Name" />
-                  <Select
-                    name="industry"
-                    label="Industry"
-                    options={[
-                      { label: 'Select industry...', value: '' },
-                      ...INDUSTRY_OPTIONS.map(opt => ({ label: opt, value: opt }))
-                    ]}
-                  />
-                  <div className="col-span-2">
-                    <Input name="skills" label="Skills (comma-separated)" placeholder="Leadership, Networking, Marketing..." />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Interested Industries</label>
-                    <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                      {INDUSTRY_OPTIONS.map(opt => (
-                        <label key={opt} className="cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={addModalInterestedIndustries.includes(opt)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setAddModalInterestedIndustries([...addModalInterestedIndustries, opt]);
-                              } else {
-                                setAddModalInterestedIndustries(addModalInterestedIndustries.filter(i => i !== opt));
-                              }
-                            }}
-                            className="hidden"
-                          />
-                          <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 ${addModalInterestedIndustries.includes(opt) ? 'bg-sky-500 text-white border-sky-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-sky-500/30'}`}>
-                            {opt}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Hobbies & Interests</h3>
-                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  {HOBBY_OPTIONS.map(opt => (
-                    <label key={opt} className="cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={addModalHobbies.includes(opt)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setAddModalHobbies([...addModalHobbies, opt]);
-                          } else {
-                            setAddModalHobbies(addModalHobbies.filter(h => h !== opt));
-                          }
-                        }}
-                        className="hidden"
-                      />
-                      <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 ${addModalHobbies.includes(opt) ? 'bg-jci-blue text-white border-jci-blue shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-jci-blue/30'}`}>
-                        {opt}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </section>
-
-              <p className="text-xs text-slate-400 italic text-center py-4">
-                Additional detailed fields such as Apparel, Social Media, and Emergency Contacts can be filled after registration via the Edit Profile button.
-              </p>
-            </div>
-          </div>
-
-        </form>
-      </Modal>
+        onClose={() => setAddModalOpen(false)}
+        members={members}
+        allProjects={allProjects}
+        onCreateMember={handleAddMember}
+      />
 
       {/* Batch Import Modal */}
       <MemberBatchImportModal

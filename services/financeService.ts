@@ -700,16 +700,18 @@ export class FinanceService {
       existingSplits.forEach(addMembershipSyncTarget);
       splits.forEach(addMembershipSyncTarget);
 
+      // Build all split IDs up front so parent update is in the same batch
+      const splitIds: string[] = [];
+      const batch = writeBatch(db);
+
       // Delete splits that were removed
       for (const split of existingSplits) {
         if (!newSplitIds.includes(split.id)) {
-          await deleteDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
+          batch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
         }
       }
 
       // Upsert split records
-      const splitIds: string[] = [];
-
       for (const split of splits) {
         if (split.id && existingSplitIds.has(split.id)) {
           // Update existing split
@@ -723,17 +725,13 @@ export class FinanceService {
             amount: split.amount,
             description: split.description,
           };
-
-          // Only include year if it has a value
-          if (split.year) {
-            updateData.year = split.year;
-          }
-
-          await updateDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), updateData);
+          if (split.year) updateData.year = split.year;
+          batch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), updateData);
           splitIds.push(split.id);
         } else {
-          // Create new split
-          const splitData: any = {
+          // Create new split — pre-allocate a doc ID so it can go into the batch
+          const newRef = doc(collection(db, COLLECTIONS.TRANSACTION_SPLITS));
+          const splitData: any = removeUndefined({
             parentTransactionId,
             category: split.category,
             type: parentTransaction.type,
@@ -743,32 +741,20 @@ export class FinanceService {
             paymentRequestId: split.paymentRequestId,
             amount: split.amount,
             description: split.description,
-            createdAt: new Date().toISOString(),
-            createdBy,
-          };
-
-          // Only include year if it has a value
-          if (split.year) {
-            splitData.year = split.year;
-          }
-
-          const splitDoc = await addDoc(collection(db, COLLECTIONS.TRANSACTION_SPLITS), removeUndefined({
-            ...splitData,
             createdAt: Timestamp.now(),
-          }));
-
-          splitIds.push(splitDoc.id);
+            createdBy,
+          });
+          if (split.year) splitData.year = split.year;
+          batch.set(newRef, splitData);
+          splitIds.push(newRef.id);
         }
       }
 
-      // Update parent transaction with split information and reset category
-      await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId), {
+      // Update parent transaction in the same batch
+      batch.update(doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId), {
         isSplit: true,
-        splitIds: splitIds,
-        // Store original category for potential restoration
+        splitIds,
         originalCategory: parentTransaction.category,
-        // Reset main transaction category when a split is created
-        // Use an empty string to indicate no primary category in the parent
         category: '' as any,
         projectId: '',
         purpose: '',
@@ -776,6 +762,8 @@ export class FinanceService {
         projectTransactionId: null,
         updatedAt: Timestamp.now(),
       });
+
+      await batch.commit();
 
       for (const [key, projectId] of membershipSyncTargets.entries()) {
         const [memberId] = key.split(':');
@@ -991,17 +979,9 @@ export class FinanceService {
 
           const split = splitDoc.data() as TransactionSplit;
 
-          // Cleanup inventory stock movement before deleting
-          if (split.inventoryLinkId && split.inventoryQuantity) {
-            const { InventoryService } = await import('./inventoryService');
-            await InventoryService.deleteStockMovementForRef(splitId);
-          }
-
-          await deleteDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
-
           // Update parent transaction splitIds array
           const remainingSplits = await this.getTransactionSplits(split.parentTransactionId);
-          const remainingIds = remainingSplits.map(s => s.id);
+          const remainingIds = remainingSplits.filter(s => s.id !== splitId).map(s => s.id);
 
           // Get parent transaction to restore category
           const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
@@ -1011,7 +991,6 @@ export class FinanceService {
           const updateData: any = {
             splitIds: remainingIds,
             isSplit: remainingIds.length > 0,
-            // Restore category if no splits remain
             category: remainingIds.length === 0 ? originalCategory : '',
             updatedAt: Timestamp.now(),
           };
@@ -1023,7 +1002,17 @@ export class FinanceService {
             updateData.purpose = '';
           }
 
-          await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), updateData);
+          // Commit split delete + parent update atomically
+          const splitDelBatch = writeBatch(db);
+          splitDelBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
+          splitDelBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), updateData);
+          await splitDelBatch.commit();
+
+          // Inventory cleanup runs after the Firestore batch succeeds
+          if (split.inventoryLinkId && split.inventoryQuantity) {
+            const { InventoryService } = await import('./inventoryService');
+            await InventoryService.deleteStockMovementForRef(splitId);
+          }
 
           // Sync member membership if deleted split was Membership category
           if (split.category === 'Membership' && split.memberId && split.year) {
@@ -1120,17 +1109,24 @@ export class FinanceService {
         updateData.date = Timestamp.fromDate(new Date(updates.date));
       }
 
-      await updateDoc(transactionRef, updateData);
-
-      // If transaction type is updated, update all its splits too
+      // If transaction type is updated, propagate to all splits in the same batch
       if (updates.type) {
         const splits = await this.getTransactionSplits(transactionId);
-        for (const split of splits) {
-          await updateDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
-            type: updates.type,
-            updatedAt: Timestamp.now(),
-          });
+        if (splits.length > 0) {
+          const typeBatch = writeBatch(db);
+          typeBatch.update(transactionRef, updateData);
+          for (const split of splits) {
+            typeBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
+              type: updates.type,
+              updatedAt: Timestamp.now(),
+            });
+          }
+          await typeBatch.commit();
+        } else {
+          await updateDoc(transactionRef, updateData);
         }
+      } else {
+        await updateDoc(transactionRef, updateData);
       }
 
       // Sync with Inventory if needed
@@ -1264,15 +1260,20 @@ export class FinanceService {
       purpose?: string;
       paymentRequestId?: string;
     }
-  ): Promise<{ updated: number; errors: string[] }> {
+  ): Promise<{ updated: number; skipped: string[]; errors: string[] }> {
     return withDevMode(
       async () => {
       console.log(`[Dev Mode] Batch updating category for ${transactionIds.length} transactions`);
       let updatedCount = 0;
+      const skipped: string[] = [];
       for (const txId of transactionIds) {
         const idx = localMockTransactions.findIndex(t => t.id === txId);
         if (idx !== -1) {
           const currentTransaction = localMockTransactions[idx];
+          if (currentTransaction?.status === 'Reconciled' || currentTransaction?.status === 'Partially Reconciled') {
+            skipped.push(txId);
+            continue;
+          }
           const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
@@ -1300,9 +1301,10 @@ export class FinanceService {
         }
       }
       saveMockTransactions();
-      return { updated: updatedCount, errors: [] };
+      return { updated: updatedCount, skipped, errors: [] };
     },
     async () => {
+    const skipped: string[] = [];
     const results = await Promise.all(
       transactionIds.map(async (txId) => {
         try {
@@ -1311,6 +1313,11 @@ export class FinanceService {
           const currentTransaction = currentDoc.exists()
             ? ({ id: currentDoc.id, ...currentDoc.data() } as Transaction)
             : null;
+
+          if (currentTransaction?.status === 'Reconciled' || currentTransaction?.status === 'Partially Reconciled') {
+            skipped.push(txId);
+            return { success: true };
+          }
 
           const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
@@ -1377,12 +1384,14 @@ export class FinanceService {
       else if (res.error) errors.push(res.error);
     });
 
-    return { updated, errors };
+    invalidateFinanceCache();
+    return { updated, skipped, errors };
       }
     );
   }
 
   // Batch update Transaction Category fields for multiple split records
+
   static async batchUpdateSplitCategory(
     splitIds: string[],
     categoryUpdates: {
@@ -1393,15 +1402,21 @@ export class FinanceService {
       purpose?: string;
       paymentRequestId?: string;
     }
-  ): Promise<{ updated: number; errors: string[] }> {
+  ): Promise<{ updated: number; skipped: string[]; errors: string[] }> {
     return withDevMode(
       async () => {
       console.log(`[Dev Mode] Batch updating category for ${splitIds.length} splits`);
       let updatedCount = 0;
+      const skipped: string[] = [];
       for (const splitId of splitIds) {
         const idx = devModeSplits.findIndex(s => s.id === splitId);
         if (idx !== -1) {
           const currentSplit = devModeSplits[idx];
+          const parentTx = localMockTransactions.find(t => t.id === currentSplit?.parentTransactionId);
+          if (parentTx?.status === 'Reconciled' || parentTx?.status === 'Partially Reconciled') {
+            skipped.push(splitId);
+            continue;
+          }
           const finalCategory = categoryUpdates.category ?? currentSplit?.category;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
@@ -1424,9 +1439,10 @@ export class FinanceService {
         }
       }
       saveDevModeSplits();
-      return { updated: updatedCount, errors: [] };
+      return { updated: updatedCount, skipped, errors: [] };
     },
     async () => {
+    const skipped: string[] = [];
     const results = await Promise.all(
       splitIds.map(async (splitId) => {
         try {
@@ -1435,6 +1451,18 @@ export class FinanceService {
           const currentSplit = currentDoc.exists()
             ? ({ id: currentDoc.id, ...currentDoc.data() } as TransactionSplit)
             : null;
+
+          // Skip splits whose parent transaction is Reconciled
+          if (currentSplit?.parentTransactionId) {
+            const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, currentSplit.parentTransactionId));
+            if (parentDoc.exists()) {
+              const parentStatus = parentDoc.data()?.status;
+              if (parentStatus === 'Reconciled' || parentStatus === 'Partially Reconciled') {
+                skipped.push(splitId);
+                return { success: true as const, wasSkipped: true as const };
+              }
+            }
+          }
 
           const finalCategory = categoryUpdates.category ?? currentSplit?.category;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
@@ -1483,11 +1511,12 @@ export class FinanceService {
     let updated = 0;
     const errors: string[] = [];
     results.forEach(res => {
-      if (res.success) updated++;
+      if (res.success && !res.wasSkipped) updated++;
       else if (res.error) errors.push(res.error);
     });
 
-    return { updated, errors };
+    invalidateFinanceCache();
+    return { updated, skipped, errors };
       }
     );
   }
@@ -1560,6 +1589,30 @@ export class FinanceService {
               await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
                 console.warn('[deleteTransaction] Could not clean up bank tx link:', err)
               );
+            }
+          }
+
+          // Delete child splits before deleting the parent to avoid orphaned split records
+          const childSplits = await this.getTransactionSplits(transactionId);
+          if (childSplits.length > 0) {
+            const splitBatch = writeBatch(db);
+            for (const split of childSplits) {
+              splitBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
+            }
+            await splitBatch.commit();
+            // Clean up side-effects for each deleted split
+            const { InventoryService } = await import('./inventoryService');
+            for (const split of childSplits) {
+              if (split.inventoryLinkId && split.inventoryQuantity) {
+                await InventoryService.deleteStockMovementForRef(split.id).catch(err =>
+                  console.warn('[deleteTransaction] Could not clean up split inventory:', err)
+                );
+              }
+              if (split.category === 'Membership' && split.memberId && split.year) {
+                await this.syncMemberMembership(split.memberId, `${split.year} membership`).catch(err =>
+                  console.warn('[deleteTransaction] Could not sync membership for split:', err)
+                );
+              }
             }
           }
 
@@ -2063,6 +2116,7 @@ export class FinanceService {
 
           const cleanAccount = removeUndefined(newAccount);
           const docRef = await addDoc(collection(db, COLLECTIONS.BANK_ACCOUNTS), cleanAccount);
+          invalidateFinanceCache();
           return docRef.id;
         } catch (error) {
           console.error('Error creating bank account:', error);
@@ -2091,6 +2145,7 @@ export class FinanceService {
           }
 
           await updateDoc(accountRef, updateData);
+          invalidateFinanceCache();
         } catch (error) {
           console.error('Error updating bank account:', error);
           throw error;
@@ -2099,21 +2154,31 @@ export class FinanceService {
     );
   }
 
-  // Delete bank account — guarded: refuses if linked transactions exist (情景 BB)
+  // Delete bank account — guarded: refuses if linked transactions or reconciliation records exist (E03)
   static async deleteBankAccount(accountId: string): Promise<void> {
     return withDevMode(
       () => { console.log(`[Dev Mode] Mocking delete for bank account ${accountId}`); },
       async () => {
-        const txQuery = query(
-          collection(db, COLLECTIONS.TRANSACTIONS),
-          where('bankAccountId', '==', accountId),
-          limit(1)
-        );
-        const txSnap = await getDocs(txQuery);
+        const [txSnap, reconcSnap] = await Promise.all([
+          getDocs(query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('bankAccountId', '==', accountId),
+            limit(1)
+          )),
+          getDocs(query(
+            collection(db, COLLECTIONS.RECONCILIATIONS),
+            where('bankAccountId', '==', accountId),
+            limit(1)
+          )),
+        ]);
         if (!txSnap.empty) {
           throw new Error('Cannot delete a bank account that has linked transactions. Reassign or delete the transactions first.');
         }
+        if (!reconcSnap.empty) {
+          throw new Error('Cannot delete a bank account that has reconciliation records. Please archive the account instead.');
+        }
         await deleteDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId));
+        invalidateFinanceCache();
       }
     );
   }
@@ -2255,7 +2320,7 @@ export class FinanceService {
 
       const memberIds = [...new Set(previousYearPaid.map(t => t.memberId).filter(Boolean))];
 
-      let renewalsByType: Record<string, number> = {
+      const renewalsByType: Record<string, number> = {
         Probation: 0,
         Official: 0,
         Honorary: 0,
@@ -2263,8 +2328,15 @@ export class FinanceService {
         Visiting: 0,
         Associate: 0,
       };
-      let notificationsSent = 0;
       const validationErrors: Array<{ memberId: string; error: string }> = [];
+
+      // Phase 1: Validate all members and collect transaction data (no Firestore writes yet)
+      const toCreate: Array<{
+        memberId: string;
+        membershipType: string;
+        duesAmount: number;
+        txData: Record<string, unknown>;
+      }> = [];
 
       for (const memberId of memberIds) {
         try {
@@ -2274,22 +2346,20 @@ export class FinanceService {
           // Skip inactive members — they retain historical records but do not renew
           if ((member.role as string) === 'INACTIVE') continue;
 
-          // Check if renewal already exists — reuse the already-fetched list (M-A: no O(N) inner query)
+          // Check if renewal already exists — reuse the already-fetched list (no O(N) inner query)
           const alreadyRenewed = allMembershipTransactions.some(t => {
             const transactionYear = new Date(t.date).getFullYear();
             return transactionYear === year && t.memberId === memberId && t.type === 'Income';
           });
-
           if (alreadyRenewed) continue;
 
           // Determine membership type (default to 'Official' if not set)
           const membershipType = member.membershipType || 'Official';
 
-          // Guest pays a one-time entry fee (RM350) when joining — they have no annual renewal dues.
-          // After paying, they are promoted to Probation and renew as Probation going forward.
+          // Guest pays a one-time entry fee when joining — no annual renewal dues
           if (membershipType === 'Guest') continue;
 
-          // Validate membership type eligibility — check nested field first, fall back to flat
+          // Validate membership type eligibility
           if (membershipType === 'Visiting') {
             const nationality = member.general?.nationality ?? member.nationality;
             if (nationality === 'Malaysia' || !nationality) {
@@ -2312,47 +2382,38 @@ export class FinanceService {
             }
           }
 
-          // Get dues amount for membership type from config (canonical source)
           const baseDuesAmount = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
-
-          // Skip types with RM0 dues (Honorary, Senator) — no transaction needed
           if (baseDuesAmount === 0) continue;
 
-          // Add RM50 registration fee if member has never paid it before (first-time non-Guest members)
           const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
           const registrationFee = hasPaidFee ? 0 : 50;
           const duesAmount = baseDuesAmount + registrationFee;
 
-          // Create renewal transaction
           const renewalDate = new Date(year, 0, 1);
           const purpose = resolveMembershipPurpose(duesAmount, year, rules, membershipType);
-          await this.createTransaction({
-            type: 'Income',
-            category: 'Membership',
-            amount: duesAmount,
-            description: `${year} Membership Dues - ${membershipType.charAt(0).toUpperCase() + membershipType.slice(1)} Member`,
-            purpose,
-            memberId: memberId,
-            status: 'Pending',
-            date: renewalDate.toISOString(),
-            transactionType: 'dues',
-            projectId: `${year} membership`,
+
+          toCreate.push({
+            memberId,
+            membershipType,
+            duesAmount,
+            txData: {
+              type: 'Income',
+              category: 'Membership',
+              amount: duesAmount,
+              description: `${year} Membership Dues - ${membershipType.charAt(0).toUpperCase() + membershipType.slice(1)} Member`,
+              purpose,
+              memberId,
+              status: 'Pending',
+              date: Timestamp.fromDate(renewalDate),
+              transactionType: 'dues',
+              projectId: `${year} membership`,
+              // bankAccountId intentionally absent: these are Pending invoices with no payment received yet.
+              // LO attribution (bankAccountId → bankAccounts.loId) is set when the member pays and a
+              // Cleared transaction is recorded against the matching bank account.
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            },
           });
-
-          renewalsByType[membershipType]++;
-
-          // Send notification (skip for senators with RM0 dues)
-          if (duesAmount > 0) {
-            await CommunicationService.createNotification({
-              memberId: memberId,
-              title: `Membership Dues Renewal for ${year}`,
-              message: `Your ${membershipType} membership dues of RM${duesAmount} for ${year} are now due. Please complete payment to maintain your active membership status.`,
-              type: 'info',
-            });
-            notificationsSent++;
-          }
-
-          // Member membership record will be automatically synced by createTransaction
         } catch (memberError) {
           console.error(`Error processing renewal for member ${memberId}:`, memberError);
           validationErrors.push({
@@ -2362,10 +2423,52 @@ export class FinanceService {
         }
       }
 
-      console.log(`Dues renewal initiated for ${year}:`, renewalsByType);
+      // Phase 2: Batch write all transactions atomically (D-1 fix — no partial writes on failure)
+      const BATCH_LIMIT = 490;
+      let batch = writeBatch(db);
+      let batchCount = 0;
+      for (const item of toCreate) {
+        const ref = doc(collection(db, COLLECTIONS.TRANSACTIONS));
+        batch.set(ref, { ...item.txData, id: ref.id });
+        renewalsByType[item.membershipType] = (renewalsByType[item.membershipType] ?? 0) + 1;
+        batchCount++;
+        if (batchCount >= BATCH_LIMIT) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchCount = 0;
+        }
+      }
+      if (batchCount > 0) await batch.commit();
 
+      // Phase 3: Sync members.membership.{year} for each created transaction (D-2 fix)
+      for (const item of toCreate) {
+        await this.syncMemberMembership(item.memberId, `${year} membership`).catch(err =>
+          console.warn(`[initiateDuesRenewal] membership sync failed for ${item.memberId}:`, err)
+        );
+      }
+
+      // Phase 4: Send notifications (best-effort, intentionally outside the batch)
+      let notificationsSent = 0;
+      for (const item of toCreate) {
+        try {
+          await CommunicationService.createNotification({
+            memberId: item.memberId,
+            title: `Membership Dues Renewal for ${year}`,
+            message: `Your ${item.membershipType} membership dues of RM${item.duesAmount} for ${year} are now due. Please complete payment to maintain your active membership status.`,
+            type: 'info',
+          });
+          notificationsSent++;
+        } catch (notifErr) {
+          console.warn(`[initiateDuesRenewal] notification failed for ${item.memberId}:`, notifErr);
+        }
+      }
+
+      // Phase 5: Invalidate cache so dashboard reflects new records immediately (D-3 fix)
+      invalidateFinanceCache();
+
+      console.log(`Dues renewal initiated for ${year}:`, renewalsByType);
       return {
-        totalMembers: memberIds.length,
+        totalMembers: toCreate.length,
         renewalsByType,
         notificationsSent,
         validationErrors,
@@ -2379,18 +2482,17 @@ export class FinanceService {
   }
 
   // Send reminder notifications for overdue dues (excludes senators)
-  static async sendDuesReminders(year: number, daysOverdue: number = 30): Promise<number> {
+  static async sendDuesReminders(year: number, daysOverdue: number = 30): Promise<{ sent: number; failed: string[] }> {
     return withDevMode(
       () => {
         console.log(`[Dev Mode] Would send dues reminders for year ${year}`);
-        return 0;
+        return { sent: 0, failed: [] };
       },
       async () => {
     try {
       const { CommunicationService } = await import('./communicationService');
       const { MembersService } = await import('./membersService');
 
-      // Get all pending dues transactions for the year
       const duesTransactions = await this.getTransactionsByCategory('Membership');
       const pendingDues = duesTransactions.filter(t => {
         const transactionYear = new Date(t.date).getFullYear();
@@ -2401,32 +2503,44 @@ export class FinanceService {
           daysSinceDue >= daysOverdue;
       });
 
-      let remindersSent = 0;
+      const eligible = await Promise.all(
+        pendingDues
+          .filter(t => !!t.memberId)
+          .map(async t => {
+            const member = await MembersService.getMemberById(t.memberId!).catch(() => null);
+            if (!member) return null;
+            if (member.membershipType === 'Senator' || member.membershipType === 'Honorary' || member.membershipType === 'Guest') return null;
+            return { transaction: t, member };
+          })
+      );
 
-      for (const transaction of pendingDues) {
-        if (!transaction.memberId) continue;
+      const toNotify = eligible.filter(Boolean) as Array<{ transaction: typeof pendingDues[0]; member: NonNullable<Awaited<ReturnType<typeof MembersService.getMemberById>>> }>;
 
-        try {
-          const member = await MembersService.getMemberById(transaction.memberId);
-          if (!member) continue;
-
-          // Skip types exempt from annual dues (zero-dues or one-time entry fee only)
-          if (member.membershipType === 'Senator' || member.membershipType === 'Honorary' || member.membershipType === 'Guest') continue;
-
-          await CommunicationService.createNotification({
-            memberId: transaction.memberId,
+      const results = await Promise.allSettled(
+        toNotify.map(({ transaction, member }) =>
+          CommunicationService.createNotification({
+            memberId: transaction.memberId!,
             title: `Reminder: Membership Dues Payment Overdue`,
             message: `Your ${member.membershipType || 'membership'} dues of RM${transaction.amount} for ${year} are overdue. Please complete payment to avoid membership suspension.`,
             type: 'warning',
-          });
+          })
+        )
+      );
 
-          remindersSent++;
-        } catch (error) {
-          console.error(`Error sending reminder to member ${transaction.memberId}:`, error);
+      const failed: string[] = [];
+      results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          const memberId = toNotify[i].transaction.memberId ?? 'unknown';
+          console.warn(`[sendDuesReminders] notification failed for ${memberId}:`, result.reason);
+          failed.push(memberId);
         }
-      }
+      });
 
-      return remindersSent;
+      const sent = results.filter(r => r.status === 'fulfilled').length;
+      if (failed.length > 0) {
+        console.warn(`[sendDuesReminders] ${failed.length} of ${toNotify.length} reminders failed for year ${year}`);
+      }
+      return { sent, failed };
     } catch (error) {
       console.error('Error sending dues reminders:', error);
       throw error;
@@ -2929,21 +3043,23 @@ export class FinanceService {
         updatedAt: new Date().toISOString(),
       };
 
-      const docRef = await addDoc(
-        collection(db, COLLECTIONS.RECONCILIATIONS),
-        {
-          ...reconciliationRecord,
-          reconciliationDate: Timestamp.fromDate(new Date(reconciliationDate)),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        }
-      );
-
-      // Update account balance and last reconciled date
-      await this.updateBankAccount(accountId, {
-        balance: statementBalance,
-        lastReconciled: reconciliationDate,
+      // Write reconciliation record + bank account update atomically (E02 fix)
+      const reconciliationRef = doc(collection(db, COLLECTIONS.RECONCILIATIONS));
+      const commitBatch = writeBatch(db);
+      commitBatch.set(reconciliationRef, {
+        ...reconciliationRecord,
+        reconciliationDate: Timestamp.fromDate(new Date(reconciliationDate)),
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
       });
+      commitBatch.update(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId), {
+        balance: statementBalance,
+        lastReconciled: Timestamp.fromDate(new Date(reconciliationDate)),
+        updatedAt: Timestamp.now(),
+      });
+      await commitBatch.commit();
+      invalidateFinanceCache();
+      const docRef = reconciliationRef;
 
       // Mark transactions as reconciled (only if no discrepancies).
       // Only `Cleared` transactions qualify — a Pending transaction hasn't actually
@@ -2957,27 +3073,42 @@ export class FinanceService {
             new Date(t.date) <= new Date(reconciliationDate)
         );
 
-        for (const transaction of accountTransactions) {
-          if (transaction.id) {
-            await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, transaction.id), {
-              status: 'Reconciled',
-              reconciledAt: Timestamp.now(),
-              reconciledBy,
-            });
+        // Batch all status updates so they succeed or fail together
+        const BATCH_LIMIT = 500;
+        let markBatch = writeBatch(db);
+        let batchCount = 0;
+        const flushBatch = async () => {
+          if (batchCount > 0) {
+            await markBatch.commit();
+            markBatch = writeBatch(db);
+            batchCount = 0;
+          }
+        };
 
-            // Also mark split transactions as reconciled
-            if (transaction.isSplit && transaction.splitIds && transaction.splitIds.length > 0) {
-              const splits = await this.getTransactionSplits(transaction.id);
-              for (const split of splits) {
-                await updateDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
-                  status: 'Reconciled',
-                  reconciledAt: Timestamp.now(),
-                  reconciledBy,
-                });
-              }
+        for (const transaction of accountTransactions) {
+          if (!transaction.id) continue;
+          markBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, transaction.id), {
+            status: 'Reconciled',
+            reconciledAt: Timestamp.now(),
+            reconciledBy,
+          });
+          batchCount++;
+          if (batchCount >= BATCH_LIMIT) await flushBatch();
+
+          if (transaction.isSplit && transaction.splitIds && transaction.splitIds.length > 0) {
+            const splits = await this.getTransactionSplits(transaction.id);
+            for (const split of splits) {
+              markBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
+                status: 'Reconciled',
+                reconciledAt: Timestamp.now(),
+                reconciledBy,
+              });
+              batchCount++;
+              if (batchCount >= BATCH_LIMIT) await flushBatch();
             }
           }
         }
+        await flushBatch();
       }
 
       return docRef.id;
@@ -3104,10 +3235,11 @@ export class FinanceService {
       },
       async () => {
         const snaps = await Promise.all([txId1, txId2].map(id => getDoc(doc(db, COLLECTIONS.TRANSACTIONS, id))));
+        const batch = writeBatch(db);
         for (const snap of snaps) {
           if (!snap.exists()) continue;
           const prevStatus = (snap.data() as Transaction).prevStatus ?? 'Cleared';
-          await updateDoc(snap.ref, {
+          batch.update(snap.ref, {
             matchStatus: null,
             matchedBankTxIds: null,
             status: prevStatus,
@@ -3116,6 +3248,7 @@ export class FinanceService {
             reconciledAt: null,
           });
         }
+        await batch.commit();
         // Revert any PR that was marked paid via this match pair (情景 E — unmatch path)
         for (const snap of snaps) {
           if (!snap.exists()) continue;
@@ -3979,14 +4112,51 @@ export class FinanceService {
         if (!snap.exists()) throw new Error('Transaction not found');
         const tx = snap.data() as Transaction;
         if (tx.status === 'Voided') throw new Error('Transaction is already voided');
+
+        // Run all side-effect cleanup BEFORE committing the Voided status so that
+        // a partial failure leaves the transaction in its original state rather
+        // than Voided-but-uncleaned.
+
+        // Clean up bank-tx match links
+        if (tx.matchedBankTxIds?.length) {
+          const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
+          for (const bankTxId of tx.matchedBankTxIds) {
+            await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
+              console.warn('[voidTransaction] Could not clean up bank tx link:', err)
+            );
+          }
+        }
+
+        // Revert PR from 'paid' → 'approved'
+        if (tx.paymentRequestId) {
+          const { PaymentRequestService } = await import('./paymentRequestService');
+          await PaymentRequestService.revertPaid(tx.paymentRequestId);
+        }
+
+        // Reverse inventory movement
+        if (tx.inventoryLinkId && tx.inventoryQuantity) {
+          const { InventoryService } = await import('./inventoryService');
+          await InventoryService.deleteStockMovementForRef(transactionId);
+        }
+
+        // Sync membership if applicable
+        if (tx.category === 'Membership' && tx.memberId) {
+          await this.syncMemberMembership(tx.memberId as string, tx.projectId);
+        }
+
+        // All cleanup succeeded — now commit the status change
         await updateDoc(ref, {
           status: 'Voided',
           voidedAt: Timestamp.now(),
           voidedBy,
           voidReason: reason,
           prevStatus: tx.status,
+          matchedBankTxIds: [],
+          matchStatus: 'unmatched',
           updatedAt: Timestamp.now(),
         });
+
+        invalidateFinanceCache();
       }
     );
   }
