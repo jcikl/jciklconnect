@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { Database, Play, Eye, CheckCircle2, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '../ui/Common';
@@ -9,13 +9,24 @@ const OLD_LO_ID = 'default-lo';
 const NEW_LO_ID = 'jcikl';
 const BATCH_SIZE = 400;
 
-const MIGRATE_COLLECTIONS = [
-  { name: 'members',              label: 'Members' },
-  { name: 'paymentRequests',      label: 'Payment Requests' },
-  { name: 'eventRegistrations',   label: 'Event Registrations' },
-  { name: 'incentiveSubmissions', label: 'Incentive Submissions' },
-  { name: 'loStarProgress',       label: 'LO Star Progress' },
-  { name: 'nonMemberLeads',       label: 'Non-Member Leads' },
+// flat: query where('loId','==',OLD) then batch update { loId: NEW }
+// nested: scan all docs, filter those with boardHistory[].loId == OLD, rewrite array
+type ColKind = 'flat' | 'nested';
+
+const MIGRATE_COLLECTIONS: { name: string; label: string; kind: ColKind; nestedField?: string }[] = [
+  { name: 'members',              label: 'Members',               kind: 'flat' },
+  { name: 'paymentRequests',      label: 'Payment Requests',      kind: 'flat' },
+  { name: 'eventRegistrations',   label: 'Event Registrations',   kind: 'flat' },
+  { name: 'incentiveSubmissions', label: 'Incentive Submissions',  kind: 'flat' },
+  { name: 'loStarProgress',       label: 'LO Star Progress',       kind: 'flat' },
+  { name: 'nonMemberLeads',       label: 'Non-Member Leads',       kind: 'flat' },
+  { name: 'events',               label: 'Events',                 kind: 'flat' },
+  { name: 'points',               label: 'Points',                 kind: 'flat' },
+  { name: 'transactions',         label: 'Transactions',           kind: 'flat' },
+  { name: 'bankAccounts',         label: 'Bank Accounts',          kind: 'flat' },
+  { name: 'publications',         label: 'Publications',           kind: 'flat' },
+  // nested: members.boardHistory[].loId — separate pass over all member docs
+  { name: 'members__boardHistory', label: 'Members › boardHistory[].loId', kind: 'nested', nestedField: 'boardHistory' },
 ];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -30,6 +41,66 @@ interface ColResult {
 
 type Results = Record<string, ColResult>;
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function scanFlat(colName: string): Promise<number> {
+  const snap = await getDocs(query(collection(db, colName), where('loId', '==', OLD_LO_ID)));
+  return snap.size;
+}
+
+async function migrateFlat(
+  colName: string,
+  onProgress: (updated: number) => void,
+): Promise<number> {
+  const snap = await getDocs(query(collection(db, colName), where('loId', '==', OLD_LO_ID)));
+  const docs = snap.docs;
+  let updated = 0;
+  for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    docs.slice(i, i + BATCH_SIZE).forEach(d => batch.update(d.ref, { loId: NEW_LO_ID }));
+    await batch.commit();
+    updated += Math.min(BATCH_SIZE, docs.length - i);
+    onProgress(updated);
+  }
+  return updated;
+}
+
+async function scanNested(colName: string, arrayField: string): Promise<number> {
+  // boardHistory is only on members; scan the members collection
+  const snap = await getDocs(collection(db, colName));
+  return snap.docs.filter(d => {
+    const arr: any[] = d.data()[arrayField] ?? [];
+    return arr.some(item => item?.loId === OLD_LO_ID);
+  }).length;
+}
+
+async function migrateNested(
+  colName: string,
+  arrayField: string,
+  onProgress: (updated: number) => void,
+): Promise<number> {
+  const snap = await getDocs(collection(db, colName));
+  const dirty = snap.docs.filter(d => {
+    const arr: any[] = d.data()[arrayField] ?? [];
+    return arr.some(item => item?.loId === OLD_LO_ID);
+  });
+
+  let updated = 0;
+  for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    dirty.slice(i, i + BATCH_SIZE).forEach(d => {
+      const arr: any[] = d.data()[arrayField] ?? [];
+      const patched = arr.map(item =>
+        item?.loId === OLD_LO_ID ? { ...item, loId: NEW_LO_ID } : item
+      );
+      batch.update(d.ref, { [arrayField]: patched });
+    });
+    await batch.commit();
+    updated += Math.min(BATCH_SIZE, dirty.length - i);
+    onProgress(updated);
+  }
+  return updated;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export const DbMaintenanceView: React.FC = () => {
   const [results, setResults]     = useState<Results>({});
@@ -43,7 +114,7 @@ export const DbMaintenanceView: React.FC = () => {
       [col]: { status: 'idle', count: 0, updated: 0, ...prev[col], ...update },
     }));
 
-  // ── Scan (dry-run) ──────────────────────────────────────────────────────────
+  // ── Scan ────────────────────────────────────────────────────────────────────
   const handleScan = async () => {
     setRunning(true);
     setConfirmed(false);
@@ -53,10 +124,10 @@ export const DbMaintenanceView: React.FC = () => {
     for (const col of MIGRATE_COLLECTIONS) {
       patch(col.name, { status: 'scanning' });
       try {
-        const snap = await getDocs(
-          query(collection(db, col.name), where('loId', '==', OLD_LO_ID))
-        );
-        patch(col.name, { status: 'done', count: snap.size });
+        const count = col.kind === 'nested'
+          ? await scanNested(col.nestedField === 'boardHistory' ? 'members' : col.name, col.nestedField!)
+          : await scanFlat(col.name);
+        patch(col.name, { status: 'done', count });
       } catch (e: any) {
         patch(col.name, { status: 'error', error: e?.message ?? 'unknown' });
       }
@@ -75,22 +146,18 @@ export const DbMaintenanceView: React.FC = () => {
     for (const col of MIGRATE_COLLECTIONS) {
       patch(col.name, { status: 'migrating', updated: 0 });
       try {
-        const snap = await getDocs(
-          query(collection(db, col.name), where('loId', '==', OLD_LO_ID))
-        );
-
-        const docs = snap.docs;
         let updated = 0;
-
-        for (let i = 0; i < docs.length; i += BATCH_SIZE) {
-          const batch = writeBatch(db);
-          docs.slice(i, i + BATCH_SIZE).forEach(d => batch.update(d.ref, { loId: NEW_LO_ID }));
-          await batch.commit();
-          updated += Math.min(BATCH_SIZE, docs.length - i);
-          patch(col.name, { updated });
+        if (col.kind === 'nested') {
+          updated = await migrateNested(
+            col.nestedField === 'boardHistory' ? 'members' : col.name,
+            col.nestedField!,
+            u => patch(col.name, { updated: u }),
+          );
+        } else {
+          updated = await migrateFlat(col.name, u => patch(col.name, { updated: u }));
         }
-
-        patch(col.name, { status: 'done', count: docs.length, updated });
+        const prevCount = results[col.name]?.count ?? updated;
+        patch(col.name, { status: 'done', count: prevCount, updated });
       } catch (e: any) {
         patch(col.name, { status: 'error', error: e?.message ?? 'unknown' });
       }
@@ -167,7 +234,12 @@ export const DbMaintenanceView: React.FC = () => {
                 {/* Label */}
                 <div className="flex-1 min-w-0">
                   <span className="text-sm text-slate-700 font-medium">{col.label}</span>
-                  <span className="ml-2 text-xs text-slate-400 font-mono">{col.name}</span>
+                  <span className="ml-2 text-xs text-slate-400 font-mono">
+                    {col.kind === 'nested' ? `members[].${col.nestedField}` : col.name}
+                  </span>
+                  {col.kind === 'nested' && (
+                    <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-500 bg-violet-50 px-1.5 py-0.5 rounded">nested</span>
+                  )}
                   {r?.error && <p className="text-xs text-rose-500 mt-0.5 truncate">{r.error}</p>}
                 </div>
 

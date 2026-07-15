@@ -3,9 +3,13 @@
  *
  * Batch-updates every document that has  loId == 'default-lo'  to  loId == 'jcikl'.
  *
- * Affected collections:
+ * Affected collections (flat loId field):
  *   members, paymentRequests, eventRegistrations,
- *   incentiveSubmissions, loStarProgress, nonMemberLeads
+ *   incentiveSubmissions, loStarProgress, nonMemberLeads,
+ *   events, points, transactions, bankAccounts, publications
+ *
+ * Nested field:
+ *   members → boardHistory[].loId  (array items patched individually)
  *
  * Usage:
  *   node scripts/migrateLoId.mjs            # live run
@@ -42,24 +46,28 @@ initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const OLD_LO_ID = 'default-lo';
-const NEW_LO_ID = 'jcikl';
-const DRY_RUN   = process.argv.includes('--dry-run');
-const BATCH_SIZE = 400; // Firestore batch limit is 500; keep headroom
+const OLD_LO_ID  = 'default-lo';
+const NEW_LO_ID  = 'jcikl';
+const DRY_RUN    = process.argv.includes('--dry-run');
+const BATCH_SIZE = 400;
 
-const COLLECTIONS = [
+const FLAT_COLLECTIONS = [
   'members',
   'paymentRequests',
   'eventRegistrations',
   'incentiveSubmissions',
   'loStarProgress',
   'nonMemberLeads',
+  'events',
+  'points',
+  'transactions',
+  'bankAccounts',
+  'publications',
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-async function migrateCollection(colName) {
-  const colRef  = db.collection(colName);
-  const snap    = await colRef.where('loId', '==', OLD_LO_ID).get();
+// ── Flat migration ────────────────────────────────────────────────────────────
+async function migrateFlat(colName) {
+  const snap = await db.collection(colName).where('loId', '==', OLD_LO_ID).get();
 
   if (snap.empty) {
     console.log(`  ${colName}: 0 documents — nothing to do`);
@@ -67,24 +75,51 @@ async function migrateCollection(colName) {
   }
 
   console.log(`  ${colName}: ${snap.size} document(s) found`);
-
   if (DRY_RUN) return snap.size;
 
-  // Process in batches
   const docs   = snap.docs;
   let updated  = 0;
 
   for (let i = 0; i < docs.length; i += BATCH_SIZE) {
     const batch = db.batch();
-    const chunk = docs.slice(i, i + BATCH_SIZE);
-
-    for (const doc of chunk) {
-      batch.update(doc.ref, { loId: NEW_LO_ID });
-    }
-
+    docs.slice(i, i + BATCH_SIZE).forEach(d => batch.update(d.ref, { loId: NEW_LO_ID }));
     await batch.commit();
-    updated += chunk.length;
+    updated += Math.min(BATCH_SIZE, docs.length - i);
     console.log(`    committed ${updated}/${docs.length}`);
+  }
+
+  return updated;
+}
+
+// ── Nested migration: members.boardHistory[].loId ─────────────────────────────
+async function migrateBoardHistory() {
+  const snap  = await db.collection('members').get();
+  const dirty = snap.docs.filter(d => {
+    const history = d.data().boardHistory ?? [];
+    return history.some(h => h?.loId === OLD_LO_ID);
+  });
+
+  if (dirty.length === 0) {
+    console.log(`  members[boardHistory]: 0 documents — nothing to do`);
+    return 0;
+  }
+
+  console.log(`  members[boardHistory]: ${dirty.length} document(s) with old loId in boardHistory`);
+  if (DRY_RUN) return dirty.length;
+
+  let updated = 0;
+
+  for (let i = 0; i < dirty.length; i += BATCH_SIZE) {
+    const batch = db.batch();
+    dirty.slice(i, i + BATCH_SIZE).forEach(d => {
+      const patched = (d.data().boardHistory ?? []).map(h =>
+        h?.loId === OLD_LO_ID ? { ...h, loId: NEW_LO_ID } : h
+      );
+      batch.update(d.ref, { boardHistory: patched });
+    });
+    await batch.commit();
+    updated += Math.min(BATCH_SIZE, dirty.length - i);
+    console.log(`    committed ${updated}/${dirty.length}`);
   }
 
   return updated;
@@ -98,9 +133,13 @@ console.log(`${'─'.repeat(55)}\n`);
 
 let totalUpdated = 0;
 
-for (const col of COLLECTIONS) {
-  totalUpdated += await migrateCollection(col);
+console.log('── Flat collections ──────────────────────────────────');
+for (const col of FLAT_COLLECTIONS) {
+  totalUpdated += await migrateFlat(col);
 }
+
+console.log('\n── Nested fields ─────────────────────────────────────');
+totalUpdated += await migrateBoardHistory();
 
 console.log(`\n${'─'.repeat(55)}`);
 console.log(`  ${DRY_RUN ? 'Documents that WOULD be updated' : 'Total updated'}: ${totalUpdated}`);
