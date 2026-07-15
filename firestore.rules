@@ -876,10 +876,16 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
 
-    // ToyyibPay Bills: Board/Admin can write; all authenticated members can read
+    // ToyyibPay Bills
+    // - Board/Admin can read and write all bills
+    // - Members can read and create their own bills only (for dues/event payments)
+    // - Webhook writes go through Admin SDK and bypass these rules
     match /toyyibBills/{billId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isBoard();
+      allow read: if isBoard() ||
+                     (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow create: if isBoard() ||
+                       (isAuthenticated() && request.resource.data.memberId == request.auth.uid);
+      allow update, delete: if isBoard();
     }
 
     // Finance Alerts: written by server-side (Admin SDK / webhook) for issues requiring manual review.

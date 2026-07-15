@@ -55,6 +55,9 @@ export interface ToyyibBillRecord {
   /** Project ID — used for duplicate-bill detection on event payments */
   projectId?: string;
   createdAt?: any;
+  /** Written by webhook callback after payment confirmation */
+  billExternalReferenceNo?: string;
+  updatedAt?: any;
 }
 
 // All ToyyibPay API calls go through our Netlify Function proxy to avoid CORS.
@@ -277,25 +280,24 @@ export class ToyyibService {
     categoryCode: string,
     projectId?: string,
   ): Promise<{ billCode: string; paymentUrl: string } | null> {
+    // Fetch up to 10 bills for this member+category, then filter out failed ones
+    // client-side. Using != at query level would require a composite Firestore index;
+    // this approach works without any extra index since bills per member+category are few.
     const constraints: any[] = [
       where('memberId', '==', memberId),
       where('categoryCode', '==', categoryCode),
-      limit(1),
+      limit(10),
     ];
     if (projectId) constraints.splice(2, 0, where('projectId', '==', projectId));
 
     const snap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), ...constraints));
-    for (const d of snap.docs) {
-      const bill = d.data() as ToyyibBillRecord;
-      // "3" = failed — allow re-creation; everything else is active or paid
-      if (bill.billpaymentStatus !== '3') {
-        return {
-          billCode: bill.billCode,
-          paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${bill.billCode}`,
-        };
-      }
-    }
-    return null;
+    const active = snap.docs.find(d => (d.data() as ToyyibBillRecord).billpaymentStatus !== '3');
+    if (!active) return null;
+    const bill = active.data() as ToyyibBillRecord;
+    return {
+      billCode: bill.billCode,
+      paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${bill.billCode}`,
+    };
   }
 
   /**
@@ -319,8 +321,8 @@ export class ToyyibService {
     const billpaymentStatus: string = String(txn.billpaymentStatus ?? '2');
     const billPaymentDate: string = txn.billPaymentDate ?? '';
 
-    const snap = await getDocs(collection(db, COLLECTIONS.TOYYIB_BILLS));
-    const match = snap.docs.find(d => (d.data() as ToyyibBillRecord).billCode === billCode);
+    const snap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), where('billCode', '==', billCode), limit(1)));
+    const match = snap.docs[0];
     if (match) {
       await updateDoc(doc(db, COLLECTIONS.TOYYIB_BILLS, match.id), { billpaymentStatus, billPaymentDate });
     }
