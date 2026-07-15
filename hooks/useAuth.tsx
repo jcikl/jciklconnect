@@ -471,23 +471,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);
     isSigningUpRef.current = false;
 
-    // 4. Write a pending-review record to a dedicated collection so admins
-    //    can see it without requiring the new user to list all admin members
-    //    (which would fail Firestore rules for a brand-new PROBATION account).
-    if (isNewSelfRegistration) {
-      try {
-        const { addDoc, collection: col } = await import('firebase/firestore');
-        await addDoc(col(db, 'pendingRegistrations'), {
-          memberId: userCredential!.user.uid,
-          name: additionalData?.fullName || name,
-          email,
-          submittedAt: new Date().toISOString(),
-          status: 'pending',
-        });
-      } catch {
-        // Non-critical — admins can still see PROBATION members in GuestManagementView
-      }
-    }
+    // pendingRegistrations write removed — GuestManagementView queries PROBATION members directly.
 
     // If we matched an existing profile that had a different ID (imported random ID),
     // we might want to delete the old document to avoid duplicates.
