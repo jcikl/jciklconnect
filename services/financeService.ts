@@ -13,6 +13,7 @@ import {
   limit,
   startAfter,
   Timestamp,
+  writeBatch,
   getDoc as getFirestoreDoc,
   documentId,
   DocumentSnapshot,
@@ -2027,7 +2028,7 @@ export class FinanceService {
             const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
 
             return accounts.map(account => {
-              const accountTransactions = transactions.filter(t => t.bankAccountId === account.id && !t.isSplitChild);
+              const accountTransactions = transactions.filter(t => t.bankAccountId === account.id && !t.isSplitChild && t.status !== 'Voided');
               const transactionSum = accountTransactions.reduce((sum, t) => {
                 return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
               }, 0);
@@ -2743,10 +2744,10 @@ export class FinanceService {
       const accountInitialBalance = accountDoc.exists() ? (accountDoc.data().initialBalance || 0) : 0;
       const cutoffDate = new Date(upToDate);
 
-      // Filter transactions up to the reconciliation date for this account
+      // Filter transactions up to the reconciliation date for this account (exclude voided)
       const relevantTransactions = allTransactions.filter(t => {
         const txDate = new Date(t.date);
-        return t.bankAccountId === accountId && txDate <= cutoffDate;
+        return t.bankAccountId === accountId && txDate <= cutoffDate && t.status !== 'Voided';
       });
 
       const byType = {
@@ -2787,8 +2788,14 @@ export class FinanceService {
         }
       }
 
+      const categoryToByTypeKey = (cat: string): keyof typeof byType => {
+        if (cat === 'Projects & Activities') return 'project';
+        if (cat === 'Membership') return 'dues';
+        if (cat === 'Administrative') return 'operations';
+        return cat as keyof typeof byType;
+      };
       const totalBalance = (transactionTypeFilter
-        ? byType[transactionTypeFilter]
+        ? byType[categoryToByTypeKey(transactionTypeFilter)] ?? 0
         : Object.values(byType).reduce((sum, val) => sum + val, 0)) + accountInitialBalance;
 
       return { totalBalance, byType };
@@ -3015,10 +3022,16 @@ export class FinanceService {
     bankImports: Transaction[];
     manualEntries: Transaction[];
   }> {
-    const all = await this.getAllTransactions();
-    const unreconciled = all.filter(
-      t => t.bankAccountId === accountId && t.status !== 'Reconciled' && !t.isSplitChild
+    const snap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.TRANSACTIONS),
+        where('bankAccountId', '==', accountId),
+        where('status', 'in', ['Pending', 'Cleared'])
+      )
     );
+    const unreconciled = snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as Transaction))
+      .filter(t => !t.isSplitChild);
     return {
       bankImports: unreconciled.filter(t => t.source === 'bank_import'),
       manualEntries: unreconciled.filter(t => t.source !== 'bank_import'),
@@ -3054,7 +3067,8 @@ export class FinanceService {
         const bankPrevStatus = bankSnap.exists() ? (bankSnap.data() as Transaction).status : 'Cleared';
         const manualPrevStatus = manualSnap.exists() ? (manualSnap.data() as Transaction).status : 'Cleared';
 
-        await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
+        const batch = writeBatch(db);
+        batch.update(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
           matchStatus: 'full',
           matchedBankTxIds: [manualTxId],
           status: 'Reconciled',
@@ -3062,7 +3076,7 @@ export class FinanceService {
           reconciledBy,
           reconciledAt: now,
         });
-        await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, manualTxId), {
+        batch.update(doc(db, COLLECTIONS.TRANSACTIONS, manualTxId), {
           matchStatus: 'full',
           matchedBankTxIds: [bankTxId],
           status: 'Reconciled',
@@ -3070,6 +3084,7 @@ export class FinanceService {
           reconciledBy,
           reconciledAt: now,
         });
+        await batch.commit();
       }
     );
   }
@@ -3143,6 +3158,7 @@ export class FinanceService {
           const transactionsSnapshot = await getDocs(transactionsQuery);
           const transactionSum = transactionsSnapshot.docs.reduce((sum, doc) => {
             const t = doc.data();
+            if (t.status === 'Voided' || t.isSplitChild) return sum;
             return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));
           }, 0);
 

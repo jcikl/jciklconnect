@@ -74,7 +74,7 @@ export interface Transaction {
 export interface BankAccount {
   id: string;
   name: string;
-  balance: number;
+  balance?: number;
   initialBalance?: number;
   currency: string;
   lastReconciled: string;
