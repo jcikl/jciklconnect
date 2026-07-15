@@ -85,8 +85,8 @@ export class MembersService {
 
   /** Get all members, optionally filtered by loId (for multi-LO). */
   static async getAllMembers(loIdFilter?: string | null): Promise<Member[]> {
-    // Treat jcikl same as "all" — single-LO deployments should share one cache entry.
-    const normalised = (!loIdFilter || loIdFilter === DEFAULT_LO_ID) ? null : loIdFilter;
+    // Treat jcikl (and legacy 'default-lo') as "all" — single-LO deployments share one cache entry.
+    const normalised = (!loIdFilter || loIdFilter === DEFAULT_LO_ID || loIdFilter === 'default-lo') ? null : loIdFilter;
     const cacheKey = normalised ? CACHE_KEY_LO(normalised) : CACHE_KEY_ALL_MEMBERS;
 
     return apiCache.getOrSet(cacheKey, async () => {
