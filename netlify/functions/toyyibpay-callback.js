@@ -349,9 +349,13 @@ exports.handler = async (event) => {
               status: 'Pending',
               updatedAt: Timestamp.now(),
             });
-            // Sync membership status back to pending after refund
+            // Sync membership status back to pending after refund — reset all payment fields
             await db.collection('members').doc(billMemberId).update({
               [`membership.${billYear}.status`]: 'pending',
+              [`membership.${billYear}.amount`]: 0,
+              [`membership.${billYear}.transactionId`]: [],
+              [`membership.${billYear}.paymentDate`]: null,
+              [`membership.${billYear}.purpose`]: null,
               updatedAt: Timestamp.now(),
             }).catch(err => console.warn('[toyyibpay-callback] Could not revert membership status:', err));
           }

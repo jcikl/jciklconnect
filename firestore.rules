@@ -236,10 +236,12 @@ service cloud.firestore {
       allow create, update: if canAccessFinance() &&
         (resource == null ||
           (resource.data.get('status', '') != 'Reconciled' &&
-           resource.data.get('status', '') != 'Partially Reconciled'));
+           resource.data.get('status', '') != 'Partially Reconciled' &&
+           resource.data.get('status', '') != 'Voided'));
       allow delete: if canDeleteFinance() &&
         resource.data.get('status', '') != 'Reconciled' &&
-        resource.data.get('status', '') != 'Partially Reconciled';
+        resource.data.get('status', '') != 'Partially Reconciled' &&
+        resource.data.get('status', '') != 'Voided';
     }
 
     // Transaction Splits: same rules as transactions; update/delete blocked on Reconciled parent
@@ -251,10 +253,14 @@ service cloud.firestore {
       allow create: if canAccessFinance();
       allow update: if canAccessFinance() &&
         (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
-         get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled');
+         (get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled' &&
+          get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Partially Reconciled' &&
+          get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Voided'));
       allow delete: if canDeleteFinance() &&
         (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
-         get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled');
+         (get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled' &&
+          get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Partially Reconciled' &&
+          get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Voided'));
     }
 
     // Project Transactions (Story 4.1): Project-specific financials.

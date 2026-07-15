@@ -716,7 +716,7 @@ export class ReconciliationService {
       const updates: any = {
         projectTransactionIds: [],
         projectTransactionId: null,
-        status: 'Cleared',
+        status: (bankTx as any).prevStatus ?? 'Cleared',
         purpose: '',
       };
 
