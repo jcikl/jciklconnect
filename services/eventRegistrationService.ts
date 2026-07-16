@@ -254,7 +254,8 @@ export const EventRegistrationService = {
               // Add a note so finance can trace the cancelled registration.
             }
           } catch (err) {
-            console.warn('[EventRegistrationService.cancel] Could not clean up income tx:', err);
+            console.error('[EventRegistrationService.cancel] Could not clean up income tx:', err);
+            throw err;
           }
         }
 

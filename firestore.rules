@@ -145,7 +145,8 @@ service cloud.firestore {
          (resource.data.get('role', 'GUEST') == 'GUEST' ||
           (request.resource.data.get('general', {}).get('nationality', null) == resource.data.get('general', {}).get('nationality', null) &&
            request.resource.data.get('general', {}).get('dob', null)         == resource.data.get('general', {}).get('dob', null) &&
-           request.resource.data.get('general', {}).get('idNumber', null)    == resource.data.get('general', {}).get('idNumber', null)))
+           request.resource.data.get('general', {}).get('idNumber', null)    == resource.data.get('general', {}).get('idNumber', null) &&
+           request.resource.data.get('general', {}).get('idType', null)      == resource.data.get('general', {}).get('idType', null)))
         ) ||
         (canEditMembers() && (resource == null || resourceInMyLo(resource.data)) &&
          // BOARD members cannot elevate anyone to ADMIN / SUPER_ADMIN (E13 fix)
@@ -294,7 +295,10 @@ service cloud.firestore {
     // `transactions`, so they get the same finance-role gate — not just isAuthenticated().
     match /projectTrx/{transactionId} {
       // PT-1: INACTIVE members excluded; finance/board-only gate mirrors transactions collection
-      allow read: if isAuthenticated() && (isAdmin() || isBoard() || canAccessFinance());
+      // PT-R1: split get/list so loId scoping works in list queries (resource.data is null in list)
+      allow get: if isAuthenticated() && (isAdmin() || isBoard() || canAccessFinance());
+      allow list: if isAuthenticated() && (isAdmin() || isBoard() ||
+        (canAccessFinance() && getMyLoId() != null));
       allow create: if canAccessFinance();
       // PT-update/delete: block modifications to already-reconciled project transactions; PT-U2: add hasOnly
       allow update: if canAccessFinance() &&
@@ -379,8 +383,16 @@ service cloud.firestore {
         request.resource.data.get('memberId', null) is string &&
         request.resource.data.get('eventId', null) is string &&
         (request.resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+      // ER-U4: Board update add hasOnly — prevent overwriting points/attendedAt/memberId from SDK
       allow update: if isAuthenticated() &&
-        (canReadOrgMembers() ||
+        ((canReadOrgMembers() && (isAdmin() ||
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'status', 'paidAt', 'checkedInAt', 'paymentMethod', 'financeTransactionId',
+             'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus',
+             'billExternalReferenceNo', 'cancelledAt', 'cancelledBy', 'cancelledByName', 'cancelledByRole',
+             'registeredBy', 'registeredByName', 'memberName', 'notes', 'updatedAt', 'updatedBy',
+             'points', 'attendedAt', 'attended'
+           ]))) ||
          (resource.data.get('memberId', null) == request.auth.uid && eventRegSelfUpdateOnlyTouchesOwnFields()));
       // E-1: members may NOT hard-delete their own registration (bypasses finance tx cleanup); only board+ can delete
       allow delete: if isAuthenticated() && canReadOrgMembers();
@@ -680,7 +692,10 @@ service cloud.firestore {
     // R-8: delete restricted to Admin only — BOARD must not be able to erase audit records
     // R-3: update hasOnly — BOARD cannot overwrite core audit fields (statementBalance, reconciledBy, etc.)
     match /reconciliations/{reconciliationId} {
-      allow read, create: if isAuthenticated() && (isAdmin() || isBoard());
+      // R-5: split get/list so isAdmin() bypass works for batch admin scans (resource.data null in list)
+      allow get: if isAuthenticated() && (isAdmin() || isBoard());
+      allow list: if isAuthenticated() && (isAdmin() || isBoard());
+      allow create: if isAuthenticated() && (isAdmin() || isBoard());
       allow update: if isAuthenticated() && (isAdmin() ||
         (isBoard() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'notes', 'updatedAt', 'updatedBy', 'status'

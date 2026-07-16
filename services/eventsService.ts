@@ -398,6 +398,9 @@ export class EventsService {
           // vs the previous order where attendanceList had the member but status stayed 'registered'.
           const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
           if (reg) {
+            if (reg.status === 'cancelled') {
+              throw new Error('Cannot mark attendance for a cancelled registration');
+            }
             const at = (checkInTime ?? new Date()).toISOString();
             await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
           }

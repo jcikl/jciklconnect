@@ -12,6 +12,8 @@ import {
   orderBy,
   limit,
   Timestamp,
+  writeBatch,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -396,26 +398,30 @@ export class InventoryService {
       }
 
       const newQuantity = item.quantity + quantity;
-      await this.updateItem(itemId, {
+      const batch = writeBatch(db);
+      const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+      batch.update(itemRef, {
         quantity: newQuantity,
         status: newQuantity > 0 ? 'Available' : 'Out of Stock',
         purchasePrice: unitCost,
         purchaseDate: new Date().toISOString(),
+        lastTransactionId: transactionId,
+        lastTransactionDate: Timestamp.now(),
+        updatedAt: Timestamp.now(),
       });
-
-      await this.linkTransactionToInventory(transactionId, itemId, quantity, unitCost);
-
-      await this.recordStockMovement({
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      batch.set(movementRef, {
         itemId,
         itemName: item.name,
         type: 'In',
         quantity,
         previousQuantity: item.quantity,
         newQuantity,
-        variant: undefined, // Base item logic for now
         reason: 'Purchase',
-        performedBy: 'System', // Could enhance to pass user
+        performedBy: 'System',
+        date: Timestamp.now(),
       });
+      await batch.commit();
     } catch (error) {
       console.error('Error recording merchandise purchase:', error);
       throw error;
@@ -446,25 +452,29 @@ export class InventoryService {
       }
 
       const newQuantity = item.quantity - quantity;
-      await this.updateItem(itemId, {
+      const batch = writeBatch(db);
+      const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+      batch.update(itemRef, {
         quantity: newQuantity,
         status: newQuantity > 0 ? 'Available' : 'Out of Stock',
         lastSaleDate: new Date().toISOString(),
+        lastTransactionId: transactionId,
+        lastTransactionDate: Timestamp.now(),
+        updatedAt: Timestamp.now(),
       });
-
-      await this.linkTransactionToInventory(transactionId, itemId, quantity, unitPrice);
-
-      await this.recordStockMovement({
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      batch.set(movementRef, {
         itemId,
         itemName: item.name,
         type: 'Out',
         quantity: -quantity,
         previousQuantity: item.quantity,
         newQuantity,
-        variant: undefined, // Base item logic for now
         reason: 'Sale',
-        performedBy: 'System', // Could enhance to pass user
+        performedBy: 'System',
+        date: Timestamp.now(),
       });
+      await batch.commit();
     } catch (error) {
       console.error('Error recording merchandise sale:', error);
       throw error;
@@ -718,12 +728,14 @@ export class InventoryService {
       () => { console.log(`[DEV MODE] Checking in item ${itemId}`); },
       async () => {
     try {
-      await this.updateItem(itemId, {
+      const docRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+      await updateDoc(docRef, {
         status: 'Available',
-        checkedOutTo: undefined,
-        checkedOutDate: undefined,
-        expectedReturnDate: undefined,
-        returnedDate: new Date().toISOString()
+        checkedOutTo: deleteField(),
+        checkedOutDate: deleteField(),
+        expectedReturnDate: deleteField(),
+        returnedDate: new Date().toISOString(),
+        updatedAt: Timestamp.now(),
       });
     } catch (error) {
       console.error('Error checking in item:', error);
@@ -875,14 +887,16 @@ export class InventoryService {
       // Update total quantity as well (sum of all variants)
       const newTotalQuantity = variants.reduce((sum, v) => sum + v.quantity, 0);
 
-      await this.updateItem(itemId, {
+      const batch = writeBatch(db);
+      const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+      batch.update(itemRef, {
         variants,
         quantity: newTotalQuantity,
         status: newTotalQuantity > 0 ? 'Available' : 'Out of Stock',
+        updatedAt: Timestamp.now(),
       });
-
-      // Record movement
-      await this.recordStockMovement({
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      const movementData: Record<string, unknown> = {
         itemId,
         itemName: item.name,
         type: operation === 'increment' ? 'In' : 'Out',
@@ -891,9 +905,12 @@ export class InventoryService {
         newQuantity: newTotalQuantity,
         variant: variantSize,
         reason: operation === 'increment' ? 'Restock' : 'Sale',
-        performedBy: 'System', // This shouldIdeally be passed in
-        referenceId,
-      });
+        performedBy: 'System',
+        date: Timestamp.now(),
+      };
+      if (referenceId !== undefined) movementData.referenceId = referenceId;
+      batch.set(movementRef, movementData);
+      await batch.commit();
     } catch (error) {
       console.error('Error updating variant quantity:', error);
       throw error;
@@ -1139,23 +1156,30 @@ export class InventoryService {
         newTotal += adjustmentQuantity;
       }
 
-      await this.updateItem(itemId, {
+      const batch = writeBatch(db);
+      const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+      const itemUpdate: Record<string, unknown> = {
         quantity: newTotal,
-        variants: updatedVariants,
         status: newTotal > 0 ? 'Available' : 'Out of Stock',
-      });
-
-      await this.recordStockMovement({
+        updatedAt: Timestamp.now(),
+      };
+      if (updatedVariants !== undefined) itemUpdate.variants = updatedVariants;
+      batch.update(itemRef, itemUpdate);
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      const movementData: Record<string, unknown> = {
         itemId,
         itemName: item.name,
         type: 'Adjustment',
         quantity: adjustmentQuantity,
         previousQuantity: previousTotal,
         newQuantity: newTotal,
-        variant: variantSize,
         reason,
         performedBy,
-      });
+        date: Timestamp.now(),
+      };
+      if (variantSize !== undefined) movementData.variant = variantSize;
+      batch.set(movementRef, movementData);
+      await batch.commit();
     } catch (error) {
       console.error('Error adjusting stock:', error);
       throw error;

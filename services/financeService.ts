@@ -1022,6 +1022,7 @@ export class FinanceService {
           splitDelBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
           splitDelBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), updateData);
           await splitDelBatch.commit();
+          invalidateFinanceCache();
 
           // Inventory cleanup runs after the Firestore batch succeeds
           if (split.inventoryLinkId && split.inventoryQuantity) {
@@ -3193,6 +3194,7 @@ export class FinanceService {
             }
           }
           await flushBatch();
+          invalidateFinanceCache();
         } catch (markError) {
           // Compensate: remove the reconciliation record so the account stays consistent.
           // The bank account balance update is left in place (it reflects the statement).

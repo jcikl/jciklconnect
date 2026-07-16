@@ -774,6 +774,18 @@ export class MembersService {
         });
       }
       await this.commitWithRetry(deleteBatch);
+
+      const [boardSnap, bizSnap] = await Promise.all([
+        getDocs(query(collection(db, 'boardMembers'), where('memberId', '==', memberId))),
+        getDocs(query(collection(db, COLLECTIONS.BUSINESS_DIRECTORY), where('memberId', '==', memberId))),
+      ]);
+      if (!boardSnap.empty || !bizSnap.empty) {
+        const cleanupBatch = writeBatch(db);
+        boardSnap.docs.forEach(d => cleanupBatch.delete(d.ref));
+        bizSnap.docs.forEach(d => cleanupBatch.delete(d.ref));
+        await this.commitWithRetry(cleanupBatch);
+      }
+
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.deleteMember');
       this.invalidateMembersCache();
     } catch (error) {
@@ -928,6 +940,16 @@ export class MembersService {
         }
       }
       await this.updateMember(memberId, { role: newRole });
+      const boardSnap = await getDocs(
+        query(collection(db, 'boardMembers'), where('memberId', '==', memberId))
+      );
+      if (!boardSnap.empty) {
+        const roleBatch = writeBatch(db);
+        boardSnap.docs.forEach(d =>
+          roleBatch.update(d.ref, { displayRole: newRole, updatedAt: Timestamp.now() })
+        );
+        await this.commitWithRetry(roleBatch);
+      }
     } catch (error) {
       console.error('Error updating member role:', error);
       throw error;
