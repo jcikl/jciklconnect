@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useAuth } from '../../../hooks/useAuth';
 import { X, Plus, Trash2, Lightbulb, Edit, Check } from 'lucide-react';
 import { Transaction, TransactionSplit } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
@@ -49,6 +50,7 @@ export function TransactionSplitModal({
   projectYears = [],
   projectPurposes = [],
 }: TransactionSplitModalProps) {
+  const { user } = useAuth();
   const currentYear = new Date().getFullYear();
   const [splits, setSplits] = useState<SplitItem[]>([
     { category: 'Projects & Activities', year: currentYear, projectId: '', memberId: '', purpose: '', paymentRequestId: '', amount: 0, description: '', id: undefined },
@@ -425,7 +427,7 @@ export function TransactionSplitModal({
       await FinanceService.createTransactionSplit(
         transaction.id,
         splits,
-        'current-user-id'
+        user?.uid ?? user?.id ?? ''
       );
       onSuccess();
       onClose();
@@ -445,9 +447,7 @@ export function TransactionSplitModal({
     setError(null);
 
     try {
-      for (const split of existingSplits) {
-        await FinanceService.deleteTransactionSplit(split.id);
-      }
+      await Promise.all(existingSplits.map((split) => FinanceService.deleteTransactionSplit(split.id)));
       onSuccess();
       onClose();
     } catch (err) {

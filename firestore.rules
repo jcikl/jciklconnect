@@ -21,7 +21,7 @@ service cloud.firestore {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              getUserRole() != null &&
-             getUserRole() in ['GUEST', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN', 'INACTIVE'];
+             getUserRole() in ['GUEST', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
     
     function memberData() {
@@ -139,7 +139,8 @@ service cloud.firestore {
            'jciCareer', 'menteeIds', 'mentorId',
            'deletedAt', 'deletedBy', 'createdAt', 'createdBy',
            'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
-           'leaderboardScore', 'points'
+           'leaderboardScore', 'points',
+           'churnRisk', 'tier', 'birthdayMMDD', 'isDeveloper'
          ]) &&
          (resource.data.get('role', 'GUEST') == 'GUEST' ||
           (request.resource.data.get('general', {}).get('nationality', null) == resource.data.get('general', {}).get('nationality', null) &&
@@ -230,15 +231,28 @@ service cloud.firestore {
 
     // Transactions: board / finance roles; multi-LO scoped by loId unless isAdmin/Board()
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() &&
+      // TX-R1: split read into get (resource.data valid) and list (resource.data is null — no loId check)
+      allow get: if isAuthenticated() &&
         (isAdmin() ||
          isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
-      allow create, update: if canAccessFinance() &&
+      allow list: if isAuthenticated() && (isAdmin() || isBoard());
+      allow create: if canAccessFinance() &&
         (resource == null ||
           (resource.data.get('status', '') != 'Reconciled' &&
            resource.data.get('status', '') != 'Partially Reconciled' &&
            resource.data.get('status', '') != 'Voided'));
+      // TX-R2: finance staff limited to status/reconciliation fields; Admin unrestricted
+      allow update: if canAccessFinance() &&
+        (resource == null ||
+          (resource.data.get('status', '') != 'Reconciled' &&
+           resource.data.get('status', '') != 'Partially Reconciled' &&
+           resource.data.get('status', '') != 'Voided')) &&
+        (isAdmin() ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'status', 'reconciliationId', 'reconciledAt', 'reconciledBy',
+           'prevStatus', 'paidAt', 'paidBy', 'updatedAt', 'updatedBy', 'notes', 'category'
+         ]));
       allow delete: if canDeleteFinance() &&
         resource.data.get('status', '') != 'Reconciled' &&
         resource.data.get('status', '') != 'Partially Reconciled' &&
@@ -247,11 +261,14 @@ service cloud.firestore {
 
     // Transaction Splits: same rules as transactions; update/delete blocked on Reconciled parent
     match /transactionSplits/{splitId} {
+      // T10: isAdmin()/isBoard() are already exclusive; canAccessFinance() branch is scoped to loId
       allow read: if isAuthenticated() &&
         (isAdmin() ||
          isBoard() ||
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
-      allow create: if canAccessFinance();
+      // T7: block adding splits to already-reconciled parent transactions
+      allow create: if canAccessFinance() &&
+        get(/databases/$(database)/documents/transactions/$(request.resource.data.get('parentTransactionId', ''))).data.get('status', '') != 'Reconciled';
       allow update: if canAccessFinance() &&
         (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
          (get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled' &&
@@ -268,9 +285,14 @@ service cloud.firestore {
     // These carry the same reconciliation reverse-index (matchedBankAmount etc.) as
     // `transactions`, so they get the same finance-role gate — not just isAuthenticated().
     match /projectTrx/{transactionId} {
-      allow read: if isMember();
-      allow create, update: if canAccessFinance();
-      allow delete: if canDeleteFinance();
+      // PT-1: INACTIVE members excluded; finance/board-only gate mirrors transactions collection
+      allow read: if isAuthenticated() && (isAdmin() || isBoard() || canAccessFinance());
+      allow create: if canAccessFinance();
+      // PT-update/delete: block modifications to already-reconciled project transactions
+      allow update: if canAccessFinance() &&
+        resource.data.get('status', '') != 'Reconciled';
+      allow delete: if canDeleteFinance() &&
+        resource.data.get('status', '') != 'Reconciled';
     }
     
 
@@ -303,7 +325,9 @@ service cloud.firestore {
         request.resource.data.get('status', null) in ['draft', 'submitted'];
       allow update: if isAuthenticated() &&
         (isAdmin() ||
-         resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' ||
+         resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'amount', 'attachments', 'category', 'updatedAt', 'updatedBy', 'status']) &&
+           request.resource.data.get('status', null) in ['draft', 'submitted'] ||
          resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) in ['submitted', 'approved'] && request.resource.data.get('status', null) == 'cancelled' ||
          resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'rejected' && request.resource.data.get('status', null) == 'submitted' ||
          canAccessFinance() && paymentRequestInMyScope() &&
@@ -626,10 +650,11 @@ service cloud.firestore {
     }
     
     // Reconciliations collection
+    // R-1: use isAdmin()/isBoard() so SUPER_ADMIN is included (was excluded by hardcoded role list)
+    // R-8: delete restricted to Admin only — BOARD must not be able to erase audit records
     match /reconciliations/{reconciliationId} {
-      allow read, create, update, delete: if isAuthenticated() && 
-                                             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                             get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      allow read, create, update: if isAuthenticated() && (isAdmin() || isBoard());
+      allow delete: if isAuthenticated() && isAdmin();
     }
     
     // Event Budgets collection
@@ -895,7 +920,11 @@ service cloud.firestore {
     // Finance roles can read and mark as resolved; only Admin SDK (no auth) writes them.
     match /finance_alerts/{alertId} {
       allow read: if canAccessFinance();
-      allow update: if canAccessFinance();
+      // FA-1: whitelist only resolution fields; block tampering with message/transactionId
+      allow update: if canAccessFinance() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['resolved', 'resolvedAt', 'resolvedBy', 'updatedAt']
+        );
       allow create, delete: if false;
     }
 

@@ -23,7 +23,8 @@ export const sendNotification = functions.https.onCall(async (data, context) => 
     message: message,
     data: notificationData || {},
     read: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: admin.firestore.FieldValue.serverTimestamp()
   });
 
   // In a real implementation, you might also send push notifications, emails, etc.
@@ -66,7 +67,8 @@ export const sendBulkNotifications = functions.https.onCall(async (data, context
       message: message,
       data: notificationData || {},
       read: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
     notificationIds.push(notificationRef.id);
   }
@@ -258,6 +260,7 @@ async function sendFcmPush(
     data,
     read: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   // Look up FCM token from users collection

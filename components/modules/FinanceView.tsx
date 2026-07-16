@@ -47,15 +47,17 @@ import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 
 
 const FinanceAlertsPanel: React.FC<{ userId: string }> = ({ userId }) => {
+  const { showToast } = useToast();
   const [alerts, setAlerts] = useState<FinanceAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setAlerts(await FinanceService.getFinanceAlerts(true)); } catch { /* ignore */ }
+    try { setAlerts(await FinanceService.getFinanceAlerts(true)); }
+    catch { showToast('Failed to load finance alerts', 'error'); }
     finally { setLoading(false); }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -84,7 +86,11 @@ const FinanceAlertsPanel: React.FC<{ userId: string }> = ({ userId }) => {
             disabled={resolvingId === alert.id}
             onClick={async () => {
               setResolvingId(alert.id);
-              await FinanceService.resolveFinanceAlert(alert.id, userId).catch(() => {});
+              try {
+                await FinanceService.resolveFinanceAlert(alert.id, userId);
+              } catch {
+                showToast('Failed to resolve alert', 'error');
+              }
               setResolvingId(null);
               load();
             }}

@@ -523,6 +523,9 @@ export class FinanceService {
           // Sync with inventory if linked
           await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
 
+          // TX-C1: invalidate cache so subsequent reads reflect the new project transaction
+          invalidateFinanceCache();
+
           return docRef.id;
         } catch (error) {
           console.error('Error creating project transaction:', error);
@@ -711,6 +714,16 @@ export class FinanceService {
         }
       }
 
+      // T5: validate that Membership splits always carry a year before any write.
+      for (const split of splits) {
+        if (split.category === 'Membership') {
+          const resolvedYear = split.year || this.getMembershipYearFromProjectId(split.projectId);
+          if (!resolvedYear) {
+            throw new Error(`Membership split requires a year (memberId: ${split.memberId ?? 'unknown'})`);
+          }
+        }
+      }
+
       // Upsert split records
       for (const split of splits) {
         if (split.id && existingSplitIds.has(split.id)) {
@@ -764,6 +777,9 @@ export class FinanceService {
       });
 
       await batch.commit();
+
+      // T6: invalidate cache after successful split write
+      invalidateFinanceCache();
 
       for (const [key, projectId] of membershipSyncTargets.entries()) {
         const [memberId] = key.split(':');
@@ -866,29 +882,27 @@ export class FinanceService {
           if (!currentDoc.exists()) throw new Error('Split not found');
           const currentSplit = currentDoc.data() as TransactionSplit;
 
+          // TX-W2: validate BEFORE writing so we never commit an invalid split amount.
+          if (updates.amount !== undefined) {
+            const allSplits = await this.getTransactionSplits(currentSplit.parentTransactionId);
+            const totalSplitAmount = allSplits.reduce((sum, s) => {
+              return sum + (s.id === splitId ? updates.amount! : s.amount);
+            }, 0);
+            const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, currentSplit.parentTransactionId));
+            if (parentDoc.exists()) {
+              const parentAmount = parentDoc.data().amount;
+              if (Math.abs(totalSplitAmount - parentAmount) > 0.01) {
+                throw new Error(
+                  `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentAmount})`
+                );
+              }
+            }
+          }
+
           await updateDoc(splitRef, {
             ...removeUndefined(updates),
             updatedAt: Timestamp.now(),
           });
-
-          // If amount changed, validate total still equals parent
-          if (updates.amount !== undefined) {
-            const updatedDoc = await getDoc(splitRef);
-            if (updatedDoc.exists()) {
-              const split = updatedDoc.data() as TransactionSplit;
-              const allSplits = await this.getTransactionSplits(split.parentTransactionId);
-              const totalSplitAmount = allSplits.reduce((sum, s) => sum + s.amount, 0);
-              const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
-              if (parentDoc.exists()) {
-                const parentAmount = parentDoc.data().amount;
-                if (Math.abs(totalSplitAmount - parentAmount) > 0.01) {
-                  throw new Error(
-                    `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentAmount})`
-                  );
-                }
-              }
-            }
-          }
 
           // Sync inventory stock movement for this split
           const fullSplit = { ...currentSplit, ...updates } as TransactionSplit;
@@ -1304,8 +1318,20 @@ export class FinanceService {
       return { updated: updatedCount, skipped, errors: [] };
     },
     async () => {
+    // TX-W5: fetch all docs concurrently, then write atomically via writeBatch,
+    // then run membership side-effects. Partial write failures no longer leave mixed state.
     const skipped: string[] = [];
-    const results = await Promise.all(
+    const errors: string[] = [];
+
+    // Phase 1: read all docs in parallel
+    type TxPlan = {
+      txId: string;
+      currentTransaction: Transaction;
+      updateData: any;
+      nextTransaction: Transaction;
+    };
+    const plans: TxPlan[] = [];
+    await Promise.all(
       transactionIds.map(async (txId) => {
         try {
           const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, txId);
@@ -1316,7 +1342,7 @@ export class FinanceService {
 
           if (currentTransaction?.status === 'Reconciled' || currentTransaction?.status === 'Partially Reconciled') {
             skipped.push(txId);
-            return { success: true };
+            return;
           }
 
           const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
@@ -1341,51 +1367,56 @@ export class FinanceService {
             }
           }
 
-          await updateDoc(transactionRef, updateData);
-
           const nextTransaction = {
             ...(currentTransaction || {}),
             ...categoryUpdates,
             ...(updateData.projectId ? { projectId: updateData.projectId } : {}),
           } as Transaction;
 
-          if (nextTransaction.category === 'Membership' && nextTransaction.memberId) {
-            const projectId = nextTransaction.projectId || this.getMembershipProjectIdFromYear(categoryUpdates.year);
-            await this.syncMemberMembership(nextTransaction.memberId, projectId);
+          if (currentTransaction) {
+            plans.push({ txId, currentTransaction, updateData, nextTransaction });
           }
-
-          // Sync old member when category changes AWAY from Membership (情景 V)
-          if (
-            currentTransaction?.category === 'Membership' &&
-            currentTransaction.memberId &&
-            finalCategory !== 'Membership'
-          ) {
-            await this.syncMemberMembership(currentTransaction.memberId, currentTransaction.projectId);
-          } else if (
-            currentTransaction?.category === 'Membership' &&
-            currentTransaction.memberId &&
-            (currentTransaction.memberId !== nextTransaction.memberId || currentTransaction.projectId !== nextTransaction.projectId)
-          ) {
-            await this.syncMemberMembership(currentTransaction.memberId, currentTransaction.projectId);
-          }
-
-          return { success: true };
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Unknown error';
-          return { success: false, error: `Transaction ${txId}: ${msg}` };
+          errors.push(`Transaction ${txId}: ${msg}`);
         }
       })
     );
 
-    let updated = 0;
-    const errors: string[] = [];
-    results.forEach(res => {
-      if (res.success) updated++;
-      else if (res.error) errors.push(res.error);
-    });
+    // Phase 2: write all computed updates atomically
+    if (plans.length > 0) {
+      const batch = writeBatch(db);
+      for (const { txId, updateData } of plans) {
+        batch.update(doc(db, COLLECTIONS.TRANSACTIONS, txId), updateData);
+      }
+      await batch.commit();
+    }
+
+    // Phase 3: membership side-effects (after successful batch commit)
+    for (const { currentTransaction, nextTransaction } of plans) {
+      const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
+      if (nextTransaction.category === 'Membership' && nextTransaction.memberId) {
+        const projectId = nextTransaction.projectId || this.getMembershipProjectIdFromYear(categoryUpdates.year);
+        await this.syncMemberMembership(nextTransaction.memberId, projectId);
+      }
+      // Sync old member when category changes AWAY from Membership (情景 V)
+      if (
+        currentTransaction?.category === 'Membership' &&
+        currentTransaction.memberId &&
+        finalCategory !== 'Membership'
+      ) {
+        await this.syncMemberMembership(currentTransaction.memberId, currentTransaction.projectId);
+      } else if (
+        currentTransaction?.category === 'Membership' &&
+        currentTransaction.memberId &&
+        (currentTransaction.memberId !== nextTransaction.memberId || currentTransaction.projectId !== nextTransaction.projectId)
+      ) {
+        await this.syncMemberMembership(currentTransaction.memberId, currentTransaction.projectId);
+      }
+    }
 
     invalidateFinanceCache();
-    return { updated, skipped, errors };
+    return { updated: plans.length, skipped, errors };
       }
     );
   }
@@ -1442,8 +1473,21 @@ export class FinanceService {
       return { updated: updatedCount, skipped, errors: [] };
     },
     async () => {
+    // T4: fetch all docs concurrently, then write atomically via writeBatch,
+    // then run membership side-effects. Partial write failures no longer leave mixed state.
     const skipped: string[] = [];
-    const results = await Promise.all(
+    const errors: string[] = [];
+
+    type SplitPlan = {
+      splitId: string;
+      currentSplit: TransactionSplit;
+      updateData: any;
+      nextSplit: TransactionSplit;
+    };
+    const plans: SplitPlan[] = [];
+
+    // Phase 1: read all docs in parallel
+    await Promise.all(
       splitIds.map(async (splitId) => {
         try {
           const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
@@ -1459,10 +1503,12 @@ export class FinanceService {
               const parentStatus = parentDoc.data()?.status;
               if (parentStatus === 'Reconciled' || parentStatus === 'Partially Reconciled') {
                 skipped.push(splitId);
-                return { success: true as const, wasSkipped: true as const };
+                return;
               }
             }
           }
+
+          if (!currentSplit) return;
 
           const finalCategory = categoryUpdates.category ?? currentSplit?.category;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
@@ -1481,42 +1527,44 @@ export class FinanceService {
             updateData.projectId = buildMembershipProjectId(yearVal);
           }
 
-          await updateDoc(splitRef, updateData);
-
-          const nextSplit = { ...(currentSplit || {}), ...categoryUpdates } as TransactionSplit;
-          if (nextSplit.category === 'Membership' && nextSplit.memberId) {
-            const projectId = this.getMembershipProjectIdFromYear(nextSplit.year || categoryUpdates.year);
-            await this.syncMemberMembership(nextSplit.memberId, projectId);
-          }
-
-          if (
-            currentSplit?.category === 'Membership' &&
-            currentSplit.memberId &&
-            (currentSplit.memberId !== nextSplit.memberId || currentSplit.year !== nextSplit.year)
-          ) {
-            await this.syncMemberMembership(
-              currentSplit.memberId,
-              this.getMembershipProjectIdFromYear(currentSplit.year)
-            );
-          }
-
-          return { success: true };
+          const nextSplit = { ...currentSplit, ...categoryUpdates } as TransactionSplit;
+          plans.push({ splitId, currentSplit, updateData, nextSplit });
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Unknown error';
-          return { success: false, error: `Split ${splitId}: ${msg}` };
+          errors.push(`Split ${splitId}: ${msg}`);
         }
       })
     );
 
-    let updated = 0;
-    const errors: string[] = [];
-    results.forEach(res => {
-      if (res.success && !res.wasSkipped) updated++;
-      else if (res.error) errors.push(res.error);
-    });
+    // Phase 2: write atomically
+    if (plans.length > 0) {
+      const batch = writeBatch(db);
+      for (const { splitId, updateData } of plans) {
+        batch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId), updateData);
+      }
+      await batch.commit();
+    }
+
+    // Phase 3: membership side-effects after successful commit
+    for (const { currentSplit, nextSplit } of plans) {
+      if (nextSplit.category === 'Membership' && nextSplit.memberId) {
+        const projectId = this.getMembershipProjectIdFromYear(nextSplit.year || categoryUpdates.year);
+        await this.syncMemberMembership(nextSplit.memberId, projectId);
+      }
+      if (
+        currentSplit?.category === 'Membership' &&
+        currentSplit.memberId &&
+        (currentSplit.memberId !== nextSplit.memberId || currentSplit.year !== nextSplit.year)
+      ) {
+        await this.syncMemberMembership(
+          currentSplit.memberId,
+          this.getMembershipProjectIdFromYear(currentSplit.year)
+        );
+      }
+    }
 
     invalidateFinanceCache();
-    return { updated, skipped, errors };
+    return { updated: plans.length, skipped, errors };
       }
     );
   }
@@ -1616,18 +1664,19 @@ export class FinanceService {
             }
           }
 
+          // TX-W1: revertPaid BEFORE deleteDoc — if deleteDoc succeeded but revertPaid failed,
+          // the paymentRequest would stay 'paid' with no linked transaction.
+          if (transaction?.paymentRequestId) {
+            const { PaymentRequestService } = await import('./paymentRequestService');
+            await PaymentRequestService.revertPaid(transaction.paymentRequestId);
+          }
+
           await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
           invalidateFinanceCache();
 
           // Sync with Member Membership if category is Membership
           if (transaction && transaction.category === 'Membership' && transaction.memberId) {
             await this.syncMemberMembership(transaction.memberId as string, transaction.projectId);
-          }
-
-          // Revert PR from 'paid' → 'approved' when the linked bank tx is deleted (情景 E)
-          if (transaction?.paymentRequestId) {
-            const { PaymentRequestService } = await import('./paymentRequestService');
-            await PaymentRequestService.revertPaid(transaction.paymentRequestId);
           }
         } catch (error) {
           console.error('Error deleting transaction:', error);
@@ -1699,44 +1748,57 @@ export class FinanceService {
       }
 
       // 1. Clean up bank transactions linked directly
+      // TX-W4: use a writeBatch so all bank-tx updates succeed or fail together.
       const bankTxsQuery = query(
         collection(db, COLLECTIONS.TRANSACTIONS),
         where('projectTransactionIds', 'array-contains', transactionId)
       );
       const bankTxsSnapshot = await getDocs(bankTxsQuery);
+      const bankTxBatch = writeBatch(db);
+      // Collect PR reversions to run after the batch commits (can't batch these)
+      const prReversions: Array<{ paymentRequestId: string }> = [];
       for (const docSnap of bankTxsSnapshot.docs) {
         const btx = docSnap.data() as Transaction;
         const btxLinkedIds = btx.projectTransactionIds || [];
         const newLinkedIds = btxLinkedIds.filter((id: string) => id !== transactionId);
         const willClear = newLinkedIds.length === 0;
-        await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, docSnap.id), {
+        bankTxBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, docSnap.id), {
           projectTransactionIds: newLinkedIds,
           projectTransactionId: newLinkedIds[0] || null,
           status: willClear ? 'Cleared' : 'Reconciled',
           ...(willClear ? { purpose: '' } : {}),
         });
-        // Revert PR from 'paid' → 'approved' when the matching bank tx is delinked (情景 E)
         if (willClear && btx.paymentRequestId) {
-          const { PaymentRequestService } = await import('./paymentRequestService');
-          await PaymentRequestService.revertPaid(btx.paymentRequestId);
+          prReversions.push({ paymentRequestId: btx.paymentRequestId });
         }
+      }
+      await bankTxBatch.commit();
+      // Revert PRs after batch succeeds (情景 E)
+      for (const { paymentRequestId } of prReversions) {
+        const { PaymentRequestService } = await import('./paymentRequestService');
+        await PaymentRequestService.revertPaid(paymentRequestId);
       }
 
       // 2. Clean up transaction splits linked to this project transaction
+      // T8: use a writeBatch for split updates so all succeed or fail together.
       const splitsQuery = query(
         collection(db, COLLECTIONS.TRANSACTION_SPLITS),
         where('projectTransactionIds', 'array-contains', transactionId)
       );
       const splitsSnapshot = await getDocs(splitsQuery);
+      const splitBatch = writeBatch(db);
+      // Collect parent-status updates and auto-generated deletes for post-batch processing
+      const parentStatusUpdates: Array<{ parentTransactionId: string; splitId: string }> = [];
+      const autoGenDeletes: string[] = [];
       for (const docSnap of splitsSnapshot.docs) {
         const split = docSnap.data() as TransactionSplit;
         const splitLinkedIds = (split as any).projectTransactionIds || [];
         const newLinkedIds = splitLinkedIds.filter((id: string) => id !== transactionId);
-        
+
         if (split.autoGenerated && newLinkedIds.length === 0) {
-          await this.deleteTransactionSplit(docSnap.id);
+          autoGenDeletes.push(docSnap.id);
         } else {
-          await updateDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, docSnap.id), {
+          splitBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, docSnap.id), {
             projectTransactionIds: newLinkedIds,
             projectTransactionId: newLinkedIds[0] || null,
             ...(newLinkedIds.length === 0 ? { purpose: '' } : {}),
@@ -1744,17 +1806,25 @@ export class FinanceService {
           });
         }
 
-        // Revert parent bank tx status when split is delinked (情景 W / HH / OO)
         if (newLinkedIds.length === 0 && !split.autoGenerated) {
-          const parentBankTxDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
-          if (parentBankTxDoc.exists()) {
-            const allParentSplits = await this.getTransactionSplits(split.parentTransactionId);
-            const anyLinked = allParentSplits.some(s => s.id !== docSnap.id && (s.projectTransactionIds?.length ?? 0) > 0);
-            await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), {
-              status: anyLinked ? 'Partially Reconciled' : 'Cleared',
-              updatedAt: Timestamp.now(),
-            });
-          }
+          parentStatusUpdates.push({ parentTransactionId: split.parentTransactionId, splitId: docSnap.id });
+        }
+      }
+      await splitBatch.commit();
+      // Delete auto-generated splits and update parent statuses after batch commits
+      for (const splitId of autoGenDeletes) {
+        await this.deleteTransactionSplit(splitId);
+      }
+      // Revert parent bank tx status when split is delinked (情景 W / HH / OO)
+      for (const { parentTransactionId: parentBankTxId, splitId } of parentStatusUpdates) {
+        const parentBankTxDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, parentBankTxId));
+        if (parentBankTxDoc.exists()) {
+          const allParentSplits = await this.getTransactionSplits(parentBankTxId);
+          const anyLinked = allParentSplits.some(s => s.id !== splitId && (s.projectTransactionIds?.length ?? 0) > 0);
+          await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, parentBankTxId), {
+            status: anyLinked ? 'Partially Reconciled' : 'Cleared',
+            updatedAt: Timestamp.now(),
+          });
         }
       }
 
@@ -1808,6 +1878,10 @@ export class FinanceService {
       );
     } catch (error) {
       console.error('Error syncing transaction with inventory:', error);
+      // I-2: inventory sync failed — the transaction was already written but the inventory
+      // quantity was not updated. Flush the finance cache so stale totals don't mask the gap.
+      // The inventory quantity discrepancy requires manual reconciliation.
+      invalidateFinanceCache();
     }
   }
 

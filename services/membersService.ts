@@ -519,34 +519,16 @@ export class MembersService {
         }
       }
 
-      // Email change → keep the Firebase Auth login email in sync (before writing Firestore,
-      // so an email conflict blocks the whole update instead of leaving the two out of sync)
+      // Capture email change intent before building cleanUpdates — Auth sync happens AFTER
+      // Firestore is written so that a conflict (409) can revert the already-written Firestore
+      // fields rather than leaving Auth updated but Firestore stale.
       const newEmail = (updates as any).email ?? (updates.contact as any)?.email;
       const currentEmail = currentData?.contact?.email || currentData?.email;
-      if (
-        newEmail &&
+      const emailChanging =
+        !!(newEmail &&
         currentEmail &&
         newEmail.toLowerCase() !== currentEmail.toLowerCase() &&
-        !isDevMode()
-      ) {
-        try {
-          const res = await fetch('/.netlify/functions/update-auth-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: memberId, newEmail }),
-          });
-          if (res.status === 409) {
-            throw new Error('This email is already used by another account. Email not updated.');
-          }
-          if (!res.ok) {
-            console.warn('update-auth-email failed with status', res.status, '— profile email updated without Auth sync');
-          }
-        } catch (err) {
-          if (err instanceof Error && err.message.includes('already used')) throw err;
-          // Function unreachable (e.g. local dev) — proceed; Auth email stays unchanged
-          console.warn('update-auth-email unreachable, skipping Auth sync:', err);
-        }
-      }
+        !isDevMode());
 
       const cleanUpdates: Record<string, any> = {
         updatedAt: Timestamp.now(),
@@ -570,6 +552,37 @@ export class MembersService {
       const _caller = _named.slice(0, 3).join(' ← ') || 'membersService.updateMember';
       logWrite(CACHE_KEY_ALL_MEMBERS, _caller);
       this.invalidateMembersCache();
+
+      // Auth email sync — runs AFTER Firestore succeeds so we can revert if Auth rejects
+      if (emailChanging) {
+        try {
+          const res = await fetch('/.netlify/functions/update-auth-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: memberId, newEmail }),
+          });
+          if (res.status === 409) {
+            // Email already taken in Auth — revert the email fields we just wrote to Firestore
+            const revertFields: Record<string, unknown> = { updatedAt: Timestamp.now() };
+            if ('email' in normalizedUpdates) revertFields['email'] = currentEmail;
+            if (normalizedUpdates['contact.email'] !== undefined || (normalizedUpdates['contact'] as any)?.email !== undefined) {
+              revertFields['contact.email'] = currentEmail;
+            }
+            await updateDoc(memberRef, revertFields).catch(e =>
+              console.error('Failed to revert email in Firestore after Auth 409:', e)
+            );
+            this.invalidateMembersCache();
+            throw new Error('This email is already used by another account. Email not updated.');
+          }
+          if (!res.ok) {
+            console.warn('update-auth-email failed with status', res.status, '— Firestore email updated without Auth sync');
+          }
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('already used')) throw err;
+          // Function unreachable (e.g. local dev) — Firestore email was updated; Auth email stays unchanged
+          console.warn('update-auth-email unreachable, skipping Auth sync:', err);
+        }
+      }
 
       const mergedMember = { ...(currentData ?? {}), ...normalizedUpdates, id: memberId };
       const { BusinessDirectoryService } = await import('./businessDirectoryService');
@@ -1053,29 +1066,25 @@ export class MembersService {
 
       const now = Timestamp.now();
 
-      // Soft-delete in chunks of 400 (matches Firestore batch limit)
-      for (let i = 0; i < memberIds.length; i += 400) {
-        const batch = writeBatch(db);
-        memberIds.slice(i, i + 400).forEach(id => {
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), {
-            role: 'INACTIVE',
-            deletedAt: now,
-            deletedBy: currentUid,
-            updatedAt: now,
-          });
-        });
-        await batch.commit();
-      }
+      // Build all write ops (soft-deletes + menteeIds cleanup) into a single list so they
+      // are committed in the same batch chunks — if any chunk fails the retry covers both
+      // sides together, preventing members from being deleted while their mentors still list them.
+      type UpdateOp = { id: string; data: Record<string, unknown> };
+      const allOps: UpdateOp[] = [
+        ...memberIds.map(id => ({
+          id,
+          data: { role: 'INACTIVE', deletedAt: now, deletedBy: currentUid, updatedAt: now } as Record<string, unknown>,
+        })),
+        ...[...mentorCleanup.entries()].map(([mentorId, ids]) => ({
+          id: mentorId,
+          data: { menteeIds: arrayRemove(...ids), updatedAt: now } as Record<string, unknown>,
+        })),
+      ];
 
-      // Clean up menteeIds on affected mentor docs (one update per mentor, all ids at once)
-      const mentorEntries = [...mentorCleanup.entries()];
-      for (let i = 0; i < mentorEntries.length; i += 400) {
+      for (let i = 0; i < allOps.length; i += 400) {
         const batch = writeBatch(db);
-        mentorEntries.slice(i, i + 400).forEach(([mentorId, ids]) => {
-          batch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
-            menteeIds: arrayRemove(...ids),
-            updatedAt: now,
-          });
+        allOps.slice(i, i + 400).forEach(({ id, data }) => {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), data);
         });
         await this.commitWithRetry(batch);
       }
@@ -1212,6 +1221,7 @@ export class MembersService {
     }
 
     await flushBatch();
+    this.invalidateMembersCache();
     return result;
   }
 
@@ -1366,6 +1376,7 @@ export class MembersService {
     }
 
     await flushBatch();
+    this.invalidateMembersCache();
     return result;
   }
 
@@ -1562,6 +1573,7 @@ export class MembersService {
     }
 
     await flushBatch();
+    this.invalidateMembersCache();
     return result;
   }
 
@@ -1603,6 +1615,7 @@ export class MembersService {
     }
 
     if (batchOps > 0) await batch.commit();
+    this.invalidateMembersCache();
     return result;
   }
 
@@ -1640,6 +1653,7 @@ export class MembersService {
     }
 
     if (batchOps > 0) await batch.commit();
+    this.invalidateMembersCache();
     return result;
   }
 

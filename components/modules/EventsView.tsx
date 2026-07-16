@@ -514,12 +514,21 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         } as Parameters<typeof FinanceService.createTransaction>[0]);
       }
 
-      await EventRegistrationService.updateStatus(reg.id, 'paid', {
-        paidAt: now,
-        paidByName: actorName,
-        paymentMethod,
-        ...(financeTransactionId ? { financeTransactionId } : {}),
-      });
+      try {
+        await EventRegistrationService.updateStatus(reg.id, 'paid', {
+          paidAt: now,
+          paidByName: actorName,
+          paymentMethod,
+          ...(financeTransactionId ? { financeTransactionId } : {}),
+        });
+      } catch (statusErr) {
+        // Registration update failed — delete the finance transaction we just created
+        // so we don't leave a dangling income record with no linked registration.
+        if (financeTransactionId) {
+          await FinanceService.deleteTransaction(financeTransactionId).catch(() => {});
+        }
+        throw statusErr;
+      }
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: now, paidByName: actorName, paymentMethod } : r)));
       showToast('Marked as paid', 'success');
     } catch {
@@ -543,6 +552,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         }
         if (tx) {
           await FinanceService.deleteTransaction(reg.financeTransactionId);
+          // If the registration status update below fails, there is no reliable way to
+          // recreate the deleted transaction automatically. Surface an explicit error so
+          // finance can reconcile manually rather than silently leaving inconsistent data.
         }
       }
       await EventRegistrationService.updateStatus(reg.id, nextStatus, { paidAt: null, paidByName: null, financeTransactionId: null });
