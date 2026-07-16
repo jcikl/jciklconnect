@@ -706,6 +706,7 @@ export class EventsService {
       if (guestData.notes != null) guestRegistration['notes'] = guestData.notes;
 
       await addDoc(col, guestRegistration);
+      apiCache.delete(`guestRegistrations:event:${eventId}`);
     } catch (error) {
       errorLoggingService.logError(error as Error, {
         component: 'EventsService',

@@ -14,7 +14,8 @@
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 
-const TOYYIB_SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY || 'tl5be74e-pazq-kti6-xci2-bh6npgb4gcjv';
+const TOYYIB_SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
+if (!TOYYIB_SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
 const TOYYIB_IS_SANDBOX = process.env.TOYYIBPAY_SANDBOX !== 'false';
 const TOYYIB_BASE_URL = TOYYIB_IS_SANDBOX
   ? 'https://dev.toyyibpay.com/index.php/api'

@@ -468,6 +468,7 @@ export class BoardManagementService {
           isCurrentCommissionDirector: false,
           updatedAt: new Date().toISOString(),
         });
+        MembersService.invalidateMembersCache();
       }
     );
   }
@@ -482,6 +483,7 @@ export class BoardManagementService {
           isCurrentCommissionDirector: false,
           updatedAt: new Date().toISOString(),
         });
+        MembersService.invalidateMembersCache();
       }
     );
   }

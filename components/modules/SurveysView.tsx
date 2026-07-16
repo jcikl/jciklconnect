@@ -199,7 +199,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 </div>
                 <div className="p-4">
                     {activeTab === 'surveys' ? (
-                        <LoadingState loading={loading} error={error} empty={false}>
+                        <LoadingState loading={loading} error={error} empty={filteredSurveys.length === 0}>
                             {/* â”€â”€ Desktop table â”€â”€ */}
                             <div className="hidden md:block overflow-x-auto">
                                 <table className="w-full text-sm">

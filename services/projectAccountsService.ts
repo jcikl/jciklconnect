@@ -16,6 +16,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { FinanceService } from './financeService';
+import { ProjectsService } from './projectsService';
 import { Project } from '../types';
 
 export interface ProjectAccount {
@@ -216,6 +217,7 @@ export class ProjectAccountsService {
         lastReconciled: Timestamp.fromDate(now),
         updatedAt: Timestamp.now(),
       });
+      ProjectsService.invalidateProjectsCache();
 
       console.log(`Reconciled project account for project ${projectId}: ${discrepancies.length} discrepancies found`);
 

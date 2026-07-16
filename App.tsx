@@ -69,10 +69,7 @@ const BoardDashboard = lazy(() => import('./components/dashboard/BoardDashboard'
 const DashboardHome = lazy(() => import('./components/dashboard/DashboardHome').then(m => ({ default: m.DashboardHome })));
 const DeveloperInterface = lazy(() => import('./components/modules/DeveloperInterface').then(m => ({ default: m.DeveloperInterface })));
 const ToyyibView = lazy(() => import('./components/modules/ToyyibView').then(m => ({ default: m.ToyyibView })));
-const WhapiConfigView = lazy(() => import('./components/modules/WhapiConfigView').then(m => ({ default: m.WhapiConfigView })));
 const ApiConfigView = lazy(() => import('./components/modules/ApiConfigView').then(m => ({ default: m.ApiConfigView })));
-const MembershipConfigView = lazy(() => import('./components/modules/MembershipConfigView').then(m => ({ default: m.MembershipConfigView })));
-const AccessConfigView = lazy(() => import('./components/modules/AccessConfigView').then(m => ({ default: m.AccessConfigView })));
 const SystemConfigView = lazy(() => import('./components/modules/SystemConfigView').then(m => ({ default: m.SystemConfigView })));
 const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
 const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));

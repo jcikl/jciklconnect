@@ -4,7 +4,8 @@
  * Supported actions: getCategories, getCategoryDetails, createCategory, createBill, getBills, getSettlements
  */
 
-const SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY || 'tl5be74e-pazq-kti6-xci2-bh6npgb4gcjv';
+const SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
+if (!SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
 const IS_SANDBOX = process.env.TOYYIBPAY_SANDBOX !== 'false'; // default sandbox
 const BASE_URL = IS_SANDBOX
   ? 'https://dev.toyyibpay.com/index.php/api'

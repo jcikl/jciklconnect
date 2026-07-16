@@ -17,6 +17,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { FinanceService } from './financeService';
+import { EventsService } from './eventsService';
 import { Transaction } from '../types';
 
 export interface EventBudget {
@@ -133,6 +134,7 @@ export class EventBudgetService {
               ...budgetData,
               updatedAt: Timestamp.now(),
             });
+            EventsService.invalidateEventsCache();
             return existingBudget.id;
           } else {
             // Create new budget
@@ -146,6 +148,7 @@ export class EventBudgetService {
             }
 
             const docRef = await addDoc(collection(db, COLLECTIONS.EVENTS || 'eventBudgets'), newBudget);
+            EventsService.invalidateEventsCache();
             return docRef.id;
           }
         } catch (error) {

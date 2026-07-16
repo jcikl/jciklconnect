@@ -154,9 +154,18 @@ async function executeAction(config: any, data: any): Promise<any> {
       console.log(`Sending email to ${config.to}: ${config.subject}`);
       return { emailSent: true, to: config.to };
       
-    case 'update_field':
-      // Update a document field
+    case 'update_field': {
+      // Update a document field — restricted to an explicit allowlist to prevent
+      // workflows from writing to sensitive or unintended collections.
+      const ALLOWED_COLLECTIONS = [
+        'members', 'events', 'projects', 'tasks', 'notifications',
+        'workflows', 'activityPlans', 'eventRegistrations'
+      ];
       if (config.collection && config.documentId && config.field) {
+        if (!ALLOWED_COLLECTIONS.includes(config.collection)) {
+          console.error(`executeAction: collection '${config.collection}' not in allowlist — update_field blocked`);
+          return { fieldUpdated: false, blocked: true };
+        }
         await db.collection(config.collection).doc(config.documentId).update({
           [config.field]: config.value,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -164,6 +173,7 @@ async function executeAction(config: any, data: any): Promise<any> {
         return { fieldUpdated: true };
       }
       throw new Error('Invalid update_field configuration');
+    }
       
     case 'create_record':
       // Create a new document

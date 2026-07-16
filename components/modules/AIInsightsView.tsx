@@ -17,13 +17,15 @@ export const AIInsightsView: React.FC<AIInsightsViewProps> = ({ onNavigate, sear
     const [eventPredictions, setEventPredictions] = useState<EventDemandPrediction[]>([]);
     const [projectPredictions, setProjectPredictions] = useState<ProjectSuccessPrediction[]>([]);
     const [loading, setLoading] = useState(false);
-    const { events } = useEvents();
-    const { projects } = useProjects();
+    const { events, loading: eventsLoading } = useEvents();
+    const { projects, loading: projectsLoading } = useProjects();
     const { showToast } = useToast();
 
     useEffect(() => {
-        loadPredictions();
-    }, []);
+        if (!eventsLoading && !projectsLoading && events.length > 0) {
+            loadPredictions();
+        }
+    }, [eventsLoading, projectsLoading, events, projects]);
 
     const loadPredictions = async () => {
         setLoading(true);

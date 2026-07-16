@@ -60,8 +60,6 @@ export const COLLECTIONS = {
   PAYMENT_REQUESTS: 'paymentRequests',
   /** 活动报名/缴费/签到统一名单（Story 8.1） */
   EVENT_REGISTRATIONS: 'eventRegistrations',
-  /** 非会员留资（Story 9.1） */
-  NON_MEMBER_LEADS: 'nonMemberLeads',
   STOCK_MOVEMENTS: 'stock_movements',
   /** JCI Gamification refactoring */
   INCENTIVE_PROGRAMS: 'incentivePrograms',
@@ -525,17 +523,4 @@ export const CONTRACT_STATUS = {
   EXPIRED: 'Expired',
 } as const;
 
-export const OPPORTUNITY_URGENCY = {
-  SCARCE: 'Scarce',     // < 3 slots
-  LIMIT_REACHED: 'Full',
-  ENDING_SOON: 'Ending', // < 24h
-} as const;
-
-/** Points Tiers with privilege descriptions */
-export const MEMBER_PRIVILEGES = {
-  BRONZE: ['Basic Community Access'],
-  SILVER: ['Bounty Hunting Allowed', 'Business Directory Listing'],
-  GOLD: ['Priority Opportunity Drops', 'Matching Service'],
-  PLATINUM: ['Exclusive Boardroom Access', 'Global HQ Referral'],
-} as const;
 

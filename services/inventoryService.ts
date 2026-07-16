@@ -472,6 +472,7 @@ export class InventoryService {
         lastTransactionDate: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
+      InventoryService.invalidateInventoryCache(itemId);
 
       // Update quantity based on transaction type (handled by caller)
     } catch (error) {

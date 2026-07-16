@@ -17,7 +17,7 @@ import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
 import { NudgeBanner } from '../ui/NudgeBanner';
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
-import { MEMBER_TIERS, MEMBER_PRIVILEGES, BOUNTY_STATUS } from '../../config/constants';
+import { MEMBER_TIERS, BOUNTY_STATUS } from '../../config/constants';
 import { ContractService, CommitmentContract } from '../../services/contractService';
 import { PromotionService, type MemberEngagementProgressSummary, type EngagementYear } from '../../services/promotionService';
 import { MembersService } from '../../services/membersService';

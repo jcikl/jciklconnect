@@ -4,9 +4,16 @@ import * as admin from 'firebase-admin';
 const db = admin.firestore();
 
 // Function to check and award badges automatically
+// Collections written by this function — triggering on them would cause an infinite loop
+const SELF_TRIGGERING_COLLECTIONS = ['notifications', 'points', 'badgeAwards', 'achievementProgress', 'pointEscrow'];
+
 export const checkBadgeAwards = functions.firestore
   .document('{collection}/{documentId}')
   .onWrite(async (change, context) => {
+    // Guard: skip if the triggering collection is one we write to, to prevent infinite loops
+    const collectionName = context.params.collection;
+    if (SELF_TRIGGERING_COLLECTIONS.includes(collectionName)) return null;
+
     // Get all active badges
     const badgesSnapshot = await db.collection('badges').get();
     
@@ -218,6 +225,10 @@ async function checkCustomCriteria(criteria: any, memberId: string): Promise<{ e
 export const updateAchievementProgress = functions.firestore
   .document('{collection}/{documentId}')
   .onWrite(async (change, context) => {
+    // Guard: skip if the triggering collection is one we write to, to prevent infinite loops
+    const collectionName = context.params.collection;
+    if (SELF_TRIGGERING_COLLECTIONS.includes(collectionName)) return null;
+
     // Get all achievements
     const achievementsSnapshot = await db.collection('achievements').get();
     
@@ -358,10 +369,20 @@ export const calculatePointsFromRules = functions.https.onCall(async (data, cont
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
 
-  const { memberId, trigger, activityData } = data;
+  let { memberId, trigger, activityData } = data;
 
   if (!memberId || !trigger) {
     throw new functions.https.HttpsError('invalid-argument', 'Member ID and trigger are required');
+  }
+
+  // Security: only ADMIN/SUPER_ADMIN/BOARD may award points to an arbitrary memberId.
+  // All other callers are forced to award points to themselves only.
+  if (context.auth.uid !== memberId) {
+    const callerDoc = await db.collection('members').doc(context.auth.uid).get();
+    const callerRole = callerDoc.data()?.role;
+    if (!['ADMIN', 'SUPER_ADMIN', 'BOARD'].includes(callerRole)) {
+      memberId = context.auth.uid;
+    }
   }
 
   // Get all active point rules for this trigger

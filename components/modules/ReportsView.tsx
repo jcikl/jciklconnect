@@ -94,9 +94,17 @@ export const ReportsView: React.FC = () => {
   const [mykdGenModal, setMykdGenModal] = useState(false);
 
   const { showToast } = useToast();
-  const { members } = useMembers();
-  const { events } = useEvents();
-  const { projects } = useProjects();
+  const { members, loading: membersLoading, error: membersError } = useMembers();
+  const { events, loading: eventsLoading, error: eventsError } = useEvents();
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
+  const dataLoading = membersLoading || eventsLoading || projectsLoading;
+  const dataError = membersError || eventsError || projectsError;
+
+  React.useEffect(() => {
+    if (dataError) {
+      showToast(`Failed to load data: ${dataError}`, 'error');
+    }
+  }, [dataError]);
   const [transactions, setTransactions] = useState<any[]>([]);
 
   useEffect(() => {
@@ -573,7 +581,7 @@ export const ReportsView: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Reports</h2>
           <p className="text-sm text-slate-500 hidden sm:block">Generate and analyze organizational reports</p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)} size="sm" className="flex items-center gap-1.5 shrink-0">
+        <Button onClick={() => setIsCreateModalOpen(true)} size="sm" className="flex items-center gap-1.5 shrink-0" disabled={dataLoading}>
           <Plus size={14} />Generate Report
         </Button>
       </div>

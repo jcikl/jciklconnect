@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 if (!getApps().length) {
   initializeApp({
@@ -16,6 +17,22 @@ if (!getApps().length) {
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
+  }
+
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  }
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const decoded = await getAuth().verifyIdToken(idToken);
+    const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
+    const role = callerDoc.data()?.role;
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+    }
+  } catch {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
 
   let uid, email;
