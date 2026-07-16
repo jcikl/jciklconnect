@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Memory File Protocol (Mandatory)
+
+Every time a memory file is created or deleted, these two steps are **required without exception**:
+
+1. **Update `MEMORY.md` index** — add or remove the corresponding entry (one line: `- [Title](filename.md) — one-line summary`)
+2. **Verify no orphan files** — run a mental or literal check: every `.md` file in the memory directory must have a matching entry in `MEMORY.md`, and every entry in `MEMORY.md` must point to a file that exists
+
+If these two steps are skipped, the memory file becomes an orphan — it exists on disk but will never be read, making it permanently invisible.
+
 ## Commands
 
 ```bash
