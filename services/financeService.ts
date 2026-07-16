@@ -761,6 +761,7 @@ export class FinanceService {
           const newRef = doc(collection(db, COLLECTIONS.TRANSACTION_SPLITS));
           const splitData: any = removeUndefined({
             parentTransactionId,
+            loId: parentTransaction.loId ?? null,
             category: split.category,
             type: parentTransaction.type,
             projectId: split.projectId,
@@ -994,7 +995,7 @@ export class FinanceService {
             ...(remainingIds.length === 0 ? {
               projectTransactionIds: [],
               projectTransactionId: null,
-              status: (parentTx as any).prevStatus ?? 'Cleared',
+              status: (parentTx as any).prevStatus ?? 'Pending',
               purpose: '',
             } : {}),
           };
@@ -1030,7 +1031,7 @@ export class FinanceService {
           if (remainingIds.length === 0) {
             updateData.projectTransactionIds = [];
             updateData.projectTransactionId = null;
-            updateData.status = parentTx?.prevStatus ?? 'Cleared';
+            updateData.status = parentTx?.prevStatus ?? 'Pending';
             updateData.purpose = '';
           }
 
@@ -1639,8 +1640,13 @@ export class FinanceService {
           // Fetch transaction first to sync inventory if needed
           const transaction = await this.getTransactionById(transactionId);
 
-          if (transaction?.status === 'Reconciled' || transaction?.status === 'Partially Reconciled') {
-            throw new Error(`Cannot delete a ${transaction.status} transaction. Unmatch it first before deleting.`);
+          if (
+            transaction?.status === 'Reconciled' ||
+            transaction?.status === 'Partially Reconciled' ||
+            transaction?.status === 'Cleared' ||
+            transaction?.status === 'Voided'
+          ) {
+            throw new Error(`Cannot delete a matched or reconciled transaction (status: ${transaction.status}). Reverse it instead.`);
           }
 
           if (transaction && transaction.inventoryLinkId && transaction.inventoryQuantity) {
@@ -1714,6 +1720,56 @@ export class FinanceService {
           }
         } catch (error) {
           console.error('Error deleting transaction:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Reverse a transaction by creating a counter-entry and voiding the original
+  static async reverseTransaction(transactionId: string, reason: string): Promise<void> {
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Mocking reversal for transaction ${transactionId}`);
+      },
+      async () => {
+        try {
+          const original = await this.getTransactionById(transactionId);
+          if (!original) throw new Error('Transaction not found');
+          if (original.status === 'Voided') throw new Error('Transaction is already voided');
+
+          const reversalData: Omit<Transaction, 'id'> = {
+            date: new Date().toISOString().split('T')[0],
+            description: `REVERSAL: ${original.description}`,
+            purpose: original.purpose,
+            amount: original.amount,
+            type: original.type === 'Income' ? 'Expense' : 'Income',
+            category: original.category,
+            status: 'Voided' as const,
+            bankAccountId: original.bankAccountId,
+            memberId: original.memberId,
+            projectId: original.projectId,
+            year: original.year,
+            transactionType: original.transactionType,
+            reversalOf: transactionId,
+            reversalReason: reason,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          const batch = writeBatch(db);
+          const reversalRef = doc(collection(db, COLLECTIONS.TRANSACTIONS));
+          batch.set(reversalRef, removeUndefined(reversalData));
+          batch.update(doc(db, COLLECTIONS.TRANSACTIONS, transactionId), {
+            status: 'Voided',
+            reversalReason: reason,
+            updatedAt: new Date().toISOString(),
+          });
+          await batch.commit();
+
+          invalidateFinanceCache();
+        } catch (error) {
+          console.error('Error reversing transaction:', error);
           throw error;
         }
       }
@@ -3469,7 +3525,7 @@ export class FinanceService {
       () => {
         localMockTransactions = localMockTransactions.map(t => {
           if (t.id === txId1 || t.id === txId2) {
-            return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: (t.prevStatus ?? 'Cleared') as Transaction['status'], prevStatus: undefined, reconciledBy: undefined, reconciledAt: undefined };
+            return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: (t.prevStatus ?? 'Pending') as Transaction['status'], prevStatus: undefined, reconciledBy: undefined, reconciledAt: undefined };
           }
           return t;
         });
@@ -3480,7 +3536,7 @@ export class FinanceService {
         const batch = writeBatch(db);
         for (const snap of snaps) {
           if (!snap.exists()) continue;
-          const prevStatus = (snap.data() as Transaction).prevStatus ?? 'Cleared';
+          const prevStatus = (snap.data() as Transaction).prevStatus ?? 'Pending';
           batch.update(snap.ref, {
             matchStatus: null,
             matchedBankTxIds: null,

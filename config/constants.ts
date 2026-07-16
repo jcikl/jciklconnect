@@ -12,7 +12,6 @@ export const COLLECTIONS = {
   BANK_ACCOUNTS: 'bankAccounts',
   INVENTORY: 'inventory',
   POINTS: 'points',
-  POINT_RULES: 'pointRules',
   SPONSORSHIPS: 'sponsorships',
   AUTOMATION_RULES: 'automationRules',
   WORKFLOWS: 'workflows',

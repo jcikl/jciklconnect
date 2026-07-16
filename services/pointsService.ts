@@ -534,7 +534,7 @@ export class PointsService {
           async () => {
             try {
               const q = query(
-                collection(db, COLLECTIONS.POINT_RULES),
+                collection(db, COLLECTIONS.POINTS_RULES),
                 where('category', '==', category),
                 where('active', '==', true),
                 limit(1)
@@ -587,12 +587,12 @@ export class PointsService {
               let q;
               if (includeInactive) {
                 q = query(
-                  collection(db, COLLECTIONS.POINT_RULES),
+                  collection(db, COLLECTIONS.POINTS_RULES),
                   orderBy('category')
                 );
               } else {
                 q = query(
-                  collection(db, COLLECTIONS.POINT_RULES),
+                  collection(db, COLLECTIONS.POINTS_RULES),
                   where('active', '==', true),
                   orderBy('category')
                 );
@@ -643,7 +643,7 @@ export class PointsService {
           const ruleId = 'id' in rule ? rule.id : undefined;
           if (ruleId) {
             // Update existing rule
-            const ruleRef = doc(db, COLLECTIONS.POINT_RULES, ruleId);
+            const ruleRef = doc(db, COLLECTIONS.POINTS_RULES, ruleId);
             await updateDoc(ruleRef, {
               ...rule,
               updatedAt: Timestamp.now(),
@@ -658,7 +658,7 @@ export class PointsService {
               createdAt: Timestamp.now(),
               updatedAt: Timestamp.now(),
             };
-            const docRef = await addDoc(collection(db, COLLECTIONS.POINT_RULES), newRule);
+            const docRef = await addDoc(collection(db, COLLECTIONS.POINTS_RULES), newRule);
             PointsService.invalidatePointRulesCache();
             return docRef.id;
           }
@@ -678,7 +678,7 @@ export class PointsService {
       },
       async () => {
         try {
-          const ruleRef = doc(db, COLLECTIONS.POINT_RULES, ruleId);
+          const ruleRef = doc(db, COLLECTIONS.POINTS_RULES, ruleId);
           await updateDoc(ruleRef, {
             active: false,
             updatedAt: Timestamp.now(),

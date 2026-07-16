@@ -39,6 +39,7 @@ export interface Transaction {
   projectId?: string;
   memberId?: string;
   bankAccountId?: string;
+  loId?: string | null;
   reconciledAt?: string;
   reconciledBy?: string;
   referenceNumber?: string | null;
@@ -72,6 +73,8 @@ export interface Transaction {
   eventRegistrationId?: string;
   paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
   toyyibBillCode?: string;
+  reversalOf?: string;
+  reversalReason?: string;
 }
 
 export interface BankAccount {

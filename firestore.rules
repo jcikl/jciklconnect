@@ -284,10 +284,11 @@ service cloud.firestore {
            'matchStatus', 'matchedBankTxIds',
            'memberId', 'loId', 'transactionType', 'year'
          ]));
-      allow delete: if canDeleteFinance() &&
+      allow delete: if isAdmin() || (canDeleteFinance() &&
         resource.data.get('status', '') != 'Reconciled' &&
         resource.data.get('status', '') != 'Partially Reconciled' &&
-        resource.data.get('status', '') != 'Voided';
+        resource.data.get('status', '') != 'Cleared' &&
+        resource.data.get('status', '') != 'Voided');
     }
 
     // Transaction Splits: same rules as transactions; update/delete blocked on Reconciled parent
@@ -456,14 +457,6 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || isBoard();
     }
     
-    // Point Rules collection
-    match /pointRules/{ruleId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && 
-                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
-    }
-    
     // Notifications collection
     match /notifications/{notificationId} {
       // E1 fix (P0): allow read was used for both get and list, but resource.data is null in list queries,
@@ -485,7 +478,8 @@ service cloud.firestore {
          request.resource.data.keys().hasAll(['memberId','title','message','type','read']) &&
          request.resource.data.get('type', '') in [
            'payment_request_cancelled', 'payment_request_submitted',
-           'payment_request_updated', 'event_registration_cancelled'
+           'payment_request_updated', 'event_registration_cancelled',
+           'info'
          ]));
 
       // Users can mark their own notifications as read; board/admin can update any field

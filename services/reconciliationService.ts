@@ -719,7 +719,7 @@ export class ReconciliationService {
         // Full unlink (no specific projectTxId) — restore parent tx status so it re-enters the reconciliation candidate pool
         if (!projectTxId) {
           await FinanceService.updateTransaction(bankTxId, {
-            status: (bankTx as any).prevStatus ?? 'Cleared',
+            status: (bankTx as any).prevStatus ?? 'Pending',
             projectTransactionIds: [],
             projectTransactionId: null,
           });
@@ -731,7 +731,7 @@ export class ReconciliationService {
       const updates: any = {
         projectTransactionIds: [],
         projectTransactionId: null,
-        status: (bankTx as any).prevStatus ?? 'Cleared',
+        status: (bankTx as any).prevStatus ?? 'Pending',
         purpose: '',
       };
 
