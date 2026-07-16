@@ -242,7 +242,7 @@ service cloud.firestore {
           (resource.data.get('status', '') != 'Reconciled' &&
            resource.data.get('status', '') != 'Partially Reconciled' &&
            resource.data.get('status', '') != 'Voided'));
-      // TX-R2: finance staff limited to status/reconciliation fields; Admin unrestricted
+      // TX-R2: finance staff limited to business fields; Admin unrestricted (TX-A: added missing writable fields)
       allow update: if canAccessFinance() &&
         (resource == null ||
           (resource.data.get('status', '') != 'Reconciled' &&
@@ -251,7 +251,10 @@ service cloud.firestore {
         (isAdmin() ||
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'status', 'reconciliationId', 'reconciledAt', 'reconciledBy',
-           'prevStatus', 'paidAt', 'paidBy', 'updatedAt', 'updatedBy', 'notes', 'category'
+           'prevStatus', 'paidAt', 'paidBy', 'updatedAt', 'updatedBy', 'notes', 'category',
+           'isSplit', 'splitIds', 'originalCategory', 'projectId', 'purpose', 'projectTransactionIds',
+           'description', 'amount', 'type', 'date', 'reference', 'bankAccountId', 'attachments',
+           'paymentRequestId', 'inventoryLinkId', 'inventoryVariant', 'inventoryQuantity', 'tags'
          ]));
       allow delete: if canDeleteFinance() &&
         resource.data.get('status', '') != 'Reconciled' &&
@@ -273,7 +276,12 @@ service cloud.firestore {
         (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
          (get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled' &&
           get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Partially Reconciled' &&
-          get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Voided'));
+          get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Voided')) &&
+        (isAdmin() ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'description', 'amount', 'category', 'projectId', 'year', 'memberId',
+           'purpose', 'paymentRequestId', 'type', 'notes', 'updatedAt', 'updatedBy'
+         ]));
       allow delete: if canDeleteFinance() &&
         (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
          (get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled' &&
@@ -288,9 +296,15 @@ service cloud.firestore {
       // PT-1: INACTIVE members excluded; finance/board-only gate mirrors transactions collection
       allow read: if isAuthenticated() && (isAdmin() || isBoard() || canAccessFinance());
       allow create: if canAccessFinance();
-      // PT-update/delete: block modifications to already-reconciled project transactions
+      // PT-update/delete: block modifications to already-reconciled project transactions; PT-U2: add hasOnly
       allow update: if canAccessFinance() &&
-        resource.data.get('status', '') != 'Reconciled';
+        resource.data.get('status', '') != 'Reconciled' &&
+        (isAdmin() ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'description', 'amount', 'type', 'date', 'status', 'category', 'notes',
+           'reference', 'attachments', 'updatedAt', 'updatedBy', 'approvedBy', 'approvedAt',
+           'rejectedBy', 'rejectedAt', 'rejectionReason'
+         ]));
       allow delete: if canDeleteFinance() &&
         resource.data.get('status', '') != 'Reconciled';
     }
@@ -357,8 +371,10 @@ service cloud.firestore {
       return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
     }
     match /eventRegistrations/{regId} {
-      allow read: if isAuthenticated() &&
+      // ER-R1: split get/list — resource.data is null in list queries; members can only self-read via get
+      allow get: if isAuthenticated() &&
         (isAdmin() || resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+      allow list: if isAuthenticated() && (isAdmin() || canReadOrgMembers());
       allow create: if isAuthenticated() &&
         request.resource.data.get('memberId', null) is string &&
         request.resource.data.get('eventId', null) is string &&
@@ -485,14 +501,24 @@ service cloud.firestore {
     }
     
     // Inventory collection
+    // I-8: update hasOnly — lock system fields (createdAt, lastTransactionId) from direct overwrite
     match /inventory/{itemId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && (isAdmin() || isBoard());
+      allow create, delete: if isAuthenticated() && (isAdmin() || isBoard());
+      allow update: if isAuthenticated() && (isAdmin() || isBoard()) &&
+        (isAdmin() ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'name', 'description', 'quantity', 'status', 'location', 'variants',
+           'minQuantity', 'category', 'purchasePrice', 'depreciatedValue', 'notes',
+           'lastCheckedAt', 'checkedOutTo', 'checkedOutDate', 'expectedReturnDate',
+           'updatedAt', 'updatedBy', 'tags', 'serialNumber', 'condition'
+         ]));
     }
 
     // Stock Movements collection
+    // I-4: restrict read to MEMBER+ (was isAuthenticated which includes GUEST)
     match /stock_movements/{movementId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && isMember();
       allow create, update, delete: if isBoard();
     }
     
@@ -652,8 +678,13 @@ service cloud.firestore {
     // Reconciliations collection
     // R-1: use isAdmin()/isBoard() so SUPER_ADMIN is included (was excluded by hardcoded role list)
     // R-8: delete restricted to Admin only — BOARD must not be able to erase audit records
+    // R-3: update hasOnly — BOARD cannot overwrite core audit fields (statementBalance, reconciledBy, etc.)
     match /reconciliations/{reconciliationId} {
-      allow read, create, update: if isAuthenticated() && (isAdmin() || isBoard());
+      allow read, create: if isAuthenticated() && (isAdmin() || isBoard());
+      allow update: if isAuthenticated() && (isAdmin() ||
+        (isBoard() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'notes', 'updatedAt', 'updatedBy', 'status'
+        ])));
       allow delete: if isAuthenticated() && isAdmin();
     }
     

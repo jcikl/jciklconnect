@@ -564,6 +564,7 @@ export class FinanceService {
           }
 
           await updateDoc(transactionRef, updateData);
+          invalidateFinanceCache();
         } catch (error) {
           console.error('Error updating project transaction:', error);
           throw error;
@@ -1136,11 +1137,14 @@ export class FinanceService {
             });
           }
           await typeBatch.commit();
+          invalidateFinanceCache();
         } else {
           await updateDoc(transactionRef, updateData);
+          invalidateFinanceCache();
         }
       } else {
         await updateDoc(transactionRef, updateData);
+        invalidateFinanceCache();
       }
 
       // Sync with Inventory if needed

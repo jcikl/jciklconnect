@@ -303,6 +303,7 @@ export class EventsService {
             attendees: Math.max(0, event.attendees - 1),
             registeredMembers: arrayRemove(memberId),
           });
+          this.invalidateEventsCache();
         } catch (error) {
           console.error('Error canceling registration:', error);
           throw error;

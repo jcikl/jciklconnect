@@ -380,20 +380,28 @@ export class CommunicationService {
 
       // Send in-app notifications if requested
       if (announcementData.sendNotification) {
-        for (const member of targetMembers) {
-          if (member?.id) {
-            try {
-              await this.createNotification({
-                memberId: member.id,
-                title: announcementData.title,
-                message: announcementData.content.substring(0, 200),
-                type: announcementData.priority === 'Urgent' ? 'error' : announcementData.priority === 'High' ? 'warning' : 'info',
-              });
-              notificationsSent++;
-            } catch (error) {
-              console.error(`Error sending notification to member ${member.id}:`, error);
-            }
+        const notifiableMembers = targetMembers.filter(m => m?.id);
+        const results = await Promise.allSettled(
+          notifiableMembers.map(member =>
+            this.createNotification({
+              memberId: member.id,
+              title: announcementData.title,
+              message: announcementData.content.substring(0, 200),
+              type: announcementData.priority === 'Urgent' ? 'error' : announcementData.priority === 'High' ? 'warning' : 'info',
+            })
+          )
+        );
+        const failedMemberIds: string[] = [];
+        results.forEach((result, i) => {
+          if (result.status === 'fulfilled') {
+            notificationsSent++;
+          } else {
+            failedMemberIds.push(notifiableMembers[i].id);
+            console.error(`Error sending notification to member ${notifiableMembers[i].id}:`, result.reason);
           }
+        });
+        if (failedMemberIds.length > 0) {
+          console.error(`Failed to send notifications to members: ${failedMemberIds.join(', ')}`);
         }
       }
 
