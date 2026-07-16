@@ -1411,14 +1411,6 @@
       ]
     },
     {
-      "collectionGroup": "opportunityDrops",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "expiresAt", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "pointEscrow",
       "queryScope": "COLLECTION",
       "fields": [

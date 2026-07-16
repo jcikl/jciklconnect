@@ -72,7 +72,6 @@ export const COLLECTIONS = {
   /** Wolf-like Competition System Collections */
   BOUNTIES: 'bounties',
   CONTRACTS: 'contracts',
-  OPPORTUNITY_DROPS: 'opportunityDrops',
   POINT_ESCROW: 'pointEscrow', // For holding funds during bounty/contract
   PUBLICATIONS: 'publications',
   PARTNERSHIPS: 'partnerships',

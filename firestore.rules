@@ -972,12 +972,6 @@ service cloud.firestore {
                           .hasOnly(['signerIds', 'status', 'proofUrl', 'updatedAt']));
       allow delete: if isAdmin();
     }
-    // FIX 19: hardcoded role list excluded SUPER_ADMIN; replaced with role helpers
-    match /opportunityDrops/{dropId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isBoard() || isAdmin();
-      allow delete: if isAdmin();
-    }
     match /pointEscrow/{escrowId} {
       // FIX 5: split read (resource.data null in list); restrict create/update/delete.
       // Any authenticated user was able to create and modify escrow records.
