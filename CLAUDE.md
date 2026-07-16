@@ -204,11 +204,26 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 ⑤ 逻辑错误报告表：每行一个错误，列 = 错误类型｜位置｜错误描述｜修复原因（大白话）｜修复建议（大白话）｜优先级（P0紧急/P1重要/P2建议）
 ```
 
-### 已分析集合
+### 已分析集合（analyze-collection）
 
-| 集合 | 分析日期 | Service方法数 | CRUD操作数 | 逻辑错误数 | 变体不对称数 | 退回完整度 | 相邻风险集合（修复时需同步检查）|
-|------|----------|--------------|-----------|-----------|------------|-----------|-------------------------------|
+| 集合 | 分析日期 | Service方法数 | CRUD操作数 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 相邻风险集合（修复时需同步检查）|
+|------|----------|--------------|-----------|----------------------|------------|-----------|-------------------------------|
 | `members` | 2026-07-15（v2框架前） | 30 | 20 | 13已修 | 已修 | 部分 | `boardMembers`, `businessDirectory`, `eventRegistrations`, `points` |
+| `transactions` | 2026-07-16 | 39 | 30 | 10（1/4/5）| 4 | 部分 | `transactionSplits`, `projectTrx`, `paymentRequests`, `reconciliations`, `members` |
+| `transactionSplits` | 2026-07-16 | 11 | 9 | 10（0/8/2）| 3 | 部分 | `transactions`, `members`, `paymentRequests` |
+| `projectTrx` | 2026-07-16 | 8 | 10 | 9（0/6/3）| 3 | 部分 | `transactions`, `projects`, `bankAccounts` |
+| `paymentRequests` | 2026-07-16 | 18 | 11 | 7（2/3/2）| 1 | 部分 | `transactions`, `members`, `eventRegistrations`, `notifications` |
+| `eventRegistrations` | 2026-07-16 | 12 | 15 | 12（2/6/4）| 3 | 部分 | `events`, `members`, `points`, `transactions`, `notifications` |
+| `reconciliations` | 2026-07-16 | 11 | 8 | 11（0/7/4）| 2 | 部分 | `transactions`, `bankAccounts`, `members` |
+| `inventoryItems` | 2026-07-16 | 37 | 14 | 13（1/6/6）| 5 | 缺失 | `transactions`, `members`, `notifications`, `financeAlerts` |
+| `notifications` | 2026-07-16 | 19 | 12 | 8（2/4/2）| 2 | 部分 | `members`, `events`, `points`, `workflows` |
+| `financeAlerts` | 2026-07-16 | 2 | 2 | 6（0/3/3）| 0 | 缺失 | `transactions`, `bankAccounts`, `members` |
+
+### 已分析集合（collection-deps）
+
+| 集合 | 分析日期 | 联动集合数 | 强耦合 | 中耦合 | 弱耦合 | P0风险数 | P0风险摘要 |
+|------|----------|-----------|-------|-------|-------|---------|-----------|
+| `transactions` | 2026-07-16 | 10 | 3（`transactionSplits`, `members`, `projectTrx`）| 4（`paymentRequests`, `inventoryItems`, `notifications`, `reconciliations`）| 2（`financeAlerts`, `eventRegistrations`）+ 1 自引用 | 3 | rules `loId` 判断失效（全 LO 数据泄露）；`revertPaid` 非批次（PR 永久 Paid 但无交易）；删 Membership 交易不清 `members.transactionId[]` |
 
 ### Firestore 权限规则注意事项
 

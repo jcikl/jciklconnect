@@ -124,7 +124,8 @@ service cloud.firestore {
                        (request.auth.uid == memberId || isBoard()) &&
                        request.resource.data.name is string &&
                        request.resource.data.email is string &&
-                       request.resource.data.role is string;
+                       request.resource.data.role is string &&
+                       (isBoard() || request.resource.data.get('role', 'GUEST') == 'GUEST');
 
       // Self-write: members may update any profile field EXCEPT the locked list below.
       // GUEST may also set nationality/dob/idNumber; once promoted to MEMBER+ those three are locked.
@@ -295,17 +296,18 @@ service cloud.firestore {
         (isAdmin() ||
          resource.data.get('applicantId', null) == request.auth.uid ||
          (canAccessFinance() && paymentRequestInMyScope()));
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() &&
         request.resource.data.get('applicantId', null) == request.auth.uid &&
         request.resource.data.get('loId', null) is string &&
         request.resource.data.get('referenceNumber', null) is string &&
-        request.resource.data.get('status', null) is string;
+        request.resource.data.get('status', null) in ['draft', 'submitted'];
       allow update: if isAuthenticated() &&
         (isAdmin() ||
          resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft' ||
          resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) in ['submitted', 'approved'] && request.resource.data.get('status', null) == 'cancelled' ||
          resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'rejected' && request.resource.data.get('status', null) == 'submitted' ||
-         canAccessFinance() && paymentRequestInMyScope());
+         canAccessFinance() && paymentRequestInMyScope() &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'updatedBy', 'remark']));
       allow delete: if isAuthenticated() && (
         (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft') ||
         isAdmin() || isDeveloper());
@@ -326,12 +328,13 @@ service cloud.firestore {
       let unchanged = ['status', 'paidAt', 'checkedInAt', 'paymentMethod', 'financeTransactionId',
         'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus', 'billExternalReferenceNo',
         'cancelledAt', 'cancelledBy', 'cancelledByName', 'cancelledByRole',
-        'registeredBy', 'registeredByName', 'memberName'];
+        'registeredBy', 'registeredByName', 'memberName',
+        'eventId', 'memberId', 'loId', 'createdAt', 'updatedAt'];
       return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
     }
     match /eventRegistrations/{regId} {
       allow read: if isAuthenticated() &&
-        (resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+        (isAdmin() || resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
       allow create: if isAuthenticated() &&
         request.resource.data.get('memberId', null) is string &&
         request.resource.data.get('eventId', null) is string &&
@@ -368,14 +371,16 @@ service cloud.firestore {
                       (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
       
-      // System can create notifications
-      allow create: if isAuthenticated();
-      
-      // Users can update their own notifications (mark as read)
-      allow update: if isAuthenticated() && 
-                       (resource.data.memberId == request.auth.uid || 
+      // Only board/admin/system may create notifications to prevent spoofing
+      allow create: if isAuthenticated() && isBoard();
+
+      // Users can mark their own notifications as read; board/admin can update any field
+      allow update: if isAuthenticated() &&
+                       (isAdmin() ||
                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']) ||
+                        (resource.data.memberId == request.auth.uid &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt'])));
       
       allow delete: if isAuthenticated() && 
                        exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
@@ -458,9 +463,7 @@ service cloud.firestore {
     // Inventory collection
     match /inventory/{itemId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && 
-                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      allow create, update, delete: if isAuthenticated() && (isAdmin() || isBoard());
     }
 
     // Stock Movements collection

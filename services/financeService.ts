@@ -3065,51 +3065,68 @@ export class FinanceService {
       // Only `Cleared` transactions qualify — a Pending transaction hasn't actually
       // cleared the bank yet, so folding it into a balanced reconciliation would
       // "launder" unconfirmed money as if it had been verified against the statement.
+      //
+      // Phase-2 is executed after phase-1 (reconciliation record + bank account update)
+      // has already committed.  If phase-2 fails we delete the reconciliation record so
+      // the account returns to a clean state and the user can retry safely.
       if (discrepancies.length === 0) {
-        const allTransactions = await this.getAllTransactions();
-        const accountTransactions = allTransactions.filter(
-          t => t.bankAccountId === accountId &&
-            t.status === 'Cleared' &&
-            new Date(t.date) <= new Date(reconciliationDate)
-        );
+        try {
+          const allTransactions = await this.getAllTransactions();
+          const accountTransactions = allTransactions.filter(
+            t => t.bankAccountId === accountId &&
+              t.status === 'Cleared' &&
+              new Date(t.date) <= new Date(reconciliationDate)
+          );
 
-        // Batch all status updates so they succeed or fail together
-        const BATCH_LIMIT = 500;
-        let markBatch = writeBatch(db);
-        let batchCount = 0;
-        const flushBatch = async () => {
-          if (batchCount > 0) {
-            await markBatch.commit();
-            markBatch = writeBatch(db);
-            batchCount = 0;
-          }
-        };
+          // Batch all status updates so they succeed or fail together
+          const BATCH_LIMIT = 500;
+          let markBatch = writeBatch(db);
+          let batchCount = 0;
+          const flushBatch = async () => {
+            if (batchCount > 0) {
+              await markBatch.commit();
+              markBatch = writeBatch(db);
+              batchCount = 0;
+            }
+          };
 
-        for (const transaction of accountTransactions) {
-          if (!transaction.id) continue;
-          markBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, transaction.id), {
-            prevStatus: transaction.status,
-            status: 'Reconciled',
-            reconciledAt: Timestamp.now(),
-            reconciledBy,
-          });
-          batchCount++;
-          if (batchCount >= BATCH_LIMIT) await flushBatch();
+          for (const transaction of accountTransactions) {
+            if (!transaction.id) continue;
+            markBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, transaction.id), {
+              prevStatus: transaction.status,
+              status: 'Reconciled',
+              reconciledAt: Timestamp.now(),
+              reconciledBy,
+            });
+            batchCount++;
+            if (batchCount >= BATCH_LIMIT) await flushBatch();
 
-          if (transaction.isSplit && transaction.splitIds && transaction.splitIds.length > 0) {
-            const splits = await this.getTransactionSplits(transaction.id);
-            for (const split of splits) {
-              markBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
-                status: 'Reconciled',
-                reconciledAt: Timestamp.now(),
-                reconciledBy,
-              });
-              batchCount++;
-              if (batchCount >= BATCH_LIMIT) await flushBatch();
+            if (transaction.isSplit && transaction.splitIds && transaction.splitIds.length > 0) {
+              const splits = await this.getTransactionSplits(transaction.id);
+              for (const split of splits) {
+                markBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
+                  status: 'Reconciled',
+                  reconciledAt: Timestamp.now(),
+                  reconciledBy,
+                });
+                batchCount++;
+                if (batchCount >= BATCH_LIMIT) await flushBatch();
+              }
             }
           }
+          await flushBatch();
+        } catch (markError) {
+          // Compensate: remove the reconciliation record so the account stays consistent.
+          // The bank account balance update is left in place (it reflects the statement).
+          try {
+            const { deleteDoc } = await import('firebase/firestore');
+            await deleteDoc(reconciliationRef);
+          } catch {
+            // Best-effort cleanup; log the original error regardless.
+          }
+          console.error('reconcileBankAccount: phase-2 transaction marking failed; reconciliation record rolled back', markError);
+          throw markError;
         }
-        await flushBatch();
       }
 
       return docRef.id;
