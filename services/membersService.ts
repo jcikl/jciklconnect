@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { logWrite, logDelete } from './firestoreLogger';
+import { logError as logServiceError } from './errorLoggingService';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import {
   Member,
@@ -437,8 +438,13 @@ export class MembersService {
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.createMember');
       this.invalidateMembersCache();
 
-      const { BusinessDirectoryService } = await import('./businessDirectoryService');
-      await BusinessDirectoryService.syncPublicListing(docRef.id, normalizedData);
+      // Isolate syncPublicListing so a failure here does not roll back the member creation (E-02)
+      try {
+        const { BusinessDirectoryService } = await import('./businessDirectoryService');
+        await BusinessDirectoryService.syncPublicListing(docRef.id, normalizedData);
+      } catch (syncErr) {
+        console.error('syncPublicListing failed after createMember — member was created successfully:', syncErr);
+      }
 
       if (cleanMemberData.introducer) {
         this.recalculateIntroducerStats(cleanMemberData.introducer).catch(console.error);
@@ -710,6 +716,10 @@ export class MembersService {
       );
     } catch (err) {
       console.warn('Board member display sync skipped:', err);
+      logServiceError(
+        err instanceof Error ? err : new Error(String(err)),
+        { component: 'MembersService', action: 'syncBoardMemberDisplayFields', memberId }
+      );
     }
   }
 
@@ -939,17 +949,20 @@ export class MembersService {
           e.code = 'permission-denied'; throw e;
         }
       }
-      await this.updateMember(memberId, { role: newRole });
+      // Query boardMembers first so we can include the displayRole update in the same batch (E-03)
       const boardSnap = await getDocs(
         query(collection(db, 'boardMembers'), where('memberId', '==', memberId))
       );
-      if (!boardSnap.empty) {
-        const roleBatch = writeBatch(db);
-        boardSnap.docs.forEach(d =>
-          roleBatch.update(d.ref, { displayRole: newRole, updatedAt: Timestamp.now() })
-        );
-        await this.commitWithRetry(roleBatch);
-      }
+      const roleBatch = writeBatch(db);
+      roleBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+        role: newRole,
+        updatedAt: Timestamp.now(),
+      });
+      boardSnap.docs.forEach(d =>
+        roleBatch.update(d.ref, { displayRole: newRole, updatedAt: Timestamp.now() })
+      );
+      await this.commitWithRetry(roleBatch);
+      this.invalidateMembersCache();
     } catch (error) {
       console.error('Error updating member role:', error);
       throw error;
@@ -1109,6 +1122,37 @@ export class MembersService {
           batch.update(doc(db, COLLECTIONS.MEMBERS, id), data);
         });
         await this.commitWithRetry(batch);
+      }
+
+      // Clean up boardMembers and businessDirectory for all deleted members (E-01)
+      const [boardSnaps, bizSnaps] = await Promise.all([
+        getDocs(query(collection(db, 'boardMembers'), where('memberId', 'in', memberIds.slice(0, 30)))),
+        getDocs(query(collection(db, COLLECTIONS.BUSINESS_DIRECTORY), where('memberId', 'in', memberIds.slice(0, 30)))),
+      ]);
+      // Handle batches > 30 (Firestore 'in' limit is 30)
+      const extraBoardSnaps = memberIds.length > 30
+        ? await Promise.all(
+            Array.from({ length: Math.ceil((memberIds.length - 30) / 30) }, (_, i) =>
+              getDocs(query(collection(db, 'boardMembers'), where('memberId', 'in', memberIds.slice(30 + i * 30, 60 + i * 30))))
+            )
+          )
+        : [];
+      const extraBizSnaps = memberIds.length > 30
+        ? await Promise.all(
+            Array.from({ length: Math.ceil((memberIds.length - 30) / 30) }, (_, i) =>
+              getDocs(query(collection(db, COLLECTIONS.BUSINESS_DIRECTORY), where('memberId', 'in', memberIds.slice(30 + i * 30, 60 + i * 30))))
+            )
+          )
+        : [];
+      const allBoardDocs = [...boardSnaps.docs, ...extraBoardSnaps.flatMap(s => s.docs)];
+      const allBizDocs = [...bizSnaps.docs, ...extraBizSnaps.flatMap(s => s.docs)];
+      if (allBoardDocs.length > 0 || allBizDocs.length > 0) {
+        const sideCleanupOps = [...allBoardDocs, ...allBizDocs];
+        for (let i = 0; i < sideCleanupOps.length; i += 400) {
+          const cleanBatch = writeBatch(db);
+          sideCleanupOps.slice(i, i + 400).forEach(d => cleanBatch.delete(d.ref));
+          await this.commitWithRetry(cleanBatch);
+        }
       }
 
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.batchDeleteMembers');

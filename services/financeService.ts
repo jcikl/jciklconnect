@@ -41,7 +41,7 @@ const FINANCE_CACHE_PREFIX = 'finance:';
 const TX_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 
 /** Invalidate all finance caches (call after any write to transactions/bankAccounts). */
-function invalidateFinanceCache(): void {
+export function invalidateFinanceCache(): void {
   apiCache.deleteByPrefix(FINANCE_CACHE_PREFIX);
 }
 
@@ -909,6 +909,9 @@ export class FinanceService {
             updatedAt: Timestamp.now(),
           });
 
+          // TS-E3: invalidate cache after every split update so reads reflect the change
+          invalidateFinanceCache();
+
           // Sync inventory stock movement for this split
           const fullSplit = { ...currentSplit, ...updates } as TransactionSplit;
           const { InventoryService } = await import('./inventoryService');
@@ -1758,6 +1761,10 @@ export class FinanceService {
       // Note: project transactions might be in either collection
       let transaction = await this.getTransactionById(transactionId);
 
+      // E2: deleteDoc FIRST so that if it fails (e.g. doc not found), no cascade
+      // cleanup has run yet and there is nothing to undo.
+      await deleteDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId));
+
       if (transaction && transaction.inventoryLinkId && transaction.inventoryQuantity) {
         // Remove stock movement if exists
         const { InventoryService } = await import('./inventoryService');
@@ -1845,14 +1852,15 @@ export class FinanceService {
         }
       }
 
-      // Try deleting from projectTrx collection first
-      await deleteDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId));
+      // E1: invalidate cache after successful delete + cascade
+      invalidateFinanceCache();
     } catch (error) {
       console.error('Error deleting project transaction:', error);
 
-      // If error (e.g. not found), try main collection for backward compatibility
+      // If error (e.g. not found in projectTrx), try main collection for backward compatibility
       try {
         await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+        invalidateFinanceCache();
       } catch (innerError) {
         throw error;
       }
@@ -1899,6 +1907,7 @@ export class FinanceService {
       // quantity was not updated. Flush the finance cache so stale totals don't mask the gap.
       // The inventory quantity discrepancy requires manual reconciliation.
       invalidateFinanceCache();
+      throw error;
     }
   }
 
@@ -3188,6 +3197,7 @@ export class FinanceService {
               status: 'Reconciled',
               reconciledAt: Timestamp.now(),
               reconciledBy,
+              reconciliationId: reconciliationRef.id,
             });
             batchCount++;
             if (batchCount >= BATCH_LIMIT) await flushBatch();
@@ -3205,11 +3215,14 @@ export class FinanceService {
               }
             }
           }
-          await flushBatch();
-          await updateDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId), {
+          // E-5: include lastReconciledAt in the final markBatch so it's atomic
+          // with the transaction status updates.
+          markBatch.update(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId), {
             lastReconciledAt: Timestamp.now(),
             lastReconciledBy: reconciledBy,
           });
+          batchCount++;
+          await flushBatch();
           invalidateFinanceCache();
         } catch (markError) {
           // Compensate: remove the reconciliation record so the account stays consistent.
@@ -3288,16 +3301,44 @@ export class FinanceService {
                 batchCount = 0;
               }
             };
+            const affectedTxIds: string[] = [];
             for (const txDoc of txSnap.docs) {
               rollbackBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, txDoc.id), {
-                status: 'Pending',
+                // E-3: restore the status the transaction had before reconciliation,
+                // not a hardcoded 'Pending' (most transactions were 'Cleared').
+                status: txDoc.data().prevStatus ?? 'Cleared',
                 reconciliationId: null,
                 reconciledAt: null,
                 reconciledBy: null,
               });
+              affectedTxIds.push(txDoc.id);
               batchCount++;
               if (batchCount >= BATCH_LIMIT) await flushBatch();
             }
+
+            // E-6: also reset transactionSplits that belong to the affected transactions
+            if (affectedTxIds.length > 0) {
+              for (let i = 0; i < affectedTxIds.length; i += 10) {
+                const chunk = affectedTxIds.slice(i, i + 10);
+                const splitsSnap = await getDocs(
+                  query(
+                    collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+                    where('parentTransactionId', 'in', chunk)
+                  )
+                );
+                for (const splitDoc of splitsSnap.docs) {
+                  rollbackBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitDoc.id), {
+                    status: splitDoc.data().prevStatus ?? 'Cleared',
+                    reconciliationId: null,
+                    reconciledAt: null,
+                    reconciledBy: null,
+                  });
+                  batchCount++;
+                  if (batchCount >= BATCH_LIMIT) await flushBatch();
+                }
+              }
+            }
+
             await flushBatch();
           }
 

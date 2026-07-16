@@ -306,6 +306,10 @@ export class InventoryService {
       const items = await this.getAllItems();
       const maintenanceSchedules = await this.getMaintenanceSchedules();
 
+      // Collect new alerts (after dedup checks) then write all at once
+      type NewAlert = { itemId: string; type: string; severity: string; message: string };
+      const newAlerts: NewAlert[] = [];
+
       // Check for low stock items
       for (const item of items) {
         if (item.quantity <= (item.minQuantity || 0)) {
@@ -317,7 +321,7 @@ export class InventoryService {
             limit(1)
           ));
           if (existingLowStock.empty) {
-            await this.createAlert({
+            newAlerts.push({
               itemId: item.id,
               type: 'Low Stock',
               severity: item.quantity === 0 ? 'Critical' : 'High',
@@ -338,7 +342,7 @@ export class InventoryService {
               limit(1)
             ));
             if (existingOverdue.empty) {
-              await this.createAlert({
+              newAlerts.push({
                 itemId: item.id,
                 type: 'Overdue Return',
                 severity: 'Medium',
@@ -365,7 +369,7 @@ export class InventoryService {
             limit(1)
           ));
           if (existingMaint.empty) {
-            await this.createAlert({
+            newAlerts.push({
               itemId: schedule.itemId,
               type: 'Maintenance Due',
               severity: daysUntil < -7 ? 'High' : 'Medium',
@@ -373,6 +377,19 @@ export class InventoryService {
             });
           }
         }
+      }
+
+      // Write all new alerts atomically
+      if (newAlerts.length > 0) {
+        const batch = writeBatch(db);
+        newAlerts.forEach(alert => {
+          batch.set(doc(collection(db, COLLECTIONS.INVENTORY_ALERTS)), {
+            ...alert,
+            acknowledged: false,
+            createdAt: Timestamp.now(),
+          });
+        });
+        await batch.commit();
       }
     } catch (error) {
       console.error('Error generating alerts:', error);
@@ -552,10 +569,12 @@ export class InventoryService {
 
       const issues: string[] = [];
 
-      // Import FinanceService dynamically to avoid circular dependency
-      const { FinanceService } = await import('./financeService');
-      const allTransactions = await FinanceService.getAllTransactions();
-      const transaction = allTransactions.find(t => t.id === transactionId);
+      // Fetch only the specific transaction to avoid loading all records
+      const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
+      const transactionSnap = await getDoc(transactionRef);
+      const transaction = transactionSnap.exists()
+        ? { id: transactionSnap.id, ...transactionSnap.data() }
+        : null;
 
       if (!transaction) {
         issues.push('Transaction not found');
@@ -746,12 +765,30 @@ export class InventoryService {
         throw new Error('Item is not available for checkout');
       }
 
-      await this.updateItem(itemId, {
+      const batch = writeBatch(db);
+      const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+      batch.update(itemRef, {
         status: 'Checked Out',
         checkedOutTo: memberId,
         checkedOutDate: new Date().toISOString(),
-        expectedReturnDate: expectedReturnDate?.toISOString()
+        expectedReturnDate: expectedReturnDate?.toISOString() ?? deleteField(),
+        updatedAt: Timestamp.now(),
       });
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      batch.set(movementRef, {
+        itemId,
+        itemName: item.name,
+        type: 'Out',
+        quantity: 1,
+        previousQuantity: item.quantity,
+        newQuantity: item.quantity,
+        reason: 'Checkout',
+        performedBy: memberId,
+        date: Timestamp.now(),
+        createdAt: Timestamp.now(),
+        reference: 'manual checkout',
+      });
+      await batch.commit();
     } catch (error) {
       console.error('Error checking out item:', error);
       throw error;
@@ -765,8 +802,13 @@ export class InventoryService {
       () => { console.log(`[DEV MODE] Checking in item ${itemId}`); },
       async () => {
     try {
+      const item = await this.getItemById(itemId);
+      if (!item) {
+        throw new Error('Item not found');
+      }
+      const batch = writeBatch(db);
       const docRef = doc(db, COLLECTIONS.INVENTORY, itemId);
-      await updateDoc(docRef, {
+      batch.update(docRef, {
         status: 'Available',
         checkedOutTo: deleteField(),
         checkedOutDate: deleteField(),
@@ -774,6 +816,21 @@ export class InventoryService {
         returnedDate: new Date().toISOString(),
         updatedAt: Timestamp.now(),
       });
+      const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+      batch.set(movementRef, {
+        itemId,
+        itemName: item.name,
+        type: 'In',
+        quantity: 1,
+        previousQuantity: item.quantity,
+        newQuantity: item.quantity,
+        reason: 'Checkin',
+        performedBy: (item as any).checkedOutTo || 'unknown',
+        date: Timestamp.now(),
+        createdAt: Timestamp.now(),
+        reference: 'manual checkin',
+      });
+      await batch.commit();
     } catch (error) {
       console.error('Error checking in item:', error);
       throw error;
@@ -1164,11 +1221,35 @@ export class InventoryService {
         const movementDoc = snapshot.docs[0];
         const movement = movementDoc.data() as StockMovement;
 
-        // Revert inventory
-        await this.adjustVariantQuantityOnly(movement.itemId, movement.variant || '', -movement.quantity);
-
-        // Delete the record
-        await deleteDoc(movementDoc.ref);
+        // Revert inventory and delete movement atomically
+        const item = await this.getItemById(movement.itemId);
+        if (item) {
+          const variantSize = movement.variant || '';
+          const change = -movement.quantity;
+          const variants = [...(item.variants || [])];
+          const variantIndex = variants.findIndex(v => v.size === variantSize);
+          if (variantIndex > -1) {
+            variants[variantIndex].quantity += change;
+          } else if (change > 0) {
+            variants.push({ size: variantSize, quantity: change });
+          } else {
+            variants.push({ size: variantSize, quantity: change });
+          }
+          const newTotalQuantity = variants.reduce((sum, v) => sum + v.quantity, 0);
+          const batch = writeBatch(db);
+          const itemRef = doc(db, COLLECTIONS.INVENTORY, movement.itemId);
+          batch.update(itemRef, {
+            variants,
+            quantity: newTotalQuantity,
+            status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
+            updatedAt: Timestamp.now(),
+          });
+          batch.delete(movementDoc.ref);
+          await batch.commit();
+        } else {
+          // Item no longer exists; just delete the orphan movement
+          await deleteDoc(movementDoc.ref);
+        }
       }
     } catch (error) {
       console.error('Error deleting stock movement:', error);

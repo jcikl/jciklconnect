@@ -573,6 +573,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       const now = new Date().toISOString();
       const actorName = member?.name ?? member?.id ?? 'Admin';
       await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: now, checkedInByName: actorName });
+      EventsService.invalidateEventsCache();
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'checked_in' as const, checkedInAt: now, checkedInByName: actorName } : r)));
       showToast('Marked as checked in', 'success');
     } catch {
@@ -587,6 +588,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     const prevStatus = reg.paidAt ? 'paid' : 'registered';
     try {
       await EventRegistrationService.updateStatus(reg.id, prevStatus, { checkedInAt: null, checkedInByName: null });
+      EventsService.invalidateEventsCache();
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: prevStatus as EventRegistration['status'], checkedInAt: null, checkedInByName: null } : r)));
       showToast('Check-in reverted', 'success');
     } catch {

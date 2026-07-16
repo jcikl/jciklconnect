@@ -16,6 +16,8 @@ export interface InventoryItem {
   returnedDate?: string;
   minQuantity?: number;
   maintenanceSchedule?: MaintenanceSchedule;
+  lastTransactionId?: string;
+  lastTransactionDate?: string;
   lastSaleDate?: string;
   purchaseDate?: string;
   purchasePrice?: number;
@@ -79,9 +81,10 @@ export interface Notification {
   memberId?: string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'ai';
+  type: 'info' | 'success' | 'warning' | 'error' | 'ai' | 'dues_reminder' | 'event_reminder' | 'payment_request_cancelled' | 'payment_request_submitted' | 'payment_request_updated' | 'event_registration_cancelled';
   read: boolean;
   timestamp: string;
+  readAt?: string;
 }
 
 export interface ClubActivity {

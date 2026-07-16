@@ -218,6 +218,27 @@ export class EventsService {
             query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('eventId', '==', eventId))
           );
           if (!regSnap.empty) {
+            // FIX E4: clean up linked finance transactions (Pending/Cleared) before
+            // deleting registration docs, to avoid orphaned transaction records.
+            const { FinanceService } = await import('./financeService');
+            const txIds = regSnap.docs
+              .map(d => d.data().financeTransactionId as string | undefined)
+              .filter((id): id is string => Boolean(id));
+            if (txIds.length > 0) {
+              await Promise.allSettled(
+                txIds.map(async txId => {
+                  try {
+                    const tx = await FinanceService.getTransactionById(txId);
+                    if (tx && (tx.status === 'Pending' || tx.status === 'Cleared')) {
+                      await FinanceService.deleteTransaction(txId);
+                    }
+                  } catch (err) {
+                    console.warn('[EventsService.deleteEvent] Could not clean up tx', txId, err);
+                  }
+                })
+              );
+            }
+
             const BATCH_SIZE = 490;
             const docs = regSnap.docs;
             for (let i = 0; i < docs.length; i += BATCH_SIZE) {
@@ -324,11 +345,25 @@ export class EventsService {
           if (!event) throw new Error('Event not found');
 
           // N-1: cancel reg doc first, then decrement event counter — consistent with registerForEvent.
-          // If updateDoc fails after cancel, counter is high by 1 (minor) vs the previous order where
-          // counter was already decremented but the reg doc remained active (worse: appears to have free slot).
+          // FIX E5: capture financeTransactionId BEFORE cancelling, update registration status FIRST,
+          // then delete the finance transaction. This ensures the registration is never left in an
+          // active state while its transaction is already gone (which made it look paid but uncancelled).
           const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
+          const financeTransactionId: string | undefined = reg?.financeTransactionId ?? undefined;
           if (reg) {
             await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, cancelledByRole);
+          }
+          // Delete linked finance transaction only AFTER status is safely 'cancelled'
+          if (financeTransactionId) {
+            try {
+              const { FinanceService } = await import('./financeService');
+              const tx = await FinanceService.getTransactionById(financeTransactionId);
+              if (tx && (tx.status === 'Pending' || tx.status === 'Cleared')) {
+                await FinanceService.deleteTransaction(financeTransactionId);
+              }
+            } catch (txErr) {
+              console.warn('[EventsService.cancelRegistration] Could not delete tx', financeTransactionId, txErr);
+            }
           }
           await updateDoc(eventRef, {
             attendees: Math.max(0, event.attendees - 1),
@@ -468,12 +503,11 @@ export class EventsService {
             const at = (checkInTime ?? new Date()).toISOString();
             await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
           }
-          // 报名/缴费/签到一致：同步签到记录到 events.attendanceList（Story 8.1）
+          // FIX E2: sync memberId (string) into events.attendanceList so the field
+          // stays consistent with eventRegistrations status='checked_in'.
           await updateDoc(eventRef, {
-            attendanceList: arrayUnion({
-              memberId,
-              checkInTime: checkInTime ? Timestamp.fromDate(checkInTime) : Timestamp.now(),
-            }),
+            attendanceList: arrayUnion(memberId),
+            updatedAt: Timestamp.now(),
           });
 
           // E-3: PointsService.awardEventAttendancePoints removed — the Cloud Function
@@ -486,6 +520,40 @@ export class EventsService {
           MembersService.recalculateAttendance(memberId).catch(console.error);
         } catch (error) {
           console.error('Error marking attendance:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Undo attendance (un-check-in) — FIX E3
+  static async undoAttendance(
+    eventId: string,
+    memberId: string
+  ): Promise<void> {
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+
+          const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
+          if (reg) {
+            if (reg.status !== 'checked_in') {
+              throw new Error('Member is not currently checked in');
+            }
+            await EventRegistrationService.updateStatus(reg.id, 'registered', {});
+          }
+          // FIX E3: remove memberId from events.attendanceList to match reverted status
+          await updateDoc(eventRef, {
+            attendanceList: arrayRemove(memberId),
+            updatedAt: Timestamp.now(),
+          });
+
+          const { MembersService } = await import('./membersService');
+          MembersService.recalculateAttendance(memberId).catch(console.error);
+        } catch (error) {
+          console.error('Error undoing attendance:', error);
           throw error;
         }
       }

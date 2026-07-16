@@ -73,6 +73,10 @@ export const useCommunication = () => {
     }
   };
 
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    await CommunicationService.deleteNotification(notificationId);
+  }, []);
+
   return {
     posts,
     notifications,
@@ -82,5 +86,6 @@ export const useCommunication = () => {
     createPost,
     likePost,
     markNotificationAsRead,
+    deleteNotification,
   };
 };

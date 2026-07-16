@@ -22,7 +22,7 @@ import { PaymentRequest, PaymentRequestStatus } from '../types';
 import { removeUndefined } from '../utils/dataUtils';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_PAYMENT_REQUESTS } from './mockData';
-import { FinanceService } from './financeService';
+import { FinanceService, invalidateFinanceCache } from './financeService';
 
 /** Board positions authorised to approve/reject PRs (情景 25) */
 const APPROVER_BOARD_TITLES = ['President', 'Secretary', 'Honorary Treasurer'];
@@ -148,6 +148,7 @@ export class PaymentRequestService {
       reviewedAt: null,
     });
     const ref = await addDoc(collection(db, COLLECTIONS.PAYMENT_REQUESTS), payload);
+    invalidateFinanceCache();
     // Notify approvers if submitted immediately (情景 NN)
     if ((data.status ?? 'submitted') === 'submitted') {
       const pr = { id: ref.id, ...payload, referenceNumber } as unknown as PaymentRequest;
@@ -322,9 +323,27 @@ export class PaymentRequestService {
           batch.set(txRef, transactionPayload);
           batch.update(ref, prUpdatePayload);
           await batch.commit();
+          invalidateFinanceCache();
         } else {
-          await updateDoc(ref, prUpdatePayload);
-          await this._deleteExpenseTransactionForPR(id);
+          // E-5: query linked expense txs first, then batch status update + deletions atomically
+          const linkedQ = query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('paymentRequestId', '==', id),
+            where('type', '==', 'Expense')
+          );
+          const linkedSnap = await getDocs(linkedQ);
+          const batch = writeBatch(db);
+          batch.update(ref, prUpdatePayload);
+          for (const txDoc of linkedSnap.docs) {
+            const tx = txDoc.data() as import('../types').Transaction;
+            if (tx.status === 'Reconciled' || tx.status === 'Partially Reconciled') {
+              console.warn(`[PaymentRequestService] Skipping delete of reconciled transaction ${txDoc.id} linked to PR ${id} — reconcile must be reversed manually first`);
+              continue;
+            }
+            batch.delete(txDoc.ref);
+          }
+          await batch.commit();
+          invalidateFinanceCache();
         }
 
         // Notify applicant (AA)
@@ -357,6 +376,7 @@ export class PaymentRequestService {
           paidAt: bankTxDate,
           updatedAt: Timestamp.now(),
         });
+        invalidateFinanceCache();
         // Notify applicant (AA)
         const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
         if (snap.exists()) {
@@ -385,6 +405,7 @@ export class PaymentRequestService {
           paidAt: null,
           updatedAt: Timestamp.now(),
         });
+        invalidateFinanceCache();
       }
     );
   }
@@ -415,6 +436,7 @@ export class PaymentRequestService {
           updatedAt: Timestamp.now(),
           updatedBy,
         });
+        invalidateFinanceCache();
         const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
         if (snap.exists()) await this._notifyApprovers({ id: snap.id, ...snap.data() } as PaymentRequest);
       }
@@ -488,23 +510,28 @@ export class PaymentRequestService {
     );
   }
 
-  static async update(id: string, updates: Partial<Pick<PaymentRequest, 'purpose' | 'amount' | 'totalAmount' | 'activityRef' | 'status' | 'items'>>, updatedBy?: string | null): Promise<void> {
+  static async update(id: string, updates: Partial<Pick<PaymentRequest, 'purpose' | 'amount' | 'totalAmount' | 'activityRef' | 'items'>>, updatedBy?: string | null): Promise<void> {
     return withDevMode(
       () => {
         const idx = devPaymentRequests.findIndex((p) => p.id === id);
         if (idx >= 0) {
           const now = new Date().toISOString();
           devPaymentRequests = [...devPaymentRequests];
-          devPaymentRequests[idx] = { ...devPaymentRequests[idx], ...updates, updatedAt: now, updatedBy: updatedBy ?? null };
+          // E-8: exclude status — only dedicated methods may change status
+          const { status: _status, ...safeUpdates } = updates as any;
+          devPaymentRequests[idx] = { ...devPaymentRequests[idx], ...safeUpdates, updatedAt: now, updatedBy: updatedBy ?? null };
         }
       },
       async () => {
+        // E-8: strip status so callers cannot bypass the dedicated status-transition methods
+        const { status: _status, ...safeUpdates } = updates as any;
         const payload = removeUndefined({
-          ...updates,
+          ...safeUpdates,
           updatedAt: Timestamp.now(),
           updatedBy: updatedBy ?? null,
         });
         await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
+        invalidateFinanceCache();
 
         // If amount changed and PR is already approved, sync the linked expense transaction (情景 R)
         if ((updates.amount !== undefined || updates.totalAmount !== undefined)) {
@@ -553,6 +580,7 @@ export class PaymentRequestService {
           updatedBy: userId,
           ...(expenseTxCleanupFailed ? { expenseTxFailed: true } : {}),
         });
+        invalidateFinanceCache();
         // Notify applicant (AA)
         const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
         if (snap.exists()) await this._notifyApplicant({ id: snap.id, ...snap.data() } as PaymentRequest, 'cancelled');
@@ -606,13 +634,21 @@ export class PaymentRequestService {
         where('type', '==', 'Expense')
       );
       const snap = await getDocs(q);
-      const linked = snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').Transaction));
-      for (const tx of linked) {
+      // E-6: collect eligible refs then delete in one writeBatch instead of individual calls
+      const batch = writeBatch(db);
+      let hasDeletes = false;
+      for (const txDoc of snap.docs) {
+        const tx = txDoc.data() as import('../types').Transaction;
         if (tx.status === 'Reconciled' || tx.status === 'Partially Reconciled') {
-          console.warn(`[PaymentRequestService] Skipping delete of reconciled transaction ${tx.id} linked to PR ${prId} — reconcile must be reversed manually first`);
+          console.warn(`[PaymentRequestService] Skipping delete of reconciled transaction ${txDoc.id} linked to PR ${prId} — reconcile must be reversed manually first`);
           continue;
         }
-        await FinanceService.deleteTransaction(tx.id);
+        batch.delete(txDoc.ref);
+        hasDeletes = true;
+      }
+      if (hasDeletes) {
+        await batch.commit();
+        invalidateFinanceCache();
       }
     } catch (err) {
       console.error('[PaymentRequestService] Failed to delete expense transaction for PR', prId, err);

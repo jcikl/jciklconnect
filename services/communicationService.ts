@@ -180,20 +180,25 @@ export class CommunicationService {
 
   // Create notification
   static async createNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'read'>): Promise<string> {
-    try {
-      const newNotification = {
-        ...notificationData,
-        timestamp: Timestamp.now(),
-        read: false,
-        createdAt: Timestamp.now(),
-      };
-      
-      const docRef = await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), newNotification);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log('[DEV MODE] createNotification:', notificationData); return 'mock-notification-id'; },
+      async () => {
+        try {
+          const newNotification = {
+            ...notificationData,
+            timestamp: Timestamp.now(),
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+
+          const docRef = await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), newNotification);
+          return docRef.id;
+        } catch (error) {
+          console.error('Error creating notification:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Send email notification

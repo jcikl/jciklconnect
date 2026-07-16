@@ -152,6 +152,7 @@ export interface ProjectTransaction {
   approvedBy?: string;
   approvedAt?: string;
   tags?: string[];
+  status?: string;
 }
 
 export interface ProjectFinancialSummary {
