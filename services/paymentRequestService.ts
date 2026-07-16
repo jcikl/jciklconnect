@@ -7,6 +7,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -282,27 +283,50 @@ export class PaymentRequestService {
         }
 
         const now = Timestamp.now();
-        const payload: any = {
+        const prUpdatePayload: any = {
           status,
           reviewedBy: reviewedBy ?? null,
           reviewedAt: now,
           updatedAt: now,
         };
-        if (status === 'rejected') payload.rejectionReason = rejectionReason ?? null;
-
-        await updateDoc(ref, payload);
+        if (status === 'rejected') prUpdatePayload.rejectionReason = rejectionReason ?? null;
 
         if (status === 'approved') {
-          const snap = await getDoc(ref);
-          if (snap.exists()) {
-            const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
-            await this._createExpenseTransaction(pr, reviewedBy);
-          }
-        }
-        if (status === 'rejected') {
-          // Defensive: clears any expense tx that may already exist for this PR (情景 KK).
+          const pr = { id: snap0.id, ...snap0.data() } as PaymentRequest;
+          const category = pr.category === 'projects_activities' ? 'Projects & Activities' : 'Administrative';
+          const projectId = pr.activityId || pr.activityRef || undefined;
+          const year = new Date(pr.date || pr.createdAt).getFullYear();
+          const description = pr.items?.length
+            ? pr.items.map((i: any) => i.purpose).filter(Boolean).join(', ')
+            : (pr.purpose || pr.referenceNumber);
+          const txDate = pr.date || pr.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0];
+          const transactionPayload = removeUndefined({
+            date: Timestamp.fromDate(new Date(txDate)),
+            description,
+            referenceNumber: pr.referenceNumber,
+            amount: pr.totalAmount || pr.amount,
+            type: 'Expense',
+            category,
+            status: 'Pending',
+            paymentRequestId: pr.id,
+            projectId: projectId || (category === 'Administrative' ? 'Administrative' : undefined),
+            bankAccountId: pr.claimFromBankAccountId || undefined,
+            purpose: pr.purpose || undefined,
+            year,
+            source: 'manual',
+            createdAt: now,
+            updatedAt: now,
+          });
+          const batch = writeBatch(db);
+          const txRef = doc(collection(db, COLLECTIONS.TRANSACTIONS));
+          batch.set(txRef, transactionPayload);
+          batch.update(ref, prUpdatePayload);
+          await batch.commit();
+        } else {
+          await updateDoc(ref, prUpdatePayload);
           await this._deleteExpenseTransactionForPR(id);
         }
+
         // Notify applicant (AA)
         const snap2 = await getDoc(ref);
         if (snap2.exists()) {
@@ -544,8 +568,23 @@ export class PaymentRequestService {
         devPaymentRequests = devPaymentRequests.filter(p => p.id !== id);
       },
       async () => {
-        await this._deleteExpenseTransactionForPR(id);
-        await deleteDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        const linkedQ = query(
+          collection(db, COLLECTIONS.TRANSACTIONS),
+          where('paymentRequestId', '==', id),
+          where('type', '==', 'Expense')
+        );
+        const linkedSnap = await getDocs(linkedQ);
+        const batch = writeBatch(db);
+        for (const txDoc of linkedSnap.docs) {
+          const tx = txDoc.data() as import('../types').Transaction;
+          if (tx.status === 'Reconciled' || tx.status === 'Partially Reconciled') {
+            console.warn(`[PaymentRequestService] Skipping delete of reconciled transaction ${txDoc.id} linked to PR ${id} — reconcile must be reversed manually first`);
+            continue;
+          }
+          batch.delete(txDoc.ref);
+        }
+        batch.delete(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        await batch.commit();
       }
     );
   }

@@ -423,8 +423,15 @@ service cloud.firestore {
                       (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
       
-      // Only board/admin/system may create notifications to prevent spoofing
-      allow create: if isAuthenticated() && isBoard();
+      // PR-C: MEMBER cancel/submit notifications need create rights; N-8: require all fields present
+      // isBoard() for general notifications; isMember() for specific self-service action types only
+      allow create: if isAuthenticated() && (isBoard() ||
+        (isMember() &&
+         request.resource.data.keys().hasAll(['memberId','title','message','type','read']) &&
+         request.resource.data.get('type', '') in [
+           'payment_request_cancelled', 'payment_request_submitted',
+           'payment_request_updated', 'event_registration_cancelled'
+         ]));
 
       // Users can mark their own notifications as read; board/admin can update any field
       allow update: if isAuthenticated() &&
@@ -434,11 +441,13 @@ service cloud.firestore {
                         (resource.data.memberId == request.auth.uid &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt'])));
       
-      allow delete: if isAuthenticated() && 
-                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // N-7: allow members to delete their own notifications for inbox cleanup
+      allow delete: if isAuthenticated() &&
+                       (resource.data.memberId == request.auth.uid ||
+                        (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
     }
-    
+
     // Documents collection
     match /documents/{documentId} {
       allow read: if isAuthenticated();
@@ -971,7 +980,9 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['resolved', 'resolvedAt', 'resolvedBy', 'updatedAt']
         );
-      allow create, delete: if false;
+      allow create: if false;
+      // FA-5: Admin can delete invalid/stale alerts that can't be resolved
+      allow delete: if isAuthenticated() && isAdmin();
     }
 
     // Firestore audit log — written by firestoreLogger, read by admins only

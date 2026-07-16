@@ -96,6 +96,7 @@ export interface FinanceAlert {
   resolvedAt?: string;
   resolvedBy?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type PaymentRequestStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'paid';

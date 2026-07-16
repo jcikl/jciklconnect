@@ -164,6 +164,20 @@ export class CommunicationService {
     );
   }
 
+  static async deleteNotification(notificationId: string): Promise<void> {
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Simulating deleting notification ${notificationId}`); },
+      async () => {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId));
+        } catch (error) {
+          console.error('Error deleting notification:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
   // Create notification
   static async createNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'read'>): Promise<string> {
     try {

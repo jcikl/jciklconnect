@@ -213,6 +213,20 @@ export class EventsService {
       async () => {
         try {
           await deleteDoc(doc(db, COLLECTIONS.PROJECTS, eventId));
+
+          const regSnap = await getDocs(
+            query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('eventId', '==', eventId))
+          );
+          if (!regSnap.empty) {
+            const BATCH_SIZE = 490;
+            const docs = regSnap.docs;
+            for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+              const batch = writeBatch(db);
+              docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+              await batch.commit();
+            }
+          }
+
           this.invalidateEventsCache();
         } catch (error) {
           console.error('Error deleting event:', error);
@@ -253,21 +267,38 @@ export class EventsService {
             throw new Error('Event is full');
           }
 
-          // E-5: write registration doc first, then update event counter.
-          // If events update fails, the reg exists but the counter is low — a minor desync.
-          // The previous order (events update first) was worse: incremented counter with no registration doc.
+          let newRegistrationId: string | null = null;
+          let wasReactivated = false;
           if (existing && existing.status === 'cancelled') {
+            wasReactivated = true;
             await EventRegistrationService.updateStatus(existing.id, 'registered', {
               registeredBy: extraFields?.registeredBy,
               registeredByName: extraFields?.registeredByName,
             });
           } else {
-            await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID, extraFields);
+            newRegistrationId = await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID, extraFields);
           }
-          await updateDoc(eventRef, {
-            attendees: event.attendees + 1,
-            registeredMembers: arrayUnion(memberId),
-          });
+          try {
+            await updateDoc(eventRef, {
+              attendees: event.attendees + 1,
+              registeredMembers: arrayUnion(memberId),
+            });
+          } catch (counterError) {
+            if (newRegistrationId) {
+              try {
+                await deleteDoc(doc(db, COLLECTIONS.EVENT_REGISTRATIONS, newRegistrationId));
+              } catch (rollbackError) {
+                console.error('Error rolling back registration doc:', rollbackError);
+              }
+            } else if (wasReactivated && existing) {
+              try {
+                await EventRegistrationService.updateStatus(existing.id, 'cancelled', {});
+              } catch (rollbackError) {
+                console.error('Error rolling back reactivated registration:', rollbackError);
+              }
+            }
+            throw counterError;
+          }
         } catch (error) {
           console.error('Error registering for event:', error);
           throw error;
@@ -354,18 +385,51 @@ export class EventsService {
           }
 
           // After batch succeeds, clean up linked finance txs (best effort — Reconciled txs are skipped)
-          for (const reg of active) {
-            if (reg.financeTransactionId) {
-              try {
-                const { FinanceService } = await import('./financeService');
-                const tx = await FinanceService.getTransactionById(reg.financeTransactionId);
-                if (tx && (tx.status === 'Pending' || tx.status === 'Cleared')) {
-                  await FinanceService.deleteTransaction(reg.financeTransactionId);
+          await Promise.allSettled(
+            active
+              .filter(reg => reg.financeTransactionId)
+              .map(async reg => {
+                try {
+                  const { FinanceService } = await import('./financeService');
+                  const tx = await FinanceService.getTransactionById(reg.financeTransactionId!);
+                  if (tx && (tx.status === 'Pending' || tx.status === 'Cleared')) {
+                    await FinanceService.deleteTransaction(reg.financeTransactionId!);
+                  }
+                } catch (err) {
+                  console.warn('[EventsService.cancelEvent] Could not clean up tx for', reg.id, err);
                 }
-              } catch (err) {
-                console.warn('[EventsService.cancelEvent] Could not clean up tx for', reg.id, err);
-              }
-            }
+              })
+          );
+
+          const checkedIn = active.filter(reg => reg.status === 'checked_in');
+          if (checkedIn.length > 0) {
+            const { PointsService } = await import('./pointsService');
+            await Promise.allSettled(
+              checkedIn.map(async reg => {
+                try {
+                  const pointSnap = await getDocs(
+                    query(
+                      collection(db, COLLECTIONS.POINTS),
+                      where('memberId', '==', reg.memberId),
+                      where('relatedEntityId', '==', eventId)
+                    )
+                  );
+                  const total = pointSnap.docs.reduce((sum, d) => sum + (d.data().amount ?? d.data().points ?? 0), 0);
+                  if (total > 0) {
+                    await PointsService.awardPoints(
+                      reg.memberId,
+                      -total,
+                      'EVENT_ATTENDANCE',
+                      'Reversed: event cancelled',
+                      eventId,
+                      'event'
+                    );
+                  }
+                } catch (err) {
+                  console.warn('[EventsService.cancelEvent] Could not reverse points for', reg.memberId, err);
+                }
+              })
+            );
           }
         }
 

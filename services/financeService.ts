@@ -1669,6 +1669,14 @@ export class FinanceService {
             }
           }
 
+          if (transaction?.projectTransactionIds?.length) {
+            const ptBatch = writeBatch(db);
+            for (const ptId of transaction.projectTransactionIds) {
+              ptBatch.delete(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, ptId));
+            }
+            await ptBatch.commit();
+          }
+
           // TX-W1: revertPaid BEFORE deleteDoc — if deleteDoc succeeded but revertPaid failed,
           // the paymentRequest would stay 'paid' with no linked transaction.
           if (transaction?.paymentRequestId) {
@@ -3194,6 +3202,10 @@ export class FinanceService {
             }
           }
           await flushBatch();
+          await updateDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId), {
+            lastReconciledAt: Timestamp.now(),
+            lastReconciledBy: reconciledBy,
+          });
           invalidateFinanceCache();
         } catch (markError) {
           // Compensate: remove the reconciliation record so the account stays consistent.
@@ -3239,6 +3251,55 @@ export class FinanceService {
           } as ReconciliationRecord));
         } catch (error) {
           console.error('Error fetching reconciliation history:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  static async deleteReconciliation(reconciliationId: string): Promise<void> {
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] Would delete reconciliation ${reconciliationId}`);
+      },
+      async () => {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.RECONCILIATIONS, reconciliationId));
+
+          const txSnap = await getDocs(
+            query(
+              collection(db, COLLECTIONS.TRANSACTIONS),
+              where('reconciliationId', '==', reconciliationId)
+            )
+          );
+
+          if (!txSnap.empty) {
+            const BATCH_LIMIT = 500;
+            let rollbackBatch = writeBatch(db);
+            let batchCount = 0;
+            const flushBatch = async () => {
+              if (batchCount > 0) {
+                await rollbackBatch.commit();
+                rollbackBatch = writeBatch(db);
+                batchCount = 0;
+              }
+            };
+            for (const txDoc of txSnap.docs) {
+              rollbackBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, txDoc.id), {
+                status: 'Pending',
+                reconciliationId: null,
+                reconciledAt: null,
+                reconciledBy: null,
+              });
+              batchCount++;
+              if (batchCount >= BATCH_LIMIT) await flushBatch();
+            }
+            await flushBatch();
+          }
+
+          invalidateFinanceCache();
+        } catch (error) {
+          console.error('Error deleting reconciliation:', error);
           throw error;
         }
       }

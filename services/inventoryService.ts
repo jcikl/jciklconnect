@@ -134,7 +134,17 @@ export class InventoryService {
       () => { console.log(`[DEV MODE] Deleting inventory item ${itemId}`); },
       async () => {
     try {
-      await deleteDoc(doc(db, COLLECTIONS.INVENTORY, itemId));
+      const [movementsSnap, alertsSnap, schedulesSnap] = await Promise.all([
+        getDocs(query(collection(db, COLLECTIONS.STOCK_MOVEMENTS), where('itemId', '==', itemId))),
+        getDocs(query(collection(db, COLLECTIONS.INVENTORY_ALERTS), where('itemId', '==', itemId))),
+        getDocs(query(collection(db, COLLECTIONS.MAINTENANCE_SCHEDULES), where('itemId', '==', itemId))),
+      ]);
+      const batch = writeBatch(db);
+      batch.delete(doc(db, COLLECTIONS.INVENTORY, itemId));
+      movementsSnap.docs.forEach(d => batch.delete(d.ref));
+      alertsSnap.docs.forEach(d => batch.delete(d.ref));
+      schedulesSnap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
     } catch (error) {
       console.error('Error deleting inventory item:', error);
       throw error;
@@ -975,43 +985,101 @@ export class InventoryService {
       const movementDoc = snapshot.docs[0];
       const movement = movementDoc.data() as StockMovement;
 
-      // Determine new signed quantity
       const newSignedQty = details.operation === 'increment' ? details.quantity : -details.quantity;
-
-      // Handle Inventory Logic
       const sameItem = movement.itemId === details.itemId;
       const sameVariant = movement.variant === details.variantSize;
 
-      if (sameItem && sameVariant) {
-        // Same item, just update the difference
-        const netChange = newSignedQty - movement.quantity;
-        if (netChange !== 0) {
-          await this.adjustVariantQuantityOnly(details.itemId, details.variantSize, netChange);
+      const batch = writeBatch(db);
+
+      if (sameItem) {
+        const item = await this.getItemById(details.itemId);
+        if (item) {
+          const variants = [...(item.variants || [])];
+          if (sameVariant) {
+            const netChange = newSignedQty - movement.quantity;
+            if (netChange !== 0) {
+              const vi = variants.findIndex(v => v.size === details.variantSize);
+              if (vi > -1) variants[vi].quantity += netChange;
+              else variants.push({ size: details.variantSize, quantity: netChange });
+            }
+          } else {
+            const oldVi = variants.findIndex(v => v.size === (movement.variant || ''));
+            if (oldVi > -1) variants[oldVi].quantity += -movement.quantity;
+            else variants.push({ size: movement.variant || '', quantity: -movement.quantity });
+            const newVi = variants.findIndex(v => v.size === details.variantSize);
+            if (newVi > -1) variants[newVi].quantity += newSignedQty;
+            else variants.push({ size: details.variantSize, quantity: newSignedQty });
+          }
+          const newTotalQuantity = variants.reduce((sum, v) => sum + v.quantity, 0);
+          const inventoryChanged = !sameVariant || (newSignedQty - movement.quantity) !== 0;
+          if (inventoryChanged) {
+            const itemRef = doc(db, COLLECTIONS.INVENTORY, details.itemId);
+            batch.update(itemRef, {
+              variants,
+              quantity: newTotalQuantity,
+              status: newTotalQuantity > 0 ? 'Available' : 'Out of Stock',
+              updatedAt: Timestamp.now(),
+            });
+          }
+          batch.update(movementDoc.ref, {
+            itemId: details.itemId,
+            itemName: item.name,
+            variant: details.variantSize,
+            quantity: newSignedQty,
+            type: details.operation === 'increment' ? 'In' : 'Out',
+            reason: details.operation === 'increment' ? 'Restock' : 'Sale',
+            newQuantity: newTotalQuantity,
+            previousQuantity: newTotalQuantity - newSignedQty,
+            updatedAt: Timestamp.now(),
+          });
         }
       } else {
-        // Different item/variant: Revert old, Apply new
-        // 1. Revert Old: subtract old quantity
-        await this.adjustVariantQuantityOnly(movement.itemId, movement.variant || '', -movement.quantity);
-
-        // 2. Apply New: add new quantity
-        await this.adjustVariantQuantityOnly(details.itemId, details.variantSize, newSignedQty);
+        const [oldItem, newItem] = await Promise.all([
+          this.getItemById(movement.itemId),
+          this.getItemById(details.itemId),
+        ]);
+        if (oldItem) {
+          const oldVariants = [...(oldItem.variants || [])];
+          const oldVi = oldVariants.findIndex(v => v.size === (movement.variant || ''));
+          if (oldVi > -1) oldVariants[oldVi].quantity += -movement.quantity;
+          else oldVariants.push({ size: movement.variant || '', quantity: -movement.quantity });
+          const oldNewTotal = oldVariants.reduce((sum, v) => sum + v.quantity, 0);
+          const oldItemRef = doc(db, COLLECTIONS.INVENTORY, movement.itemId);
+          batch.update(oldItemRef, {
+            variants: oldVariants,
+            quantity: oldNewTotal,
+            status: oldNewTotal > 0 ? 'Available' : 'Out of Stock',
+            updatedAt: Timestamp.now(),
+          });
+        }
+        if (newItem) {
+          const newVariants = [...(newItem.variants || [])];
+          const newVi = newVariants.findIndex(v => v.size === details.variantSize);
+          if (newVi > -1) newVariants[newVi].quantity += newSignedQty;
+          else newVariants.push({ size: details.variantSize, quantity: newSignedQty });
+          const newTotalQuantity = newVariants.reduce((sum, v) => sum + v.quantity, 0);
+          const newItemRef = doc(db, COLLECTIONS.INVENTORY, details.itemId);
+          batch.update(newItemRef, {
+            variants: newVariants,
+            quantity: newTotalQuantity,
+            status: newTotalQuantity > 0 ? 'Available' : 'Out of Stock',
+            updatedAt: Timestamp.now(),
+          });
+          batch.update(movementDoc.ref, {
+            itemId: details.itemId,
+            itemName: newItem.name,
+            variant: details.variantSize,
+            quantity: newSignedQty,
+            type: details.operation === 'increment' ? 'In' : 'Out',
+            reason: details.operation === 'increment' ? 'Restock' : 'Sale',
+            newQuantity: newTotalQuantity,
+            previousQuantity: newTotalQuantity - newSignedQty,
+            updatedAt: Timestamp.now(),
+          });
+        }
       }
 
-      // Update the Stock Movement Record
-      const newItem = await this.getItemById(details.itemId);
-      const newItemQty = newItem?.quantity || 0;
-
-      await updateDoc(movementDoc.ref, {
-        itemId: details.itemId,
-        itemName: newItem?.name || 'Unknown',
-        variant: details.variantSize,
-        quantity: newSignedQty,
-        type: details.operation === 'increment' ? 'In' : 'Out',
-        reason: details.operation === 'increment' ? 'Restock' : 'Sale',
-        newQuantity: newItemQty,
-        previousQuantity: newItemQty - newSignedQty,
-        updatedAt: Timestamp.now()
-      });
+      await batch.commit();
 
     } catch (error) {
       console.error('Error updating stock movement:', error);
