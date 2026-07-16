@@ -1,4 +1,6 @@
 // Activity Plans Service - CRUD Operations
+// P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS)
+// P1 fixes: isDevMode guard, cacheService, status guards, writeBatch for createNewVersion
 import {
   collection,
   doc,
@@ -11,10 +13,30 @@ import {
   where,
   orderBy,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
+
+// ---------------------------------------------------------------------------
+// Cache constants
+// ---------------------------------------------------------------------------
+const CACHE_PREFIX_ACTIVITY_PLANS = 'activity_plans';
+const CACHE_KEY_ALL = `${CACHE_PREFIX_ACTIVITY_PLANS}_all`;
+const ACTIVITY_PLANS_TTL = 3 * 60 * 1000; // 3 minutes
+
+function cacheKeyByStatus(status: string) {
+  return `${CACHE_PREFIX_ACTIVITY_PLANS}_status_${status}`;
+}
+function cacheKeyById(id: string) {
+  return `${CACHE_PREFIX_ACTIVITY_PLANS}_id_${id}`;
+}
+function cacheKeyByProject(projectId: string) {
+  return `${CACHE_PREFIX_ACTIVITY_PLANS}_project_${projectId}`;
+}
 
 export interface ActivityPlan {
   id?: string;
@@ -53,8 +75,40 @@ export interface ActivityPlan {
   parentProjectId?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function mapDoc(d: { id: string; data: () => Record<string, any> }): ActivityPlan {
+  const data = d.data();
+  return {
+    id: d.id,
+    ...data,
+    proposedDate: data.proposedDate?.toDate?.()?.toISOString?.() ?? data.proposedDate,
+    submittedDate: data.submittedDate?.toDate?.() ?? data.submittedDate,
+    reviewedDate: data.reviewedDate?.toDate?.() ?? data.reviewedDate,
+    createdAt: data.createdAt?.toDate?.() ?? new Date(),
+    updatedAt: data.updatedAt?.toDate?.() ?? new Date(),
+  } as ActivityPlan;
+}
+
 export class ActivityPlansService {
-  // Get all activity plans
+
+  // ---------------------------------------------------------------------------
+  // Cache management
+  // ---------------------------------------------------------------------------
+
+  static invalidateActivityPlansCache(): void {
+    apiCache.deleteByPrefix(CACHE_PREFIX_ACTIVITY_PLANS);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Read operations
+  // ---------------------------------------------------------------------------
+
+  /** Get all activity plans (cached 3 min). */
+  // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P1: added cacheService + isDevMode via withDevMode
   static async getAllActivityPlans(): Promise<ActivityPlan[]> {
     return withDevMode<ActivityPlan[]>(
       () => [
@@ -89,52 +143,62 @@ export class ActivityPlansService {
           updatedAt: new Date('2024-02-05'),
         },
       ],
-      async () => {
-        const snapshot = await getDocs(
-          query(
-            collection(db, COLLECTIONS.PROJECTS),
-            where('status', 'in', ['Draft', 'Submitted', 'Under Review', 'Rejected']),
-            orderBy('createdAt', 'desc')
-          )
-        );
-        return snapshot.docs.map(d => ({
-          id: d.id,
-          ...d.data(),
-          proposedDate: d.data().proposedDate?.toDate?.()?.toISOString?.() ?? d.data().proposedDate,
-          submittedDate: d.data().submittedDate?.toDate?.() ?? d.data().submittedDate,
-          reviewedDate: d.data().reviewedDate?.toDate?.() ?? d.data().reviewedDate,
-          createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
-          updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
-        })) as ActivityPlan[];
-      }
+      () =>
+        apiCache.getOrSet(
+          CACHE_KEY_ALL,
+          async () => {
+            try {
+              const snapshot = await getDocs(
+                query(
+                  collection(db, COLLECTIONS.ACTIVITY_PLANS), // FIX P0
+                  orderBy('createdAt', 'desc')
+                )
+              );
+              return snapshot.docs.map(mapDoc);
+            } catch (error) {
+              errorLoggingService.logError(error as Error, {
+                component: 'ActivityPlansService',
+                action: 'getAllActivityPlans',
+              });
+              throw error;
+            }
+          },
+          ACTIVITY_PLANS_TTL
+        )
     );
   }
 
-  // Get activity plan by ID (from projects collection)
+  /** Get a single activity plan by ID (cached 3 min). */
+  // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P1: added withDevMode + cacheService
   static async getActivityPlanById(planId: string): Promise<ActivityPlan | null> {
-    try {
-      const docRef = doc(db, COLLECTIONS.PROJECTS, planId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return {
-          id: docSnap.id,
-          ...docSnap.data(),
-          proposedDate: docSnap.data().proposedDate?.toDate?.()?.toISOString() || docSnap.data().proposedDate,
-          submittedDate: docSnap.data().submittedDate?.toDate?.() || docSnap.data().submittedDate,
-          reviewedDate: docSnap.data().reviewedDate?.toDate?.() || docSnap.data().reviewedDate,
-          createdAt: docSnap.data().createdAt?.toDate() || new Date(),
-          updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
-        } as ActivityPlan;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching activity plan:', error);
-      throw error;
-    }
+    return withDevMode<ActivityPlan | null>(
+      () => null,
+      () =>
+        apiCache.getOrSet(
+          cacheKeyById(planId),
+          async () => {
+            try {
+              const docRef = doc(db, COLLECTIONS.ACTIVITY_PLANS, planId); // FIX P0
+              const docSnap = await getDoc(docRef);
+              if (!docSnap.exists()) return null;
+              return mapDoc({ id: docSnap.id, data: () => docSnap.data() as Record<string, any> });
+            } catch (error) {
+              errorLoggingService.logError(error as Error, {
+                component: 'ActivityPlansService',
+                action: 'getActivityPlanById',
+                planId,
+              });
+              throw error;
+            }
+          },
+          ACTIVITY_PLANS_TTL
+        )
+    );
   }
 
-  // Get activity plans for a specific project (parentProjectId)
+  /** Get activity plans linked to a parent project (cached 3 min). */
+  // FIX P1: added cacheService + isDevMode (already used ACTIVITY_PLANS — correct)
   static async getActivityPlansByProjectId(projectId: string): Promise<ActivityPlan[]> {
     return withDevMode<ActivityPlan[]>(
       () => [
@@ -155,214 +219,332 @@ export class ActivityPlansService {
           updatedAt: new Date('2024-01-15'),
         },
       ],
+      () =>
+        apiCache.getOrSet(
+          cacheKeyByProject(projectId),
+          async () => {
+            try {
+              const snapshot = await getDocs(
+                query(
+                  collection(db, COLLECTIONS.ACTIVITY_PLANS),
+                  where('parentProjectId', '==', projectId),
+                  orderBy('createdAt', 'desc')
+                )
+              );
+              return snapshot.docs.map(mapDoc);
+            } catch (error) {
+              errorLoggingService.logError(error as Error, {
+                component: 'ActivityPlansService',
+                action: 'getActivityPlansByProjectId',
+                projectId,
+              });
+              throw error;
+            }
+          },
+          ACTIVITY_PLANS_TTL
+        )
+    );
+  }
+
+  /** Get activity plans filtered by status (cached 3 min). */
+  // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P1: added withDevMode + cacheService
+  static async getActivityPlansByStatus(status: ActivityPlan['status']): Promise<ActivityPlan[]> {
+    return withDevMode<ActivityPlan[]>(
+      () => [],
+      () =>
+        apiCache.getOrSet(
+          cacheKeyByStatus(status),
+          async () => {
+            try {
+              const snapshot = await getDocs(
+                query(
+                  collection(db, COLLECTIONS.ACTIVITY_PLANS), // FIX P0
+                  where('status', '==', status),
+                  orderBy('createdAt', 'desc')
+                )
+              );
+              return snapshot.docs.map(mapDoc);
+            } catch (error) {
+              errorLoggingService.logError(error as Error, {
+                component: 'ActivityPlansService',
+                action: 'getActivityPlansByStatus',
+                status,
+              });
+              throw error;
+            }
+          },
+          ACTIVITY_PLANS_TTL
+        )
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Write operations
+  // ---------------------------------------------------------------------------
+
+  /** Create a new activity plan in the activityPlans collection. */
+  // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P1: added withDevMode, cache invalidation, errorLoggingService
+  static async createActivityPlan(
+    planData: Omit<ActivityPlan, 'id' | 'createdAt' | 'updatedAt' | 'version'>
+  ): Promise<string> {
+    return withDevMode<string>(
+      () => 'mock-plan-id',
       async () => {
-        const snapshot = await getDocs(
-          query(
-            collection(db, COLLECTIONS.ACTIVITY_PLANS),
-            where('parentProjectId', '==', projectId),
-            orderBy('createdAt', 'desc')
-          )
-        );
-        return snapshot.docs.map(d => ({
-          id: d.id,
-          ...d.data(),
-          proposedDate: d.data().proposedDate?.toDate?.()?.toISOString?.() ?? d.data().proposedDate,
-          submittedDate: d.data().submittedDate?.toDate?.() ?? d.data().submittedDate,
-          reviewedDate: d.data().reviewedDate?.toDate?.() ?? d.data().reviewedDate,
-          createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
-          updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
-        })) as ActivityPlan[];
+        try {
+          const cleanPlanData: Record<string, unknown> = {
+            version: 1,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+          Object.keys(planData).forEach(key => {
+            const value = planData[key as keyof typeof planData];
+            if (value !== undefined) {
+              if (key === 'proposedDate' && value) {
+                cleanPlanData.proposedDate = Timestamp.fromDate(new Date(value as string | Date));
+              } else if (key === 'submittedDate' || key === 'reviewedDate') {
+                cleanPlanData[key] = value instanceof Date ? Timestamp.fromDate(value) : value;
+              } else {
+                cleanPlanData[key] = value;
+              }
+            }
+          });
+
+          const docRef = await addDoc(collection(db, COLLECTIONS.ACTIVITY_PLANS), cleanPlanData); // FIX P0
+          this.invalidateActivityPlansCache(); // FIX P1
+          return docRef.id;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'ActivityPlansService',
+            action: 'createActivityPlan',
+          });
+          throw error;
+        }
       }
     );
   }
 
-  // Get activity plans by status
-  static async getActivityPlansByStatus(status: ActivityPlan['status']): Promise<ActivityPlan[]> {
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.PROJECTS),
-          where('status', '==', status),
-          orderBy('createdAt', 'desc')
-        )
-      );
-      return snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        proposedDate: d.data().proposedDate?.toDate?.()?.toISOString?.() ?? d.data().proposedDate,
-        submittedDate: d.data().submittedDate?.toDate?.() ?? d.data().submittedDate,
-        reviewedDate: d.data().reviewedDate?.toDate?.() ?? d.data().reviewedDate,
-        createdAt: d.data().createdAt?.toDate?.() ?? new Date(),
-        updatedAt: d.data().updatedAt?.toDate?.() ?? new Date(),
-      })) as ActivityPlan[];
-    } catch (error) {
-      console.error('Error fetching activity plans by status:', error);
-      throw error;
-    }
-  }
-
-  // Create activity plan (stored in projects collection)
-  static async createActivityPlan(planData: Omit<ActivityPlan, 'id' | 'createdAt' | 'updatedAt' | 'version'>): Promise<string> {
-    try {
-      const cleanPlanData: Record<string, unknown> = {
-        version: 1,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-      Object.keys(planData).forEach(key => {
-        const value = planData[key as keyof typeof planData];
-        if (value !== undefined) {
-          if (key === 'proposedDate' && value) {
-            cleanPlanData.proposedDate = Timestamp.fromDate(new Date(value as string | Date));
-          } else if (key === 'submittedDate' || key === 'reviewedDate') {
-            cleanPlanData[key] = value instanceof Date ? Timestamp.fromDate(value) : value;
-          } else {
-            cleanPlanData[key] = value;
-          }
-        }
-      });
-
-      const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), cleanPlanData);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating activity plan:', error);
-      throw error;
-    }
-  }
-
-  // Update activity plan
+  /** Update an activity plan. */
+  // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P1: added withDevMode, cache invalidation, errorLoggingService
   static async updateActivityPlan(planId: string, updates: Partial<ActivityPlan>): Promise<void> {
-    try {
-      const planRef = doc(db, COLLECTIONS.PROJECTS, planId);
+    return withDevMode<void>(
+      () => {},
+      async () => {
+        try {
+          const planRef = doc(db, COLLECTIONS.ACTIVITY_PLANS, planId); // FIX P0
 
-      // Filter out undefined values - Firestore doesn't accept undefined
-      const updateData: Record<string, any> = {
-        updatedAt: Timestamp.now(),
-      };
+          const updateData: Record<string, unknown> = {
+            updatedAt: Timestamp.now(),
+          };
 
-      // Only include defined values (not undefined)
-      Object.keys(updates).forEach(key => {
-        const value = updates[key as keyof typeof updates];
-        if (value !== undefined) {
-          if (key === 'proposedDate' && value) {
-            updateData.proposedDate = Timestamp.fromDate(new Date(value as string | Date));
-          } else {
-            updateData[key] = value;
-          }
+          Object.keys(updates).forEach(key => {
+            const value = updates[key as keyof typeof updates];
+            if (value !== undefined) {
+              if (key === 'proposedDate' && value) {
+                updateData.proposedDate = Timestamp.fromDate(new Date(value as string | Date));
+              } else {
+                updateData[key] = value;
+              }
+            }
+          });
+
+          await updateDoc(planRef, updateData);
+          this.invalidateActivityPlansCache(); // FIX P1
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'ActivityPlansService',
+            action: 'updateActivityPlan',
+            planId,
+          });
+          throw error;
         }
-      });
-
-      await updateDoc(planRef, updateData);
-    } catch (error) {
-      console.error('Error updating activity plan:', error);
-      throw error;
-    }
+      }
+    );
   }
 
-  // Submit activity plan for review
+  /**
+   * Submit a Draft activity plan for review.
+   * FIX P1: status guard — only allowed when status === 'Draft'.
+   */
   static async submitActivityPlan(planId: string, submittedBy: string): Promise<void> {
-    try {
-      await this.updateActivityPlan(planId, {
-        status: 'Submitted',
-        submittedBy,
-        submittedDate: new Date(),
-      });
-    } catch (error) {
-      console.error('Error submitting activity plan:', error);
-      throw error;
-    }
+    return withDevMode<void>(
+      () => {},
+      async () => {
+        try {
+          // FIX P1: status guard
+          const plan = await this.getActivityPlanById(planId);
+          if (!plan) throw new Error('Activity plan not found');
+          if (plan.status !== 'Draft') {
+            throw new Error(`Cannot submit plan in status "${plan.status}" — only Draft plans can be submitted`);
+          }
+
+          await this.updateActivityPlan(planId, {
+            status: 'Submitted',
+            submittedBy,
+            submittedDate: new Date(),
+          });
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'ActivityPlansService',
+            action: 'submitActivityPlan',
+            planId,
+          });
+          throw error;
+        }
+      }
+    );
   }
 
-  // Review activity plan (approve/reject)
+  /**
+   * Approve or reject a Submitted activity plan.
+   * FIX P1: status guard — only allowed when status === 'Submitted'.
+   */
   static async reviewActivityPlan(
     planId: string,
     decision: 'Approved' | 'Rejected',
     reviewedBy: string,
     comments?: string
   ): Promise<void> {
-    return withDevMode(() => {}, async () => {
-      const plan = await this.getActivityPlanById(planId);
-      if (!plan) {
-        throw new Error('Activity plan not found');
-      }
+    return withDevMode<void>(
+      () => {},
+      async () => {
+        try {
+          const plan = await this.getActivityPlanById(planId);
+          if (!plan) throw new Error('Activity plan not found');
 
-      await this.updateActivityPlan(planId, {
-        status: decision,
-        reviewedBy,
-        reviewedDate: new Date(),
-        reviewComments: comments,
-      });
-
-      // Send notification to plan submitter
-      try {
-        const { CommunicationService } = await import('./communicationService');
-        await CommunicationService.createNotification({
-          memberId: plan.submittedBy,
-          title: `Activity Plan ${decision}: ${plan.title}`,
-          message: comments
-            ? `Your activity plan has been ${decision.toLowerCase()}. Comments: ${comments}`
-            : `Your activity plan has been ${decision.toLowerCase()}.`,
-          type: decision === 'Approved' ? 'success' : 'warning',
-        });
-      } catch (notifError) {
-        console.error('Error sending review notification:', notifError);
-        // Don't throw - notification failure shouldn't block the review
-      }
-    });
-  }
-
-  // Create new version of activity plan
-  static async createNewVersion(planId: string, updates: Partial<ActivityPlan>, submittedBy: string): Promise<string> {
-    try {
-      const existingPlan = await this.getActivityPlanById(planId);
-      if (!existingPlan) {
-        throw new Error('Activity plan not found');
-      }
-
-      const newVersion: Record<string, unknown> = {
-        version: existingPlan.version + 1,
-        previousVersionId: planId,
-        status: 'Draft' as const,
-        submittedBy,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-
-      // Copy existing plan data (excluding id and version-related fields)
-      Object.keys(existingPlan).forEach(key => {
-        if (key !== 'id' && key !== 'version' && key !== 'previousVersionId' &&
-            key !== 'submittedDate' && key !== 'reviewedBy' && key !== 'reviewedDate' &&
-            key !== 'reviewComments' && key !== 'createdAt' && key !== 'updatedAt') {
-          const value = existingPlan[key as keyof ActivityPlan];
-          if (value !== undefined) {
-            newVersion[key] = value;
+          // FIX P1: status guard
+          if (plan.status !== 'Submitted') {
+            throw new Error(`Cannot review plan in status "${plan.status}" — only Submitted plans can be reviewed`);
           }
-        }
-      });
 
-      // Apply updates (excluding undefined values)
-      Object.keys(updates).forEach(key => {
-        const value = updates[key as keyof typeof updates];
-        if (value !== undefined) {
-          newVersion[key] = value;
-        }
-      });
+          await this.updateActivityPlan(planId, {
+            status: decision,
+            reviewedBy,
+            reviewedDate: new Date(),
+            reviewComments: comments,
+          });
 
-      const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), newVersion);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error creating new version:', error);
-      throw error;
-    }
+          // Send notification to plan submitter (non-blocking)
+          try {
+            const { CommunicationService } = await import('./communicationService');
+            await CommunicationService.createNotification({
+              memberId: plan.submittedBy,
+              title: `Activity Plan ${decision}: ${plan.title}`,
+              message: comments
+                ? `Your activity plan has been ${decision.toLowerCase()}. Comments: ${comments}`
+                : `Your activity plan has been ${decision.toLowerCase()}.`,
+              type: decision === 'Approved' ? 'success' : 'warning',
+            });
+          } catch (notifError) {
+            // Non-blocking — notification failure must not prevent the review from persisting
+            errorLoggingService.logError(notifError as Error, {
+              component: 'ActivityPlansService',
+              action: 'reviewActivityPlan_notification',
+              planId,
+            });
+          }
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'ActivityPlansService',
+            action: 'reviewActivityPlan',
+            planId,
+          });
+          throw error;
+        }
+      }
+    );
   }
 
-  // Delete activity plan
+  /**
+   * Create a new version of an existing activity plan.
+   * FIX P0: was COLLECTIONS.PROJECTS for the addDoc call.
+   * FIX P1: rewritten with writeBatch — new version doc + previousVersionId update in one batch.
+   */
+  static async createNewVersion(
+    planId: string,
+    updates: Partial<ActivityPlan>,
+    submittedBy: string
+  ): Promise<string> {
+    return withDevMode<string>(
+      () => 'mock-new-version-id',
+      async () => {
+        try {
+          const existingPlan = await this.getActivityPlanById(planId);
+          if (!existingPlan) throw new Error('Activity plan not found');
+
+          const newVersionData: Record<string, unknown> = {
+            version: existingPlan.version + 1,
+            previousVersionId: planId,
+            status: 'Draft' as const,
+            submittedBy,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+
+          // Copy existing plan fields (excluding versioning / review fields)
+          const skipKeys = new Set([
+            'id', 'version', 'previousVersionId',
+            'submittedDate', 'reviewedBy', 'reviewedDate',
+            'reviewComments', 'createdAt', 'updatedAt',
+          ]);
+          Object.keys(existingPlan).forEach(key => {
+            if (!skipKeys.has(key)) {
+              const value = existingPlan[key as keyof ActivityPlan];
+              if (value !== undefined) newVersionData[key] = value;
+            }
+          });
+
+          // Apply caller-provided overrides
+          Object.keys(updates).forEach(key => {
+            const value = updates[key as keyof typeof updates];
+            if (value !== undefined) newVersionData[key] = value;
+          });
+
+          // FIX P1: use writeBatch — create new doc + stamp previousVersionId on original atomically
+          const batch = writeBatch(db);
+          const newDocRef = doc(collection(db, COLLECTIONS.ACTIVITY_PLANS)); // FIX P0
+          batch.set(newDocRef, newVersionData);
+          batch.update(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId), { // FIX P0
+            previousVersionId: newDocRef.id,
+            updatedAt: Timestamp.now(),
+          });
+          await batch.commit();
+
+          this.invalidateActivityPlansCache(); // FIX P1
+          return newDocRef.id;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'ActivityPlansService',
+            action: 'createNewVersion',
+            planId,
+          });
+          throw error;
+        }
+      }
+    );
+  }
+
+  /** Delete an activity plan. */
+  // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P1: added withDevMode, cache invalidation, errorLoggingService
   static async deleteActivityPlan(planId: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.PROJECTS, planId));
-    } catch (error) {
-      console.error('Error deleting activity plan:', error);
-      throw error;
-    }
+    return withDevMode<void>(
+      () => {},
+      async () => {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId)); // FIX P0
+          this.invalidateActivityPlansCache(); // FIX P1
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'ActivityPlansService',
+            action: 'deleteActivityPlan',
+            planId,
+          });
+          throw error;
+        }
+      }
+    );
   }
 }

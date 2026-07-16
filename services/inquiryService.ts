@@ -1,7 +1,26 @@
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { Inquiry } from '../types';
+import { isDevMode } from '@/utils/devMode';
+import { errorLoggingService } from '@/services/errorLoggingService';
+
+// Inquiry type is internal to this service — not exposed in types.ts
+export interface Inquiry {
+  id?: string;
+  senderId: string;
+  senderName: string;
+  senderPhone: string;
+  senderCompany?: string;
+  recipientId: string;
+  recipientName: string;
+  recipientPhone: string;
+  businessId: string;
+  businessName: string;
+  requirements: string;
+  channel: 'whatsapp_direct' | 'whapi_bot' | 'no_phone';
+  status: 'sent' | 'pending' | 'failed';
+  createdAt: Timestamp;
+}
 
 function digitsOnly(phone: string): string {
   return phone.replace(/\D/g, '');
@@ -119,6 +138,14 @@ export async function submitInquiry(params: SubmitInquiryParams): Promise<{
   channel: Inquiry['channel'];
   waUrl?: string;
 }> {
+  // Dev mode: skip real Firestore writes and WhatsApp calls
+  if (isDevMode()) {
+    const channel: Inquiry['channel'] = (params.senderInGroup && params.recipientInGroup && !!params.recipientPhone)
+      ? 'whatsapp_direct'
+      : params.recipientPhone ? 'whapi_bot' : 'no_phone';
+    return { channel, waUrl: channel === 'whatsapp_direct' ? 'https://wa.me/dev-mock' : undefined };
+  }
+
   const {
     senderId, senderName, senderPhone, senderJobTitle, senderCompany, senderInGroup,
     recipientId, recipientName, recipientPhone, recipientInGroup,
@@ -132,48 +159,14 @@ export async function submitInquiry(params: SubmitInquiryParams): Promise<{
   let waUrl: string | undefined;
 
   if (bothInGroup && hasPhone) {
-    // Case A: both in group — direct WhatsApp redirect
     channel = 'whatsapp_direct';
     const msg = buildDirectMessage(senderName, senderJobTitle, senderCompany, requirements);
     waUrl = `https://api.whatsapp.com/send?phone=${waPhone(recipientPhone)}&text=${encodeURIComponent(msg)}`;
   } else {
-    // Case B: at least one party not in group, OR recipient has no phone
-    // → send via Whapi to admin + recipient
     channel = hasPhone ? 'whapi_bot' : 'no_phone';
-
-    const token = localStorage.getItem('whapi_config_key');
-    if (!token) throw new Error('Whapi token not configured');
-
-    const adminPhone = localStorage.getItem('whapi_admin_phone');
-    const note = !hasPhone
-      ? 'Recipient has no phone number on file.'
-      : !senderInGroup
-      ? 'Sender is not in the WhatsApp group.'
-      : 'Recipient is not in the WhatsApp group.';
-
-    const sends: Promise<void>[] = [];
-
-    // Notify admin
-    if (adminPhone) {
-      const adminMsg = buildAdminBotMessage(
-        senderName, senderPhone, senderCompany,
-        recipientName, businessName, requirements, note
-      );
-      sends.push(sendWhapiMessage(adminPhone, adminMsg, token));
-    }
-
-    // Notify recipient (if they have a phone)
-    if (hasPhone) {
-      const recipientMsg = buildRecipientBotMessage(
-        recipientName, senderName, senderPhone, senderCompany, requirements
-      );
-      sends.push(sendWhapiMessage(recipientPhone, recipientMsg, token));
-    }
-
-    await Promise.all(sends);
   }
 
-  // Write to Firestore regardless of channel
+  // Step 1: Write to Firestore first — if this fails we throw before any WhatsApp call
   const record: Omit<Inquiry, 'id'> = {
     senderId,
     senderName,
@@ -191,6 +184,51 @@ export async function submitInquiry(params: SubmitInquiryParams): Promise<{
   };
 
   await addDoc(collection(db, COLLECTIONS.INQUIRIES), record);
+
+  // Step 2: Send WhatsApp notifications via Whapi (best-effort; failures are logged, not thrown)
+  if (channel !== 'whatsapp_direct') {
+    // Token comes from environment variables — never from localStorage
+    const token = import.meta.env.VITE_WHAPI_TOKEN as string | undefined;
+    if (!token) {
+      errorLoggingService.logError(
+        new Error('VITE_WHAPI_TOKEN is not set — Whapi notifications skipped'),
+        { component: 'inquiryService', action: 'submitInquiry' }
+      );
+    } else {
+      const adminPhone = import.meta.env.VITE_WHAPI_ADMIN_PHONE as string | undefined;
+      const note = !hasPhone
+        ? 'Recipient has no phone number on file.'
+        : !senderInGroup
+        ? 'Sender is not in the WhatsApp group.'
+        : 'Recipient is not in the WhatsApp group.';
+
+      const sends: Promise<void>[] = [];
+
+      if (adminPhone) {
+        const adminMsg = buildAdminBotMessage(
+          senderName, senderPhone, senderCompany,
+          recipientName, businessName, requirements, note
+        );
+        sends.push(sendWhapiMessage(adminPhone, adminMsg, token));
+      }
+
+      if (hasPhone) {
+        const recipientMsg = buildRecipientBotMessage(
+          recipientName, senderName, senderPhone, senderCompany, requirements
+        );
+        sends.push(sendWhapiMessage(recipientPhone, recipientMsg, token));
+      }
+
+      // Log Whapi failures without throwing — Firestore record already persisted
+      await Promise.allSettled(sends).then(results => {
+        results.forEach(r => {
+          if (r.status === 'rejected') {
+            errorLoggingService.logError(r.reason instanceof Error ? r.reason : new Error(String(r.reason)), { component: 'inquiryService', action: 'sendWhapiMessage' });
+          }
+        });
+      });
+    }
+  }
 
   return { channel, waUrl };
 }

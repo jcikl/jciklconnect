@@ -4,8 +4,7 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
-  updateDoc,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -17,6 +16,21 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { logListener } from './firestoreLogger';
+import { apiCache } from './cacheService';
+
+const CONV_COLLECTION = COLLECTIONS.CONVERSATIONS || 'conversations';
+const MSG_COLLECTION = COLLECTIONS.MESSAGES || 'messages';
+
+// Cache TTL: 3 minutes for conversations (frequently updated)
+const CACHE_TTL_CONVERSATIONS = 3 * 60 * 1000;
+
+function convCacheKey(memberId: string): string {
+  return `conversations:member:${memberId}`;
+}
+
+function invalidateConversationsCache(memberId: string): void {
+  apiCache.deleteByPrefix(`conversations:member:${memberId}`);
+}
 
 export interface Message {
   id?: string;
@@ -78,19 +92,34 @@ export class MessagingService {
             }
           }
 
+          // Fix P1-C: ensure participants always includes createdBy so both UIDs are present
+          const allParticipants = Array.from(new Set([...participants, createdBy]));
+
+          // Initialize unreadCount to 0 for every participant
+          const unreadCount: Record<string, number> = {};
+          allParticipants.forEach(uid => { unreadCount[uid] = 0; });
+
           const conversationData: Omit<Conversation, 'id'> = {
             type,
             name,
-            participants,
+            participants: allParticipants,
             projectId,
             createdBy,
             lastActivity: Timestamp.now(),
             createdAt: Timestamp.now(),
-            unreadCount: {},
+            unreadCount,
           };
 
-          const docRef = await addDoc(collection(db, COLLECTIONS.CONVERSATIONS || 'conversations'), conversationData);
-          return docRef.id;
+          // Use writeBatch so future callers can extend atomically; single-doc creation is safe as addDoc
+          const batch = writeBatch(db);
+          const newConvRef = doc(collection(db, CONV_COLLECTION));
+          batch.set(newConvRef, conversationData);
+          await batch.commit();
+
+          // Invalidate cache for all participants
+          allParticipants.forEach(uid => invalidateConversationsCache(uid));
+
+          return newConvRef.id;
         } catch (error) {
           console.error('Error creating conversation:', error);
           throw error;
@@ -104,59 +133,61 @@ export class MessagingService {
     return withDevMode(
       () => null,
       async () => {
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.CONVERSATIONS || 'conversations'),
-          where('type', '==', 'direct'),
-          where('participants', 'array-contains', memberId1)
-        )
-      );
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, CONV_COLLECTION),
+              where('type', '==', 'direct'),
+              where('participants', 'array-contains', memberId1)
+            )
+          );
 
-      const conversation = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as Conversation))
-        .find(conv => 
-          conv.participants.includes(memberId1) && 
-          conv.participants.includes(memberId2) &&
-          conv.participants.length === 2
-        );
+          const conversation = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() } as Conversation))
+            .find(conv =>
+              conv.participants.includes(memberId1) &&
+              conv.participants.includes(memberId2) &&
+              conv.participants.length === 2
+            );
 
-      return conversation || null;
-    } catch (error) {
-      console.error('Error finding direct conversation:', error);
-      return null;
-    }
-  });
+          return conversation || null;
+        } catch (error) {
+          console.error('Error finding direct conversation:', error);
+          return null;
+        }
+      }
+    );
   }
 
-  // Get all conversations for a member
+  // Get all conversations for a member (Fix P2: cache by memberId)
   static async getConversations(memberId: string): Promise<Conversation[]> {
     return withDevMode(
       () => [],
       async () => {
-        try {
-          const snapshot = await getDocs(
-            query(
-              collection(db, COLLECTIONS.CONVERSATIONS || 'conversations'),
-              where('participants', 'array-contains', memberId),
-              orderBy('lastActivity', 'desc')
-            )
-          );
+        return apiCache.getOrSet(
+          convCacheKey(memberId),
+          async () => {
+            const snapshot = await getDocs(
+              query(
+                collection(db, CONV_COLLECTION),
+                where('participants', 'array-contains', memberId),
+                orderBy('lastActivity', 'desc')
+              )
+            );
 
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            lastActivity: doc.data().lastActivity?.toDate?.() || doc.data().lastActivity,
-            createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-            lastMessage: doc.data().lastMessage ? {
-              ...doc.data().lastMessage,
-              timestamp: doc.data().lastMessage.timestamp?.toDate?.() || doc.data().lastMessage.timestamp,
-            } : undefined,
-          } as Conversation));
-        } catch (error) {
-          console.error('Error fetching conversations:', error);
-          throw error;
-        }
+            return snapshot.docs.map(d => ({
+              id: d.id,
+              ...d.data(),
+              lastActivity: d.data().lastActivity?.toDate?.() || d.data().lastActivity,
+              createdAt: d.data().createdAt?.toDate?.() || d.data().createdAt,
+              lastMessage: d.data().lastMessage ? {
+                ...d.data().lastMessage,
+                timestamp: d.data().lastMessage.timestamp?.toDate?.() || d.data().lastMessage.timestamp,
+              } : undefined,
+            } as Conversation));
+          },
+          CACHE_TTL_CONVERSATIONS
+        );
       }
     );
   }
@@ -169,7 +200,7 @@ export class MessagingService {
         try {
           const snapshot = await getDocs(
             query(
-              collection(db, COLLECTIONS.MESSAGES || 'messages'),
+              collection(db, MSG_COLLECTION),
               where('conversationId', '==', conversationId),
               orderBy('createdAt', 'desc'),
               limit(limitCount)
@@ -177,11 +208,11 @@ export class MessagingService {
           );
 
           return snapshot.docs
-            .map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-              editedAt: doc.data().editedAt?.toDate?.() || doc.data().editedAt,
+            .map(d => ({
+              id: d.id,
+              ...d.data(),
+              createdAt: d.data().createdAt?.toDate?.() || d.data().createdAt,
+              editedAt: d.data().editedAt?.toDate?.() || d.data().editedAt,
             } as Message))
             .reverse(); // Reverse to show oldest first
         } catch (error) {
@@ -192,7 +223,7 @@ export class MessagingService {
     );
   }
 
-  // Send a message
+  // Send a message (Fix P1: atomic writeBatch for message + conversation update)
   static async sendMessage(
     conversationId: string,
     senderId: string,
@@ -208,92 +239,110 @@ export class MessagingService {
         return 'mock-message-id';
       },
       async () => {
-    try {
-      const messageData: Omit<Message, 'id'> = {
-        conversationId,
-        senderId,
-        senderName,
-        senderAvatar,
-        content,
-        type,
-        attachments,
-        readBy: [senderId], // Sender has read their own message
-        createdAt: Timestamp.now(),
-      };
+        try {
+          // Fetch conversation first to compute unreadCounts (read before batch)
+          const conversationRef = doc(db, CONV_COLLECTION, conversationId);
+          const conversationDoc = await getDoc(conversationRef);
 
-      const docRef = await addDoc(collection(db, COLLECTIONS.MESSAGES || 'messages'), messageData);
+          const now = Timestamp.now();
+          const batch = writeBatch(db);
 
-      // Update conversation's last message and activity
-      const conversationRef = doc(db, COLLECTIONS.CONVERSATIONS || 'conversations', conversationId);
-      const conversationDoc = await getDoc(conversationRef);
-      
-      if (conversationDoc.exists()) {
-        const conversation = conversationDoc.data() as Conversation;
-        const participants = conversation.participants || [];
-        
-        // Update unread counts (increment for all participants except sender)
-        const unreadCount = conversation.unreadCount || {};
-        participants.forEach(participantId => {
-          if (participantId !== senderId) {
-            unreadCount[participantId] = (unreadCount[participantId] || 0) + 1;
-          }
-        });
-
-        await updateDoc(conversationRef, {
-          lastMessage: {
-            content: content.substring(0, 100), // Truncate for preview
+          // (a) New message document
+          const newMsgRef = doc(collection(db, MSG_COLLECTION));
+          const messageData: Omit<Message, 'id'> = {
+            conversationId,
             senderId,
-            timestamp: Timestamp.now(),
-          },
-          lastActivity: Timestamp.now(),
-          unreadCount,
-        });
-      }
+            senderName,
+            senderAvatar,
+            content,
+            type,
+            attachments,
+            readBy: [senderId], // Sender has read their own message
+            createdAt: now,
+          };
+          batch.set(newMsgRef, messageData);
 
-      return docRef.id;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
-    }
-  });
+          // (b) Update conversation lastMessage + unreadCounts atomically
+          if (conversationDoc.exists()) {
+            const conversation = conversationDoc.data() as Conversation;
+            const participants = conversation.participants || [];
+
+            const unreadCount = { ...(conversation.unreadCount || {}) };
+            participants.forEach(participantId => {
+              if (participantId !== senderId) {
+                unreadCount[participantId] = (unreadCount[participantId] || 0) + 1;
+              }
+            });
+
+            batch.update(conversationRef, {
+              lastMessage: {
+                content: content.substring(0, 100),
+                senderId,
+                timestamp: now,
+              },
+              lastActivity: now,
+              unreadCount,
+            });
+
+            // Invalidate conversations cache for all participants
+            participants.forEach(uid => invalidateConversationsCache(uid));
+          }
+
+          await batch.commit();
+
+          return newMsgRef.id;
+        } catch (error) {
+          console.error('Error sending message:', error);
+          throw error;
+        }
+      }
+    );
   }
 
-  // Mark messages as read
+  // Mark messages as read (Fix P1: single writeBatch for all updates)
   static async markAsRead(conversationId: string, memberId: string): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
-    try {
-      // Get unread messages
-      const messages = await this.getMessages(conversationId, 100);
-      const unreadMessages = messages.filter(m => !m.readBy.includes(memberId));
+        try {
+          // Fetch conversation and unread messages in parallel
+          const [messages, conversationDoc] = await Promise.all([
+            this.getMessages(conversationId, 100),
+            getDoc(doc(db, CONV_COLLECTION, conversationId)),
+          ]);
 
-      // Update each unread message
-      const updatePromises = unreadMessages.map(message => {
-        const messageRef = doc(db, COLLECTIONS.MESSAGES || 'messages', message.id!);
-        return updateDoc(messageRef, {
-          readBy: [...message.readBy, memberId],
-        });
-      });
+          const unreadMessages = messages.filter(m => !m.readBy.includes(memberId));
 
-      await Promise.all(updatePromises);
+          if (unreadMessages.length === 0 && !conversationDoc.exists()) return;
 
-      // Reset unread count for this member
-      const conversationRef = doc(db, COLLECTIONS.CONVERSATIONS || 'conversations', conversationId);
-      const conversationDoc = await getDoc(conversationRef);
-      
-      if (conversationDoc.exists()) {
-        const conversation = conversationDoc.data() as Conversation;
-        const unreadCount = conversation.unreadCount || {};
-        unreadCount[memberId] = 0;
+          const batch = writeBatch(db);
 
-        await updateDoc(conversationRef, { unreadCount });
+          // Update each unread message's readBy array
+          for (const message of unreadMessages) {
+            const messageRef = doc(db, MSG_COLLECTION, message.id!);
+            batch.update(messageRef, {
+              readBy: [...message.readBy, memberId],
+            });
+          }
+
+          // Reset unread count for this member on the conversation
+          if (conversationDoc.exists()) {
+            const conversation = conversationDoc.data() as Conversation;
+            const unreadCount = { ...(conversation.unreadCount || {}) };
+            unreadCount[memberId] = 0;
+            batch.update(doc(db, CONV_COLLECTION, conversationId), { unreadCount });
+          }
+
+          await batch.commit();
+
+          // Invalidate conversations cache for this member
+          invalidateConversationsCache(memberId);
+        } catch (error) {
+          console.error('Error marking messages as read:', error);
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-      throw error;
-    }
-  });
+    );
   }
 
   // Subscribe to real-time messages for a conversation
@@ -305,7 +354,7 @@ export class MessagingService {
       return () => {}; // Return empty unsubscribe function
     }
 
-    const messagesRef = collection(db, COLLECTIONS.MESSAGES || 'messages');
+    const messagesRef = collection(db, MSG_COLLECTION);
     const q = query(
       messagesRef,
       where('conversationId', '==', conversationId),
@@ -314,11 +363,11 @@ export class MessagingService {
 
     logListener('messages', 'messagingService.subscribeToMessages');
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-        editedAt: doc.data().editedAt?.toDate?.() || doc.data().editedAt,
+      const messages = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate?.() || d.data().createdAt,
+        editedAt: d.data().editedAt?.toDate?.() || d.data().editedAt,
       } as Message));
       callback(messages);
     }, (error) => {
@@ -337,7 +386,7 @@ export class MessagingService {
       return () => {}; // Return empty unsubscribe function
     }
 
-    const conversationsRef = collection(db, COLLECTIONS.CONVERSATIONS || 'conversations');
+    const conversationsRef = collection(db, CONV_COLLECTION);
     const q = query(
       conversationsRef,
       where('participants', 'array-contains', memberId),
@@ -346,14 +395,14 @@ export class MessagingService {
 
     logListener('conversations', 'messagingService.subscribeToConversations');
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const conversations = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        lastActivity: doc.data().lastActivity?.toDate?.() || doc.data().lastActivity,
-        createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-        lastMessage: doc.data().lastMessage ? {
-          ...doc.data().lastMessage,
-          timestamp: doc.data().lastMessage.timestamp?.toDate?.() || doc.data().lastMessage.timestamp,
+      const conversations = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        lastActivity: d.data().lastActivity?.toDate?.() || d.data().lastActivity,
+        createdAt: d.data().createdAt?.toDate?.() || d.data().createdAt,
+        lastMessage: d.data().lastMessage ? {
+          ...d.data().lastMessage,
+          timestamp: d.data().lastMessage.timestamp?.toDate?.() || d.data().lastMessage.timestamp,
         } : undefined,
       } as Conversation));
       callback(conversations);
@@ -364,4 +413,3 @@ export class MessagingService {
     return unsubscribe;
   }
 }
-

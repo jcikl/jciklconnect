@@ -7,19 +7,22 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   orderBy,
   limit,
   Timestamp,
+  serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES } from '../config/constants';
 import { AutomationRule, WorkflowExecution, WorkflowExecutionStep } from '../types';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_AUTOMATION_RULES } from './mockData';
 import { PointsService } from './pointsService';
 import { CommunicationService } from './communicationService';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface Workflow {
   id?: string;
@@ -241,7 +244,35 @@ export class AutomationService {
         throw new Error('Workflow not found or inactive');
       }
 
-      // Create execution record
+      // ── Fix P1: Build idempotency key to match workflowService schema ────────
+      const triggerId: string =
+        context.triggerId ?? context.entityId ?? triggeredBy ?? 'manual';
+      const idempotencyKey = `${workflowId}_${triggerId}_${executionStartTime}`;
+
+      // ── Fix P1: Recover stuck executions (running > 30 min) ─────────────────
+      const thirtyMinutesAgo = Timestamp.fromMillis(Date.now() - 30 * 60 * 1000);
+      const stuckQuery = query(
+        collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS),
+        where('workflowId', '==', workflowId),
+        where('status', '==', 'running'),
+        where('startedAt', '<', thirtyMinutesAgo),
+        limit(20)
+      );
+      const stuckSnap = await getDocs(stuckQuery);
+      if (!stuckSnap.empty) {
+        const batch = writeBatch(db);
+        stuckSnap.docs.forEach(stuckDoc => {
+          batch.update(stuckDoc.ref, {
+            status: 'timeout',
+            completedAt: serverTimestamp(),
+            error: { message: 'Execution timed out after 30 minutes' },
+          });
+        });
+        await batch.commit();
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
+      // Create execution record — includes idempotencyKey to match workflowService schema
       const execution: Omit<WorkflowExecution, 'id'> = {
         workflowId,
         workflowName: workflow.name,
@@ -257,7 +288,8 @@ export class AutomationService {
         collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS),
         {
           ...execution,
-          startedAt: Timestamp.now(),
+          startedAt: serverTimestamp(),
+          idempotencyKey,
         }
       );
 

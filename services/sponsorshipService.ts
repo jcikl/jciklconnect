@@ -16,6 +16,15 @@ import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { SponsorshipRecord } from '../types';
 import { PointsService } from './pointsService';
+import { apiCache } from './cacheService';
+import { logError as logServiceError } from './errorLoggingService';
+
+const SPONSORSHIPS_CACHE_PREFIX = 'sponsorships:';
+const SPONSORSHIPS_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+export function invalidateSponsorshipsCache(): void {
+  apiCache.deleteByPrefix(SPONSORSHIPS_CACHE_PREFIX);
+}
 
 const MOCK_SPONSORSHIPS: SponsorshipRecord[] = [
   { id: 'mock-s1', memberId: 'm1', memberName: 'Alex Rivera', sponsorName: 'Tech Corp', amount: 5000, date: '2026-05-15', description: 'Annual Summit sponsor' },
@@ -27,13 +36,16 @@ export class SponsorshipsService {
     return withDevMode(
       () => [...MOCK_SPONSORSHIPS],
       async () => {
+    const cacheKey = `${SPONSORSHIPS_CACHE_PREFIX}all`;
+    const cached = apiCache.get<SponsorshipRecord[]>(cacheKey);
+    if (cached) return cached;
     try {
       const q = query(
         collection(db, COLLECTIONS.SPONSORSHIPS),
         orderBy('date', 'desc')
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(docSnap => {
+      const result = snapshot.docs.map(docSnap => {
         const d = docSnap.data();
         return {
           id: docSnap.id,
@@ -45,11 +57,13 @@ export class SponsorshipsService {
           description: d.description,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
-        };
+        } as SponsorshipRecord;
       });
+      apiCache.set(cacheKey, result, SPONSORSHIPS_CACHE_TTL);
+      return result;
     } catch (error) {
-      console.error('Error fetching sponsorships:', error);
-      return [];
+      logServiceError(error as Error, 'SponsorshipsService.getAllSponsorships');
+      throw error;
     }
 });
   }
@@ -58,13 +72,16 @@ export class SponsorshipsService {
     return withDevMode(
       () => MOCK_SPONSORSHIPS.filter(s => s.memberId === memberId),
       async () => {
+    const cacheKey = `${SPONSORSHIPS_CACHE_PREFIX}member:${memberId}`;
+    const cached = apiCache.get<SponsorshipRecord[]>(cacheKey);
+    if (cached) return cached;
     try {
       const q = query(
         collection(db, COLLECTIONS.SPONSORSHIPS),
         where('memberId', '==', memberId)
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(docSnap => {
+      const result = snapshot.docs.map(docSnap => {
         const d = docSnap.data();
         return {
           id: docSnap.id,
@@ -76,11 +93,13 @@ export class SponsorshipsService {
           description: d.description,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
-        };
+        } as SponsorshipRecord;
       });
+      apiCache.set(cacheKey, result, SPONSORSHIPS_CACHE_TTL);
+      return result;
     } catch (error) {
-      console.error('Error fetching sponsorships by member:', error);
-      return [];
+      logServiceError(error as Error, 'SponsorshipsService.getSponsorshipsByMember');
+      throw error;
     }
 });
   }
@@ -90,8 +109,12 @@ export class SponsorshipsService {
       async () => {
         const mockId = `mock-sponsorship-${Date.now()}`;
         console.log(`[DEV MODE] Created mock sponsorship:`, data);
-        // Trigger dynamic recalculate (mock console log)
-        await PointsService.recalculateMemberRadarStats(data.memberId);
+        invalidateSponsorshipsCache();
+        try {
+          await PointsService.recalculateMemberRadarStats(data.memberId);
+        } catch (radarErr) {
+          logServiceError(radarErr as Error, '[DEV] SponsorshipsService.createSponsorship → recalculateMemberRadarStats');
+        }
         return mockId;
       },
       async () => {
@@ -101,11 +124,16 @@ export class SponsorshipsService {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
-      // Recalculate member points and radar stats
-      await PointsService.recalculateMemberRadarStats(data.memberId);
+      invalidateSponsorshipsCache();
+      // Recalculate member points and radar stats — non-fatal if it fails
+      try {
+        await PointsService.recalculateMemberRadarStats(data.memberId);
+      } catch (radarErr) {
+        logServiceError(radarErr as Error, 'SponsorshipsService.createSponsorship → recalculateMemberRadarStats');
+      }
       return docRef.id;
     } catch (error) {
-      console.error('Error creating sponsorship:', error);
+      logServiceError(error as Error, 'SponsorshipsService.createSponsorship');
       throw error;
     }
 });
@@ -129,15 +157,20 @@ export class SponsorshipsService {
         ...updates,
         updatedAt: Timestamp.now(),
       });
-      // Recalculate for current and potentially previous member if securing member was changed
-      if (updates.memberId) {
-        await PointsService.recalculateMemberRadarStats(updates.memberId);
-      }
-      if (previousMemberId && previousMemberId !== updates.memberId) {
-        await PointsService.recalculateMemberRadarStats(previousMemberId);
+      invalidateSponsorshipsCache();
+      // Recalculate for current and potentially previous member — non-fatal if it fails
+      const membersToRecalc = new Set<string>();
+      if (updates.memberId) membersToRecalc.add(updates.memberId);
+      if (previousMemberId && previousMemberId !== updates.memberId) membersToRecalc.add(previousMemberId);
+      for (const mid of membersToRecalc) {
+        try {
+          await PointsService.recalculateMemberRadarStats(mid);
+        } catch (radarErr) {
+          logServiceError(radarErr as Error, `SponsorshipsService.updateSponsorship → recalculateMemberRadarStats(${mid})`);
+        }
       }
     } catch (error) {
-      console.error('Error updating sponsorship:', error);
+      logServiceError(error as Error, 'SponsorshipsService.updateSponsorship');
       throw error;
     }
 });
@@ -153,10 +186,15 @@ export class SponsorshipsService {
     try {
       const docRef = doc(db, COLLECTIONS.SPONSORSHIPS, id);
       await deleteDoc(docRef);
-      // Recalculate member points and radar stats
-      await PointsService.recalculateMemberRadarStats(memberId);
+      invalidateSponsorshipsCache();
+      // Recalculate member points and radar stats — non-fatal if it fails
+      try {
+        await PointsService.recalculateMemberRadarStats(memberId);
+      } catch (radarErr) {
+        logServiceError(radarErr as Error, 'SponsorshipsService.deleteSponsorship → recalculateMemberRadarStats');
+      }
     } catch (error) {
-      console.error('Error deleting sponsorship:', error);
+      logServiceError(error as Error, 'SponsorshipsService.deleteSponsorship');
       throw error;
     }
 });

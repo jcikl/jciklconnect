@@ -26,6 +26,14 @@ import { Member, UserRole, BoardPosition, BoardMember, BoardTransition, BoardTer
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 import { CommunicationService } from './communicationService';
+import { apiCache } from './cacheService';
+
+const CACHE_PREFIX_BOARD_TERM = 'boardTermSettings:';
+const BOARD_TERM_TTL = 10 * 60 * 1000; // 10 minutes
+
+function invalidateBoardTermCache(year: string): void {
+  apiCache.delete(CACHE_PREFIX_BOARD_TERM + year);
+}
 
 export class BoardManagementService {
   // Get current active board members
@@ -656,18 +664,27 @@ export class BoardManagementService {
   // ─── Presidential Term Settings ──────────────────────────────────────────
 
   static async getBoardTermSettings(year: string): Promise<BoardTermSettings | null> {
-    try {
-      const ref = doc(db, COLLECTIONS.BOARD_TERM_SETTINGS, year);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return null;
-      return { year, ...snap.data() } as BoardTermSettings;
-    } catch (error) {
-      console.error('Error getting board term settings:', error);
-      return null;
-    }
+    if (isDevMode()) return null;
+    return apiCache.getOrSet<BoardTermSettings | null>(
+      CACHE_PREFIX_BOARD_TERM + year,
+      async () => {
+        try {
+          const ref = doc(db, COLLECTIONS.BOARD_TERM_SETTINGS, year);
+          const snap = await getDoc(ref);
+          if (!snap.exists()) return null;
+          return { year, ...snap.data() } as BoardTermSettings;
+        } catch (error) {
+          console.error('Error getting board term settings:', error);
+          return null;
+        }
+      },
+      BOARD_TERM_TTL,
+      'getBoardTermSettings'
+    );
   }
 
   static async setBoardTermSettings(year: string, settings: Partial<Omit<BoardTermSettings, 'year' | 'updatedAt'>>): Promise<void> {
+    if (isDevMode()) return;
     try {
       const ref = doc(db, COLLECTIONS.BOARD_TERM_SETTINGS, year);
       // Strip undefined values — Firestore rejects them
@@ -676,6 +693,7 @@ export class BoardManagementService {
         if (v !== undefined) clean[k] = v;
       }
       await setDoc(ref, clean, { merge: true });
+      invalidateBoardTermCache(year);
     } catch (error) {
       console.error('Error setting board term settings:', error);
       throw error;

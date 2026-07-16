@@ -4,6 +4,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { addDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface EmailConfig {
   provider: 'sendgrid' | 'mailgun' | 'smtp' | 'ses' | 'resend';
@@ -351,8 +352,9 @@ export class EmailService {
       });
       return docRef.id;
     } catch (error) {
-      console.error('Error logging email:', error);
       // Don't throw - email logging failure shouldn't break email sending
+      // Log silently via errorLoggingService so failures are traceable without crashing
+      try { errorLoggingService.logError(error as Error, { component: 'EmailService', action: 'logEmail' }); } catch { /* ignore */ }
       return '';
     }
   }

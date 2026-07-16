@@ -37,6 +37,7 @@ import {
   buildCategoryCleanupUpdates,
 } from '../utils/transactionCategoryUtils';
 import { apiCache } from './cacheService';
+import { SponsorshipsService } from './sponsorshipService';
 
 const FINANCE_CACHE_PREFIX = 'finance:';
 const TX_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
@@ -3809,7 +3810,14 @@ export class FinanceService {
       const eventFees = incomeTransactions
         .filter(t => t.category === 'Projects & Activities')
         .reduce((sum, t) => sum + t.amount, 0);
-      const sponsorships = 0; // Now part of Projects & Activities
+      // Sum sponsorship amounts within the fiscal year window
+      const allSponsorships = await SponsorshipsService.getAllSponsorships();
+      const sponsorships = allSponsorships
+        .filter(s => {
+          const sDate = new Date(s.date);
+          return sDate >= startDate && sDate <= endDate;
+        })
+        .reduce((sum, s) => sum + (s.amount ?? 0), 0);
       const otherIncome = incomeTransactions
         .filter(t => t.category !== 'Membership' && t.category !== 'Projects & Activities')
         .reduce((sum, t) => sum + t.amount, 0);

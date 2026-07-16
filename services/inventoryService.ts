@@ -22,26 +22,63 @@ import { InventoryItem, MaintenanceSchedule, InventoryAlert, StockMovement } fro
 import { withDevMode } from '../utils/devMode';
 import { MOCK_INVENTORY } from './mockData';
 import { removeUndefined } from '../utils/dataUtils';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 
 export class InventoryService {
+  // ── Cache helpers ──────────────────────────────────────────────────────────
+  private static readonly CACHE_ALL = 'inventory:all';
+  private static readonly CACHE_ITEM_PREFIX = 'inventory:item:';
+  private static readonly CACHE_MOVEMENTS_PREFIX = 'inventory:movements:';
+  private static readonly CACHE_ALERTS = 'inventory:alerts';
+  private static readonly CACHE_MAINTENANCE = 'inventory:maintenance';
+  private static readonly CACHE_TTL = 3 * 60 * 1000; // 3 min
+
+  private static invalidateInventoryCache(itemId?: string): void {
+    apiCache.delete(InventoryService.CACHE_ALL);
+    if (itemId) {
+      apiCache.delete(`${InventoryService.CACHE_ITEM_PREFIX}${itemId}`);
+    }
+  }
+
+  private static invalidateMovementsCache(itemId: string): void {
+    apiCache.delete(`${InventoryService.CACHE_MOVEMENTS_PREFIX}${itemId}`);
+  }
+
+  private static invalidateAlertsCache(): void {
+    apiCache.delete(InventoryService.CACHE_ALERTS);
+  }
+
+  private static invalidateMaintenanceCache(): void {
+    apiCache.delete(InventoryService.CACHE_MAINTENANCE);
+  }
+
   // Get all inventory items
   static async getAllItems(): Promise<InventoryItem[]> {
     return withDevMode(
       () => MOCK_INVENTORY,
       async () => {
-    try {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.INVENTORY), orderBy('name', 'asc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as InventoryItem));
-    } catch (error) {
-      console.error('Error fetching inventory items:', error);
-      throw error;
-    }
-});
+        return apiCache.getOrSet(
+          InventoryService.CACHE_ALL,
+          async () => {
+            try {
+              const snapshot = await getDocs(
+                query(collection(db, COLLECTIONS.INVENTORY), orderBy('name', 'asc'))
+              );
+              return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+              } as InventoryItem));
+            } catch (error) {
+              errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getAllItems' });
+              throw error;
+            }
+          },
+          InventoryService.CACHE_TTL,
+          'InventoryService.getAllItems'
+        );
+      }
+    );
   }
 
   // Get item by ID
@@ -49,19 +86,26 @@ export class InventoryService {
     return withDevMode(
       () => MOCK_INVENTORY.find(item => item.id === itemId) || null,
       async () => {
-    try {
-      const docRef = doc(db, COLLECTIONS.INVENTORY, itemId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as InventoryItem;
+        return apiCache.getOrSet(
+          `${InventoryService.CACHE_ITEM_PREFIX}${itemId}`,
+          async () => {
+            try {
+              const docRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                return { id: docSnap.id, ...docSnap.data() } as InventoryItem;
+              }
+              return null;
+            } catch (error) {
+              errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getItemById' });
+              throw error;
+            }
+          },
+          InventoryService.CACHE_TTL,
+          'InventoryService.getItemById'
+        );
       }
-      return null;
-    } catch (error) {
-      console.error('Error fetching inventory item:', error);
-      throw error;
-    }
-});
+    );
   }
 
   // Get items by category
@@ -82,7 +126,7 @@ export class InventoryService {
         ...doc.data(),
       } as InventoryItem));
     } catch (error) {
-      console.error('Error fetching items by category:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getItemsByCategory' });
       throw error;
     }
 });
@@ -101,9 +145,10 @@ export class InventoryService {
       };
       const cleanItem = removeUndefined(newItem);
       const docRef = await addDoc(collection(db, COLLECTIONS.INVENTORY), cleanItem);
+      InventoryService.invalidateInventoryCache();
       return docRef.id;
     } catch (error) {
-      console.error('Error adding inventory item:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'addItem' });
       throw error;
     }
 });
@@ -122,8 +167,9 @@ export class InventoryService {
       };
       const cleanUpdates = removeUndefined(updatesData);
       await updateDoc(docRef, cleanUpdates);
+      InventoryService.invalidateInventoryCache(itemId);
     } catch (error) {
-      console.error('Error updating inventory item:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'updateItem' });
       throw error;
     }
 });
@@ -146,8 +192,10 @@ export class InventoryService {
       alertsSnap.docs.forEach(d => batch.delete(d.ref));
       schedulesSnap.docs.forEach(d => batch.delete(d.ref));
       await batch.commit();
+      InventoryService.invalidateInventoryCache(itemId);
+      InventoryService.invalidateMovementsCache(itemId);
     } catch (error) {
-      console.error('Error deleting inventory item:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'deleteItem' });
       throw error;
     }
 });
@@ -164,7 +212,7 @@ export class InventoryService {
         item.quantity <= (item.minQuantity || 0)
       );
     } catch (error) {
-      console.error('Error fetching low stock items:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getLowStockItems' });
       throw error;
     }
 });
@@ -218,7 +266,7 @@ export class InventoryService {
         nextMaintenanceDate: doc.data().nextMaintenanceDate?.toDate?.()?.toISOString() || doc.data().nextMaintenanceDate,
       } as MaintenanceSchedule));
     } catch (error) {
-      console.error('Error fetching maintenance schedules:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getMaintenanceSchedules' });
       throw error;
     }
 });
@@ -273,7 +321,7 @@ export class InventoryService {
         acknowledgedAt: doc.data().acknowledgedAt?.toDate?.()?.toISOString() || doc.data().acknowledgedAt,
       } as InventoryAlert));
     } catch (error) {
-      console.error('Error fetching inventory alerts:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getInventoryAlerts' });
       throw error;
     }
 });
@@ -290,9 +338,10 @@ export class InventoryService {
         acknowledged: false,
         createdAt: Timestamp.now(),
       });
+      InventoryService.invalidateAlertsCache();
       return docRef.id;
     } catch (error) {
-      console.error('Error creating inventory alert:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'createAlert' });
       throw error;
     }
 });
@@ -388,9 +437,10 @@ export class InventoryService {
           });
         });
         await batch.commit();
+        InventoryService.invalidateAlertsCache();
       }
     } catch (error) {
-      console.error('Error generating alerts:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'generateAlerts' });
       throw error;
     }
 });
@@ -425,7 +475,7 @@ export class InventoryService {
 
       // Update quantity based on transaction type (handled by caller)
     } catch (error) {
-      console.error('Error linking transaction to inventory:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'linkTransactionToInventory' });
       throw error;
     }
 });
@@ -474,8 +524,10 @@ export class InventoryService {
         date: Timestamp.now(),
       });
       await batch.commit();
+      InventoryService.invalidateInventoryCache(itemId);
+      InventoryService.invalidateMovementsCache(itemId);
     } catch (error) {
-      console.error('Error recording merchandise purchase:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'recordMerchandisePurchase' });
       throw error;
     }
 });
@@ -527,8 +579,10 @@ export class InventoryService {
         date: Timestamp.now(),
       });
       await batch.commit();
+      InventoryService.invalidateInventoryCache(itemId);
+      InventoryService.invalidateMovementsCache(itemId);
     } catch (error) {
-      console.error('Error recording merchandise sale:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'recordMerchandiseSale' });
       throw error;
     }
 });
@@ -597,7 +651,7 @@ export class InventoryService {
         transactionValue,
       };
     } catch (error) {
-      console.error('Error verifying inventory-finance consistency:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'verifyInventoryFinanceConsistency' });
       throw error;
     }
 });
@@ -610,7 +664,7 @@ export class InventoryService {
     try {
       return await this.getItemsByCategory('Merchandise');
     } catch (error) {
-      console.error('Error fetching merchandise items:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getMerchandiseItems' });
       throw error;
     }
   }
@@ -688,7 +742,7 @@ export class InventoryService {
         discrepancies,
       };
     } catch (error) {
-      console.error('Error reconciling merchandise inventory:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'reconcileMerchandiseInventory' });
       throw error;
     }
 });
@@ -789,8 +843,10 @@ export class InventoryService {
         reference: 'manual checkout',
       });
       await batch.commit();
+      InventoryService.invalidateInventoryCache(itemId);
+      InventoryService.invalidateMovementsCache(itemId);
     } catch (error) {
-      console.error('Error checking out item:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'checkOutItem' });
       throw error;
     }
 });
@@ -836,8 +892,10 @@ export class InventoryService {
         reference: 'manual checkin',
       });
       await batch.commit();
+      InventoryService.invalidateInventoryCache(itemId);
+      InventoryService.invalidateMovementsCache(itemId);
     } catch (error) {
-      console.error('Error checking in item:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'checkInItem' });
       throw error;
     }
 });
@@ -859,9 +917,10 @@ export class InventoryService {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
+      InventoryService.invalidateMaintenanceCache();
       return docRef.id;
     } catch (error) {
-      console.error('Error creating maintenance schedule:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'createMaintenanceSchedule' });
       throw error;
     }
 });
@@ -878,8 +937,9 @@ export class InventoryService {
         ...updates,
         updatedAt: Timestamp.now()
       });
+      InventoryService.invalidateMaintenanceCache();
     } catch (error) {
-      console.error('Error updating maintenance schedule:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'updateMaintenanceSchedule' });
       throw error;
     }
 });
@@ -914,8 +974,10 @@ export class InventoryService {
         updatedAt: now,
       });
       await batch.commit();
+      InventoryService.invalidateMaintenanceCache();
+      InventoryService.invalidateInventoryCache(schedule.itemId);
     } catch (error) {
-      console.error('Error completing maintenance:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'completeMaintenance' });
       throw error;
     }
 });
@@ -933,8 +995,9 @@ export class InventoryService {
         acknowledgedBy,
         acknowledgedAt: Timestamp.now()
       });
+      InventoryService.invalidateAlertsCache();
     } catch (error) {
-      console.error('Error acknowledging alert:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'acknowledgeAlert' });
       throw error;
     }
 });
@@ -962,7 +1025,7 @@ export class InventoryService {
         lastDepreciationUpdate: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Error updating item depreciation:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'updateItemDepreciation' });
       throw error;
     }
 });
@@ -1028,8 +1091,10 @@ export class InventoryService {
       if (referenceId !== undefined) movementData.referenceId = referenceId;
       batch.set(movementRef, movementData);
       await batch.commit();
+      InventoryService.invalidateInventoryCache(itemId);
+      InventoryService.invalidateMovementsCache(itemId);
     } catch (error) {
-      console.error('Error updating variant quantity:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'updateVariantQuantity' });
       throw error;
     }
 });
@@ -1049,13 +1114,25 @@ export class InventoryService {
       const snapshot = await getDocs(q);
       return !snapshot.empty;
     } catch (error) {
-      console.error('Error checking stock movement existence:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'hasStockMovementForRef' });
       return false;
     }
 });
   }
 
-  // Update an existing stock movement for a reference ID
+  /**
+   * Append-only replacement for the former updateStockMovementForRef.
+   *
+   * Instead of mutating the original movement document (which would destroy the
+   * audit trail), this method:
+   *   1. Finds the existing movement by referenceId.
+   *   2. Writes a COMPENSATION movement that negates the original (append-only).
+   *   3. Writes a NEW movement for the updated values.
+   *   4. Applies the net inventory delta atomically via writeBatch.
+   *
+   * If no movement exists yet, it falls through to updateVariantQuantity (first
+   * write path).  Callers in financeService do not need to change.
+   */
   static async updateStockMovementForRef(
     referenceId: string,
     details: {
@@ -1068,125 +1145,173 @@ export class InventoryService {
     return withDevMode(
       () => {},
       async () => {
-    try {
-      // 1. Find the existing movement
-      const q = query(
-        collection(db, COLLECTIONS.STOCK_MOVEMENTS),
-        where('referenceId', '==', referenceId),
-        limit(1)
-      );
-      const snapshot = await getDocs(q);
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.STOCK_MOVEMENTS),
+            where('referenceId', '==', referenceId),
+            limit(1)
+          );
+          const snapshot = await getDocs(q);
 
-      if (snapshot.empty) {
-        // If it doesn't exist, create it anew
-        await this.updateVariantQuantity(
-          details.itemId,
-          details.variantSize,
-          details.quantity,
-          details.operation,
-          referenceId
-        );
-        return;
-      }
-
-      const movementDoc = snapshot.docs[0];
-      const movement = movementDoc.data() as StockMovement;
-
-      const newSignedQty = details.operation === 'increment' ? details.quantity : -details.quantity;
-      const sameItem = movement.itemId === details.itemId;
-      const sameVariant = movement.variant === details.variantSize;
-
-      const batch = writeBatch(db);
-
-      if (sameItem) {
-        const item = await this.getItemById(details.itemId);
-        if (item) {
-          const variants = [...(item.variants || [])];
-          // Net quantity delta for this item (replaces old movement with new one)
-          const netDelta = newSignedQty - movement.quantity;
-          if (sameVariant) {
-            if (netDelta !== 0) {
-              const vi = variants.findIndex(v => v.size === details.variantSize);
-              if (vi > -1) variants[vi].quantity += netDelta;
-              else variants.push({ size: details.variantSize, quantity: netDelta });
-            }
-          } else {
-            const oldVi = variants.findIndex(v => v.size === (movement.variant || ''));
-            if (oldVi > -1) variants[oldVi].quantity += -movement.quantity;
-            else variants.push({ size: movement.variant || '', quantity: -movement.quantity });
-            const newVi = variants.findIndex(v => v.size === details.variantSize);
-            if (newVi > -1) variants[newVi].quantity += newSignedQty;
-            else variants.push({ size: details.variantSize, quantity: newSignedQty });
+          if (snapshot.empty) {
+            // No previous movement → create it from scratch (first-write path)
+            await this.updateVariantQuantity(
+              details.itemId,
+              details.variantSize,
+              details.quantity,
+              details.operation,
+              referenceId
+            );
+            return;
           }
-          const inventoryChanged = !sameVariant || netDelta !== 0;
-          if (inventoryChanged) {
+
+          // ── Append-only update path ──────────────────────────────────────
+          const originalMovementDoc = snapshot.docs[0];
+          const originalMovement = originalMovementDoc.data() as StockMovement;
+          const originalSignedQty = originalMovement.quantity; // may be negative for 'Out'
+
+          const newSignedQty = details.operation === 'increment' ? details.quantity : -details.quantity;
+          // Net inventory delta = new desired quantity − what was previously applied
+          const netDelta = newSignedQty - originalSignedQty;
+
+          const [oldItem, newItem] = await Promise.all([
+            this.getItemById(originalMovement.itemId),
+            originalMovement.itemId !== details.itemId
+              ? this.getItemById(details.itemId)
+              : Promise.resolve(null),
+          ]);
+          const targetItem = newItem ?? oldItem;
+          if (!targetItem) {
+            throw new Error(`Inventory item not found for updateStockMovementForRef ref=${referenceId}`);
+          }
+
+          const batch = writeBatch(db);
+
+          // 1. Compensation movement — negates the original so the log is coherent
+          const compensationRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+          batch.set(compensationRef, {
+            itemId: originalMovement.itemId,
+            itemName: originalMovement.itemName ?? targetItem.name,
+            type: originalMovement.type === 'In' ? 'Out' : 'In',
+            quantity: -originalSignedQty,
+            reason: 'Compensation',
+            compensatesMovementId: originalMovementDoc.id,
+            referenceId,
+            performedBy: 'System',
+            date: Timestamp.now(),
+          });
+
+          // 2. New movement for the updated values
+          const newMovementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+          batch.set(newMovementRef, {
+            itemId: details.itemId,
+            itemName: targetItem.name,
+            variant: details.variantSize,
+            type: details.operation === 'increment' ? 'In' : 'Out',
+            quantity: newSignedQty,
+            reason: details.operation === 'increment' ? 'Restock' : 'Sale',
+            referenceId,
+            performedBy: 'System',
+            date: Timestamp.now(),
+          });
+
+          // 3. Update inventory quantity by net delta only (no mutation of movement docs)
+          if (originalMovement.itemId !== details.itemId) {
+            // Item changed — reverse the original on the old item, apply new on new item
+            const oldItemRef = doc(db, COLLECTIONS.INVENTORY, originalMovement.itemId);
+            batch.update(oldItemRef, {
+              quantity: increment(-originalSignedQty),
+              updatedAt: Timestamp.now(),
+            });
+            const newItemRef = doc(db, COLLECTIONS.INVENTORY, details.itemId);
+            const newItemData = await this.getItemById(details.itemId);
+            if (newItemData) {
+              const variants = [...(newItemData.variants || [])];
+              const vi = variants.findIndex(v => v.size === details.variantSize);
+              if (vi > -1) variants[vi].quantity += newSignedQty;
+              else variants.push({ size: details.variantSize, quantity: newSignedQty });
+              batch.update(newItemRef, {
+                variants,
+                quantity: increment(newSignedQty),
+                updatedAt: Timestamp.now(),
+              });
+            }
+          } else if (netDelta !== 0) {
+            // Same item — apply net delta
             const itemRef = doc(db, COLLECTIONS.INVENTORY, details.itemId);
-            // Use increment() for quantity to avoid read-modify-write race; update variants array as-is
+            const variants = [...(targetItem.variants || [])];
+            const vi = variants.findIndex(v => v.size === details.variantSize);
+            if (vi > -1) variants[vi].quantity += netDelta;
+            else variants.push({ size: details.variantSize, quantity: netDelta });
             batch.update(itemRef, {
               variants,
               quantity: increment(netDelta),
               updatedAt: Timestamp.now(),
             });
           }
-          batch.update(movementDoc.ref, {
-            itemId: details.itemId,
-            itemName: item.name,
-            variant: details.variantSize,
-            quantity: newSignedQty,
-            type: details.operation === 'increment' ? 'In' : 'Out',
-            reason: details.operation === 'increment' ? 'Restock' : 'Sale',
-            updatedAt: Timestamp.now(),
-          });
-        }
-      } else {
-        const [oldItem, newItem] = await Promise.all([
-          this.getItemById(movement.itemId),
-          this.getItemById(details.itemId),
-        ]);
-        if (oldItem) {
-          const oldVariants = [...(oldItem.variants || [])];
-          const oldVi = oldVariants.findIndex(v => v.size === (movement.variant || ''));
-          if (oldVi > -1) oldVariants[oldVi].quantity += -movement.quantity;
-          else oldVariants.push({ size: movement.variant || '', quantity: -movement.quantity });
-          const oldItemRef = doc(db, COLLECTIONS.INVENTORY, movement.itemId);
-          // Use increment() to atomically reverse the old movement quantity
-          batch.update(oldItemRef, {
-            variants: oldVariants,
-            quantity: increment(-movement.quantity),
-            updatedAt: Timestamp.now(),
-          });
-        }
-        if (newItem) {
-          const newVariants = [...(newItem.variants || [])];
-          const newVi = newVariants.findIndex(v => v.size === details.variantSize);
-          if (newVi > -1) newVariants[newVi].quantity += newSignedQty;
-          else newVariants.push({ size: details.variantSize, quantity: newSignedQty });
-          const newItemRef = doc(db, COLLECTIONS.INVENTORY, details.itemId);
-          // Use increment() to atomically apply the new movement quantity
-          batch.update(newItemRef, {
-            variants: newVariants,
-            quantity: increment(newSignedQty),
-            updatedAt: Timestamp.now(),
-          });
-          batch.update(movementDoc.ref, {
-            itemId: details.itemId,
-            itemName: newItem.name,
-            variant: details.variantSize,
-            quantity: newSignedQty,
-            type: details.operation === 'increment' ? 'In' : 'Out',
-            reason: details.operation === 'increment' ? 'Restock' : 'Sale',
-            updatedAt: Timestamp.now(),
-          });
+
+          await batch.commit();
+          InventoryService.invalidateInventoryCache(details.itemId);
+          InventoryService.invalidateMovementsCache(details.itemId);
+          if (originalMovement.itemId !== details.itemId) {
+            InventoryService.invalidateInventoryCache(originalMovement.itemId);
+            InventoryService.invalidateMovementsCache(originalMovement.itemId);
+          }
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'updateStockMovementForRef' });
+          throw error;
         }
       }
+    );
+  }
 
-      await batch.commit();
+  /**
+   * Compensate (reverse) a specific stock movement by its document ID.
+   * Writes a new movement with negated quantity and links back via
+   * `compensatesMovementId`. Updates inventory atomically. Append-only.
+   */
+  static async compensateStockMovement(originalMovementId: string, reason: string): Promise<string> {
+    return withDevMode(
+      () => { console.log(`[DEV MODE] Compensating movement ${originalMovementId}`); return `mock_comp_${Date.now()}`; },
+      async () => {
+        try {
+          const originalRef = doc(db, COLLECTIONS.STOCK_MOVEMENTS, originalMovementId);
+          const originalSnap = await getDoc(originalRef);
+          if (!originalSnap.exists()) {
+            throw new Error(`Stock movement ${originalMovementId} not found`);
+          }
+          const original = originalSnap.data() as StockMovement;
+          const compensationQty = -original.quantity; // negate to reverse the effect
+          const compensationType = original.type === 'In' ? 'Out' : original.type === 'Out' ? 'In' : 'Adjustment';
 
-    } catch (error) {
-      console.error('Error updating stock movement:', error);
-      throw error;
-    }
-});
+          const batch = writeBatch(db);
+          const compRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+          batch.set(compRef, {
+            itemId: original.itemId,
+            itemName: original.itemName,
+            type: compensationType,
+            quantity: compensationQty,
+            reason,
+            compensatesMovementId: originalMovementId,
+            performedBy: 'System',
+            date: Timestamp.now(),
+          });
+          // Apply the reversed delta to the inventory item
+          const itemRef = doc(db, COLLECTIONS.INVENTORY, original.itemId);
+          batch.update(itemRef, {
+            quantity: increment(compensationQty),
+            updatedAt: Timestamp.now(),
+          });
+          await batch.commit();
+          InventoryService.invalidateInventoryCache(original.itemId);
+          InventoryService.invalidateMovementsCache(original.itemId);
+          return compRef.id;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'compensateStockMovement' });
+          throw error;
+        }
+      }
+    );
   }
 
   // Helper to adjust quantity without creating a movement record
@@ -1216,7 +1341,7 @@ export class InventoryService {
         status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
       });
     } catch (e) {
-      console.error('Error inside adjustVariantQuantityOnly:', e);
+      errorLoggingService.logError(e as Error, 'InventoryService.adjustVariantQuantityOnly');
       throw e;
     }
   }
@@ -1263,35 +1388,66 @@ export class InventoryService {
           });
           batch.delete(movementDoc.ref);
           await batch.commit();
+          InventoryService.invalidateInventoryCache(movement.itemId);
+          InventoryService.invalidateMovementsCache(movement.itemId);
         } else {
           // Item no longer exists; just delete the orphan movement
           await deleteDoc(movementDoc.ref);
         }
       }
     } catch (error) {
-      console.error('Error deleting stock movement:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'deleteStockMovementForRef' });
       throw error;
     }
 });
   }
 
-  // Record a stock movement
+  // Record a stock movement — atomically updates both the movement log and
+  // the inventoryItems.quantity field so the two collections never diverge.
   static async recordStockMovement(movement: Omit<StockMovement, 'id' | 'date'>): Promise<string> {
     return withDevMode(
       () => { console.log('[DEV MODE] Recording stock movement:', movement); return `mock_mov_${Date.now()}`; },
       async () => {
-    try {
-      const cleanMovement = removeUndefined(movement);
-      const docRef = await addDoc(collection(db, COLLECTIONS.STOCK_MOVEMENTS), {
-        ...cleanMovement,
-        date: Timestamp.now(),
-      });
-      return docRef.id;
-    } catch (error) {
-      console.error('Error recording stock movement:', error);
-      throw error;
-    }
-});
+        try {
+          // Calculate signed quantity delta:
+          //   'In'  → positive (stock increases)
+          //   'Out' → negative (stock decreases); stored quantity may already be negative
+          //   'Adjustment' → take the signed value as-is
+          const absQty = Math.abs(movement.quantity);
+          const delta =
+            movement.type === 'In'
+              ? absQty
+              : movement.type === 'Out'
+              ? -absQty
+              : movement.quantity; // Adjustment is already signed
+
+          const cleanMovement = removeUndefined(movement);
+          const batch = writeBatch(db);
+
+          // 1. Append the movement record (append-only — never update existing)
+          const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
+          batch.set(movementRef, {
+            ...cleanMovement,
+            date: Timestamp.now(),
+          });
+
+          // 2. Atomically update inventory quantity
+          const itemRef = doc(db, COLLECTIONS.INVENTORY, movement.itemId);
+          batch.update(itemRef, {
+            quantity: increment(delta),
+            updatedAt: Timestamp.now(),
+          });
+
+          await batch.commit();
+          InventoryService.invalidateInventoryCache(movement.itemId);
+          InventoryService.invalidateMovementsCache(movement.itemId);
+          return movementRef.id;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'recordStockMovement' });
+          throw error;
+        }
+      }
+    );
   }
 
   // Get stock card (movements) for an item
@@ -1299,23 +1455,31 @@ export class InventoryService {
     return withDevMode(
       () => [],
       async () => {
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.STOCK_MOVEMENTS),
-        where('itemId', '==', itemId),
-        orderBy('date', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-      } as StockMovement));
-    } catch (error) {
-      console.error('Error getting stock card:', error);
-      throw error;
-    }
-});
+        return apiCache.getOrSet(
+          `${InventoryService.CACHE_MOVEMENTS_PREFIX}${itemId}`,
+          async () => {
+            try {
+              const q = query(
+                collection(db, COLLECTIONS.STOCK_MOVEMENTS),
+                where('itemId', '==', itemId),
+                orderBy('date', 'desc')
+              );
+              const snapshot = await getDocs(q);
+              return snapshot.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+                date: d.data().date?.toDate?.()?.toISOString() || d.data().date,
+              } as StockMovement));
+            } catch (error) {
+              errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'getStockCard' });
+              throw error;
+            }
+          },
+          InventoryService.CACHE_TTL,
+          'InventoryService.getStockCard'
+        );
+      }
+    );
   }
 
   // Manual stock adjustment
@@ -1373,8 +1537,10 @@ export class InventoryService {
       if (variantSize !== undefined) movementData.variant = variantSize;
       batch.set(movementRef, movementData);
       await batch.commit();
+      InventoryService.invalidateInventoryCache(itemId);
+      InventoryService.invalidateMovementsCache(itemId);
     } catch (error) {
-      console.error('Error adjusting stock:', error);
+      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'adjustStock' });
       throw error;
     }
 });

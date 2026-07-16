@@ -17,6 +17,19 @@ import { BusinessProfile } from '../types';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_BUSINESSES } from './mockData';
 import { MembersService } from './membersService';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
+
+const CACHE_KEY_ALL_PUBLIC = 'businessDirectory:public:all';
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+
+function invalidateBusinessDirectoryCache(): void {
+  apiCache.delete(CACHE_KEY_ALL_PUBLIC);
+}
+
+function cacheKeyById(id: string): string {
+  return `businessDirectory:byId:${id}`;
+}
 
 export function mapMemberToBusinessProfile(id: string, data: Record<string, unknown>): BusinessProfile | null {
   const business = (data.business ?? {}) as Record<string, unknown>;
@@ -93,19 +106,31 @@ export class BusinessDirectoryService {
     return withDevMode(
       () => {},
       async () => {
-    const profile = mapMemberToBusinessProfile(memberId, data);
-    const listingRef = doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, memberId);
+        const profile = mapMemberToBusinessProfile(memberId, data);
+        const listingRef = doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, memberId);
 
-    if (!profile) {
-      try {
-        await deleteDoc(listingRef);
-      } catch {
-        // Listing may not exist yet.
-      }
-      return;
-    }
-
-    await setDoc(listingRef, { ...profile, memberId, updatedAt: Timestamp.now() }, { merge: true });
+        try {
+          if (!profile) {
+            try {
+              await deleteDoc(listingRef);
+            } catch {
+              // Listing may not exist yet — deletion is best-effort.
+            }
+          } else {
+            await setDoc(listingRef, { ...profile, memberId, updatedAt: Timestamp.now() }, { merge: true });
+          }
+          // Invalidate caches so next read reflects the update immediately.
+          invalidateBusinessDirectoryCache();
+          apiCache.delete(cacheKeyById(memberId));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'BusinessDirectoryService',
+            action: 'syncPublicListing',
+            memberId,
+          });
+          // Re-throw so callers can decide whether to surface a warning.
+          throw error;
+        }
       }
     );
   }
@@ -115,28 +140,36 @@ export class BusinessDirectoryService {
       () => MOCK_BUSINESSES,
       async () => {
         if (publicOnly) {
-          // Unauthenticated path: read from the public denormalised collection.
-          try {
-            const snapshot = await getDocs(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS));
-            return snapshot.docs
-              .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data() as Record<string, unknown>))
-              .filter((p) => p.companyName?.trim())
-              .sort((a, b) => a.companyName.localeCompare(b.companyName));
-          } catch (error) {
-            console.error('Error fetching public business listings:', error);
-            throw error;
-          }
+          // Unauthenticated path: read from the public denormalised collection (cached).
+          return apiCache.getOrSet(CACHE_KEY_ALL_PUBLIC, async () => {
+            try {
+              const snapshot = await getDocs(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS));
+              return snapshot.docs
+                .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data() as Record<string, unknown>))
+                .filter((p) => p.companyName?.trim())
+                .sort((a, b) => a.companyName.localeCompare(b.companyName));
+            } catch (error) {
+              errorLoggingService.logError(error as Error, {
+                component: 'BusinessDirectoryService',
+                action: 'getAllBusinesses:public',
+              });
+              throw error;
+            }
+          }, CACHE_TTL_MS);
         }
 
         try {
-          // Authenticated path: use cached MembersService to avoid a raw full-collection scan.
+          // Authenticated path: MembersService already caches internally.
           const members = await MembersService.getAllMembers();
           return members
             .map((m) => mapMemberToBusinessProfile(m.id, m as unknown as Record<string, unknown>))
             .filter((profile): profile is BusinessProfile => profile !== null)
             .sort((a, b) => a.companyName.localeCompare(b.companyName));
         } catch (error) {
-          console.error('Error fetching business profiles:', error);
+          errorLoggingService.logError(error as Error, {
+            component: 'BusinessDirectoryService',
+            action: 'getAllBusinesses:authenticated',
+          });
           throw error;
         }
       }
@@ -147,21 +180,28 @@ export class BusinessDirectoryService {
     return withDevMode(
       () => MOCK_BUSINESSES.find((b) => b.id === businessId) || null,
       async () => {
-        try {
-          const listingSnap = await getDoc(doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, businessId));
-          if (listingSnap.exists()) {
-            return mapListingDoc(listingSnap.id, listingSnap.data());
-          }
+        const key = cacheKeyById(businessId);
+        return apiCache.getOrSet(key, async () => {
+          try {
+            const listingSnap = await getDoc(doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, businessId));
+            if (listingSnap.exists()) {
+              return mapListingDoc(listingSnap.id, listingSnap.data());
+            }
 
-          const memberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, businessId));
-          if (memberSnap.exists()) {
-            return mapMemberToBusinessProfile(memberSnap.id, memberSnap.data());
+            const memberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, businessId));
+            if (memberSnap.exists()) {
+              return mapMemberToBusinessProfile(memberSnap.id, memberSnap.data());
+            }
+            return null;
+          } catch (error) {
+            errorLoggingService.logError(error as Error, {
+              component: 'BusinessDirectoryService',
+              action: 'getBusinessById',
+              businessId,
+            });
+            throw error;
           }
-          return null;
-        } catch (error) {
-          console.error('Error fetching business profile:', error);
-          throw error;
-        }
+        }, CACHE_TTL_MS);
       }
     );
   }

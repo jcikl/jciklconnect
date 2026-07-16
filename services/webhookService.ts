@@ -11,11 +11,13 @@ import {
   where,
   orderBy,
   limit,
+  writeBatch,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface Webhook {
   id?: string;
@@ -72,7 +74,7 @@ export class WebhookService {
             lastTriggered: doc.data().lastTriggered ? (doc.data().lastTriggered as Timestamp)?.toDate() : undefined,
           } as Webhook));
         } catch (error) {
-          console.error('Error fetching webhooks:', error);
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'getAllWebhooks' });
           throw error;
         }
       }
@@ -104,7 +106,7 @@ export class WebhookService {
             lastTriggered: data.lastTriggered ? (data.lastTriggered as Timestamp)?.toDate() : undefined,
           } as Webhook;
         } catch (error) {
-          console.error('Error fetching webhook:', error);
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'getWebhookById' });
           throw error;
         }
       }
@@ -130,7 +132,7 @@ export class WebhookService {
 
           return docRef.id;
         } catch (error) {
-          console.error('Error creating webhook:', error);
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'createWebhook' });
           throw error;
         }
       }
@@ -149,7 +151,7 @@ export class WebhookService {
             updatedAt: Timestamp.now(),
           });
         } catch (error) {
-          console.error('Error updating webhook:', error);
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'updateWebhook' });
           throw error;
         }
       }
@@ -165,7 +167,7 @@ export class WebhookService {
           const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
           await deleteDoc(docRef);
         } catch (error) {
-          console.error('Error deleting webhook:', error);
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'deleteWebhook' });
           throw error;
         }
       }
@@ -263,7 +265,7 @@ export class WebhookService {
 
           return docRef.id;
         } catch (error) {
-          console.error('Error logging webhook execution:', error);
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'logWebhookExecution' });
           throw error;
         }
       }
@@ -307,7 +309,7 @@ export class WebhookService {
         } as WebhookLog;
       });
     } catch (error) {
-      console.error('Error fetching webhook logs:', error);
+      errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'getWebhookLogs' });
       throw error;
     }
   });
@@ -328,6 +330,76 @@ export class WebhookService {
         message: `Error: ${errorMessage}`,
       };
     }
+  }
+
+  /**
+   * Cleanup utility: batch-delete systemLogs documents older than 90 days.
+   * Call this manually from an ADMIN / SUPER_ADMIN context — not automatically triggered.
+   * TTL policy: systemLogs and webhook_logs have no automatic expiry in Firestore rules,
+   * so old records must be purged via this method or a scheduled Cloud Function.
+   */
+  static async createSystemLogCleanupJob(dryRun = false): Promise<{ deleted: number }> {
+    return withDevMode(
+      () => {
+        console.log('[Dev Mode] createSystemLogCleanupJob — would scan systemLogs older than 90 days');
+        return { deleted: 0 };
+      },
+      async () => {
+        try {
+          const cutoff = Timestamp.fromDate(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
+          const q = query(
+            collection(db, COLLECTIONS.SYSTEM_LOGS),
+            where('flushedAt', '<', cutoff),
+            limit(400) // Stay within writeBatch 500-op limit
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) return { deleted: 0 };
+          if (dryRun) return { deleted: snapshot.size };
+
+          const batch = writeBatch(db);
+          snapshot.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          return { deleted: snapshot.size };
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'createSystemLogCleanupJob' });
+          throw error;
+        }
+      }
+    );
+  }
+
+  /**
+   * Cleanup utility: batch-delete webhook_logs documents older than the given days (default 90).
+   * Call this manually from an ADMIN / SUPER_ADMIN context.
+   */
+  static async purgeOldWebhookLogs(olderThanDays = 90, dryRun = false): Promise<{ deleted: number }> {
+    return withDevMode(
+      () => {
+        console.log(`[Dev Mode] purgeOldWebhookLogs — would scan webhook_logs older than ${olderThanDays} days`);
+        return { deleted: 0 };
+      },
+      async () => {
+        try {
+          const cutoff = Timestamp.fromDate(new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000));
+          const q = query(
+            collection(db, COLLECTIONS.WEBHOOK_LOGS || 'webhook_logs'),
+            where('triggeredAt', '<', cutoff),
+            limit(400)
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) return { deleted: 0 };
+          if (dryRun) return { deleted: snapshot.size };
+
+          const batch = writeBatch(db);
+          snapshot.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          return { deleted: snapshot.size };
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'purgeOldWebhookLogs' });
+          throw error;
+        }
+      }
+    );
   }
 
   // Mock data for dev mode

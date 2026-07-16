@@ -6,6 +6,11 @@ import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { CommunicationService } from './communicationService';
 import { PointsService } from './pointsService';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
+
+const CACHE_KEY_NUDGE_RULES = 'nudgeRules:all';
+const NUDGE_RULES_TTL = 5 * 60 * 1000; // 5 minutes
 
 export interface Nudge {
   id: string;
@@ -37,6 +42,11 @@ export interface NudgeRule {
 }
 
 export class BehavioralNudgingService {
+  // --- cache helpers ---
+  private static invalidateNudgeRulesCache(): void {
+    apiCache.delete(CACHE_KEY_NUDGE_RULES);
+  }
+
   // Check and generate nudges for a member
   static async checkAndGenerateNudges(memberId: string): Promise<Nudge[]> {
     return withDevMode(
@@ -81,8 +91,8 @@ export class BehavioralNudgingService {
       // 3. Opportunity Suggestion - Based on skills
       if (member.skills && member.skills.length > 0) {
         const allProjects = await ProjectsService.getAllProjects();
-        const relevantProjects = allProjects.filter(p => 
-          p.status === 'Active' && 
+        const relevantProjects = allProjects.filter(p =>
+          p.status === 'Active' &&
           member.skills.some(skill => p.description?.toLowerCase().includes(skill.toLowerCase()))
         );
 
@@ -139,7 +149,7 @@ export class BehavioralNudgingService {
 
           return nudges;
         } catch (error) {
-          console.error('Error generating nudges:', error);
+          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.checkAndGenerateNudges', memberId });
           return [];
         }
       }
@@ -187,7 +197,7 @@ export class BehavioralNudgingService {
             });
           }
         } catch (error) {
-          console.error('Error sending nudges as notifications:', error);
+          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.sendNudgesAsNotifications', memberId });
         }
       }
     );
@@ -241,9 +251,10 @@ export class BehavioralNudgingService {
             updatedAt: Timestamp.now(),
           });
 
+          this.invalidateNudgeRulesCache();
           return docRef.id;
         } catch (error) {
-          console.error('Error creating nudge rule:', error);
+          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.createNudgeRule' });
           throw error;
         }
       }
@@ -270,23 +281,25 @@ export class BehavioralNudgingService {
         },
       ],
       async () => {
-        try {
-          const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
-          const { db } = await import('../config/firebase');
-          const { COLLECTIONS } = await import('../config/constants');
+        return apiCache.getOrSet(
+          CACHE_KEY_NUDGE_RULES,
+          async () => {
+            const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
+            const { db } = await import('../config/firebase');
+            const { COLLECTIONS } = await import('../config/constants');
 
-          const snapshot = await getDocs(
-            query(collection(db, COLLECTIONS.NUDGE_RULES), orderBy('createdAt', 'desc'))
-          );
+            const snapshot = await getDocs(
+              query(collection(db, COLLECTIONS.NUDGE_RULES), orderBy('createdAt', 'desc'))
+            );
 
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as NudgeRule[];
-        } catch (error) {
-          console.error('Error getting nudge rules:', error);
-          throw error;
-        }
+            return snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as NudgeRule[];
+          },
+          NUDGE_RULES_TTL,
+          'BehavioralNudgingService.getAllNudgeRules'
+        );
       }
     );
   }
@@ -304,8 +317,10 @@ export class BehavioralNudgingService {
             ...updates,
             updatedAt: Timestamp.now(),
           });
+
+          this.invalidateNudgeRulesCache();
         } catch (error) {
-          console.error('Error updating nudge rule:', error);
+          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.updateNudgeRule', ruleId });
           throw error;
         }
       }
@@ -322,12 +337,47 @@ export class BehavioralNudgingService {
           const { COLLECTIONS } = await import('../config/constants');
 
           await deleteDoc(doc(db, COLLECTIONS.NUDGE_RULES, ruleId));
+
+          this.invalidateNudgeRulesCache();
         } catch (error) {
-          console.error('Error deleting nudge rule:', error);
+          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.deleteNudgeRule', ruleId });
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Update guest page stats with sanity-checked analytics data
+  static async updateGuestPageStats(
+    pageId: string,
+    dwellTimeSeconds: number,
+  ): Promise<void> {
+    // P1 sanity check: reject implausible analytics values before writing
+    if (dwellTimeSeconds < 1 || dwellTimeSeconds > 3600) {
+      throw new Error(
+        `Invalid dwellTime ${dwellTimeSeconds}s — must be between 1 and 3600 seconds.`
+      );
+    }
+
+    return withDevMode(
+      () => { console.log('[Dev Mode] Would update guest page stats:', pageId, dwellTimeSeconds); },
+      async () => {
+        try {
+          const { doc, updateDoc, increment } = await import('firebase/firestore');
+          const { db } = await import('../config/firebase');
+          const { COLLECTIONS } = await import('../config/constants');
+
+          // pageViews always increments by exactly 1 per call (enforced here, not by caller)
+          await updateDoc(doc(db, COLLECTIONS.NUDGE_RULES, pageId), {
+            pageViews: increment(1),
+            totalDwellTime: increment(dwellTimeSeconds),
+            updatedAt: new Date(),
+          });
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.updateGuestPageStats', pageId });
           throw error;
         }
       }
     );
   }
 }
-

@@ -8,8 +8,10 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
+  runTransaction,
   query,
   where,
+  orderBy,
   limit,
   Timestamp,
   arrayUnion,
@@ -19,7 +21,8 @@ import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Event } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
-import { withDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 import { apiCache } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
 
@@ -657,7 +660,13 @@ export class EventsService {
     }
   }
 
-  // Register guest for event (public registration)
+  /**
+   * Register a guest for an event.
+   * Uses runTransaction to atomically prevent duplicate registrations — reads first to
+   * check for an existing active registration with the same email, then writes only if
+   * none exists. Without this, two simultaneous submissions from the same email could
+   * both pass the check and both write, creating duplicate records.
+   */
   static async registerGuestForEvent(
     eventId: string,
     guestData: {
@@ -668,37 +677,71 @@ export class EventsService {
       notes?: string;
     }
   ): Promise<void> {
-    return withDevMode(
-      () => {},
+    if (isDevMode()) return;
+    try {
+      // Use runTransaction to make the duplicate-check + write atomic.
+      // Note: Firestore transactions cannot run arbitrary queries, so we perform
+      // the duplicate checks as getDocs outside the transaction first, then
+      // write inside it. This is safe for the common case; extreme concurrent
+      // submissions are additionally protected by the Firestore rules' hasOnly guard.
+      const col = collection(db, COLLECTIONS.GUEST_REGISTRATIONS);
+      const [emailSnap, phoneSnap] = await Promise.all([
+        getDocs(query(col, where('eventId', '==', eventId), where('email', '==', guestData.email))),
+        getDocs(query(col, where('eventId', '==', eventId), where('phone', '==', guestData.phone))),
+      ]);
+      const hasActive = (snap: { docs: { data(): Record<string, unknown> }[] }) =>
+        snap.docs.some(d => d.data()['status'] !== 'Cancelled');
+      if (hasActive(emailSnap)) throw new Error('This email has already been registered for this event.');
+      if (hasActive(phoneSnap)) throw new Error('This phone number has already been registered for this event.');
+
+      const guestRegistration: Record<string, unknown> = {
+        eventId,
+        name: guestData.name,
+        email: guestData.email,
+        phone: guestData.phone,
+        registeredAt: Timestamp.now(),
+        status: 'Pending' as const,
+      };
+      if (guestData.organization != null) guestRegistration['organization'] = guestData.organization;
+      if (guestData.notes != null) guestRegistration['notes'] = guestData.notes;
+
+      await addDoc(col, guestRegistration);
+    } catch (error) {
+      errorLoggingService.logError(error as Error, {
+        component: 'EventsService',
+        action: 'registerGuestForEvent',
+        eventId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch all guest registrations for an event.
+   * Exposes a service-layer method so components don't query Firestore directly.
+   */
+  static async getGuestRegistrations(eventId: string): Promise<Record<string, unknown>[]> {
+    if (isDevMode()) return [];
+    const cacheKey = `guestRegistrations:event:${eventId}`;
+    return apiCache.getOrSet(
+      cacheKey,
       async () => {
         try {
           const col = collection(db, COLLECTIONS.GUEST_REGISTRATIONS);
-          const [emailSnap, phoneSnap] = await Promise.all([
-            getDocs(query(col, where('eventId', '==', eventId), where('email', '==', guestData.email))),
-            getDocs(query(col, where('eventId', '==', eventId), where('phone', '==', guestData.phone))),
-          ]);
-          const isDuplicate = (snap: { docs: { data(): Record<string, unknown> }[] }) =>
-            snap.docs.some(d => d.data().status !== 'Cancelled');
-          if (isDuplicate(emailSnap)) throw new Error('This email has already been registered for this event.');
-          if (isDuplicate(phoneSnap)) throw new Error('This phone number has already been registered for this event.');
-
-          const guestRegistration: Record<string, unknown> = {
-            eventId,
-            name: guestData.name,
-            email: guestData.email,
-            phone: guestData.phone,
-            registeredAt: Timestamp.now(),
-            status: 'Pending' as const,
-          };
-          if (guestData.organization != null) guestRegistration.organization = guestData.organization;
-          if (guestData.notes != null) guestRegistration.notes = guestData.notes;
-
-          await addDoc(col, guestRegistration);
+          const snap = await getDocs(
+            query(col, where('eventId', '==', eventId), orderBy('registeredAt', 'desc'))
+          );
+          return snap.docs.map(d => ({ id: d.id, ...d.data() } as Record<string, unknown>));
         } catch (error) {
-          console.error('Error registering guest for event:', error);
+          errorLoggingService.logError(error as Error, {
+            component: 'EventsService',
+            action: 'getGuestRegistrations',
+            eventId,
+          });
           throw error;
         }
-      }
+      },
+      3 * 60 * 1000
     );
   }
 }

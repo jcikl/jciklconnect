@@ -1,20 +1,20 @@
 import {
   collection,
   doc,
-  getDoc,
   getDocs,
   addDoc,
   updateDoc,
   deleteDoc,
   query,
   where,
-  orderBy,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { Partnership } from '../types';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 
 /**
  * Default mock partnerships used as fallback when Firestore is inaccessible
@@ -62,68 +62,89 @@ function toDateString(val: any): string {
   return '';
 }
 
+/**
+ * Partnership data is stored in the `advertisements` Firestore collection
+ * (COLLECTIONS.ADVERTISEMENTS). ALL reads AND writes use this single
+ * canonical collection — the old code accidentally wrote to a separate
+ * `partnerships` collection that nobody reads, causing created/updated
+ * records to be permanently invisible on the user-facing page.
+ *
+ * FIX P0 (2026-07-17): unified all operations to COLLECTIONS.ADVERTISEMENTS.
+ */
+const COLL = COLLECTIONS.ADVERTISEMENTS || 'advertisements';
+const CACHE_KEY = 'partnerships:all';
+const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
 export class PartnershipsService {
+  static invalidatePartnershipsCache(): void {
+    apiCache.deleteByPrefix('partnerships:');
+    // Also bust the shared ads cache so AdvertisementService sees changes too
+    apiCache.deleteByPrefix('ads:');
+  }
+
   /**
-   * Get all partnerships.
-   *
-   * IMPORTANT: Partnership data is managed through the admin panel's
-   * "Partnership & Promotions" page, which stores records in the
-   * `advertisements` Firestore collection (COLLECTIONS.ADVERTISEMENTS).
-   *
-   * This method reads from `advertisements`, maps each Advertisement
-   * document into the Partnership interface, and returns it.
-   *
-   * For guest users who lack Firestore read permissions, it gracefully
-   * falls back to in-memory mock data.
+   * Get all partnerships (mapped from the advertisements collection).
+   * Active-only filter is applied client-side after the Firestore read
+   * because the advertisements collection uses 'Active'/'Inactive' status
+   * values that don't map 1:1 to Partnership status without reading all docs.
    */
   static async getAllPartnerships(): Promise<Partnership[]> {
     return withDevMode(
       () => [...MOCK_PARTNERSHIPS],
-      async () => {
-    try {
-      // Read from the advertisements collection — the actual source of partnership data
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'))
-      );
+      () =>
+        apiCache.getOrSet<Partnership[]>(
+          CACHE_KEY,
+          async () => {
+            try {
+              const snapshot = await getDocs(query(collection(db, COLL)));
 
-      if (snapshot.empty) {
-        console.log('[PartnershipsService] advertisements collection is empty, returning mock data.');
-        return [...MOCK_PARTNERSHIPS];
-      }
+              if (snapshot.empty) {
+                return [...MOCK_PARTNERSHIPS];
+              }
 
-      // Map Advertisement documents → Partnership interface
-      const results: Partnership[] = snapshot.docs.map(docSnap => {
-        const d = docSnap.data();
-        return {
-          id: docSnap.id,
-          name: d.title || 'Untitled Partner',
-          period: {
-            startDate: toDateString(d.startDate),
-            endDate: toDateString(d.endDate),
+              const results: Partnership[] = snapshot.docs.map(docSnap => {
+                const d = docSnap.data();
+                return {
+                  id: docSnap.id,
+                  name: d.title || 'Untitled Partner',
+                  period: {
+                    startDate: toDateString(d.startDate),
+                    endDate: toDateString(d.endDate),
+                  },
+                  memberBenefits: d.description || '',
+                  redeemMethod: d.linkUrl || d.description || '',
+                  logo: d.logoUrl || '',
+                  banner: d.imageUrl || '',
+                  eligbleRoles: d.targetCriteria?.tiers ||
+                    d.targetCriteria?.roles || [
+                      'probation member', 'official member', 'paid_due_member',
+                      'associate member', 'lifetime member',
+                    ],
+                  status: (d.status === 'Active' ? 'active' : 'inactive') as 'active' | 'inactive',
+                };
+              });
+
+              return results;
+            } catch (error) {
+              // Guest users will hit permission-denied — fall back to mock data
+              errorLoggingService.logWarning(
+                '[PartnershipsService] Cannot read advertisements (falling back to mock data)',
+                { error: String(error) }
+              );
+              return [...MOCK_PARTNERSHIPS];
+            }
           },
-          memberBenefits: d.description || '',
-          redeemMethod: d.linkUrl || d.description || '',
-          logo: d.logoUrl || '',
-          banner: d.imageUrl || '',
-          eligbleRoles: d.targetCriteria?.tiers || d.targetCriteria?.roles || [
-            'probation member', 'official member', 'paid_due_member',
-            'associate member', 'lifetime member',
-          ],
-          status: (d.status === 'Active' ? 'active' : 'inactive') as 'active' | 'inactive',
-        };
-      });
-
-      console.log(`[PartnershipsService] Loaded ${results.length} partnerships from advertisements collection.`);
-      return results;
-    } catch (error) {
-      // Guest users will hit permission-denied here — gracefully fall back
-      console.warn('[PartnershipsService] Cannot read advertisements (falling back to mock data):', error);
-      return [...MOCK_PARTNERSHIPS];
-    }
-  });
+          CACHE_TTL,
+          'PartnershipsService.getAllPartnerships'
+        )
+    );
   }
 
-  // Create a new partnership
+  /**
+   * Create a new partnership record.
+   * FIX P0: writes to COLLECTIONS.ADVERTISEMENTS (same as getAllPartnerships reads).
+   * Maps Partnership fields back to Advertisement document shape.
+   */
   static async createPartnership(data: Omit<Partnership, 'id'>): Promise<string> {
     return withDevMode(
       () => {
@@ -133,49 +154,88 @@ export class PartnershipsService {
       },
       async () => {
         try {
-          const docRef = await addDoc(collection(db, COLLECTIONS.PARTNERSHIPS || 'partnerships'), {
-            ...data,
+          const docRef = await addDoc(collection(db, COLL), {
+            // Map Partnership → Advertisement fields
+            title: data.name,
+            description: data.memberBenefits || '',
+            linkUrl: data.redeemMethod || null,
+            logoUrl: data.logo || null,
+            imageUrl: data.banner || null,
+            targetCriteria: data.eligbleRoles?.length
+              ? { roles: data.eligbleRoles }
+              : null,
+            status: data.status === 'active' ? 'Active' : 'Inactive',
+            type: 'Banner', // default type for partnerships
+            placement: ['Homepage'],
+            impressions: 0,
+            clicks: 0,
+            priority: 0,
+            startDate: data.period?.startDate
+              ? Timestamp.fromDate(new Date(data.period.startDate))
+              : Timestamp.now(),
+            endDate: data.period?.endDate
+              ? Timestamp.fromDate(new Date(data.period.endDate))
+              : null,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           });
+          this.invalidatePartnershipsCache();
           return docRef.id;
         } catch (error) {
-          console.error('Error creating partnership:', error);
+          errorLoggingService.logError(error as Error, { context: 'PartnershipsService.createPartnership' });
           throw error;
         }
       }
     );
   }
 
-  // Update partnership
+  /**
+   * Update an existing partnership.
+   * FIX P0: updates COLLECTIONS.ADVERTISEMENTS (same collection as reads).
+   */
   static async updatePartnership(id: string, updates: Partial<Partnership>): Promise<void> {
     return withDevMode(
       () => { console.log(`[DEV MODE] Simulating update of partnership ${id}`); },
       async () => {
         try {
-          const docRef = doc(db, COLLECTIONS.PARTNERSHIPS || 'partnerships', id);
-          await updateDoc(docRef, {
-            ...updates,
-            updatedAt: Timestamp.now(),
-          });
+          const updateData: any = { updatedAt: Timestamp.now() };
+          if (updates.name !== undefined) updateData.title = updates.name;
+          if (updates.memberBenefits !== undefined) updateData.description = updates.memberBenefits;
+          if (updates.redeemMethod !== undefined) updateData.linkUrl = updates.redeemMethod;
+          if (updates.logo !== undefined) updateData.logoUrl = updates.logo;
+          if (updates.banner !== undefined) updateData.imageUrl = updates.banner;
+          if (updates.eligbleRoles !== undefined) updateData.targetCriteria = { roles: updates.eligbleRoles };
+          if (updates.status !== undefined) updateData.status = updates.status === 'active' ? 'Active' : 'Inactive';
+          if (updates.period?.startDate !== undefined)
+            updateData.startDate = Timestamp.fromDate(new Date(updates.period.startDate));
+          if (updates.period?.endDate !== undefined)
+            updateData.endDate = Timestamp.fromDate(new Date(updates.period.endDate));
+
+          const docRef = doc(db, COLL, id);
+          await updateDoc(docRef, updateData);
+          this.invalidatePartnershipsCache();
         } catch (error) {
-          console.error('Error updating partnership:', error);
+          errorLoggingService.logError(error as Error, { context: 'PartnershipsService.updatePartnership', id });
           throw error;
         }
       }
     );
   }
 
-  // Delete partnership
+  /**
+   * Delete a partnership.
+   * FIX P0: deletes from COLLECTIONS.ADVERTISEMENTS (same collection as reads).
+   */
   static async deletePartnership(id: string): Promise<void> {
     return withDevMode(
       () => { console.log(`[DEV MODE] Simulating deletion of partnership ${id}`); },
       async () => {
         try {
-          const docRef = doc(db, COLLECTIONS.PARTNERSHIPS || 'partnerships', id);
+          const docRef = doc(db, COLL, id);
           await deleteDoc(docRef);
+          this.invalidatePartnershipsCache();
         } catch (error) {
-          console.error('Error deleting partnership:', error);
+          errorLoggingService.logError(error as Error, { context: 'PartnershipsService.deletePartnership', id });
           throw error;
         }
       }

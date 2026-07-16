@@ -15,6 +15,14 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
+
+const TEMPLATES_CACHE_PREFIX = 'templates:';
+
+function invalidateTemplatesCache(): void {
+  apiCache.deleteByPrefix(TEMPLATES_CACHE_PREFIX);
+}
 
 export interface EventTemplate {
   id?: string;
@@ -96,44 +104,60 @@ export class TemplatesService {
           updatedAt: new Date(),
         },
       ],
-      async () => {
-        try {
-          const snapshot = await getDocs(
-            query(collection(db, COLLECTIONS.TEMPLATES), orderBy('name'))
-          );
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-          })) as EventTemplate[];
-        } catch (error) {
-          console.error('Error fetching event templates:', error);
-          throw error;
-        }
-      }
+      () => apiCache.getOrSet(
+        `${TEMPLATES_CACHE_PREFIX}event:all`,
+        async () => {
+          try {
+            const snapshot = await getDocs(
+              query(
+                collection(db, COLLECTIONS.TEMPLATES),
+                where('templateType', '==', 'EventTemplate'),
+                orderBy('name')
+              )
+            );
+            return snapshot.docs.map(d => ({
+              id: d.id,
+              ...d.data(),
+              createdAt: d.data().createdAt?.toDate() || new Date(),
+              updatedAt: d.data().updatedAt?.toDate() || new Date(),
+            })) as EventTemplate[];
+          } catch (error) {
+            errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'getAllEventTemplates' });
+            throw error;
+          }
+        },
+        5 * 60 * 1000
+      )
     );
   }
 
   // Get template by ID
   static async getEventTemplateById(templateId: string): Promise<EventTemplate | null> {
-    try {
-      const docRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return {
-          id: docSnap.id,
-          ...docSnap.data(),
-          createdAt: docSnap.data().createdAt?.toDate() || new Date(),
-          updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
-        } as EventTemplate;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching event template:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => null,
+      () => apiCache.getOrSet(
+        `${TEMPLATES_CACHE_PREFIX}event:${templateId}`,
+        async () => {
+          try {
+            const docRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              return {
+                id: docSnap.id,
+                ...docSnap.data(),
+                createdAt: docSnap.data().createdAt?.toDate() || new Date(),
+                updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
+              } as EventTemplate;
+            }
+            return null;
+          } catch (error) {
+            errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'getEventTemplateById' });
+            throw error;
+          }
+        },
+        5 * 60 * 1000
+      )
+    );
   }
 
   // Create event template
@@ -142,22 +166,26 @@ export class TemplatesService {
       () => `mock-template-${Date.now()}`,
       async () => {
         try {
-          // Filter out undefined values
-          const newTemplate: any = {
+          const newTemplate = {
+            templateType: 'EventTemplate',
             name: templateData.name,
             type: templateData.type,
+            description: templateData.description ?? null,
+            defaultLocation: templateData.defaultLocation ?? null,
+            defaultMaxAttendees: templateData.defaultMaxAttendees ?? null,
+            defaultBudget: templateData.defaultBudget ?? null,
+            checklist: templateData.checklist ?? [],
+            requiredResources: templateData.requiredResources ?? [],
+            estimatedDuration: templateData.estimatedDuration ?? null,
+            createdBy: templateData.createdBy ?? null,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           };
-
-          if (templateData.description !== undefined) newTemplate.description = templateData.description;
-          if (templateData.defaultLocation !== undefined) newTemplate.defaultLocation = templateData.defaultLocation;
-          if (templateData.defaultMaxAttendees !== undefined) newTemplate.defaultMaxAttendees = templateData.defaultMaxAttendees;
-
           const docRef = await addDoc(collection(db, COLLECTIONS.TEMPLATES), newTemplate);
+          invalidateTemplatesCache();
           return docRef.id;
         } catch (error) {
-          console.error('Error creating event template:', error);
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'createEventTemplate' });
           throw error;
         }
       }
@@ -166,16 +194,22 @@ export class TemplatesService {
 
   // Update event template
   static async updateEventTemplate(templateId: string, updates: Partial<EventTemplate>): Promise<void> {
-    try {
-      const templateRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
-      await updateDoc(templateRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating event template:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const templateRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
+          await updateDoc(templateRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+          invalidateTemplatesCache();
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'updateEventTemplate' });
+          throw error;
+        }
+      }
+    );
   }
 
   // Delete event template
@@ -185,8 +219,9 @@ export class TemplatesService {
       async () => {
         try {
           await deleteDoc(doc(db, COLLECTIONS.TEMPLATES, templateId));
+          invalidateTemplatesCache();
         } catch (error) {
-          console.error('Error deleting event template:', error);
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'deleteEventTemplate' });
           throw error;
         }
       }
@@ -209,26 +244,30 @@ export class TemplatesService {
           updatedAt: new Date(),
         },
       ],
-      async () => {
-        try {
-          const snapshot = await getDocs(
-            query(
-              collection(db, COLLECTIONS.TEMPLATES),
-              where('templateType', '==', 'activityPlan'),
-              orderBy('name')
-            )
-          );
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-          })) as ActivityPlanTemplate[];
-        } catch (error) {
-          console.error('Error fetching activity plan templates:', error);
-          throw error;
-        }
-      }
+      () => apiCache.getOrSet(
+        `${TEMPLATES_CACHE_PREFIX}activityPlan:all`,
+        async () => {
+          try {
+            const snapshot = await getDocs(
+              query(
+                collection(db, COLLECTIONS.TEMPLATES),
+                where('templateType', '==', 'activityPlan'),
+                orderBy('name')
+              )
+            );
+            return snapshot.docs.map(d => ({
+              id: d.id,
+              ...d.data(),
+              createdAt: d.data().createdAt?.toDate() || new Date(),
+              updatedAt: d.data().updatedAt?.toDate() || new Date(),
+            })) as ActivityPlanTemplate[];
+          } catch (error) {
+            errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'getAllActivityPlanTemplates' });
+            throw error;
+          }
+        },
+        5 * 60 * 1000
+      )
     );
   }
 
@@ -244,9 +283,10 @@ export class TemplatesService {
             updatedAt: Timestamp.now(),
           };
           const docRef = await addDoc(collection(db, COLLECTIONS.TEMPLATES), newTemplate);
+          invalidateTemplatesCache();
           return docRef.id;
         } catch (error) {
-          console.error('Error creating activity plan template:', error);
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'createActivityPlanTemplate' });
           throw error;
         }
       }
@@ -254,16 +294,22 @@ export class TemplatesService {
   }
 
   static async updateActivityPlanTemplate(templateId: string, updates: Partial<ActivityPlanTemplate>): Promise<void> {
-    try {
-      const templateRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
-      await updateDoc(templateRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating activity plan template:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const templateRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
+          await updateDoc(templateRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+          invalidateTemplatesCache();
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'updateActivityPlanTemplate' });
+          throw error;
+        }
+      }
+    );
   }
 
   static async deleteActivityPlanTemplate(templateId: string): Promise<void> {
@@ -272,8 +318,9 @@ export class TemplatesService {
       async () => {
         try {
           await deleteDoc(doc(db, COLLECTIONS.TEMPLATES, templateId));
+          invalidateTemplatesCache();
         } catch (error) {
-          console.error('Error deleting activity plan template:', error);
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'deleteActivityPlanTemplate' });
           throw error;
         }
       }
@@ -300,26 +347,30 @@ export class TemplatesService {
           updatedAt: new Date(),
         },
       ],
-      async () => {
-        try {
-          const snapshot = await getDocs(
-            query(
-              collection(db, COLLECTIONS.TEMPLATES),
-              where('templateType', '==', 'eventBudget'),
-              orderBy('name')
-            )
-          );
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-          })) as EventBudgetTemplate[];
-        } catch (error) {
-          console.error('Error fetching event budget templates:', error);
-          throw error;
-        }
-      }
+      () => apiCache.getOrSet(
+        `${TEMPLATES_CACHE_PREFIX}eventBudget:all`,
+        async () => {
+          try {
+            const snapshot = await getDocs(
+              query(
+                collection(db, COLLECTIONS.TEMPLATES),
+                where('templateType', '==', 'eventBudget'),
+                orderBy('name')
+              )
+            );
+            return snapshot.docs.map(d => ({
+              id: d.id,
+              ...d.data(),
+              createdAt: d.data().createdAt?.toDate() || new Date(),
+              updatedAt: d.data().updatedAt?.toDate() || new Date(),
+            })) as EventBudgetTemplate[];
+          } catch (error) {
+            errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'getAllEventBudgetTemplates' });
+            throw error;
+          }
+        },
+        5 * 60 * 1000
+      )
     );
   }
 
@@ -335,9 +386,10 @@ export class TemplatesService {
             updatedAt: Timestamp.now(),
           };
           const docRef = await addDoc(collection(db, COLLECTIONS.TEMPLATES), newTemplate);
+          invalidateTemplatesCache();
           return docRef.id;
         } catch (error) {
-          console.error('Error creating event budget template:', error);
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'createEventBudgetTemplate' });
           throw error;
         }
       }
@@ -345,16 +397,22 @@ export class TemplatesService {
   }
 
   static async updateEventBudgetTemplate(templateId: string, updates: Partial<EventBudgetTemplate>): Promise<void> {
-    try {
-      const templateRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
-      await updateDoc(templateRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating event budget template:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const templateRef = doc(db, COLLECTIONS.TEMPLATES, templateId);
+          await updateDoc(templateRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+          invalidateTemplatesCache();
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'updateEventBudgetTemplate' });
+          throw error;
+        }
+      }
+    );
   }
 
   static async deleteEventBudgetTemplate(templateId: string): Promise<void> {
@@ -363,8 +421,9 @@ export class TemplatesService {
       async () => {
         try {
           await deleteDoc(doc(db, COLLECTIONS.TEMPLATES, templateId));
+          invalidateTemplatesCache();
         } catch (error) {
-          console.error('Error deleting event budget template:', error);
+          errorLoggingService.logError(error as Error, { component: 'TemplatesService', action: 'deleteEventBudgetTemplate' });
           throw error;
         }
       }

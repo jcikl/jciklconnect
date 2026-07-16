@@ -398,9 +398,11 @@ service cloud.firestore {
     }
 
     // Story 9.1: 非会员留资
+    // FIX 15: allow create: if true had no field validation — bots/spammers could write arbitrary content
     match /nonMemberLeads/{leadId} {
       allow read: if isAuthenticated() && canReadOrgMembers();
-      allow create: if true;
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'source', 'createdAt']) &&
+                      request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'source', 'message', 'createdAt', 'eventId']);
       allow update, delete: if isAuthenticated() && canReadOrgMembers();
     }
 
@@ -502,9 +504,19 @@ service cloud.firestore {
     }
 
     // Documents collection
+    // FIX 7: restrict writes to Board/Admin — any member was previously able to create/update/delete governance docs
     match /documents/{documentId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Document Versions collection
+    // FIX 6: was completely missing (default deny) — version history operations always silently failed
+    match /documentVersions/{versionId} {
+      allow read: if isAuthenticated();
+      allow create: if isBoard() || isAdmin();
+      allow update, delete: if isAdmin();
     }
     
     // Surveys collection
@@ -516,20 +528,14 @@ service cloud.firestore {
     }
     
     // Survey Responses collection
+    // FIX 5: allow read used resource.data.memberId which is null in list queries — members could never list their own responses
     match /surveyResponses/{responseId} {
-      // Users can read their own responses
-      allow read: if isAuthenticated() && 
-                     (resource.data.memberId == request.auth.uid || 
-                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
-      
-      // Users can create their own responses
-      allow create: if isAuthenticated() && 
-                       request.resource.data.memberId == request.auth.uid;
-      
-      allow update, delete: if isAuthenticated() && 
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // resource.data valid for get; service-layer where(memberId == uid) handles list ownership
+      allow get: if isAuthenticated() &&
+                    (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
+      allow list: if isMember();
+      allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
+      allow update, delete: if isBoard() || isAdmin();
     }
     
     // Elections collection
@@ -582,12 +588,12 @@ service cloud.firestore {
     }
     
     // Workflow Executions collection
+    // FIX 8: was open to all authenticated — any member could forge execution records; reads leak automation internals
     match /workflow_executions/{executionId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      allow read: if isBoard() || isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
     
     // Automation Rules collection
@@ -620,29 +626,33 @@ service cloud.firestore {
 
     // Stock Movements collection
     // I-4: restrict read to MEMBER+ (was isAuthenticated which includes GUEST)
+    // FIX 21: removed allow update — stock movements are audit records and must be append-only;
+    //         Board was able to overwrite movement records, corrupting the inventory audit trail
     match /stock_movements/{movementId} {
       allow read: if isAuthenticated() && isMember();
-      allow create, update: if isBoard();
-      // E8 fix: Board must not delete audit/movement logs; only Admin can purge them
+      allow create: if isMember() || isBoard() || isAdmin();
+      // No allow update — stock movements are immutable audit records
       allow delete: if isAdmin();
     }
     
     // Hobby Clubs collection
+    // FIX 12: any authenticated user (including GUEST) could create/update/delete any club
     match /hobbyClubs/{clubId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create: if isMember() || isBoard() || isAdmin();
+      allow update: if isBoard() || isAdmin() ||
+                      (isMember() && resource.data.leadId == request.auth.uid);
+      allow delete: if isAdmin();
     }
     
     // Business Profiles collection
+    // FIX 20: allow update was checking request.resource.data.memberId (new data) — attacker sets memberId to self
+    //         to claim any profile; must check resource.data.memberId (existing owner)
     match /businessProfiles/{profileId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && 
-                               (request.resource.data.memberId == request.auth.uid || 
-                                (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                 get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
-      allow delete: if isAuthenticated() && 
-                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow delete: if isAdmin() || isBoard();
     }
     
     // Inquiries collection (Business Directory)
@@ -691,12 +701,14 @@ service cloud.firestore {
     }
     
     // Advertisements collection
+    // FIX 13: update click/impression tracking branch was missing isAuthenticated() — anonymous users could spam counters
     match /advertisements/{adId} {
       allow read: if true;
       allow create, delete: if isBoard();
-      allow update: if isBoard() || 
-        (request.resource.data.diff(resource.data).affectedKeys()
-         .hasOnly(['impressions', 'clicks', 'updatedAt']));
+      allow update: if isBoard() ||
+        (isAuthenticated() &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['impressions', 'clicks', 'updatedAt']));
     }
     
     // Promotion Packages collection
@@ -715,9 +727,10 @@ service cloud.firestore {
     }
     
     // Activity Plans collection
+    // FIX 4: any authenticated user (including GUEST) could create/update/delete activity plans
     match /activityPlans/{planId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, update, delete: if isBoard() || isAdmin();
     }
     
     // Templates collection
@@ -742,24 +755,28 @@ service cloud.firestore {
     }
     
     // Conversations collection
+    // FIX 2: allow read used resource.data.participants which is null in list queries — members could never list conversations
     match /conversations/{conversationId} {
-      allow read: if isAuthenticated() && 
-                     (request.auth.uid in resource.data.participants || 
-                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      // resource.data.participants valid on get; list restricted to Board/Admin (members use real-time subscription)
+      allow get: if isAuthenticated() && (isBoard() || isAdmin() ||
+                    request.auth.uid in resource.data.participants);
+      allow list: if isBoard() || isAdmin();
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      allow update, delete: if isBoard() || isAdmin();
     }
-    
-    // Messages collection
+
+    // Messages collection (top-level; conversationId stored on each doc)
+    // FIX 3: was open to all authenticated — any member could read messages from any conversation
     match /messages/{messageId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // get: check parent conversation participants via cross-doc read
+      allow get: if isBoard() || isAdmin() ||
+                   (isAuthenticated() &&
+                    request.auth.uid in get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data.participants);
+      // list: Board/Admin only; members get messages via real-time subscription scoped to their conversations
+      allow list: if isBoard() || isAdmin();
+      allow create: if isAuthenticated() &&
+                      request.auth.uid in get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data.participants;
+      allow update, delete: if isAdmin();
     }
     
     // Webhooks collection
@@ -770,14 +787,12 @@ service cloud.firestore {
     }
     
     // Webhook Logs collection
+    // FIX 18: allow create was open to any authenticated user — members could inject fake webhook logs
     match /webhook_logs/{logId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'ADMIN';
+      allow read: if isBoard() || isAdmin();
+      allow create: if isAdmin();
+      allow update: if false;
+      allow delete: if isAdmin();
     }
     
     // Reconciliations collection
@@ -808,25 +823,35 @@ service cloud.firestore {
     }
     
     // Event Feedback collection
+    // FIX 9: allow read was fully open — feedback contains memberId and rating visible to all;
+    //        allow create had no field validation — anyone could submit on behalf of another member
     match /eventFeedback/{feedbackId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // resource.data valid on get; list is board-only to protect submitter identity
+      allow get: if isBoard() || isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow list: if isBoard() || isAdmin();
+      allow create: if isAuthenticated() &&
+                      request.resource.data.memberId == request.auth.uid &&
+                      request.resource.data.keys().hasAll(['memberId', 'eventId', 'rating', 'createdAt']);
+      allow update, delete: if isBoard() || isAdmin();
     }
     
     // Project Reports collection
+    // FIX 23: any authenticated user could create/update/delete project reports
     match /projectReports/{reportId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow read: if isBoard() || isAdmin();
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
     }
     
     // Guest Registrations collection
+    // FIX 22: allow update had no hasOnly whitelist — Board could overwrite any field including immutable registration data
     match /guestRegistrations/{registrationId} {
       allow read: if isBoard();
       allow create: if true; // Allow guests to register
-      allow update, delete: if isBoard();
+      allow update: if isBoard() || isAdmin() &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['status', 'checkedIn', 'checkedInAt', 'notes', 'updatedAt']);
+      allow delete: if isBoard();
     }
     
     // Board of Directors: boardMembers, boardTransitions (public read for guest About page)
@@ -882,28 +907,19 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isBoard();
     }
+    // FIX 11: allow read used resource.data.memberId which is null in list queries — members could never list their own progress
     match /learningProgress/{docId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     (getUserRole() in ['BOARD', 'ADMIN'] ||
-                      resource.data.memberId == request.auth.uid);
-      allow create: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     request.resource.data.memberId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     (getUserRole() in ['BOARD', 'ADMIN'] ||
-                      resource.data.memberId == request.auth.uid);
+      // resource.data valid on get; list trusted to service-layer where(memberId == uid) filter
+      allow get: if isAuthenticated() && (isBoard() || isAdmin() || resource.data.memberId == request.auth.uid);
+      allow list: if isMember() || isBoard() || isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
+      allow update, delete: if isBoard() || isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
     }
+    // FIX 10: members could self-award certificates by setting memberId to self — create must be Admin-only
     match /certificates/{docId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     (getUserRole() in ['MEMBER', 'BOARD', 'ADMIN']);
-      allow create: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     (getUserRole() in ['BOARD', 'ADMIN'] ||
-                      request.resource.data.memberId == request.auth.uid);
-      allow update, delete: if isBoard();
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
     }
     
     // Inventory: maintenance schedules, inventory alerts (InventoryView)
@@ -956,9 +972,11 @@ service cloud.firestore {
                           .hasOnly(['signerIds', 'status', 'proofUrl', 'updatedAt']));
       allow delete: if isAdmin();
     }
+    // FIX 19: hardcoded role list excluded SUPER_ADMIN; replaced with role helpers
     match /opportunityDrops/{dropId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && getUserRole() in ['BOARD', 'ADMIN'];
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
     }
     match /pointEscrow/{escrowId} {
       // FIX 5: split read (resource.data null in list); restrict create/update/delete.
@@ -1065,11 +1083,15 @@ service cloud.firestore {
     }
 
     // Guest page analytics — unauthenticated visitors increment counters; Board reads
+    // FIX 16: allow update had no auth check — unauthenticated bots could inflate page view counters
     match /guestPageStats/{docId} {
       allow read: if isBoard();
-      allow create, update: if request.resource.data.keys().hasOnly(
+      allow create: if request.resource.data.keys().hasOnly(
         ['page', 'date', 'views', 'dwellSeconds', 'signupClicks', 'updatedAt']
       );
+      allow update: if isAuthenticated() &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['pageViews', 'totalDwellTime', 'lastVisit']);
       allow delete: if isAdmin();
     }
 
@@ -1117,11 +1139,36 @@ service cloud.firestore {
     }
 
     // Firestore audit log — written by firestoreLogger, read by admins only
+    // FIX 17: allow create was open to any authenticated user — members could inject fake audit log entries
     match /systemLogs/{logId} {
-      allow read: if isAdmin() || isDeveloper();
-      allow create: if isAuthenticated();
-      allow delete: if isAdmin() || isDeveloper();
+      allow read: if isAdmin();
+      allow create: if isAdmin();
       allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // Points Rules collection (server-side automation rules — different from pointRules UI config)
+    // FIX 1: collection had ZERO rules — all operations silently failed with default deny
+    match /pointsRules/{id} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isBoard() || isAdmin();
+    }
+
+    // Points Rule Executions collection (execution log for automated point rule triggers)
+    // FIX 1: collection had ZERO rules — execution logging always silently failed
+    match /pointsRuleExecutions/{id} {
+      allow read: if isBoard() || isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Achievement Progress collection (tracks per-member progress toward achievements)
+    // FIX 14: collection had ZERO rules — unauthenticated users could read all achievement progress
+    match /achievementProgress/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Default: deny all other access

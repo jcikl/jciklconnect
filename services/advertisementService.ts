@@ -17,6 +17,8 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { toDate } from '../utils/dateUtils';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface Advertisement {
   id?: string;
@@ -86,190 +88,182 @@ const MOCK_AD: Advertisement = {
   imageUrl: 'https://via.placeholder.com/728x90',
   linkUrl: 'https://example.com',
   startDate: new Date('2024-01-01'),
-  endDate: new Date('2024-12-31'),
+  endDate: new Date('2099-12-31'),
   status: 'Active',
   impressions: 1250,
   clicks: 45,
   priority: 5,
+  costPerImpression: 0,
+  costPerClick: 0,
+  provider: 'Mock',
+  usageLimit: 0,
+  termsAndConditions: '',
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 };
 
+const COLL = COLLECTIONS.ADVERTISEMENTS || 'advertisements';
+const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_KEY_ALL = 'ads:all';
+const CACHE_KEY_ACTIVE_PREFIX = 'ads:active:';
+
+function mapDoc(docSnap: any): Advertisement {
+  const d = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...d,
+    startDate: d.startDate?.toDate?.() || d.startDate,
+    endDate: d.endDate?.toDate?.() || d.endDate,
+    createdAt: d.createdAt?.toDate() || new Date(),
+    updatedAt: d.updatedAt?.toDate() || new Date(),
+  } as Advertisement;
+}
+
 export class AdvertisementService {
-  private static adsCache: Advertisement[] | null = null;
-  private static adsPromise: Promise<Advertisement[]> | null = null;
-  private static activeAdsCache: Record<string, { data: Advertisement[]; timestamp: number }> = {};
-  private static activeAdsPromise: Record<string, Promise<Advertisement[]>> = {};
-  private static CACHE_DURATION_MS = 30000; // 30 seconds cache
-
-  // Clear cache
-  static clearCache() {
-    this.adsCache = null;
-    this.adsPromise = null;
-    this.activeAdsCache = {};
-    this.activeAdsPromise = {};
+  // ── Cache helpers ──────────────────────────────────────────────────────────
+  static invalidateAdsCache(): void {
+    apiCache.deleteByPrefix('ads:');
   }
 
-  // Get all advertisements
+  // ── Get all advertisements ─────────────────────────────────────────────────
   static async getAllAdvertisements(): Promise<Advertisement[]> {
-    if (this.adsCache) {
-      return this.adsCache;
-    }
-
-    if (this.adsPromise) {
-      return this.adsPromise;
-    }
-
     return withDevMode(
       () => [MOCK_AD],
-      () => {
-        this.adsPromise = (async () => {
-          try {
-            const snapshot = await getDocs(
-              query(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'))
-            );
-            const ads = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
-              endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
-              createdAt: doc.data().createdAt?.toDate() || new Date(),
-              updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-            })) as Advertisement[];
-
-            // Sort in memory to avoid requiring a composite index
-            const sortedAds = ads.sort((a, b) => {
-              if (a.priority !== b.priority) {
-                return (b.priority || 0) - (a.priority || 0);
-              }
-              const aDate = a.createdAt instanceof Date ? a.createdAt : new Date();
-              const bDate = b.createdAt instanceof Date ? b.createdAt : new Date();
-              return bDate.getTime() - aDate.getTime();
-            });
-
-            this.adsCache = sortedAds;
-            return sortedAds;
-          } catch (error) {
-            console.error('Error fetching advertisements:', error);
-            throw error;
-          } finally {
-            this.adsPromise = null;
-          }
-        })();
-
-        return this.adsPromise;
-      }
+      () =>
+        apiCache.getOrSet<Advertisement[]>(
+          CACHE_KEY_ALL,
+          async () => {
+            try {
+              const snapshot = await getDocs(query(collection(db, COLL)));
+              const ads = snapshot.docs.map(mapDoc);
+              return ads.sort((a, b) => {
+                if (a.priority !== b.priority) return (b.priority || 0) - (a.priority || 0);
+                const aDate = a.createdAt instanceof Date ? a.createdAt : new Date();
+                const bDate = b.createdAt instanceof Date ? b.createdAt : new Date();
+                return bDate.getTime() - aDate.getTime();
+              });
+            } catch (error) {
+              errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getAllAdvertisements' });
+              throw error;
+            }
+          },
+          CACHE_TTL,
+          'AdvertisementService.getAllAdvertisements'
+        )
     );
   }
 
-  // Get active advertisements for placement
+  // ── Get active advertisements for a placement ──────────────────────────────
   static async getActiveAdvertisements(placement: string): Promise<Advertisement[]> {
-    const nowTime = Date.now();
-    const cached = this.activeAdsCache[placement];
-    if (cached && nowTime - cached.timestamp < this.CACHE_DURATION_MS) {
-      return cached.data;
-    }
-
-    if (this.activeAdsPromise[placement]) {
-      return this.activeAdsPromise[placement];
-    }
-
     return withDevMode(
       () => [MOCK_AD],
       () => {
-        this.activeAdsPromise[placement] = (async () => {
-          try {
-            const now = new Date();
-            const q = query(
-              collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'),
-              where('status', '==', 'Active')
-            );
+        const cacheKey = `${CACHE_KEY_ACTIVE_PREFIX}${placement}`;
+        return apiCache.getOrSet<Advertisement[]>(
+          cacheKey,
+          async () => {
+            try {
+              const now = new Date();
+              const q = query(collection(db, COLL), where('status', '==', 'Active'));
+              const snapshot = await getDocs(q);
+              const ads = snapshot.docs.map(mapDoc);
 
-            const snapshot = await getDocs(q);
-            const ads = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
-              endDate: doc.data().endDate?.toDate?.() || doc.data().endDate,
-              createdAt: doc.data().createdAt?.toDate() || new Date(),
-              updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-            })) as Advertisement[];
+              const activeAds: Advertisement[] = [];
+              for (const ad of ads) {
+                const placements = Array.isArray(ad.placement) ? ad.placement : [ad.placement];
+                if (!placements.includes(placement as any)) continue;
 
-            const activeAds = ads.filter(ad => {
-              const placements = Array.isArray(ad.placement) ? ad.placement : [ad.placement];
-              if (!placements.includes(placement as any)) return false;
+                const startDate = toDate(ad.startDate);
+                if (startDate > now) continue;
 
-              const startDate = toDate(ad.startDate);
-              if (startDate > now) return false;
+                if (ad.endDate) {
+                  const endDate = toDate(ad.endDate);
+                  if (endDate < now) {
+                    // Fire-and-forget: mark expired ads so future queries are cleaner
+                    updateDoc(doc(db, COLL, ad.id!), {
+                      status: 'Expired',
+                      updatedAt: Timestamp.now(),
+                    }).catch(() => {/* best-effort */});
+                    continue;
+                  }
+                }
 
-              if (ad.endDate) {
-                const endDate = toDate(ad.endDate);
-                if (endDate < now) return false;
+                activeAds.push(ad);
               }
 
-              return true;
-            }).sort((a, b) => (b.priority || 0) - (a.priority || 0));
-
-            this.activeAdsCache[placement] = {
-              data: activeAds,
-              timestamp: Date.now()
-            };
-            return activeAds;
-          } catch (error) {
-            console.error('Error fetching active advertisements:', error);
-            throw error;
-          } finally {
-            delete this.activeAdsPromise[placement];
-          }
-        })();
-
-        return this.activeAdsPromise[placement];
+              return activeAds.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+            } catch (error) {
+              errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getActiveAdvertisements', placement });
+              throw error;
+            }
+          },
+          CACHE_TTL,
+          'AdvertisementService.getActiveAdvertisements'
+        );
       }
     );
   }
 
-  // Record advertisement impression
+  // ── Record impression (fire-and-forget, no cache clear needed) ─────────────
   static async recordImpression(adId: string): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
         try {
-          const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
+          const adRef = doc(db, COLL, adId);
           await updateDoc(adRef, { impressions: increment(1), updatedAt: Timestamp.now() });
         } catch (error) {
-          console.error('Error recording impression:', error);
+          // Metrics are best-effort; do not surface to user but do log
+          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.recordImpression', adId });
         }
       }
     );
   }
 
-  // Record advertisement click
+  // ── Record click (fire-and-forget, no cache clear needed) ──────────────────
   static async recordClick(adId: string): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
         try {
-          const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
+          const adRef = doc(db, COLL, adId);
           await updateDoc(adRef, { clicks: increment(1), updatedAt: Timestamp.now() });
         } catch (error) {
-          console.error('Error recording click:', error);
+          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.recordClick', adId });
         }
       }
     );
   }
 
-  // Create advertisement
-  static async createAdvertisement(adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'>): Promise<string> {
-    this.clearCache();
+  // ── Create advertisement ───────────────────────────────────────────────────
+  // FIX P1: all Advertisement fields are now written explicitly, defaulting to
+  // null/0/'' when caller does not supply them, so no field is ever silently omitted.
+  static async createAdvertisement(
+    adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'>
+  ): Promise<string> {
     return withDevMode(
       () => `mock-ad-${Date.now()}`,
       async () => {
         try {
-          const newAd: any = {
+          const newAd = {
             title: adData.title,
             description: adData.description,
             type: adData.type,
             placement: adData.placement,
+            imageUrl: adData.imageUrl ?? '',
+            logoUrl: adData.logoUrl ?? null,
+            linkUrl: adData.linkUrl ?? null,
+            targetAudience: adData.targetAudience ?? null,
+            targetCriteria: adData.targetCriteria ?? null,
+            businessProfileId: adData.businessProfileId ?? null,
+            status: adData.status ?? 'Scheduled',
+            priority: adData.priority ?? 0,
+            budget: adData.budget ?? null,
+            costPerImpression: adData.costPerImpression ?? null,
+            costPerClick: adData.costPerClick ?? null,
+            provider: adData.provider ?? null,
+            usageLimit: adData.usageLimit ?? null,
+            termsAndConditions: adData.termsAndConditions ?? null,
             impressions: 0,
             clicks: 0,
             startDate: Timestamp.fromDate(toDate(adData.startDate)),
@@ -278,38 +272,26 @@ export class AdvertisementService {
             updatedAt: Timestamp.now(),
           };
 
-          // Only include optional fields if they are defined
-          if (adData.imageUrl !== undefined) newAd.imageUrl = adData.imageUrl;
-          if (adData.logoUrl !== undefined) newAd.logoUrl = adData.logoUrl;
-          if (adData.linkUrl !== undefined) newAd.linkUrl = adData.linkUrl;
-          if (adData.budget !== undefined) newAd.budget = adData.budget;
-          if (adData.targetAudience !== undefined) newAd.targetAudience = adData.targetAudience;
-          if (adData.targetCriteria !== undefined) newAd.targetCriteria = adData.targetCriteria;
-          if (adData.status !== undefined) newAd.status = adData.status;
-
-          const docRef = await addDoc(collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'), newAd);
+          const docRef = await addDoc(collection(db, COLL), newAd);
+          this.invalidateAdsCache();
           return docRef.id;
         } catch (error) {
-          console.error('Error creating advertisement:', error);
+          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.createAdvertisement' });
           throw error;
         }
       }
     );
   }
 
-  // Update advertisement
+  // ── Update advertisement ───────────────────────────────────────────────────
   static async updateAdvertisement(adId: string, updates: Partial<Advertisement>): Promise<void> {
-    this.clearCache();
     return withDevMode(
       () => {},
       async () => {
         try {
-          const adRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId);
-          const updateData: any = {
-            updatedAt: Timestamp.now(),
-          };
+          const adRef = doc(db, COLL, adId);
+          const updateData: any = { updatedAt: Timestamp.now() };
 
-          // Only include defined fields
           if (updates.title !== undefined) updateData.title = updates.title;
           if (updates.description !== undefined) updateData.description = updates.description;
           if (updates.type !== undefined) updateData.type = updates.type;
@@ -321,84 +303,103 @@ export class AdvertisementService {
           if (updates.targetAudience !== undefined) updateData.targetAudience = updates.targetAudience;
           if (updates.targetCriteria !== undefined) updateData.targetCriteria = updates.targetCriteria;
           if (updates.status !== undefined) updateData.status = updates.status;
-
-          if (updates.startDate) {
-            updateData.startDate = Timestamp.fromDate(toDate(updates.startDate));
-          }
-          if (updates.endDate) {
-            updateData.endDate = Timestamp.fromDate(toDate(updates.endDate));
-          }
+          if (updates.priority !== undefined) updateData.priority = updates.priority;
+          if (updates.costPerImpression !== undefined) updateData.costPerImpression = updates.costPerImpression;
+          if (updates.costPerClick !== undefined) updateData.costPerClick = updates.costPerClick;
+          if (updates.provider !== undefined) updateData.provider = updates.provider;
+          if (updates.usageLimit !== undefined) updateData.usageLimit = updates.usageLimit;
+          if (updates.termsAndConditions !== undefined) updateData.termsAndConditions = updates.termsAndConditions;
+          if (updates.startDate) updateData.startDate = Timestamp.fromDate(toDate(updates.startDate));
+          if (updates.endDate) updateData.endDate = Timestamp.fromDate(toDate(updates.endDate));
 
           await updateDoc(adRef, updateData);
+          this.invalidateAdsCache();
         } catch (error) {
-          console.error('Error updating advertisement:', error);
+          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.updateAdvertisement', adId });
           throw error;
         }
       }
     );
   }
 
-  // Delete advertisement
+  // ── Delete advertisement ───────────────────────────────────────────────────
   static async deleteAdvertisement(adId: string): Promise<void> {
-    this.clearCache();
     return withDevMode(
       () => {},
       async () => {
         try {
-          await deleteDoc(doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', adId));
+          await deleteDoc(doc(db, COLL, adId));
+          this.invalidateAdsCache();
         } catch (error) {
-          console.error('Error deleting advertisement:', error);
+          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.deleteAdvertisement', adId });
           throw error;
         }
       }
     );
   }
 
-  // Get promotion packages
+  // ── Get promotion packages ─────────────────────────────────────────────────
   static async getPromotionPackages(): Promise<PromotionPackage[]> {
     return withDevMode(
       () => [],
-      async () => {
-        try {
-          const snapshot = await getDocs(
-            query(collection(db, COLLECTIONS.PROMOTION_PACKAGES || 'promotionPackages'), orderBy('price', 'asc'))
-          );
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-          })) as PromotionPackage[];
-        } catch (error) {
-          console.error('Error fetching promotion packages:', error);
-          throw error;
-        }
-      }
+      () =>
+        apiCache.getOrSet<PromotionPackage[]>(
+          'ads:promotionPackages',
+          async () => {
+            try {
+              const snapshot = await getDocs(
+                query(
+                  collection(db, COLLECTIONS.PROMOTION_PACKAGES || 'promotionPackages'),
+                  orderBy('price', 'asc')
+                )
+              );
+              return snapshot.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+                createdAt: d.data().createdAt?.toDate() || new Date(),
+                updatedAt: d.data().updatedAt?.toDate() || new Date(),
+              })) as PromotionPackage[];
+            } catch (error) {
+              errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getPromotionPackages' });
+              throw error;
+            }
+          },
+          CACHE_TTL,
+          'AdvertisementService.getPromotionPackages'
+        )
     );
   }
 
-  // Get benefit usage history
+  // ── Get benefit usage history ──────────────────────────────────────────────
   static async getBenefitUsageHistory(benefitId?: string, memberId?: string): Promise<BenefitUsage[]> {
     return withDevMode(
       () => [],
       async () => {
         try {
-          let conditions = [];
+          const conditions: any[] = [];
           if (benefitId) conditions.push(where('benefitId', '==', benefitId));
           if (memberId) conditions.push(where('memberId', '==', memberId));
 
-          const q = conditions.length > 0
-            ? query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), ...conditions, orderBy('usedAt', 'desc'))
-            : query(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'), orderBy('usedAt', 'desc'));
+          const q =
+            conditions.length > 0
+              ? query(
+                  collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
+                  ...conditions,
+                  orderBy('usedAt', 'desc')
+                )
+              : query(
+                  collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
+                  orderBy('usedAt', 'desc')
+                );
 
           const snapshot = await getDocs(q);
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            usedAt: doc.data().usedAt?.toDate?.() || doc.data().usedAt,
+          return snapshot.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+            usedAt: d.data().usedAt?.toDate?.() || d.data().usedAt,
           })) as BenefitUsage[];
         } catch (error) {
-          console.error('Error fetching benefit usage history:', error);
+          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getBenefitUsageHistory' });
           return [];
         }
       }

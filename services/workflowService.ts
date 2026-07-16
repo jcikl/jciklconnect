@@ -14,6 +14,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -22,7 +23,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES } from '../config/constants';
 import {
   Workflow,
@@ -187,12 +188,37 @@ export class WorkflowService {
   }
 
   // ─── Delete workflow ─────────────────────────────────────────────────────────
+  // P1: cascade-archives all workflow_executions for the deleted workflow.
   static async deleteWorkflow(workflowId: string): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
         try {
+          // Delete the workflow document first.
           await deleteDoc(doc(db, WF_COL(), workflowId));
+
+          // Batch-archive all execution records in pages of 400 (Firestore batch limit = 500).
+          let hasMore = true;
+          while (hasMore) {
+            const execSnap = await getDocs(
+              query(
+                collection(db, EXEC_COL()),
+                where('workflowId', '==', workflowId),
+                limit(400)
+              )
+            );
+            if (execSnap.empty) {
+              hasMore = false;
+              break;
+            }
+            const batch = writeBatch(db);
+            execSnap.docs.forEach(execDoc => {
+              batch.update(execDoc.ref, { status: 'archived' });
+            });
+            await batch.commit();
+            // If fewer than 400 came back, we've processed the last page.
+            if (execSnap.docs.length < 400) hasMore = false;
+          }
         } catch (error) {
           errorLoggingService.logError(error as Error, { context: 'WorkflowService.deleteWorkflow', workflowId });
           throw error;
@@ -621,6 +647,7 @@ export class WorkflowService {
   }
 
   // ─── Execution logs ──────────────────────────────────────────────────────────
+  // P1: restricted to BOARD / ADMIN / SUPER_ADMIN callers only.
   static async getExecutionLogs(
     workflowId?: string,
     limitCount = 50
@@ -629,6 +656,18 @@ export class WorkflowService {
       () => [],
       async () => {
         try {
+          // Role guard: only board members and admins may read execution logs.
+          const currentUid = auth?.currentUser?.uid;
+          if (!currentUid) throw new Error('Unauthenticated');
+          const callerSnap = await getDoc(doc(db, 'members', currentUid));
+          const callerRole: string = callerSnap.exists()
+            ? (callerSnap.data() as any).role ?? ''
+            : '';
+          const allowedRoles = ['board', 'admin', 'super_admin', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
+          if (!allowedRoles.includes(callerRole)) {
+            throw new Error('Permission denied: execution logs require BOARD or ADMIN role');
+          }
+
           const col = collection(db, EXEC_COL());
           const q = workflowId
             ? query(

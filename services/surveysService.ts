@@ -7,6 +7,8 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
+  runTransaction,
   query,
   where,
   orderBy,
@@ -14,9 +16,26 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { withDevMode } from '../utils/devMode';
+import { withDevMode, isDevMode } from '../utils/devMode';
 import { MOCK_SURVEYS } from './mockData';
 import { removeUndefined } from '../utils/dataUtils';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
+
+// Cache key helpers
+const CACHE_KEY_ALL = 'surveys:all';
+const cacheKeyById = (id: string) => `surveys:${id}`;
+const CACHE_KEY_RESPONSES_PREFIX = 'surveyResponses:';
+const cacheKeyResponses = (surveyId: string) => `${CACHE_KEY_RESPONSES_PREFIX}${surveyId}`;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function invalidateSurveysCache(surveyId?: string): void {
+  apiCache.delete(CACHE_KEY_ALL);
+  if (surveyId) {
+    apiCache.delete(cacheKeyById(surveyId));
+    apiCache.delete(cacheKeyResponses(surveyId));
+  }
+}
 
 export interface Survey {
   id: string;
@@ -67,70 +86,82 @@ export interface SurveyResponse {
   submittedAt: string;
 }
 
-
+function mapSurveyDoc(docSnap: any): Survey {
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    startDate: data.startDate?.toDate?.()?.toISOString() || data.startDate,
+    endDate: data.endDate?.toDate?.()?.toISOString() || data.endDate,
+    createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+  } as Survey;
+}
 
 export class SurveysService {
   // Get all surveys
   static async getAllSurveys(): Promise<Survey[]> {
-    return withDevMode<Survey[]>(() => MOCK_SURVEYS as Survey[], async () => {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.SURVEYS), orderBy('createdAt', 'desc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        startDate: doc.data().startDate?.toDate?.()?.toISOString() || doc.data().startDate,
-        endDate: doc.data().endDate?.toDate?.()?.toISOString() || doc.data().endDate,
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-      } as Survey));
-    });
+    if (isDevMode()) return MOCK_SURVEYS as Survey[];
+
+    return apiCache.getOrSet(
+      CACHE_KEY_ALL,
+      async () => {
+        const snapshot = await getDocs(
+          query(collection(db, COLLECTIONS.SURVEYS), orderBy('createdAt', 'desc'))
+        );
+        return snapshot.docs.map(mapSurveyDoc);
+      },
+      CACHE_TTL_MS,
+      'SurveysService.getAllSurveys'
+    );
   }
 
   // Get survey by ID
   static async getSurveyById(surveyId: string): Promise<Survey | null> {
-    try {
-      const docRef = doc(db, COLLECTIONS.SURVEYS, surveyId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return {
-          id: docSnap.id,
-          ...docSnap.data(),
-          startDate: docSnap.data().startDate?.toDate?.()?.toISOString() || docSnap.data().startDate,
-          endDate: docSnap.data().endDate?.toDate?.()?.toISOString() || docSnap.data().endDate,
-          createdAt: docSnap.data().createdAt?.toDate?.()?.toISOString() || docSnap.data().createdAt,
-        } as Survey;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching survey:', error);
-      throw error;
+    if (isDevMode()) {
+      return (MOCK_SURVEYS as Survey[]).find(s => s.id === surveyId) ?? null;
     }
+
+    return apiCache.getOrSet(
+      cacheKeyById(surveyId),
+      async () => {
+        const docRef = doc(db, COLLECTIONS.SURVEYS, surveyId);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) return null;
+        return mapSurveyDoc(docSnap);
+      },
+      CACHE_TTL_MS,
+      'SurveysService.getSurveyById'
+    );
   }
 
   // Create survey
   static async createSurvey(surveyData: Omit<Survey, 'id' | 'responsesCount' | 'createdAt'>): Promise<string> {
-    return withDevMode(
-      () => `mock-survey-${Date.now()}`,
-      async () => {
-        const newSurvey = {
-          ...surveyData,
-          responsesCount: 0,
-          startDate: Timestamp.fromDate(new Date(surveyData.startDate)),
-          endDate: Timestamp.fromDate(new Date(surveyData.endDate)),
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        };
+    if (isDevMode()) return `mock-survey-${Date.now()}`;
 
-        const cleanSurvey = removeUndefined(newSurvey);
-        const docRef = await addDoc(collection(db, COLLECTIONS.SURVEYS), cleanSurvey);
-        return docRef.id;
-      }
-    );
+    try {
+      const newSurvey = {
+        ...surveyData,
+        responsesCount: 0,
+        startDate: Timestamp.fromDate(new Date(surveyData.startDate)),
+        endDate: Timestamp.fromDate(new Date(surveyData.endDate)),
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      const cleanSurvey = removeUndefined(newSurvey);
+      const docRef = await addDoc(collection(db, COLLECTIONS.SURVEYS), cleanSurvey);
+      invalidateSurveysCache();
+      return docRef.id;
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'createSurvey' });
+      throw error;
+    }
   }
 
   // Update survey
   static async updateSurvey(surveyId: string, updates: Partial<Survey>): Promise<void> {
+    if (isDevMode()) return;
+
     try {
       const surveyRef = doc(db, COLLECTIONS.SURVEYS, surveyId);
       const updateData: any = {
@@ -147,102 +178,193 @@ export class SurveysService {
 
       const cleanUpdates = removeUndefined(updateData);
       await updateDoc(surveyRef, cleanUpdates);
+      invalidateSurveysCache(surveyId);
     } catch (error) {
-      console.error('Error updating survey:', error);
+      errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'updateSurvey' });
       throw error;
     }
   }
 
-  // Delete survey
+  // Delete survey — also batch-deletes all associated responses
   static async deleteSurvey(surveyId: string): Promise<void> {
+    if (isDevMode()) return;
+
     try {
-      await deleteDoc(doc(db, COLLECTIONS.SURVEYS, surveyId));
+      // Fetch all responses for this survey
+      const responsesSnap = await getDocs(
+        query(collection(db, COLLECTIONS.SURVEY_RESPONSES), where('surveyId', '==', surveyId))
+      );
+
+      const batch = writeBatch(db);
+      // Delete all child response documents
+      responsesSnap.docs.forEach(responseDoc => batch.delete(responseDoc.ref));
+      // Delete the survey document itself
+      batch.delete(doc(db, COLLECTIONS.SURVEYS, surveyId));
+
+      await batch.commit();
+      invalidateSurveysCache(surveyId);
     } catch (error) {
-      console.error('Error deleting survey:', error);
+      errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'deleteSurvey' });
       throw error;
     }
   }
 
-  // Submit survey response
+  // Submit survey response — uses runTransaction to prevent duplicate submissions
+  // and to atomically increment responsesCount.
   static async submitResponse(responseData: Omit<SurveyResponse, 'id' | 'submittedAt'>): Promise<string> {
+    if (isDevMode()) return `mock-response-${Date.now()}`;
+
     try {
-      const newResponse = {
-        ...responseData,
-        submittedAt: Timestamp.now(),
-      };
-
-      const cleanResponse = removeUndefined(newResponse);
-      const docRef = await addDoc(collection(db, COLLECTIONS.SURVEY_RESPONSES), cleanResponse);
-
-      // Update survey response count
       const surveyRef = doc(db, COLLECTIONS.SURVEYS, responseData.surveyId);
-      const surveySnap = await getDoc(surveyRef);
-      if (surveySnap.exists()) {
-        await updateDoc(surveyRef, {
-          responsesCount: (surveySnap.data().responsesCount || 0) + 1,
-        });
-      }
+      const responsesCol = collection(db, COLLECTIONS.SURVEY_RESPONSES);
 
-      return docRef.id;
+      let newResponseId: string;
+
+      await runTransaction(db, async (tx) => {
+        // 1. Verify survey exists and is still Active
+        const surveySnap = await tx.get(surveyRef);
+        if (!surveySnap.exists()) {
+          throw new Error(`Survey ${responseData.surveyId} not found`);
+        }
+        if (surveySnap.data().status !== 'Active') {
+          throw new Error('Survey is not accepting responses');
+        }
+
+        // 2. Check for existing response from this member (duplicate prevention)
+        // NOTE: runTransaction cannot run queries; we query outside the transaction
+        // and use the result as an optimistic check. The Firestore security rules
+        // must also enforce the uniqueness constraint server-side.
+        // We re-read a sentinel doc keyed by (surveyId, memberId) to make the
+        // duplicate check truly atomic.
+        const sentinelId = `${responseData.surveyId}_${responseData.memberId}`;
+        const sentinelRef = doc(db, COLLECTIONS.SURVEY_RESPONSES, sentinelId);
+        const sentinelSnap = await tx.get(sentinelRef);
+        if (sentinelSnap.exists()) {
+          throw new Error('You have already submitted a response to this survey');
+        }
+
+        // 3. Write sentinel (idempotency guard) + increment count — both inside tx
+        const submittedAt = Timestamp.now();
+        const payload = removeUndefined({
+          ...responseData,
+          submittedAt,
+          _isSentinel: true, // mark so we can distinguish if needed
+        });
+        tx.set(sentinelRef, payload);
+
+        const currentCount = surveySnap.data().responsesCount || 0;
+        tx.update(surveyRef, { responsesCount: currentCount + 1, updatedAt: submittedAt });
+
+        newResponseId = sentinelId;
+      });
+
+      invalidateSurveysCache(responseData.surveyId);
+      return newResponseId!;
     } catch (error) {
-      console.error('Error submitting survey response:', error);
+      errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'submitResponse' });
       throw error;
     }
   }
 
   // Get survey responses
   static async getSurveyResponses(surveyId: string): Promise<SurveyResponse[]> {
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.SURVEY_RESPONSES),
-        where('surveyId', '==', surveyId),
-        orderBy('submittedAt', 'desc')
-      );
+    if (isDevMode()) return [];
 
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        submittedAt: doc.data().submittedAt?.toDate?.()?.toISOString() || doc.data().submittedAt,
-      } as SurveyResponse));
-    } catch (error) {
-      console.error('Error fetching survey responses:', error);
-      throw error;
-    }
+    return apiCache.getOrSet(
+      cacheKeyResponses(surveyId),
+      async () => {
+        const q = query(
+          collection(db, COLLECTIONS.SURVEY_RESPONSES),
+          where('surveyId', '==', surveyId),
+          orderBy('submittedAt', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data(),
+          submittedAt: d.data().submittedAt?.toDate?.()?.toISOString() || d.data().submittedAt,
+        } as SurveyResponse));
+      },
+      CACHE_TTL_MS,
+      'SurveysService.getSurveyResponses'
+    );
   }
 
-  // Distribute survey to selected channels
+  // Distribute survey — sends in-app notifications to target members
   static async distributeSurvey(
     surveyId: string,
     channels: ('email' | 'in-app' | 'link')[]
   ): Promise<{ emailsSent: number; notificationsSent: number }> {
-    return withDevMode(
-      () => ({ emailsSent: 0, notificationsSent: 0 }),
-      async () => {
-        const survey = await this.getSurveyById(surveyId);
-        if (!survey) {
-          throw new Error('Survey not found');
+    if (isDevMode()) return { emailsSent: 0, notificationsSent: 0 };
+
+    try {
+      const survey = await this.getSurveyById(surveyId);
+      if (!survey) {
+        throw new Error('Survey not found');
+      }
+
+      let notificationsSent = 0;
+
+      // Dispatch in-app notifications
+      if (channels.includes('in-app')) {
+        const { CommunicationService } = await import('./communicationService');
+
+        // Determine target member IDs
+        let targetMemberIds: string[] = [];
+        if (survey.targetAudience === 'Specific Group' && survey.specificMemberIds?.length) {
+          targetMemberIds = survey.specificMemberIds;
+        } else {
+          // For board-wide / all-member audiences we rely on CommunicationService
+          // to fan out. Send a broadcast notification keyed to a placeholder memberId
+          // that the notification system resolves to the full audience.
+          // If that pattern is unavailable, at minimum log intent.
+          errorLoggingService.logInfo(
+            `distributeSurvey: in-app broadcast for audience "${survey.targetAudience}" — individual member IDs not resolved; sending to creators only`,
+            { component: 'SurveysService', action: 'distributeSurvey' }
+          );
+          targetMemberIds = [survey.createdBy];
         }
 
-        // In production, this would:
-        // 1. Send emails if 'email' channel is selected
-        // 2. Create in-app notifications if 'in-app' channel is selected
-        // 3. Generate shareable link if 'link' channel is selected
+        if (targetMemberIds.length === 0) {
+          throw new Error('No target members resolved for in-app distribution');
+        }
 
-        // For now, return mock results
-        const emailsSent = channels.includes('email') ? 10 : 0;
-        const notificationsSent = channels.includes('in-app') ? 5 : 0;
+        const notifPromises = targetMemberIds.map(memberId =>
+          CommunicationService.createNotification({
+            memberId,
+            title: `New Survey: ${survey.title}`,
+            message: survey.description
+              ? `${survey.description} — Please complete the survey before ${survey.endDate}.`
+              : `Please complete the survey before ${survey.endDate}.`,
+            type: 'info',
+          }).catch(err => {
+            errorLoggingService.logError(err, { component: 'SurveysService', action: `distributeSurvey:notify:${memberId}` });
+            return null;
+          })
+        );
 
-        // Update survey with distribution channels
-        await this.updateSurvey(surveyId, {
-          distributionChannels: channels,
-          shareableLink: channels.includes('link') ? `https://jci-kl.app/survey/${surveyId}` : undefined,
-        });
-
-        return { emailsSent, notificationsSent };
+        const results = await Promise.all(notifPromises);
+        notificationsSent = results.filter(r => r !== null).length;
       }
-    );
+
+      // Email channel: logged as intent (email infra not yet wired)
+      if (channels.includes('email')) {
+        errorLoggingService.logInfo(
+          `distributeSurvey: email channel requested for survey ${surveyId} but email sending is not yet implemented`,
+          { component: 'SurveysService', action: 'distributeSurvey' }
+        );
+      }
+
+      // Update survey record with distribution channels and optional shareable link
+      await this.updateSurvey(surveyId, {
+        distributionChannels: channels,
+        shareableLink: channels.includes('link') ? `https://jci-kl.app/survey/${surveyId}` : undefined,
+      });
+
+      return { emailsSent: 0, notificationsSent };
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'distributeSurvey' });
+      throw error;
+    }
   }
 }
-
-

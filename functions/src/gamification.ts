@@ -33,9 +33,10 @@ export const checkBadgeAwards = functions.firestore
       const badgeId = badgeDoc.id;
 
       try {
-        // Check if member already has this badge
+        // Check if member already has this badge.
+        // Query on 'awardId' to match the service-layer schema written by gamificationService.awardAward().
         const existingAward = await db.collection('badgeAwards')
-          .where('badgeId', '==', badgeId)
+          .where('awardId', '==', badgeId)
           .where('memberId', '==', memberId)
           .get();
 
@@ -45,44 +46,78 @@ export const checkBadgeAwards = functions.firestore
 
         // Evaluate badge criteria
         const criteriaResult = await evaluateBadgeCriteria(badge.criteria, memberId);
-        
+
         if (criteriaResult.eligible) {
-          // Award the badge
-          await db.collection('badgeAwards').add({
-            badgeId: badgeId,
+          // Fetch current member doc so we can append to member.badges atomically
+          const memberSnap = await db.collection('members').doc(memberId).get();
+          const memberData = memberSnap.exists ? memberSnap.data() : null;
+          const currentBadges: any[] = (memberData && memberData.badges) ? memberData.badges : [];
+          const alreadyInMember = currentBadges.some((b: any) => b.id === badgeId);
+
+          // Atomic batch: write badgeAward record + update member.badges
+          const batch = db.batch();
+
+          const badgeAwardRef = db.collection('badgeAwards').doc();
+          batch.set(badgeAwardRef, {
+            // Use 'awardId' to match gamificationService.awardAward() schema so UI hooks can join correctly
+            awardId: badgeId,
             memberId: memberId,
-            awardedAt: admin.firestore.FieldValue.serverTimestamp(),
+            earnedAt: admin.firestore.FieldValue.serverTimestamp(),
             awardedBy: null, // Automatic award
+            reason: `Badge awarded automatically: ${badge.name}`,
             criteria: badge.criteria,
             progress: criteriaResult.progress
           });
 
-          // Award points if badge has point value
-          if (badge.pointValue && badge.pointValue > 0) {
-            await db.collection('points').add({
-              memberId: memberId,
-              points: badge.pointValue,
-              reason: `Badge awarded: ${badge.name}`,
-              source: 'badge',
-              sourceId: badgeId,
-              createdAt: admin.firestore.FieldValue.serverTimestamp()
+          if (!alreadyInMember) {
+            const userBadge = {
+              id: badgeId,
+              name: badge.name,
+              icon: badge.icon || '',
+              description: badge.description || '',
+              earnedDate: new Date().toISOString()
+            };
+            batch.update(db.collection('members').doc(memberId), {
+              badges: admin.firestore.FieldValue.arrayUnion(userBadge)
             });
           }
 
-          // Create notification
-          await db.collection('notifications').add({
-            memberId: memberId,
-            type: 'badge_awarded',
-            title: `Badge Earned: ${badge.name}`,
-            message: `Congratulations! You have earned the "${badge.name}" badge. ${badge.description}`,
-            data: {
-              badgeId: badgeId,
-              badgeName: badge.name,
-              pointsAwarded: badge.pointValue || 0
-            },
-            read: false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          });
+          await batch.commit();
+
+          // Award points if badge has point value (separate from batch — survivable failure)
+          if (badge.pointValue && badge.pointValue > 0) {
+            try {
+              await db.collection('points').add({
+                memberId: memberId,
+                points: badge.pointValue,
+                reason: `Badge awarded: ${badge.name}`,
+                source: 'badge',
+                sourceId: badgeId,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+            } catch (pointsError) {
+              console.error(`[checkBadgeAwards] Points award failed for badge ${badgeId} member ${memberId}:`, pointsError);
+            }
+          }
+
+          // Create notification (separate from batch — survivable failure)
+          try {
+            await db.collection('notifications').add({
+              memberId: memberId,
+              type: 'badge_awarded',
+              title: `Badge Earned: ${badge.name}`,
+              message: `Congratulations! You have earned the "${badge.name}" badge. ${badge.description}`,
+              data: {
+                badgeId: badgeId,
+                badgeName: badge.name,
+                pointsAwarded: badge.pointValue || 0
+              },
+              read: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          } catch (notifError) {
+            console.error(`[checkBadgeAwards] Notification failed for badge ${badgeId} member ${memberId}:`, notifError);
+          }
 
           console.log(`Badge ${badge.name} awarded to member ${memberId}`);
         }

@@ -6,46 +6,84 @@ import {
   getDocs,
   addDoc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
   Timestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { HobbyClub, ClubActivity } from '../types';
-import { withDevMode } from '../utils/devMode';
+import { isDevMode, withDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 import { MOCK_CLUBS } from './mockData';
 
+// --- Cache key prefixes ---
+const CACHE_PREFIX_CLUBS = 'hobbyClubs:';
+const CACHE_ALL_CLUBS = 'hobbyClubs:all';
+const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+function clubKey(clubId: string) {
+  return `${CACHE_PREFIX_CLUBS}${clubId}`;
+}
+
 export class HobbyClubsService {
+  /** Invalidate all hobby-clubs cache entries after any write. */
+  static invalidateClubsCache(clubId?: string): void {
+    apiCache.delete(CACHE_ALL_CLUBS);
+    apiCache.deleteByPrefix(CACHE_PREFIX_CLUBS);
+    if (clubId) apiCache.delete(clubKey(clubId));
+  }
+
   // Get all clubs
   static async getAllClubs(): Promise<HobbyClub[]> {
-    return withDevMode(() => MOCK_CLUBS, async () => {
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.HOBBY_CLUBS), orderBy('name', 'asc'))
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as HobbyClub));
-    });
+    if (isDevMode()) return MOCK_CLUBS;
+    return apiCache.getOrSet(
+      CACHE_ALL_CLUBS,
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.HOBBY_CLUBS), orderBy('name', 'asc'))
+          );
+          return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HobbyClub));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'HobbyClubsService',
+            action: 'getAllClubs',
+          });
+          throw error;
+        }
+      },
+      CACHE_TTL
+    );
   }
 
   // Get club by ID
   static async getClubById(clubId: string): Promise<HobbyClub | null> {
-    try {
-      const docRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as HobbyClub;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching hobby club:', error);
-      throw error;
-    }
+    if (isDevMode()) return MOCK_CLUBS.find(c => c.id === clubId) ?? null;
+    return apiCache.getOrSet(
+      clubKey(clubId),
+      async () => {
+        try {
+          const docRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() } as HobbyClub;
+          }
+          return null;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'HobbyClubsService',
+            action: 'getClubById',
+            clubId,
+          });
+          throw error;
+        }
+      },
+      CACHE_TTL
+    );
   }
 
   // Create club
@@ -53,100 +91,172 @@ export class HobbyClubsService {
     return withDevMode(
       () => `mock-club-${Date.now()}`,
       async () => {
-        const newClub = {
-          ...clubData,
-          membersCount: 1, // Creator is first member
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        };
-
-        const docRef = await addDoc(collection(db, COLLECTIONS.HOBBY_CLUBS), newClub);
-        return docRef.id;
+        try {
+          const newClub = {
+            ...clubData,
+            membersCount: 1, // Creator is first member
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+          const docRef = await addDoc(collection(db, COLLECTIONS.HOBBY_CLUBS), newClub);
+          this.invalidateClubsCache();
+          return docRef.id;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'HobbyClubsService',
+            action: 'createClub',
+          });
+          throw error;
+        }
       }
     );
   }
 
   // Update club
   static async updateClub(clubId: string, updates: Partial<HobbyClub>): Promise<void> {
+    if (isDevMode()) return;
     try {
       const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
       await updateDoc(clubRef, {
         ...updates,
         updatedAt: Timestamp.now(),
       });
+      this.invalidateClubsCache(clubId);
     } catch (error) {
-      console.error('Error updating hobby club:', error);
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'updateClub',
+        clubId,
+      });
       throw error;
     }
   }
 
-  // Delete club
+  /**
+   * Soft-delete a club by setting isDeleted: true.
+   * Hard deletion is avoided to prevent stale memberIds references in other documents.
+   */
   static async deleteClub(clubId: string): Promise<void> {
+    if (isDevMode()) return;
     try {
-      await deleteDoc(doc(db, COLLECTIONS.HOBBY_CLUBS, clubId));
+      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+      await updateDoc(clubRef, {
+        isDeleted: true,
+        updatedAt: Timestamp.now(),
+      });
+      this.invalidateClubsCache(clubId);
     } catch (error) {
-      console.error('Error deleting hobby club:', error);
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'deleteClub',
+        clubId,
+      });
       throw error;
     }
   }
 
-  // Join club
+  /**
+   * Join a club.
+   * Uses runTransaction to atomically: read current doc → check capacity → add member + increment count.
+   * Prevents race conditions where two members join simultaneously and exceed capacity.
+   */
   static async joinClub(clubId: string, memberId: string): Promise<void> {
-    return withDevMode(() => {}, async () => {
-      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-      const clubSnap = await getDoc(clubRef);
-
-      if (clubSnap.exists()) {
-        const currentMembers = clubSnap.data().memberIds || [];
-        if (!currentMembers.includes(memberId)) {
-          await updateDoc(clubRef, {
-            memberIds: [...currentMembers, memberId],
-            membersCount: (clubSnap.data().membersCount || 0) + 1,
-            updatedAt: Timestamp.now(),
-          });
-        }
-      }
-    });
-  }
-
-  // Leave club
-  static async leaveClub(clubId: string, memberId: string): Promise<void> {
+    if (isDevMode()) return;
     try {
-      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-      const clubSnap = await getDoc(clubRef);
+      await runTransaction(db, async (txn) => {
+        const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+        const clubSnap = await txn.get(clubRef);
+        if (!clubSnap.exists()) throw new Error('Club not found.');
 
-      if (clubSnap.exists()) {
-        const currentMembers = clubSnap.data().memberIds || [];
-        await updateDoc(clubRef, {
-          memberIds: currentMembers.filter((id: string) => id !== memberId),
-          membersCount: Math.max(0, (clubSnap.data().membersCount || 1) - 1),
+        const data = clubSnap.data();
+        const currentMembers: string[] = data.memberIds || [];
+        if (currentMembers.includes(memberId)) return; // already a member — idempotent
+
+        const capacity: number | undefined = data.capacity;
+        if (capacity !== undefined && currentMembers.length >= capacity) {
+          throw new Error('This club has reached its maximum capacity.');
+        }
+
+        txn.update(clubRef, {
+          memberIds: [...currentMembers, memberId],
+          membersCount: currentMembers.length + 1,
           updatedAt: Timestamp.now(),
         });
-      }
+      });
+      this.invalidateClubsCache(clubId);
     } catch (error) {
-      console.error('Error leaving club:', error);
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'joinClub',
+        clubId,
+        memberId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Leave a club.
+   * Guard: the club lead cannot leave without reassigning first.
+   */
+  static async leaveClub(clubId: string, memberId: string): Promise<void> {
+    if (isDevMode()) return;
+    try {
+      await runTransaction(db, async (txn) => {
+        const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+        const clubSnap = await txn.get(clubRef);
+        if (!clubSnap.exists()) throw new Error('Club not found.');
+
+        const data = clubSnap.data();
+        if (data.leadId === memberId) {
+          throw new Error('Club lead cannot leave without assigning a new lead first.');
+        }
+
+        const currentMembers: string[] = data.memberIds || [];
+        txn.update(clubRef, {
+          memberIds: currentMembers.filter(id => id !== memberId),
+          membersCount: Math.max(0, currentMembers.length - 1),
+          updatedAt: Timestamp.now(),
+        });
+      });
+      this.invalidateClubsCache(clubId);
+    } catch (error) {
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'leaveClub',
+        clubId,
+        memberId,
+      });
       throw error;
     }
   }
 
   // Get clubs by category
   static async getClubsByCategory(category: HobbyClub['category']): Promise<HobbyClub[]> {
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.HOBBY_CLUBS),
-        where('category', '==', category),
-        orderBy('name', 'asc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as HobbyClub));
-    } catch (error) {
-      console.error('Error fetching clubs by category:', error);
-      throw error;
-    }
+    if (isDevMode()) return MOCK_CLUBS.filter(c => c.category === category);
+    const cacheKey = `${CACHE_PREFIX_CLUBS}category:${category}`;
+    return apiCache.getOrSet(
+      cacheKey,
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.HOBBY_CLUBS),
+            where('category', '==', category),
+            orderBy('name', 'asc')
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HobbyClub));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'HobbyClubsService',
+            action: 'getClubsByCategory',
+            category,
+          });
+          throw error;
+        }
+      },
+      CACHE_TTL
+    );
   }
 
   // Derive the card-display string from the earliest upcoming activity
@@ -166,9 +276,10 @@ export class HobbyClubsService {
       nextActivity: this.computeNextActivity(activities),
       updatedAt: Timestamp.now(),
     });
+    this.invalidateClubsCache(clubId);
   }
 
-  // Read a club's activities (migrates a legacy `nextActivity` string on the fly for display)
+  // Read a club's activities
   static async getActivities(clubId: string): Promise<ClubActivity[]> {
     const club = await this.getClubById(clubId);
     return club?.activities || [];
@@ -176,6 +287,7 @@ export class HobbyClubsService {
 
   // Add a club activity
   static async addActivity(clubId: string, date: string, description: string): Promise<void> {
+    if (isDevMode()) return;
     try {
       const activities = await this.getActivities(clubId);
       activities.push({
@@ -185,13 +297,18 @@ export class HobbyClubsService {
       });
       await this.writeActivities(clubId, activities);
     } catch (error) {
-      console.error('Error adding activity:', error);
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'addActivity',
+        clubId,
+      });
       throw error;
     }
   }
 
   // Update a club activity
   static async updateActivity(clubId: string, activityId: string, updates: Partial<Omit<ClubActivity, 'id'>>): Promise<void> {
+    if (isDevMode()) return;
     try {
       const activities = await this.getActivities(clubId);
       const idx = activities.findIndex(a => a.id === activityId);
@@ -199,18 +316,29 @@ export class HobbyClubsService {
       activities[idx] = { ...activities[idx], ...updates };
       await this.writeActivities(clubId, activities);
     } catch (error) {
-      console.error('Error updating activity:', error);
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'updateActivity',
+        clubId,
+        activityId,
+      });
       throw error;
     }
   }
 
   // Delete a club activity
   static async deleteActivity(clubId: string, activityId: string): Promise<void> {
+    if (isDevMode()) return;
     try {
       const activities = await this.getActivities(clubId);
       await this.writeActivities(clubId, activities.filter(a => a.id !== activityId));
     } catch (error) {
-      console.error('Error deleting activity:', error);
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'deleteActivity',
+        clubId,
+        activityId,
+      });
       throw error;
     }
   }
@@ -222,16 +350,16 @@ export class HobbyClubsService {
 
   // Get club members
   static async getClubMembers(clubId: string): Promise<string[]> {
+    if (isDevMode()) return [];
     try {
-      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-      const clubSnap = await getDoc(clubRef);
-
-      if (clubSnap.exists()) {
-        return clubSnap.data().memberIds || [];
-      }
-      return [];
+      const club = await this.getClubById(clubId);
+      return club?.memberIds || [];
     } catch (error) {
-      console.error('Error fetching club members:', error);
+      errorLoggingService.logError(error as Error, {
+        component: 'HobbyClubsService',
+        action: 'getClubMembers',
+        clubId,
+      });
       throw error;
     }
   }

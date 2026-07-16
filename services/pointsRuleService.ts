@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -12,51 +13,74 @@ import {
   orderBy,
   limit,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { 
-  PointsRule, 
-  PointsRuleCondition, 
-  PointsRuleExecution, 
+import {
+  PointsRule,
+  PointsRuleCondition,
+  PointsRuleExecution,
   PointsCalculationBreakdown,
   PointsRuleTestResult,
   PointsRuleAnalytics,
-  Member 
+  Member
 } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
+import { PointsService } from './pointsService';
+import { errorLoggingService } from './errorLoggingService';
+
+const CACHE_PREFIX_POINTS_RULES = 'pointsRules:';
+const CACHE_TTL_POINTS_RULES = 5 * 60 * 1000; // 5 minutes
+
+function invalidatePointsRulesCache(): void {
+  apiCache.deleteByPrefix(CACHE_PREFIX_POINTS_RULES);
+}
 
 export class PointsRuleService {
   // Get all points rules
   static async getAllPointsRules(): Promise<PointsRule[]> {
-    return withDevMode(
-      () => this.getDefaultPointsRules(),
+    if (isDevMode()) return this.getDefaultPointsRules();
+    const cacheKey = `${CACHE_PREFIX_POINTS_RULES}all`;
+    return apiCache.getOrSet(
+      cacheKey,
       async () => {
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.POINTS_RULES),
-          orderBy('weight', 'desc'),
-          orderBy('name', 'asc')
-        )
-      );
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
-      } as PointsRule));
-    } catch (error) {
-      console.error('Error fetching points rules:', error);
-      throw error;
-    }
-  });
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.POINTS_RULES),
+              orderBy('weight', 'desc'),
+              orderBy('name', 'asc')
+            )
+          );
+          return snapshot.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+            createdAt: d.data().createdAt?.toDate?.()?.toISOString() || d.data().createdAt,
+            updatedAt: d.data().updatedAt?.toDate?.()?.toISOString() || d.data().updatedAt,
+          } as PointsRule));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, 'PointsRuleService.getAllPointsRules');
+          throw error;
+        }
+      },
+      CACHE_TTL_POINTS_RULES
+    );
   }
 
   // Get enabled points rules
   static async getEnabledPointsRules(): Promise<PointsRule[]> {
-    const allRules = await this.getAllPointsRules();
-    return allRules.filter(rule => rule.enabled);
+    if (isDevMode()) return this.getDefaultPointsRules().filter(r => r.enabled);
+    const cacheKey = `${CACHE_PREFIX_POINTS_RULES}enabled`;
+    return apiCache.getOrSet(
+      cacheKey,
+      async () => {
+        const allRules = await this.getAllPointsRules();
+        return allRules.filter(rule => rule.enabled);
+      },
+      CACHE_TTL_POINTS_RULES
+    );
   }
 
   // Get points rule by ID
@@ -90,54 +114,64 @@ export class PointsRuleService {
 
   // Create or update points rule
   static async savePointsRule(rule: Partial<PointsRule>): Promise<string> {
-    return withDevMode(
-      () => {
-        console.log('[DEV MODE] Would save points rule:', rule);
-        return `rule-${Date.now()}`;
-      },
-      async () => {
-        try {
-          if (rule.id) {
-            // Update existing
-            const docRef = doc(db, COLLECTIONS.POINTS_RULES, rule.id);
-            await updateDoc(docRef, {
-              ...rule,
-              updatedAt: Timestamp.now(),
-            });
-            return rule.id;
-          } else {
-            // Create new
-            const newRule = {
-              ...rule,
-              enabled: rule.enabled ?? true,
-              createdAt: Timestamp.now(),
-              updatedAt: Timestamp.now(),
-            };
-            const docRef = await addDoc(collection(db, COLLECTIONS.POINTS_RULES), newRule);
-            return docRef.id;
-          }
-        } catch (error) {
-          console.error('Error saving points rule:', error);
-          throw error;
-        }
+    if (isDevMode()) {
+      console.log('[DEV MODE] Would save points rule:', rule);
+      return `rule-${Date.now()}`;
+    }
+    try {
+      let savedId: string;
+      if (rule.id) {
+        const docRef = doc(db, COLLECTIONS.POINTS_RULES, rule.id);
+        await updateDoc(docRef, {
+          ...rule,
+          updatedAt: Timestamp.now(),
+        });
+        savedId = rule.id;
+      } else {
+        const newRule = {
+          ...rule,
+          enabled: rule.enabled ?? true,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        };
+        const docRef = await addDoc(collection(db, COLLECTIONS.POINTS_RULES), newRule);
+        savedId = docRef.id;
       }
-    );
+      invalidatePointsRulesCache();
+      return savedId;
+    } catch (error) {
+      errorLoggingService.logError(error as Error, 'PointsRuleService.savePointsRule');
+      throw error;
+    }
   }
 
-  // Delete points rule
+  // Delete points rule and all associated execution records
   static async deletePointsRule(ruleId: string): Promise<void> {
-    return withDevMode(
-      () => { console.log('[DEV MODE] Would delete points rule:', ruleId); },
-      async () => {
-        try {
-          const docRef = doc(db, COLLECTIONS.POINTS_RULES, ruleId);
-          await deleteDoc(docRef);
-        } catch (error) {
-          console.error('Error deleting points rule:', error);
-          throw error;
-        }
-      }
-    );
+    if (isDevMode()) {
+      console.log('[DEV MODE] Would delete points rule and executions for:', ruleId);
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+
+      // Delete the rule document itself
+      batch.delete(doc(db, COLLECTIONS.POINTS_RULES, ruleId));
+
+      // Delete all execution records for this rule
+      const executionsSnap = await getDocs(
+        query(
+          collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS),
+          where('ruleId', '==', ruleId)
+        )
+      );
+      executionsSnap.docs.forEach(execDoc => batch.delete(execDoc.ref));
+
+      await batch.commit();
+      invalidatePointsRulesCache();
+    } catch (error) {
+      errorLoggingService.logError(error as Error, 'PointsRuleService.deletePointsRule');
+      throw error;
+    }
   }
 
   // Validate rule conditions
@@ -256,12 +290,17 @@ export class PointsRuleService {
   static async executeRules(
     trigger: string,
     triggerData: Record<string, any>,
-    memberId: string
+    memberId: string,
+    triggerId?: string // deterministic de-dup key (e.g. eventId, taskId)
   ): Promise<PointsRuleExecution[]> {
+    if (isDevMode()) {
+      console.log('[DEV MODE] executeRules called:', { trigger, memberId, triggerId });
+      return [];
+    }
     try {
       const enabledRules = await this.getEnabledPointsRules();
       const applicableRules = enabledRules.filter(rule => rule.trigger === trigger);
-      
+
       const executions: PointsRuleExecution[] = [];
 
       for (const rule of applicableRules) {
@@ -270,39 +309,77 @@ export class PointsRuleService {
           return this.evaluateCondition(condition, actualValue);
         });
 
-        if (conditionsPassed) {
-          const calculation = this.calculatePoints([rule], triggerData);
-          
-          const execution: PointsRuleExecution = {
-            id: `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            ruleId: rule.id,
-            ruleName: rule.name,
-            memberId,
-            trigger,
-            triggerData,
-            pointsAwarded: calculation.finalPoints,
-            calculation,
-            executedAt: new Date().toISOString(),
-          };
+        if (!conditionsPassed) continue;
 
-          executions.push(execution);
+        const calculation = this.calculatePoints([rule], triggerData);
 
-          // Log execution in dev mode
-          if (isDevMode()) {
-            console.log('[DEV MODE] Points rule executed:', execution);
-          } else {
-            // Save execution to database
-            await addDoc(collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS), {
-              ...execution,
-              executedAt: Timestamp.now(),
-            });
+        // --- Duplicate-execution prevention ---
+        // Use a deterministic doc ID so a second call with the same (ruleId, memberId, triggerId)
+        // is a no-op at the Firestore level. If triggerId is absent we still check via query.
+        const dedupeId = triggerId
+          ? `${rule.id}_${memberId}_${triggerId}`
+          : null;
+
+        if (dedupeId) {
+          const existingRef = doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId);
+          const existingSnap = await getDoc(existingRef);
+          if (existingSnap.exists()) {
+            // Already executed — skip silently
+            continue;
           }
+        } else {
+          // Fallback: query-based de-dup (no triggerId provided)
+          const dupSnap = await getDocs(
+            query(
+              collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS),
+              where('ruleId', '==', rule.id),
+              where('memberId', '==', memberId),
+              limit(1)
+            )
+          );
+          if (!dupSnap.empty) continue;
         }
+
+        // --- Write execution record ---
+        const executionPayload = {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          memberId,
+          trigger,
+          triggerData,
+          pointsAwarded: calculation.finalPoints,
+          calculation,
+          executedAt: Timestamp.now(),
+        };
+
+        if (dedupeId) {
+          // setDoc with deterministic ID guarantees exactly-once semantics
+          await setDoc(doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId), executionPayload);
+        } else {
+          await addDoc(collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS), executionPayload);
+        }
+
+        // --- Actually award the points (P0 fix) ---
+        await PointsService.awardPoints(
+          memberId,
+          calculation.finalPoints,
+          'rule_execution',
+          `Points rule: ${rule.name}`,
+          dedupeId ?? rule.id,
+          'points_rule'
+        );
+
+        const execution: PointsRuleExecution = {
+          id: dedupeId ?? `exec-${Date.now()}`,
+          ...executionPayload,
+          executedAt: new Date().toISOString(),
+        };
+        executions.push(execution);
       }
 
       return executions;
     } catch (error) {
-      console.error('Error executing rules:', error);
+      errorLoggingService.logError(error as Error, 'PointsRuleService.executeRules');
       throw error;
     }
   }

@@ -593,7 +593,11 @@ export class MembersService {
 
       const mergedMember = { ...(currentData ?? {}), ...normalizedUpdates, id: memberId };
       const { BusinessDirectoryService } = await import('./businessDirectoryService');
-      await BusinessDirectoryService.syncPublicListing(memberId, mergedMember as Record<string, unknown>);
+      try {
+        await BusinessDirectoryService.syncPublicListing(memberId, mergedMember as Record<string, unknown>);
+      } catch (syncErr) {
+        console.warn('syncPublicListing failed after updateMember — member update was saved successfully:', syncErr);
+      }
       await this.syncBoardMemberDisplayFields(memberId, mergedMember as Member);
 
       // Trigger introducer recalculation if introducer changes

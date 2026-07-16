@@ -402,6 +402,41 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 | `badges` | 2026-07-16 | 7（1/2/4）| 2 | 部分 | ruleExecutionService.awardBadge返回假成功→自动化颁奖全部静默失败 |
 | `bankAccounts` | 2026-07-16 | 7（0/3/4）| 1 | 部分 | — |
 
+**第三批扫描（2026-07-17）— P0×35 P1×123 P2×77 Total×235**
+
+| 集合 | 分析日期 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 关键P0摘要 |
+|------|----------|-----------------------|------------|-----------|-----------|
+| `pointsRules` | 2026-07-17 | 10（4/4/2）| 2 | 缺失 | 集合无Firestore规则→全部静默失败；两套积分规则集合并存互不知晓；executeRules从不发放积分 |
+| `conversations+messages` | 2026-07-17 | 9（2/4/3）| 2 | 缺失 | 任意用户可读所有私信；resource.data in list→对话列表永远为空 |
+| `activityPlans` | 2026-07-17 | 10（2/6/2）| 3 | 缺失 | 任意登录用户可删改计划；8个方法查询PROJECTS而非ACTIVITY_PLANS集合 |
+| `surveys+surveyResponses` | 2026-07-17 | 9（2/5/2）| 1 | 缺失 | resource.data in list→成员看不到自己的回复；无重复提交防护 |
+| `documents+documentVersions` | 2026-07-17 | 10（2/5/3）| 2 | 缺失 | documentVersions无Firestore规则→版本历史全失败；任意用户可删治理文件 |
+| `workflow_executions` | 2026-07-17 | 8（2/4/2）| 2 | 部分 | 任意用户可伪造执行记录；所有执行记录对所有登录用户可读 |
+| `eventFeedback` | 2026-07-17 | 8（2/4/2）| 0 | 缺失 | 反馈含memberId对所有人可读；无重复提交防护 |
+| `opportunityDrops` | 2026-07-17 | 5（2/2/1）| 0 | 缺失 | 完全无service层/类型/UI入口（死代码）；SUPER_ADMIN被硬编码排除写权限 |
+| `inquiries` | 2026-07-17 | 7（2/3/2）| 0 | 缺失 | Inquiry类型导入但不存在→编译失败；API token存localStorage |
+| `webhooks+systemLogs` | 2026-07-17 | 10（2/5/3）| 2 | 缺失 | 任意用户可写systemLogs伪造审计；webhook_logs同样无角色限制 |
+| `certificates` | 2026-07-17 | 8（1/4/3）| 1 | 缺失 | 任意用户可直接SDK自颁证书，绕过课程完成校验 |
+| `learningPaths+Progress` | 2026-07-17 | 9（1/5/3）| 4 | 缺失 | resource.data in list→成员无法列出自己学习进度 |
+| `hobbyClubs` | 2026-07-17 | 9（1/5/3）| 2 | 缺失 | 任意登录用户可删改任何社团，无角色和归属权校验 |
+| `sponsorships` | 2026-07-17 | 9（1/5/3）| 1 | 缺失 | financeService硬编码sponsorships:0→赞助收入完全隐形 |
+| `advertisements` | 2026-07-17 | 9（1/5/3）| 2 | 缺失 | allow update无isAuthenticated→匿名用户可刷广告数据 |
+| `publications+partnerships` | 2026-07-17 | 10（1/5/4）| 1 | 缺失 | partnerships读advertisements写partnerships→管理后台创建的记录用户端不可见 |
+| `nudgeRules` | 2026-07-17 | 9（1/5/3）| 1 | 缺失 | nonMemberLeads allow create if true→匿名机器人可写任意内容 |
+| `stock_movements` | 2026-07-17 | 7（1/4/2）| 2 | 部分 | BOARD可覆盖库存移动记录→审计日志可被篡改 |
+| `guestRegistrations` | 2026-07-17 | 7（1/4/2）| 0 | 缺失 | 读后写无事务→并发双重报名 |
+| `memberBenefits+benefitUsage` | 2026-07-17 | 6（1/3/2）| 2 | 缺失 | 写入路径service被移入trash→权益兑换完全无效 |
+| `projectReports` | 2026-07-17 | 5（1/2/2）| 0 | 缺失 | 服务层完全缺失（空壳）；报告只在内存生成后丢弃 |
+| `achievementAwards` | 2026-07-17 | 6（1/3/2）| 0 | 缺失 | achievementProgress无Firestore规则→未登录用户可读所有成就进度 |
+| `badgeAwards` | 2026-07-17 | 9（1/5/3）| 2 | 部分 | ruleExecutionService捕获所有错误返回false→自动化徽章静默失败 |
+| `trainingModules` | 2026-07-17 | 8（0/5/3）| 2 | 缺失 | — |
+| `incentiveStandards` | 2026-07-17 | 8（0/5/3）| 2 | 部分 | — |
+| `templates` | 2026-07-17 | 7（0/3/4）| 4 | 缺失 | — |
+| `publicBusinessListings` | 2026-07-17 | 7（0/4/3）| 1 | 缺失 | — |
+| `boardTermSettings` | 2026-07-17 | 5（0/3/2）| 0 | 完整 | — |
+| `pointRules` | 2026-07-17 | 5（0/3/2）| 1 | 部分 | — |
+| `businessProfiles` | 2026-07-17 | 6（0/3/3）| 1 | 缺失 | allow update检查new data.memberId而非existing owner→任意用户可冒充覆写 |
+
 ### 已分析集合（collection-deps）
 
 | 集合 | 分析日期 | 联动集合数 | 强耦合 | 中耦合 | 弱耦合 | P0风险数 | P0风险摘要 |

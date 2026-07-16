@@ -13,6 +13,19 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
+
+const FEEDBACK_CACHE_PREFIX = 'eventFeedback:';
+const FEEDBACK_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+
+function feedbackCacheKey(eventId: string): string {
+  return `${FEEDBACK_CACHE_PREFIX}${eventId}`;
+}
+
+function invalidateFeedbackCache(eventId: string): void {
+  apiCache.delete(feedbackCacheKey(eventId));
+}
 
 export interface EventFeedback {
   id?: string;
@@ -42,8 +55,10 @@ export interface EventFeedbackSummary {
   feedbacks: EventFeedback[];
 }
 
+const FEEDBACK_COLLECTION = () => COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback';
+
 export class EventFeedbackService {
-  // Submit feedback for an event
+  // Submit feedback for an event — P0: duplicate guard at service layer
   static async submitFeedback(feedback: Omit<EventFeedback, 'id' | 'submittedAt'>): Promise<string> {
     return withDevMode(
       () => {
@@ -52,15 +67,35 @@ export class EventFeedbackService {
       },
       async () => {
         try {
+          // P0 — duplicate feedback check before writing
+          const existing = await getDocs(
+            query(
+              collection(db, FEEDBACK_COLLECTION()),
+              where('eventId', '==', feedback.eventId),
+              where('memberId', '==', feedback.memberId)
+            )
+          );
+          if (!existing.empty) {
+            throw new Error('Feedback already submitted for this event.');
+          }
+
           const feedbackData = {
             ...feedback,
             submittedAt: Timestamp.now(),
           };
 
-          const docRef = await addDoc(collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'), feedbackData);
+          const docRef = await addDoc(collection(db, FEEDBACK_COLLECTION()), feedbackData);
+
+          // P1 — invalidate cache so subsequent reads reflect new submission
+          invalidateFeedbackCache(feedback.eventId);
+
           return docRef.id;
         } catch (error) {
-          console.error('Error submitting feedback:', error);
+          errorLoggingService.logError(error as Error, {
+            context: 'EventFeedbackService.submitFeedback',
+            eventId: feedback.eventId,
+            memberId: feedback.memberId,
+          });
           throw error;
         }
       }
@@ -72,23 +107,25 @@ export class EventFeedbackService {
     return withDevMode(
       () => [],
       async () => {
-        try {
-          const snapshot = await getDocs(
-            query(
-              collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'),
-              where('eventId', '==', eventId)
-            )
-          );
+        return apiCache.getOrSet(
+          feedbackCacheKey(eventId),
+          async () => {
+            const snapshot = await getDocs(
+              query(
+                collection(db, FEEDBACK_COLLECTION()),
+                where('eventId', '==', eventId)
+              )
+            );
 
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            submittedAt: doc.data().submittedAt?.toDate?.() || doc.data().submittedAt,
-          } as EventFeedback));
-        } catch (error) {
-          console.error('Error fetching event feedback:', error);
-          throw error;
-        }
+            return snapshot.docs.map(d => ({
+              id: d.id,
+              ...d.data(),
+              submittedAt: d.data().submittedAt?.toDate?.() || d.data().submittedAt,
+            } as EventFeedback));
+          },
+          FEEDBACK_CACHE_TTL,
+          'EventFeedbackService.getEventFeedback'
+        );
       }
     );
   }
@@ -113,7 +150,7 @@ export class EventFeedbackService {
       const totalResponses = feedbacks.length;
       const averageRating = feedbacks.reduce((sum, f) => sum + f.rating, 0) / totalResponses;
       const averageSatisfaction = feedbacks.reduce((sum, f) => sum + f.overallSatisfaction, 0) / totalResponses;
-      
+
       const contentQualityFeedbacks = feedbacks.filter(f => f.contentQuality);
       const averageContentQuality = contentQualityFeedbacks.length > 0
         ? contentQualityFeedbacks.reduce((sum, f) => sum + (f.contentQuality || 0), 0) / contentQualityFeedbacks.length
@@ -136,7 +173,7 @@ export class EventFeedbackService {
       const allComments = feedbacks
         .filter(f => f.comments)
         .map(f => f.comments?.toLowerCase() || '');
-      
+
       const commonThemes: string[] = [];
       const keywords = ['great', 'good', 'excellent', 'improve', 'better', 'enjoyed', 'helpful', 'organized'];
       keywords.forEach(keyword => {
@@ -159,7 +196,7 @@ export class EventFeedbackService {
         feedbacks,
       };
     } catch (error) {
-      console.error('Error getting feedback summary:', error);
+      errorLoggingService.logError(error as Error, { context: 'EventFeedbackService.getFeedbackSummary', eventId });
       throw error;
     }
   }
@@ -172,7 +209,7 @@ export class EventFeedbackService {
         try {
           const snapshot = await getDocs(
             query(
-              collection(db, COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback'),
+              collection(db, FEEDBACK_COLLECTION()),
               where('eventId', '==', eventId),
               where('memberId', '==', memberId)
             )
@@ -180,11 +217,14 @@ export class EventFeedbackService {
 
           return !snapshot.empty;
         } catch (error) {
-          console.error('Error checking feedback submission:', error);
+          errorLoggingService.logError(error as Error, {
+            context: 'EventFeedbackService.hasMemberSubmittedFeedback',
+            eventId,
+            memberId,
+          });
           return false;
         }
       }
     );
   }
 }
-

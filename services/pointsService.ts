@@ -528,29 +528,37 @@ export class PointsService {
         updatedAt: new Date(),
       }),
       async () => {
-        try {
-          const q = query(
-            collection(db, COLLECTIONS.POINT_RULES),
-            where('category', '==', category),
-            where('active', '==', true),
-            limit(1)
-          );
+        const cacheKey = CACHE_PREFIX_POINT_RULES + 'cat:' + category;
+        return apiCache.getOrSet<PointRule | null>(
+          cacheKey,
+          async () => {
+            try {
+              const q = query(
+                collection(db, COLLECTIONS.POINT_RULES),
+                where('category', '==', category),
+                where('active', '==', true),
+                limit(1)
+              );
 
-          const snapshot = await getDocs(q);
-          if (snapshot.empty) return null;
+              const snapshot = await getDocs(q);
+              if (snapshot.empty) return null;
 
-          const doc = snapshot.docs[0];
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
-            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
-          } as PointRule;
-        } catch (error) {
-          console.error('Error fetching point rule:', error);
-          throw error;
-        }
+              const docSnap = snapshot.docs[0];
+              const data = docSnap.data();
+              return {
+                id: docSnap.id,
+                ...data,
+                createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+                updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
+              } as PointRule;
+            } catch (error) {
+              console.error('Error fetching point rule:', error);
+              throw error;
+            }
+          },
+          5 * 60 * 1000,
+          'getPointRule'
+        );
       }
     );
   }
@@ -571,27 +579,31 @@ export class PointsService {
         },
       ],
       async () => {
-        try {
-          let q;
-          if (includeInactive) {
-            q = query(
-              collection(db, COLLECTIONS.POINT_RULES),
-              orderBy('category')
-            );
-          } else {
-            q = query(
-              collection(db, COLLECTIONS.POINT_RULES),
-              where('active', '==', true),
-              orderBy('category')
-            );
-          }
+        const cacheKey = CACHE_PREFIX_POINT_RULES + 'all:' + (includeInactive ? 'all' : 'active');
+        return apiCache.getOrSet<PointRule[]>(
+          cacheKey,
+          async () => {
+            try {
+              let q;
+              if (includeInactive) {
+                q = query(
+                  collection(db, COLLECTIONS.POINT_RULES),
+                  orderBy('category')
+                );
+              } else {
+                q = query(
+                  collection(db, COLLECTIONS.POINT_RULES),
+                  where('active', '==', true),
+                  orderBy('category')
+                );
+              }
 
-          const snapshot = await getDocs(q);
-          return snapshot.docs.map(doc => {
-            const data = doc.data() as any;
-            return {
-              id: doc.id,
-              category: data.category,
+              const snapshot = await getDocs(q);
+              return snapshot.docs.map(doc => {
+                const data = doc.data() as any;
+                return {
+                  id: doc.id,
+                  category: data.category,
               name: data.name,
               basePoints: data.basePoints,
               multiplier: data.multiplier,
@@ -606,6 +618,10 @@ export class PointsService {
           console.error('Error fetching all point rules:', error);
           throw error;
         }
+          },
+          5 * 60 * 1000,
+          'getPointRules'
+        );
       }
     );
   }
@@ -1087,22 +1103,26 @@ export class PointsService {
   }
 
   // Get all standards for a given program
+  // P1 fix: check cache before hitting Firestore; populate cache after read
   static async getStandards(programId: string): Promise<IncentiveStandard[]> {
     if (isDevMode()) {
       return this.mockStandards.filter(s => s.programId === programId);
     }
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.INCENTIVE_STANDARDS),
-        where('programId', '==', programId),
-        orderBy('order', 'asc')
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as IncentiveStandard);
-    } catch (error) {
-      console.error('Error fetching standards:', error);
-      throw error;
-    }
+    const cacheKey = `${CACHE_PREFIX_INCENTIVE}standards:${programId}`;
+    return apiCache.getOrSet(cacheKey, async () => {
+      try {
+        const q = query(
+          collection(db, COLLECTIONS.INCENTIVE_STANDARDS),
+          where('programId', '==', programId),
+          orderBy('order', 'asc')
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({ ...d.data(), id: d.id }) as IncentiveStandard);
+      } catch (error) {
+        console.error('Error fetching standards:', error);
+        throw error;
+      }
+    }, 3 * 60 * 1000);
   }
 
   // Submit an incentive claim
@@ -1515,6 +1535,8 @@ export class PointsService {
   }
 
   // Save or update an incentive standard
+  // P1 fix: block edits to any standard that already has Approved submissions —
+  //         changing the rules after approval creates unreconcilable score discrepancies.
   static async saveStandard(standard: Omit<IncentiveStandard, 'id'> | IncentiveStandard): Promise<string> {
     if (isDevMode()) {
       console.log('[DEV MODE] Saving standard:', standard);
@@ -1532,6 +1554,20 @@ export class PointsService {
     try {
       const { id, ...data } = standard as any;
       if (id) {
+        // P1 guard: refuse edits when approved submissions already exist for this standard
+        const approvedSnap = await getDocs(
+          query(
+            collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+            where('standardId', '==', id),
+            where('status', '==', 'APPROVED')
+          )
+        );
+        if (!approvedSnap.empty) {
+          throw new Error(
+            'Cannot change a standard that has approved submissions. Archive it and create a new one instead.'
+          );
+        }
+
         await updateDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id), {
           ...data,
           updatedAt: Timestamp.now()
@@ -1577,8 +1613,44 @@ export class PointsService {
   }
 
   // Delete an incentive standard
+  // P1 fix: cascade-cancel all non-Approved submissions that reference this standard
+  //         so they don't remain as dangling records pointing at a deleted standard.
   static async deleteStandard(id: string): Promise<void> {
-    return this.bulkDeleteStandards([id]);
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Deleting standard ${id}`);
+      return;
+    }
+    try {
+      // Find all submissions for this standard that are not yet Approved
+      const pendingSnap = await getDocs(
+        query(
+          collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+          where('standardId', '==', id),
+          where('status', 'in', ['PENDING', 'REJECTED'])
+        )
+      );
+
+      const batch = writeBatch(db);
+
+      // Cascade: cancel dangling submissions
+      const now = Timestamp.now();
+      pendingSnap.docs.forEach(d =>
+        batch.update(d.ref, {
+          status: 'CANCELLED',
+          cancellationReason: 'Standard deleted',
+          updatedAt: now,
+        })
+      );
+
+      // Delete the standard itself
+      batch.delete(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id));
+
+      await batch.commit();
+      PointsService.invalidateIncentiveCache();
+    } catch (error) {
+      console.error('Error deleting incentive standard:', error);
+      throw error;
+    }
   }
 
   /**
