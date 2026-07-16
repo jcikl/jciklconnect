@@ -85,6 +85,40 @@ Firestore security rules are in `firestore.rules` (34 KB). Composite indexes are
 
 ---
 
+## Library vs Self-Build Decision Protocol (Auto-enforced)
+
+**Before implementing any non-trivial feature, evaluate whether a mature library already solves the problem. This is mandatory — do not skip straight to writing code.**
+
+### Step 1 — Identify the nature of the problem
+
+| Problem type | Default decision |
+|---|---|
+| Complex interaction logic (date picker, drag-and-drop, rich text, virtual scroll) | Evaluate existing libraries first |
+| Simple UI components (buttons, cards, forms, badges) | Extend `components/ui/` — do not bring in a library |
+| Data processing (charts, Excel export, PDF generation, CSV parsing) | Evaluate bundle size impact before deciding |
+| Business logic (membership rules, finance reconciliation, points calculation) | Always self-build — no external library understands the business rules |
+| Firebase / auth / routing | Already solved by existing stack — do not replace |
+
+### Step 2 — If a library is a candidate, evaluate on four criteria
+
+1. **Bundle size** — would adding this library keep data load under 2 seconds? Check the minified + gzipped size (via bundlephobia.com mental check). If the library is large but only a small part is needed, look for a lighter alternative or self-build that part only.
+2. **Maintenance health** — is it actively maintained? (recent commits, open issues being addressed, compatible with React 19)
+3. **Architecture fit** — does it work alongside Tailwind CSS, Firebase, and the existing hook/service layer without conflict?
+4. **Usage ratio** — will at least 30% of the library's features be used? If using less, self-build the specific part needed.
+
+### Step 3 — Decision output
+
+- **Use the library** → install it, document why it was chosen in a brief code comment, lazy-load it if it's heavy (`React.lazy` or dynamic `import()`)
+- **Self-build** → implement in `components/ui/` (UI) or `services/` (data logic), following the existing layer protocol
+- **Uncertain** → default to self-build for now, leave a `// TODO: evaluate [library name] if this grows more complex` comment
+
+### What this protocol is NOT
+
+- It does not apply to libraries already in the stack (React, Firebase, Tailwind, Vite, React Router, etc.)
+- It does not require asking the user for approval on every library decision — make the call, state the reasoning in the commit message
+
+---
+
 ## UI Component & Data Layer Protocol (Auto-enforced)
 
 **Every development task — whether a new feature, a bug fix, or a refactor — must run this protocol automatically, without waiting for explicit instruction.**
