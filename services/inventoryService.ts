@@ -14,6 +14,7 @@ import {
   Timestamp,
   writeBatch,
   deleteField,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -303,48 +304,49 @@ export class InventoryService {
       () => { console.log('[DEV MODE] Generating inventory alerts'); },
       async () => {
     try {
-      const items = await this.getAllItems();
-      const maintenanceSchedules = await this.getMaintenanceSchedules();
+      // Fetch all data and existing unacknowledged alerts in parallel (3 queries total, not 3×N)
+      const [items, maintenanceSchedules, existingAlertsSnap] = await Promise.all([
+        this.getAllItems(),
+        this.getMaintenanceSchedules(),
+        getDocs(query(
+          collection(db, COLLECTIONS.INVENTORY_ALERTS),
+          where('acknowledged', '==', false)
+        )),
+      ]);
 
-      // Collect new alerts (after dedup checks) then write all at once
+      // Build an in-memory set of (itemId, type) pairs that already have active alerts
+      const activeAlertKeys = new Set<string>();
+      existingAlertsSnap.docs.forEach(d => {
+        const data = d.data();
+        activeAlertKeys.add(`${data.itemId}::${data.type}`);
+      });
+
       type NewAlert = { itemId: string; type: string; severity: string; message: string };
       const newAlerts: NewAlert[] = [];
 
-      // Check for low stock items
+      // Check for low stock / out-of-stock items
       for (const item of items) {
         if (item.quantity <= (item.minQuantity || 0)) {
-          const existingLowStock = await getDocs(query(
-            collection(db, COLLECTIONS.INVENTORY_ALERTS),
-            where('itemId', '==', item.id),
-            where('type', '==', 'Low Stock'),
-            where('acknowledged', '==', false),
-            limit(1)
-          ));
-          if (existingLowStock.empty) {
+          const alertType = 'Low Stock';
+          if (!activeAlertKeys.has(`${item.id}::${alertType}`)) {
             newAlerts.push({
               itemId: item.id,
-              type: 'Low Stock',
+              type: alertType,
               severity: item.quantity === 0 ? 'Critical' : 'High',
               message: `${item.name} is ${item.quantity === 0 ? 'out of stock' : `low (${item.quantity} remaining, minimum: ${item.minQuantity})`}`,
             });
           }
         }
 
-        // Check for overdue returns (if applicable)
+        // Check for overdue returns
         if (item.status === 'Checked Out' && item.expectedReturnDate) {
           const returnDate = new Date(item.expectedReturnDate);
           if (returnDate < new Date()) {
-            const existingOverdue = await getDocs(query(
-              collection(db, COLLECTIONS.INVENTORY_ALERTS),
-              where('itemId', '==', item.id),
-              where('type', '==', 'Overdue Return'),
-              where('acknowledged', '==', false),
-              limit(1)
-            ));
-            if (existingOverdue.empty) {
+            const alertType = 'Overdue Return';
+            if (!activeAlertKeys.has(`${item.id}::${alertType}`)) {
               newAlerts.push({
                 itemId: item.id,
-                type: 'Overdue Return',
+                type: alertType,
                 severity: 'Medium',
                 message: `${item.name} is overdue for return (expected: ${item.expectedReturnDate})`,
               });
@@ -353,33 +355,29 @@ export class InventoryService {
         }
       }
 
-      // Check for upcoming maintenance
+      // Check for upcoming / overdue maintenance
+      const now = new Date();
+      const itemMap = new Map(items.map(i => [i.id, i]));
       for (const schedule of maintenanceSchedules) {
+        if (!schedule.scheduledDate) continue;
         const scheduledDate = new Date(schedule.scheduledDate);
-        const now = new Date();
         const daysUntil = Math.ceil((scheduledDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-        if (daysUntil <= 7 && daysUntil >= -7) { // Within a week (past or future)
-          const item = items.find(i => i.id === schedule.itemId);
-          const existingMaint = await getDocs(query(
-            collection(db, COLLECTIONS.INVENTORY_ALERTS),
-            where('itemId', '==', schedule.itemId),
-            where('type', '==', 'Maintenance Due'),
-            where('acknowledged', '==', false),
-            limit(1)
-          ));
-          if (existingMaint.empty) {
+        if (daysUntil <= 7 && daysUntil >= -7) {
+          const alertType = 'Maintenance Due';
+          if (!activeAlertKeys.has(`${schedule.itemId}::${alertType}`)) {
+            const item = itemMap.get(schedule.itemId);
             newAlerts.push({
               itemId: schedule.itemId,
-              type: 'Maintenance Due',
-              severity: daysUntil < -7 ? 'High' : 'Medium',
+              type: alertType,
+              severity: daysUntil < 0 ? 'High' : 'Medium',
               message: `${item?.name || 'Item'} requires ${schedule.type.toLowerCase()} maintenance (${schedule.type})`,
             });
           }
         }
       }
 
-      // Write all new alerts atomically
+      // Write all new alerts atomically in a single batch
       if (newAlerts.length > 0) {
         const batch = writeBatch(db);
         newAlerts.forEach(alert => {
@@ -767,11 +765,13 @@ export class InventoryService {
 
       const batch = writeBatch(db);
       const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+      const quantityAfterCheckout = item.quantity - 1;
       batch.update(itemRef, {
         status: 'Checked Out',
         checkedOutTo: memberId,
         checkedOutDate: new Date().toISOString(),
         expectedReturnDate: expectedReturnDate?.toISOString() ?? deleteField(),
+        quantity: increment(-1),
         updatedAt: Timestamp.now(),
       });
       const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
@@ -781,7 +781,7 @@ export class InventoryService {
         type: 'Out',
         quantity: 1,
         previousQuantity: item.quantity,
-        newQuantity: item.quantity,
+        newQuantity: quantityAfterCheckout,
         reason: 'Checkout',
         performedBy: memberId,
         date: Timestamp.now(),
@@ -806,6 +806,10 @@ export class InventoryService {
       if (!item) {
         throw new Error('Item not found');
       }
+      if (item.status !== 'Checked Out') {
+        throw new Error('Item is not currently checked out — cannot check in');
+      }
+      const quantityAfterCheckin = item.quantity + 1;
       const batch = writeBatch(db);
       const docRef = doc(db, COLLECTIONS.INVENTORY, itemId);
       batch.update(docRef, {
@@ -814,6 +818,7 @@ export class InventoryService {
         checkedOutDate: deleteField(),
         expectedReturnDate: deleteField(),
         returnedDate: new Date().toISOString(),
+        quantity: increment(1),
         updatedAt: Timestamp.now(),
       });
       const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
@@ -823,7 +828,7 @@ export class InventoryService {
         type: 'In',
         quantity: 1,
         previousQuantity: item.quantity,
-        newQuantity: item.quantity,
+        newQuantity: quantityAfterCheckin,
         reason: 'Checkin',
         performedBy: (item as any).checkedOutTo || 'unknown',
         date: Timestamp.now(),
@@ -886,11 +891,29 @@ export class InventoryService {
       () => { console.log(`[DEV MODE] Completing maintenance ${scheduleId} with notes:`, notes); },
       async () => {
     try {
-      await this.updateMaintenanceSchedule(scheduleId, {
+      const scheduleRef = doc(db, COLLECTIONS.MAINTENANCE_SCHEDULES, scheduleId);
+      const scheduleSnap = await getDoc(scheduleRef);
+      if (!scheduleSnap.exists()) {
+        throw new Error(`Maintenance schedule ${scheduleId} not found`);
+      }
+      const schedule = scheduleSnap.data() as MaintenanceSchedule;
+      const now = Timestamp.now();
+      const completedDate = new Date().toISOString();
+
+      const batch = writeBatch(db);
+      batch.update(scheduleRef, {
         status: 'Completed',
-        completedDate: new Date().toISOString(),
-        notes
+        completedDate,
+        notes: notes ?? deleteField(),
+        updatedAt: now,
       });
+      // Sync lastCheckedAt on the inventory item so it reflects the latest maintenance
+      const itemRef = doc(db, COLLECTIONS.INVENTORY, schedule.itemId);
+      batch.update(itemRef, {
+        lastCheckedAt: completedDate,
+        updatedAt: now,
+      });
+      await batch.commit();
     } catch (error) {
       console.error('Error completing maintenance:', error);
       throw error;
@@ -1079,12 +1102,13 @@ export class InventoryService {
         const item = await this.getItemById(details.itemId);
         if (item) {
           const variants = [...(item.variants || [])];
+          // Net quantity delta for this item (replaces old movement with new one)
+          const netDelta = newSignedQty - movement.quantity;
           if (sameVariant) {
-            const netChange = newSignedQty - movement.quantity;
-            if (netChange !== 0) {
+            if (netDelta !== 0) {
               const vi = variants.findIndex(v => v.size === details.variantSize);
-              if (vi > -1) variants[vi].quantity += netChange;
-              else variants.push({ size: details.variantSize, quantity: netChange });
+              if (vi > -1) variants[vi].quantity += netDelta;
+              else variants.push({ size: details.variantSize, quantity: netDelta });
             }
           } else {
             const oldVi = variants.findIndex(v => v.size === (movement.variant || ''));
@@ -1094,14 +1118,13 @@ export class InventoryService {
             if (newVi > -1) variants[newVi].quantity += newSignedQty;
             else variants.push({ size: details.variantSize, quantity: newSignedQty });
           }
-          const newTotalQuantity = variants.reduce((sum, v) => sum + v.quantity, 0);
-          const inventoryChanged = !sameVariant || (newSignedQty - movement.quantity) !== 0;
+          const inventoryChanged = !sameVariant || netDelta !== 0;
           if (inventoryChanged) {
             const itemRef = doc(db, COLLECTIONS.INVENTORY, details.itemId);
+            // Use increment() for quantity to avoid read-modify-write race; update variants array as-is
             batch.update(itemRef, {
               variants,
-              quantity: newTotalQuantity,
-              status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
+              quantity: increment(netDelta),
               updatedAt: Timestamp.now(),
             });
           }
@@ -1112,8 +1135,6 @@ export class InventoryService {
             quantity: newSignedQty,
             type: details.operation === 'increment' ? 'In' : 'Out',
             reason: details.operation === 'increment' ? 'Restock' : 'Sale',
-            newQuantity: newTotalQuantity,
-            previousQuantity: newTotalQuantity - newSignedQty,
             updatedAt: Timestamp.now(),
           });
         }
@@ -1127,12 +1148,11 @@ export class InventoryService {
           const oldVi = oldVariants.findIndex(v => v.size === (movement.variant || ''));
           if (oldVi > -1) oldVariants[oldVi].quantity += -movement.quantity;
           else oldVariants.push({ size: movement.variant || '', quantity: -movement.quantity });
-          const oldNewTotal = oldVariants.reduce((sum, v) => sum + v.quantity, 0);
           const oldItemRef = doc(db, COLLECTIONS.INVENTORY, movement.itemId);
+          // Use increment() to atomically reverse the old movement quantity
           batch.update(oldItemRef, {
             variants: oldVariants,
-            quantity: oldNewTotal,
-            status: oldNewTotal === 0 ? 'Out of Stock' : (oldNewTotal <= (oldItem.minQuantity || 0) ? 'Low Stock' : 'Available'),
+            quantity: increment(-movement.quantity),
             updatedAt: Timestamp.now(),
           });
         }
@@ -1141,12 +1161,11 @@ export class InventoryService {
           const newVi = newVariants.findIndex(v => v.size === details.variantSize);
           if (newVi > -1) newVariants[newVi].quantity += newSignedQty;
           else newVariants.push({ size: details.variantSize, quantity: newSignedQty });
-          const newTotalQuantity = newVariants.reduce((sum, v) => sum + v.quantity, 0);
           const newItemRef = doc(db, COLLECTIONS.INVENTORY, details.itemId);
+          // Use increment() to atomically apply the new movement quantity
           batch.update(newItemRef, {
             variants: newVariants,
-            quantity: newTotalQuantity,
-            status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (newItem.minQuantity || 0) ? 'Low Stock' : 'Available'),
+            quantity: increment(newSignedQty),
             updatedAt: Timestamp.now(),
           });
           batch.update(movementDoc.ref, {
@@ -1156,8 +1175,6 @@ export class InventoryService {
             quantity: newSignedQty,
             type: details.operation === 'increment' ? 'In' : 'Out',
             reason: details.operation === 'increment' ? 'Restock' : 'Sale',
-            newQuantity: newTotalQuantity,
-            previousQuantity: newTotalQuantity - newSignedQty,
             updatedAt: Timestamp.now(),
           });
         }

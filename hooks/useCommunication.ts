@@ -74,8 +74,15 @@ export const useCommunication = () => {
   };
 
   const deleteNotification = useCallback(async (notificationId: string) => {
-    await CommunicationService.deleteNotification(notificationId);
-  }, []);
+    try {
+      await CommunicationService.deleteNotification(notificationId);
+      await reloadNotifications();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete notification';
+      showToast(errorMessage, 'error');
+      throw err;
+    }
+  }, [reloadNotifications, showToast]);
 
   return {
     posts,

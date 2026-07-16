@@ -104,6 +104,7 @@ export class MembersService {
   static invalidateMembersCache(): void {
     apiCache.delete(CACHE_KEY_ALL_MEMBERS);
     apiCache.deleteByPrefix('members:lo:');
+    apiCache.deleteByPrefix('members:byRole:');
   }
 
   /** Get all members, optionally filtered by loId (for multi-LO). */
@@ -796,6 +797,23 @@ export class MembersService {
         await this.commitWithRetry(cleanupBatch);
       }
 
+      // Cascade: soft-cancel eventRegistrations and open paymentRequests (E5 fix)
+      const [regSnap, prSnap] = await Promise.all([
+        getDocs(query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('memberId', '==', memberId))),
+        getDocs(query(collection(db, COLLECTIONS.PAYMENT_REQUESTS), where('memberId', '==', memberId), where('status', 'in', ['pending', 'submitted', 'approved']))),
+      ]);
+      if (!regSnap.empty || !prSnap.empty) {
+        const cascadeOps = [
+          ...regSnap.docs.map(d => ({ ref: d.ref, data: { status: 'cancelled', updatedAt: Timestamp.now() } })),
+          ...prSnap.docs.map(d => ({ ref: d.ref, data: { status: 'memberDeleted', updatedAt: Timestamp.now() } })),
+        ];
+        for (let i = 0; i < cascadeOps.length; i += 400) {
+          const cascadeBatch = writeBatch(db);
+          cascadeOps.slice(i, i + 400).forEach(({ ref, data }) => cascadeBatch.update(ref, data));
+          await this.commitWithRetry(cascadeBatch);
+        }
+      }
+
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.deleteMember');
       this.invalidateMembersCache();
     } catch (error) {
@@ -825,6 +843,10 @@ export class MembersService {
 
   // Get members by role
   static async getMembersByRole(role: UserRole): Promise<Member[]> {
+    const cacheKey = `members:byRole:${role}`;
+    const cached = apiCache.get<Member[]>(cacheKey);
+    if (cached) return cached;
+
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
@@ -832,10 +854,12 @@ export class MembersService {
       );
 
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+      const results = snapshot.docs.map(doc => ({
         ...(doc.data() as any),
         id: doc.id,
       } as Member));
+      apiCache.set(cacheKey, results, 300000);
+      return results;
     } catch (error) {
       console.error('Error fetching members by role:', error);
       throw error;
@@ -1006,25 +1030,34 @@ export class MembersService {
       if ('mentorId' in updates) {
         throw new Error('Use assignMentor() to change mentorId — batchUpdateMembers does not sync menteeIds on mentor documents.');
       }
+      // Base normalization used for display-field detection and display sync
       const normalized = this.normalizeMemberData(updates as Record<string, any>);
       const now = Timestamp.now();
 
-      // If introducer is changing, snapshot old values before writing so we can
-      // recalculate both old and new introducers' stats after the batch (M2 fix).
+      // Fetch all current member docs for:
+      //   (a) per-member normalization to preserve existing nested fields (E3 fix), and
+      //   (b) introducer tracking for stats recalculation (M2 fix).
       const introducerChanging = 'introducer' in normalized;
       const oldIntroducerMap = new Map<string, string | undefined>();
-      if (introducerChanging) {
-        const snaps = await Promise.all(memberIds.map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id))));
-        snaps.forEach((snap, i) => {
-          if (snap.exists()) oldIntroducerMap.set(memberIds[i], (snap.data() as any).introducer as string | undefined);
-        });
-      }
+      const existingSnaps = await Promise.all(memberIds.map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id))));
+      const existingByIds = new Map<string, Member>();
+      existingSnaps.forEach((snap, i) => {
+        if (snap.exists()) {
+          existingByIds.set(memberIds[i], { ...snap.data(), id: memberIds[i] } as Member);
+          if (introducerChanging) {
+            oldIntroducerMap.set(memberIds[i], (snap.data() as any).introducer as string | undefined);
+          }
+        }
+      });
 
       // Firestore writeBatch limit is 500; flush every 400 to stay safe
       for (let i = 0; i < memberIds.length; i += 400) {
         const batch = writeBatch(db);
         memberIds.slice(i, i + 400).forEach(id => {
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...normalized, updatedAt: now });
+          const existing = existingByIds.get(id) ?? null;
+          // Normalize per-member so existing nested fields (socials, emergency, etc.) are preserved (E3 fix)
+          const perMemberNormalized = this.normalizeMemberData(updates as Record<string, any>, existing);
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, updatedAt: now });
         });
         await this.commitWithRetry(batch);
       }
@@ -1152,6 +1185,32 @@ export class MembersService {
           const cleanBatch = writeBatch(db);
           sideCleanupOps.slice(i, i + 400).forEach(d => cleanBatch.delete(d.ref));
           await this.commitWithRetry(cleanBatch);
+        }
+      }
+
+      // Cascade: soft-cancel eventRegistrations and open paymentRequests for all deleted members (E5 fix)
+      // Firestore 'in' operator supports up to 30 values; chunk accordingly.
+      const chunkSize = 30;
+      const allRegDocs: any[] = [];
+      const allPrDocs: any[] = [];
+      for (let i = 0; i < memberIds.length; i += chunkSize) {
+        const chunk = memberIds.slice(i, i + chunkSize);
+        const [chunkRegs, chunkPrs] = await Promise.all([
+          getDocs(query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('memberId', 'in', chunk))),
+          getDocs(query(collection(db, COLLECTIONS.PAYMENT_REQUESTS), where('memberId', 'in', chunk), where('status', 'in', ['pending', 'submitted', 'approved']))),
+        ]);
+        allRegDocs.push(...chunkRegs.docs);
+        allPrDocs.push(...chunkPrs.docs);
+      }
+      if (allRegDocs.length > 0 || allPrDocs.length > 0) {
+        const cascadeOps = [
+          ...allRegDocs.map((d: any) => ({ ref: d.ref, data: { status: 'cancelled', updatedAt: now } })),
+          ...allPrDocs.map((d: any) => ({ ref: d.ref, data: { status: 'memberDeleted', updatedAt: now } })),
+        ];
+        for (let i = 0; i < cascadeOps.length; i += 400) {
+          const cascadeBatch = writeBatch(db);
+          cascadeOps.slice(i, i + 400).forEach(({ ref, data }) => cascadeBatch.update(ref, data));
+          await this.commitWithRetry(cascadeBatch);
         }
       }
 
@@ -1424,8 +1483,12 @@ export class MembersService {
         const nextType = applyType(memberWorking);
         if (!nextType) continue;
 
+        // Also sync role so membershipType and role never diverge (E4 fix)
+        const nextRole = roleForMembershipType(nextType, memberWorking.role as UserRole);
+        const roleChanged = nextRole !== (memberWorking.role as UserRole);
         batch.update(doc(db, COLLECTIONS.MEMBERS, member.id), {
           membershipType: nextType,
+          ...(roleChanged ? { role: nextRole } : {}),
           updatedAt: Timestamp.now(),
         });
         batchIds.push(member.id);

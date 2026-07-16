@@ -341,32 +341,7 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
   const handleDeleteTransaction = async (transactionId: string) => {
     if (!confirm('Are you sure you want to delete this transaction?')) return;
     try {
-      // Unlink this transaction from any bank transactions
-      const relatedBankTxs = bankTransactions.filter(btx => {
-        const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-        return btxLinkedIds.includes(transactionId);
-      });
-
-      if (relatedBankTxs.length > 0) {
-        await Promise.all(relatedBankTxs.map(btx => {
-          const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-          const newLinkedIds = btxLinkedIds.filter((id: string) => id !== transactionId);
-          const updates: any = {
-            projectTransactionIds: newLinkedIds,
-            projectTransactionId: newLinkedIds[0] || null,
-            status: newLinkedIds.length > 0 ? 'Reconciled' : 'Cleared'
-          };
-          if (newLinkedIds.length === 0) {
-            updates.purpose = '';
-          }
-          if ((btx as any).isSplitChild) {
-            return FinanceService.updateTransactionSplit(btx.id, updates);
-          } else {
-            return FinanceService.updateTransaction(btx.id, updates);
-          }
-        }));
-      }
-
+      // deleteProjectTransaction handles all bank-transaction reference cleanup internally
       await FinanceService.deleteProjectTransaction(transactionId);
       showToast('Transaction deleted successfully', 'success');
       loadTransactions();
@@ -384,33 +359,11 @@ export const ProjectFinancialAccount: React.FC<ProjectFinancialAccountProps> = (
     try {
       setLoadingTransactions(true);
 
-      // Unlink any bank transactions tied to these project transactions
-      const relatedBankTxs = bankTransactions.filter(btx => {
-        const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-        return btxLinkedIds.some(id => selectedProjectTxIds.includes(id));
-      });
-
-      if (relatedBankTxs.length > 0) {
-        await Promise.all(relatedBankTxs.map(btx => {
-          const btxLinkedIds = (btx as any).projectTransactionIds || ((btx as any).projectTransactionId ? [(btx as any).projectTransactionId] : []);
-          const newLinkedIds = btxLinkedIds.filter((id: string) => !selectedProjectTxIds.includes(id));
-          const updates: any = {
-            projectTransactionIds: newLinkedIds,
-            projectTransactionId: newLinkedIds[0] || null,
-            status: newLinkedIds.length > 0 ? 'Reconciled' : 'Cleared'
-          };
-          if (newLinkedIds.length === 0) {
-            updates.purpose = '';
-          }
-          if ((btx as any).isSplitChild) {
-            return FinanceService.updateTransactionSplit(btx.id, updates);
-          } else {
-            return FinanceService.updateTransaction(btx.id, updates);
-          }
-        }));
+      // Delete sequentially so each deleteProjectTransaction handles its own
+      // bank-transaction reference cleanup before the next one runs.
+      for (const id of selectedProjectTxIds) {
+        await FinanceService.deleteProjectTransaction(id);
       }
-
-      await Promise.all(selectedProjectTxIds.map(id => FinanceService.deleteProjectTransaction(id)));
 
       showToast(`Successfully deleted ${selectedProjectTxIds.length} transactions`, 'success');
       setSelectedProjectTxIds([]);

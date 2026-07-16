@@ -499,14 +499,21 @@ export class ReconciliationService {
           }
         }
 
-        // Update reverse index on project transactions
-        for (const alloc of match.allocations) {
-          await this.updateProjectTxMatchStatus(
-            alloc.projectTxId, match.bankTxId, alloc.amount, bankTransactions, projectTransactions
-          );
-        }
-
         summary.matched++;
+
+        // Update reverse index on project transactions.
+        // E3: errors here are captured in summary.errors (not swallowed) so the caller knows
+        // which project transaction reverse-index updates failed and can surface them to finance.
+        for (const alloc of match.allocations) {
+          try {
+            await this.updateProjectTxMatchStatus(
+              alloc.projectTxId, match.bankTxId, alloc.amount, bankTransactions, projectTransactions
+            );
+          } catch (idxErr) {
+            const msg = idxErr instanceof Error ? idxErr.message : String(idxErr);
+            summary.errors.push(`ProjectTx ${alloc.projectTxId} reverse index update failed (Bank Tx ${match.bankTxId}): ${msg}`);
+          }
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         summary.errors.push(`Bank Tx ${match.bankTxId}: ${msg}`);
@@ -776,11 +783,9 @@ export class ReconciliationService {
       updates.date = bankDate;
     }
 
-    try {
-      await FinanceService.updateProjectTransaction(projectTxId, updates);
-    } catch {
-      // Silently skip if project tx update fails (e.g. in dev mode)
-    }
+    // E3: let the error propagate — the caller (executeAutoMatch) catches it per-allocation
+    // and records it in summary.errors so the caller knows which updates failed.
+    await FinanceService.updateProjectTransaction(projectTxId, updates);
   }
 
   /**

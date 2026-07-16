@@ -501,14 +501,18 @@ export class EventsService {
               throw new Error('Cannot mark attendance for a cancelled registration');
             }
             const at = (checkInTime ?? new Date()).toISOString();
-            await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: at });
+            const now = Timestamp.now();
+            // E3 fix: merge registration status update and attendanceList update into a single
+            // writeBatch so both succeed or both fail together — no half-checked-in state.
+            const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id);
+            const batch = writeBatch(db);
+            batch.update(regRef, { status: 'checked_in', checkedInAt: at, updatedAt: now });
+            batch.update(eventRef, { attendanceList: arrayUnion(memberId), updatedAt: now });
+            await batch.commit();
+          } else {
+            // No registration doc — still sync the attendanceList as a best-effort
+            await updateDoc(eventRef, { attendanceList: arrayUnion(memberId), updatedAt: Timestamp.now() });
           }
-          // FIX E2: sync memberId (string) into events.attendanceList so the field
-          // stays consistent with eventRegistrations status='checked_in'.
-          await updateDoc(eventRef, {
-            attendanceList: arrayUnion(memberId),
-            updatedAt: Timestamp.now(),
-          });
 
           // E-3: PointsService.awardEventAttendancePoints removed — the Cloud Function
           // onEventRegistrationUpdate (functions/gamificationLogic.ts) fires on checked_in status
@@ -542,13 +546,49 @@ export class EventsService {
             if (reg.status !== 'checked_in') {
               throw new Error('Member is not currently checked in');
             }
-            await EventRegistrationService.updateStatus(reg.id, 'registered', {});
+            // E9/atomic fix: merge registration status revert and attendanceList removal
+            // into one writeBatch so both writes succeed or fail together.
+            const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id);
+            const now = Timestamp.now();
+            const batch = writeBatch(db);
+            batch.update(regRef, { status: 'registered', checkedInAt: null, updatedAt: now });
+            batch.update(eventRef, { attendanceList: arrayRemove(memberId), updatedAt: now });
+            await batch.commit();
+          } else {
+            await updateDoc(eventRef, { attendanceList: arrayRemove(memberId), updatedAt: Timestamp.now() });
           }
-          // FIX E3: remove memberId from events.attendanceList to match reverted status
-          await updateDoc(eventRef, {
-            attendanceList: arrayRemove(memberId),
-            updatedAt: Timestamp.now(),
-          });
+
+          // E7 fix: attempt to reverse attendance points that were awarded at check-in.
+          // The Cloud Function awards points on checked_in; we query and negate them here.
+          try {
+            const { PointsService } = await import('./pointsService');
+            const pointSnap = await getDocs(
+              query(
+                collection(db, COLLECTIONS.POINTS),
+                where('memberId', '==', memberId),
+                where('relatedEntityId', '==', eventId)
+              )
+            );
+            const total = pointSnap.docs.reduce(
+              (sum, d) => sum + (d.data().amount ?? d.data().points ?? 0),
+              0
+            );
+            if (total > 0) {
+              await PointsService.awardPoints(
+                memberId,
+                -total,
+                'EVENT_ATTENDANCE',
+                'Reversed: attendance undone',
+                eventId,
+                'event'
+              );
+            }
+          } catch (pointsErr) {
+            console.warn(
+              '[EventsService.undoAttendance] Could not reverse attendance points for memberId:',
+              memberId, 'eventId:', eventId, pointsErr
+            );
+          }
 
           const { MembersService } = await import('./membersService');
           MembersService.recalculateAttendance(memberId).catch(console.error);

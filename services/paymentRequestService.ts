@@ -406,6 +406,18 @@ export class PaymentRequestService {
           updatedAt: Timestamp.now(),
         });
         invalidateFinanceCache();
+        // E6: notify applicant that the confirmed payment was reversed so they are not left in the dark.
+        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        if (snap.exists()) {
+          const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
+          if (pr.applicantId) {
+            await this._writeNotification(
+              pr.applicantId,
+              'Payment Reversed',
+              `Your payment request ${pr.referenceNumber} payment has been reversed — please contact the treasurer.`
+            );
+          }
+        }
       }
     );
   }
@@ -418,17 +430,28 @@ export class PaymentRequestService {
     return withDevMode(
       async () => {
         const idx = devPaymentRequests.findIndex((p) => p.id === id);
-        if (idx >= 0) {
-          const now = new Date().toISOString();
-          devPaymentRequests = [...devPaymentRequests];
-          const pr = { ...devPaymentRequests[idx], status: 'submitted' as const, rejectionReason: null, reviewedBy: null, reviewedAt: null, updatedAt: now, updatedBy };
-          devPaymentRequests[idx] = pr;
-          // Notify approvers (NN)
-          await this._notifyApprovers(pr);
+        if (idx < 0) throw new Error('Payment request not found');
+        // E7: only rejected PRs may be resubmitted.
+        if (devPaymentRequests[idx].status !== 'rejected') {
+          throw new Error('Only rejected payment requests can be resubmitted');
         }
+        const now = new Date().toISOString();
+        devPaymentRequests = [...devPaymentRequests];
+        const pr = { ...devPaymentRequests[idx], status: 'submitted' as const, rejectionReason: null, reviewedBy: null, reviewedAt: null, updatedAt: now, updatedBy };
+        devPaymentRequests[idx] = pr;
+        // Notify approvers (NN)
+        await this._notifyApprovers(pr);
       },
       async () => {
-        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
+        // E7: fetch current status before resubmitting to guard against invalid transitions.
+        const ref = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
+        const snap0 = await getDoc(ref);
+        if (!snap0.exists()) throw new Error('Payment request not found');
+        const currentStatus = (snap0.data() as PaymentRequest).status;
+        if (currentStatus !== 'rejected') {
+          throw new Error('Only rejected payment requests can be resubmitted');
+        }
+        await updateDoc(ref, {
           status: 'submitted',
           rejectionReason: null,
           reviewedBy: null,
@@ -437,7 +460,7 @@ export class PaymentRequestService {
           updatedBy,
         });
         invalidateFinanceCache();
-        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        const snap = await getDoc(ref);
         if (snap.exists()) await this._notifyApprovers({ id: snap.id, ...snap.data() } as PaymentRequest);
       }
     );
@@ -530,19 +553,39 @@ export class PaymentRequestService {
           updatedAt: Timestamp.now(),
           updatedBy: updatedBy ?? null,
         });
-        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
-        invalidateFinanceCache();
 
-        // If amount changed and PR is already approved, sync the linked expense transaction (情景 R)
-        if ((updates.amount !== undefined || updates.totalAmount !== undefined)) {
+        // E5: if amount changed and PR is approved, merge PR update + expense tx amount update
+        // into a single writeBatch so both sides stay in sync even if the process crashes between them.
+        const amountChanged = updates.amount !== undefined || updates.totalAmount !== undefined;
+        if (amountChanged) {
           const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
           if (snap.exists()) {
             const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
             if (pr.status === 'approved') {
-              await this._syncExpenseTransactionAmount(pr);
+              const linkedQ = query(
+                collection(db, COLLECTIONS.TRANSACTIONS),
+                where('paymentRequestId', '==', id),
+                where('type', '==', 'Expense')
+              );
+              const linkedSnap = await getDocs(linkedQ);
+              if (!linkedSnap.empty) {
+                const newAmount = (updates.totalAmount ?? updates.amount) as number;
+                const batch = writeBatch(db);
+                batch.update(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
+                for (const txDoc of linkedSnap.docs) {
+                  batch.update(txDoc.ref, { amount: newAmount, updatedAt: Timestamp.now() });
+                }
+                await batch.commit();
+                invalidateFinanceCache();
+                return;
+              }
             }
           }
         }
+
+        // Default path: no linked expense tx to sync, just update the PR.
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
+        invalidateFinanceCache();
       }
     );
   }

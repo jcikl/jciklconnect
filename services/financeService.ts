@@ -31,6 +31,7 @@ import {
   computeMembershipTypeFromMember,
   roleForMembershipType,
 } from './membershipConfigService';
+import { MembersService } from './membersService';
 import {
   buildMembershipProjectId,
   buildCategoryCleanupUpdates,
@@ -43,6 +44,9 @@ const TX_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 /** Invalidate all finance caches (call after any write to transactions/bankAccounts). */
 export function invalidateFinanceCache(): void {
   apiCache.deleteByPrefix(FINANCE_CACHE_PREFIX);
+  // E5 (splits): also clear year-keyed split cache entries that share the same prefix
+  // (they are covered by the prefix above, but kept explicit for clarity)
+  apiCache.deleteByPrefix('finance:splits:');
 }
 
 
@@ -467,15 +471,20 @@ export class FinanceService {
           };
 
           const cleanTransaction = removeUndefined(newTransaction);
-          const docRef = await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), cleanTransaction);
 
-          // Sync with inventory if linked
-          await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
+          // Sync with inventory BEFORE creating the transaction so we can abort if it fails
+          await this.syncTransactionWithInventory({ ...transactionData, id: '' });
 
-          // Sync with Member Membership if category is Membership
+          // Sync with Member Membership BEFORE creating the transaction (best-effort: non-blocking)
           if (transactionData.category === 'Membership' && transactionData.memberId) {
-            await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
+            try {
+              await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
+            } catch (syncErr) {
+              console.error('createTransaction: membership pre-sync failed (non-blocking):', syncErr);
+            }
           }
+
+          const docRef = await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), cleanTransaction);
 
           invalidateFinanceCache();
           return docRef.id;
@@ -1652,30 +1661,6 @@ export class FinanceService {
             }
           }
 
-          // Delete child splits before deleting the parent to avoid orphaned split records
-          const childSplits = await this.getTransactionSplits(transactionId);
-          if (childSplits.length > 0) {
-            const splitBatch = writeBatch(db);
-            for (const split of childSplits) {
-              splitBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
-            }
-            await splitBatch.commit();
-            // Clean up side-effects for each deleted split
-            const { InventoryService } = await import('./inventoryService');
-            for (const split of childSplits) {
-              if (split.inventoryLinkId && split.inventoryQuantity) {
-                await InventoryService.deleteStockMovementForRef(split.id).catch(err =>
-                  console.warn('[deleteTransaction] Could not clean up split inventory:', err)
-                );
-              }
-              if (split.category === 'Membership' && split.memberId && split.year) {
-                await this.syncMemberMembership(split.memberId, `${split.year} membership`).catch(err =>
-                  console.warn('[deleteTransaction] Could not sync membership for split:', err)
-                );
-              }
-            }
-          }
-
           if (transaction?.projectTransactionIds?.length) {
             const ptBatch = writeBatch(db);
             for (const ptId of transaction.projectTransactionIds) {
@@ -1691,7 +1676,35 @@ export class FinanceService {
             await PaymentRequestService.revertPaid(transaction.paymentRequestId);
           }
 
-          await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+          // Delete child splits AND the parent transaction atomically to avoid orphaned records.
+          // E3: both the splits and the main doc go into the same writeBatch so they succeed
+          // or fail together. If there are no splits, fall back to a plain deleteDoc.
+          const childSplits = await this.getTransactionSplits(transactionId);
+          if (childSplits.length > 0) {
+            const splitBatch = writeBatch(db);
+            for (const split of childSplits) {
+              splitBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
+            }
+            splitBatch.delete(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+            await splitBatch.commit();
+            // Clean up side-effects for each deleted split (after the batch succeeds)
+            const { InventoryService } = await import('./inventoryService');
+            for (const split of childSplits) {
+              if (split.inventoryLinkId && split.inventoryQuantity) {
+                await InventoryService.deleteStockMovementForRef(split.id).catch(err =>
+                  console.warn('[deleteTransaction] Could not clean up split inventory:', err)
+                );
+              }
+              if (split.category === 'Membership' && split.memberId && split.year) {
+                await this.syncMemberMembership(split.memberId, `${split.year} membership`).catch(err =>
+                  console.warn('[deleteTransaction] Could not sync membership for split:', err)
+                );
+              }
+            }
+          } else {
+            await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+          }
+
           invalidateFinanceCache();
 
           // Sync with Member Membership if category is Membership
@@ -1760,10 +1773,6 @@ export class FinanceService {
       // Fetch transaction first to sync inventory if needed
       // Note: project transactions might be in either collection
       let transaction = await this.getTransactionById(transactionId);
-
-      // E2: deleteDoc FIRST so that if it fails (e.g. doc not found), no cascade
-      // cleanup has run yet and there is nothing to undo.
-      await deleteDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId));
 
       if (transaction && transaction.inventoryLinkId && transaction.inventoryQuantity) {
         // Remove stock movement if exists
@@ -1852,18 +1861,19 @@ export class FinanceService {
         }
       }
 
+      // E3: delete the project transaction document AFTER all reference cleanup has succeeded
+      const projectTrxRef = doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId);
+      const projectTrxSnap = await getDoc(projectTrxRef);
+      if (!projectTrxSnap.exists()) {
+        throw new Error('Project transaction not found: ' + transactionId);
+      }
+      await deleteDoc(projectTrxRef);
+
       // E1: invalidate cache after successful delete + cascade
       invalidateFinanceCache();
     } catch (error) {
       console.error('Error deleting project transaction:', error);
-
-      // If error (e.g. not found in projectTrx), try main collection for backward compatibility
-      try {
-        await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
-        invalidateFinanceCache();
-      } catch (innerError) {
-        throw error;
-      }
+      throw error;
     }
       }
     );
@@ -2051,6 +2061,8 @@ export class FinanceService {
         }
 
         await updateDoc(memberRef, zeroTxUpdates);
+        // E4: invalidate members cache after zero-transaction reset
+        MembersService.invalidateMembersCache();
         return;
       }
 
@@ -2095,10 +2107,14 @@ export class FinanceService {
       }
 
       await updateDoc(memberRef, updates);
+      // E4: invalidate members cache so UI reflects the updated dues status immediately
+      MembersService.invalidateMembersCache();
 
       console.log(`Synced membership for member ${memberId} year ${year}. Status: ${status}, Amount: ${totalAmount}`);
     } catch (error) {
       console.error('Error syncing member membership:', error);
+      // E5: re-throw so callers know the sync failed
+      throw error;
     }
       }
     );
@@ -3206,6 +3222,8 @@ export class FinanceService {
               const splits = await this.getTransactionSplits(transaction.id);
               for (const split of splits) {
                 markBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
+                  // E4: persist prevStatus so deleteReconciliation can restore the correct status
+                  prevStatus: split.status,
                   status: 'Reconciled',
                   reconciledAt: Timestamp.now(),
                   reconciledBy,
@@ -3281,8 +3299,8 @@ export class FinanceService {
       },
       async () => {
         try {
-          await deleteDoc(doc(db, COLLECTIONS.RECONCILIATIONS, reconciliationId));
-
+          // E1: roll back transaction statuses FIRST before deleting the reconciliation doc.
+          // If rollback fails, the reconciliation doc remains and the user can retry safely.
           const txSnap = await getDocs(
             query(
               collection(db, COLLECTIONS.TRANSACTIONS),
@@ -3339,8 +3357,12 @@ export class FinanceService {
               }
             }
 
+            // Commit all rollbacks. If this throws, we abort before deleting the reconciliation doc.
             await flushBatch();
           }
+
+          // All transaction statuses restored — now safe to delete the reconciliation record.
+          await deleteDoc(doc(db, COLLECTIONS.RECONCILIATIONS, reconciliationId));
 
           invalidateFinanceCache();
         } catch (error) {
@@ -4269,7 +4291,9 @@ export class FinanceService {
     return withDevMode(
       () => [],
       async () => {
-        const cacheKey = `${FINANCE_CACHE_PREFIX}alerts:unresolved`;
+        // E2: use a distinct cache key per filter so getFinanceAlerts(true) and
+        // getFinanceAlerts(false) don't share the same cached result.
+        const cacheKey = `${FINANCE_CACHE_PREFIX}alerts:${onlyUnresolved ? 'unresolved' : 'all'}`;
         return apiCache.getOrSet<FinanceAlert[]>(
           cacheKey,
           async () => {
@@ -4304,7 +4328,13 @@ export class FinanceService {
     return withDevMode(
       () => {},
       async () => {
-        await updateDoc(doc(db, COLLECTIONS.FINANCE_ALERTS, alertId), {
+        // E3: pre-check to prevent double-resolution overwriting the original resolvedBy
+        const alertRef = doc(db, COLLECTIONS.FINANCE_ALERTS, alertId);
+        const alertSnap = await getDoc(alertRef);
+        if (!alertSnap.exists()) throw new Error('Finance alert not found');
+        if (alertSnap.data().resolved === true) throw new Error('Finance alert already resolved');
+
+        await updateDoc(alertRef, {
           resolved: true,
           resolvedAt: Timestamp.now(),
           resolvedBy,

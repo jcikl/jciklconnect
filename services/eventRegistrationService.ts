@@ -6,11 +6,14 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  writeBatch,
   query,
   where,
   orderBy,
   limit,
   Timestamp,
+  arrayRemove,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
@@ -24,11 +27,11 @@ export const EventRegistrationService = {
     return withDevMode(
       () => MOCK_REGISTRATIONS.filter((r) => r.eventId === eventId),
       async () => {
-        const q = query(
-          collection(db, COLLECTIONS.EVENT_REGISTRATIONS),
-          where('eventId', '==', eventId),
-          orderBy('createdAt', 'desc')
-        );
+        // E2 fix: filter by loId so multi-LO deployments don't leak cross-LO registrations
+        const constraints = loId
+          ? [where('eventId', '==', eventId), where('loId', '==', loId), orderBy('createdAt', 'desc')]
+          : [where('eventId', '==', eventId), orderBy('createdAt', 'desc')];
+        const q = query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), ...constraints);
         const snapshot = await getDocs(q);
         return snapshot.docs.map((d) => {
           const data = d.data();
@@ -95,11 +98,11 @@ export const EventRegistrationService = {
     return withDevMode(
       () => MOCK_REGISTRATIONS.filter((r) => r.memberId === memberId),
       async () => {
-        const q = query(
-          collection(db, COLLECTIONS.EVENT_REGISTRATIONS),
-          where('memberId', '==', memberId),
-          orderBy('createdAt', 'desc')
-        );
+        // E2 fix: filter by loId so multi-LO deployments don't leak cross-LO registrations
+        const constraints = loId
+          ? [where('memberId', '==', memberId), where('loId', '==', loId), orderBy('createdAt', 'desc')]
+          : [where('memberId', '==', memberId), orderBy('createdAt', 'desc')];
+        const q = query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), ...constraints);
         const snapshot = await getDocs(q);
         return snapshot.docs.map((d) => {
           const data = d.data();
@@ -202,6 +205,14 @@ export const EventRegistrationService = {
       async () => {
         const ref = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);
         const updateData: Record<string, unknown> = { status, updatedAt: Timestamp.now() };
+        // E6 fix: when reactivating a cancelled registration, remove stale cancellation fields
+        // so the document doesn't contradict itself (status=registered but cancelledAt still set).
+        if (status === 'registered') {
+          updateData.cancelledAt = deleteField();
+          updateData.cancelledBy = deleteField();
+          updateData.cancelledByName = deleteField();
+          updateData.cancelledByRole = deleteField();
+        }
         if (options?.paidAt !== undefined) updateData.paidAt = options.paidAt ?? null;
         if (options?.checkedInAt !== undefined) updateData.checkedInAt = options.checkedInAt ?? null;
         if (options?.registeredBy !== undefined) updateData.registeredBy = options.registeredBy;
@@ -212,6 +223,50 @@ export const EventRegistrationService = {
         if (options?.financeTransactionId !== undefined) updateData.financeTransactionId = options.financeTransactionId ?? null;
         if (options?.matchedBankTxId !== undefined) updateData.matchedBankTxId = options.matchedBankTxId;
         await updateDoc(ref, updateData);
+      }
+    );
+  },
+
+  /**
+   * E5 fix: hard-delete a registration with cascade cleanup.
+   * Atomically deletes the registration doc and removes memberId from events.attendanceList.
+   * Returns pointsReversalNeeded=true if the registration was checked_in — caller should
+   * separately reverse attendance points (complex enough to leave to the caller).
+   */
+  async hardDeleteRegistration(
+    registrationId: string
+  ): Promise<{ pointsReversalNeeded: boolean; memberId: string | null; eventId: string | null }> {
+    return withDevMode(
+      () => {
+        const idx = MOCK_REGISTRATIONS.findIndex((r) => r.id === registrationId);
+        if (idx !== -1) MOCK_REGISTRATIONS.splice(idx, 1);
+        return { pointsReversalNeeded: false, memberId: null, eventId: null };
+      },
+      async () => {
+        const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);
+        const snap = await getDoc(regRef);
+        if (!snap.exists()) return { pointsReversalNeeded: false, memberId: null, eventId: null };
+
+        const data = snap.data();
+        const memberId: string | null = data.memberId ?? null;
+        const eventId: string | null = data.eventId ?? null;
+        const wasCheckedIn = data.status === 'checked_in';
+
+        const batch = writeBatch(db);
+        batch.delete(regRef);
+        if (eventId && memberId) {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+          batch.update(eventRef, { attendanceList: arrayRemove(memberId) });
+        }
+        await batch.commit();
+
+        if (wasCheckedIn) {
+          console.warn(
+            '[EventRegistrationService.hardDeleteRegistration] Registration was checked_in — ' +
+            'manual points reversal may be needed. memberId:', memberId, 'eventId:', eventId
+          );
+        }
+        return { pointsReversalNeeded: wasCheckedIn, memberId, eventId };
       }
     );
   },

@@ -169,7 +169,16 @@ export class CommunicationService {
       () => { console.log(`[DEV MODE] Simulating deleting notification ${notificationId}`); },
       async () => {
         try {
-          await deleteDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId));
+          const notifRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
+          const notifSnap = await getDoc(notifRef);
+          if (notifSnap.exists()) {
+            const data = notifSnap.data();
+            // isDismissible defaults to true when absent (backward compat)
+            if (data.isDismissible === false) {
+              throw new Error('This notification cannot be deleted');
+            }
+          }
+          await deleteDoc(notifRef);
         } catch (error) {
           console.error('Error deleting notification:', error);
           throw error;
@@ -179,7 +188,7 @@ export class CommunicationService {
   }
 
   // Create notification
-  static async createNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'read'>): Promise<string> {
+  static async createNotification(notificationData: Omit<Notification, 'id' | 'timestamp' | 'read'> & { isDismissible?: boolean }): Promise<string> {
     return withDevMode(
       () => { console.log('[DEV MODE] createNotification:', notificationData); return 'mock-notification-id'; },
       async () => {
@@ -311,7 +320,7 @@ export class CommunicationService {
       sendNotification?: boolean;
     },
     authorId: string
-  ): Promise<{ postId: string; emailsSent: number; notificationsSent: number }> {
+  ): Promise<{ postId: string; emailsSent: number; notificationsSent: number; failedNotifications?: Array<{ memberId: string; reason: string }> }> {
     return withDevMode(
       () => {
         console.log('[DEV MODE] Would create announcement:', announcementData);
@@ -410,24 +419,26 @@ export class CommunicationService {
             })
           )
         );
-        const failedMemberIds: string[] = [];
+        const failedNotifications: Array<{ memberId: string; reason: string }> = [];
         results.forEach((result, i) => {
           if (result.status === 'fulfilled') {
             notificationsSent++;
           } else {
-            failedMemberIds.push(notifiableMembers[i].id);
-            console.error(`Error sending notification to member ${notifiableMembers[i].id}:`, result.reason);
+            const memberId = notifiableMembers[i].id;
+            const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+            failedNotifications.push({ memberId, reason });
+            console.error(`Error sending notification to member ${memberId}:`, result.reason);
           }
         });
-        if (failedMemberIds.length > 0) {
-          console.error(`Failed to send notifications to members: ${failedMemberIds.join(', ')}`);
+        if (failedNotifications.length > 0) {
+          console.error(`Failed to send notifications to ${failedNotifications.length} member(s).`);
         }
-      }
 
           return {
             postId,
             emailsSent,
             notificationsSent,
+            ...(failedNotifications.length > 0 ? { failedNotifications } : {}),
           };
         } catch (error) {
           console.error('Error creating announcement:', error);

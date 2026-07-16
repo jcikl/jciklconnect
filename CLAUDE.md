@@ -206,18 +206,22 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 
 ### 已分析集合（analyze-collection）
 
+**v3 re-analysis（2026-07-16，修复后残余）— P0×3 P1×47 P2×28 Total×78**
+
 | 集合 | 分析日期 | Service方法数 | CRUD操作数 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 相邻风险集合（修复时需同步检查）|
 |------|----------|--------------|-----------|----------------------|------------|-----------|-------------------------------|
-| `members` | 2026-07-15（v2框架前） | 30 | 20 | 13已修 | 已修 | 部分 | `boardMembers`, `businessDirectory`, `eventRegistrations`, `points` |
-| `transactions` | 2026-07-16 | 39 | 30 | 10（1/4/5）| 4 | 部分 | `transactionSplits`, `projectTrx`, `paymentRequests`, `reconciliations`, `members` |
-| `transactionSplits` | 2026-07-16 | 11 | 9 | 10（0/8/2）| 3 | 部分 | `transactions`, `members`, `paymentRequests` |
-| `projectTrx` | 2026-07-16 | 8 | 10 | 9（0/6/3）| 3 | 部分 | `transactions`, `projects`, `bankAccounts` |
-| `paymentRequests` | 2026-07-16 | 18 | 11 | 7（2/3/2）| 1 | 部分 | `transactions`, `members`, `eventRegistrations`, `notifications` |
-| `eventRegistrations` | 2026-07-16 | 12 | 15 | 12（2/6/4）| 3 | 部分 | `events`, `members`, `points`, `transactions`, `notifications` |
-| `reconciliations` | 2026-07-16 | 11 | 8 | 11（0/7/4）| 2 | 部分 | `transactions`, `bankAccounts`, `members` |
-| `inventoryItems` | 2026-07-16 | 37 | 14 | 13（1/6/6）| 5 | 缺失 | `transactions`, `members`, `notifications`, `financeAlerts` |
-| `notifications` | 2026-07-16 | 19 | 12 | 8（2/4/2）| 2 | 部分 | `members`, `events`, `points`, `workflows` |
-| `financeAlerts` | 2026-07-16 | 2 | 2 | 6（0/3/3）| 0 | 缺失 | `transactions`, `bankAccounts`, `members` |
+| `transactions` | v3 2026-07-16 | 39 | 30 | 9（0/5/4）| 4 | 部分 | `transactionSplits`, `projectTrx`, `paymentRequests`, `reconciliations`, `members` |
+| `transactionSplits` | v3 2026-07-16 | 11 | 9 | 8（1/5/2）| 3 | 部分 | `transactions`, `members`, `paymentRequests` |
+| `members` | v3 2026-07-16 | 22 | 19 | 8（0/6/2）| 2 | 部分 | `boardMembers`, `businessDirectory`, `eventRegistrations`, `points` |
+| `projectTrx` | v3 2026-07-16 | 10 | 10 | 8（0/6/2）| 2 | 部分 | `transactions`, `projects`, `bankAccounts` |
+| `paymentRequests` | v3 2026-07-16 | 18 | 12 | 7（0/4/3）| 3 | 部分 | `transactions`, `members`, `eventRegistrations`, `notifications` |
+| `eventRegistrations` | v3 2026-07-16 | 12 | 11 | 9（0/5/4）| 3 | 部分 | `events`, `members`, `points`, `transactions`, `notifications` |
+| `reconciliations` | v3 2026-07-16 | 11 | 8 | 7（0/4/3）| 2 | 部分 | `transactions`, `bankAccounts`, `members` |
+| `inventoryItems` | v3 2026-07-16 | 37 | 14 | 9（0/5/4）| 3 | 部分 | `transactions`, `members`, `notifications`, `financeAlerts` |
+| `notifications` | v3 2026-07-16 | 12 | 7 | 8（2/4/2）| 2 | 部分 | `members`, `events`, `points`, `workflows` |
+| `financeAlerts` | v3 2026-07-16 | 2 | 3 | 5（0/3/2）| 1 | 缺失 | `transactions`, `bankAccounts`, `members` |
+
+**P0 待修（3条）：** `transactionSplits` E1（allow read loId 字段缺失→跨 LO 数据泄露）；`notifications` E1（allow list resource.data→会员永远看不到自己的通知）；`notifications` E2（_writeNotification type 硬编码→通知静默失败）
 
 ### 已分析集合（collection-deps）
 
