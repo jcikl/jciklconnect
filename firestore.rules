@@ -974,7 +974,9 @@ service cloud.firestore {
     // Finance Alerts: written by server-side (Admin SDK / webhook) for issues requiring manual review.
     // Finance roles can read and mark as resolved; only Admin SDK (no auth) writes them.
     match /finance_alerts/{alertId} {
-      allow read: if canAccessFinance();
+      // FA-6: Board can read individual alerts; only Admin can list full history via SDK
+      allow get: if canAccessFinance();
+      allow list: if isAuthenticated() && isAdmin();
       // FA-1: whitelist only resolution fields; block tampering with message/transactionId
       allow update: if canAccessFinance() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(

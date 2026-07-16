@@ -309,24 +309,42 @@ export class InventoryService {
       // Check for low stock items
       for (const item of items) {
         if (item.quantity <= (item.minQuantity || 0)) {
-          await this.createAlert({
-            itemId: item.id,
-            type: 'Low Stock',
-            severity: item.quantity === 0 ? 'Critical' : 'High',
-            message: `${item.name} is ${item.quantity === 0 ? 'out of stock' : `low (${item.quantity} remaining, minimum: ${item.minQuantity})`}`,
-          });
+          const existingLowStock = await getDocs(query(
+            collection(db, COLLECTIONS.INVENTORY_ALERTS),
+            where('itemId', '==', item.id),
+            where('type', '==', 'Low Stock'),
+            where('acknowledged', '==', false),
+            limit(1)
+          ));
+          if (existingLowStock.empty) {
+            await this.createAlert({
+              itemId: item.id,
+              type: 'Low Stock',
+              severity: item.quantity === 0 ? 'Critical' : 'High',
+              message: `${item.name} is ${item.quantity === 0 ? 'out of stock' : `low (${item.quantity} remaining, minimum: ${item.minQuantity})`}`,
+            });
+          }
         }
 
         // Check for overdue returns (if applicable)
         if (item.status === 'Checked Out' && item.expectedReturnDate) {
           const returnDate = new Date(item.expectedReturnDate);
           if (returnDate < new Date()) {
-            await this.createAlert({
-              itemId: item.id,
-              type: 'Overdue Return',
-              severity: 'Medium',
-              message: `${item.name} is overdue for return (expected: ${item.expectedReturnDate})`,
-            });
+            const existingOverdue = await getDocs(query(
+              collection(db, COLLECTIONS.INVENTORY_ALERTS),
+              where('itemId', '==', item.id),
+              where('type', '==', 'Overdue Return'),
+              where('acknowledged', '==', false),
+              limit(1)
+            ));
+            if (existingOverdue.empty) {
+              await this.createAlert({
+                itemId: item.id,
+                type: 'Overdue Return',
+                severity: 'Medium',
+                message: `${item.name} is overdue for return (expected: ${item.expectedReturnDate})`,
+              });
+            }
           }
         }
       }
@@ -339,12 +357,21 @@ export class InventoryService {
 
         if (daysUntil <= 7 && daysUntil >= -7) { // Within a week (past or future)
           const item = items.find(i => i.id === schedule.itemId);
-          await this.createAlert({
-            itemId: schedule.itemId,
-            type: 'Maintenance Due',
-            severity: daysUntil < -7 ? 'High' : 'Medium',
-            message: `${item?.name || 'Item'} requires ${schedule.type.toLowerCase()} maintenance (${schedule.type})`,
-          });
+          const existingMaint = await getDocs(query(
+            collection(db, COLLECTIONS.INVENTORY_ALERTS),
+            where('itemId', '==', schedule.itemId),
+            where('type', '==', 'Maintenance Due'),
+            where('acknowledged', '==', false),
+            limit(1)
+          ));
+          if (existingMaint.empty) {
+            await this.createAlert({
+              itemId: schedule.itemId,
+              type: 'Maintenance Due',
+              severity: daysUntil < -7 ? 'High' : 'Medium',
+              message: `${item?.name || 'Item'} requires ${schedule.type.toLowerCase()} maintenance (${schedule.type})`,
+            });
+          }
         }
       }
     } catch (error) {
@@ -412,7 +439,7 @@ export class InventoryService {
       const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
       batch.update(itemRef, {
         quantity: newQuantity,
-        status: newQuantity > 0 ? 'Available' : 'Out of Stock',
+        status: newQuantity === 0 ? 'Out of Stock' : (newQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
         purchasePrice: unitCost,
         purchaseDate: new Date().toISOString(),
         lastTransactionId: transactionId,
@@ -466,7 +493,7 @@ export class InventoryService {
       const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
       batch.update(itemRef, {
         quantity: newQuantity,
-        status: newQuantity > 0 ? 'Available' : 'Out of Stock',
+        status: newQuantity === 0 ? 'Out of Stock' : (newQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
         lastSaleDate: new Date().toISOString(),
         lastTransactionId: transactionId,
         lastTransactionDate: Timestamp.now(),
@@ -902,7 +929,7 @@ export class InventoryService {
       batch.update(itemRef, {
         variants,
         quantity: newTotalQuantity,
-        status: newTotalQuantity > 0 ? 'Available' : 'Out of Stock',
+        status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
         updatedAt: Timestamp.now(),
       });
       const movementRef = doc(collection(db, COLLECTIONS.STOCK_MOVEMENTS));
@@ -1017,7 +1044,7 @@ export class InventoryService {
             batch.update(itemRef, {
               variants,
               quantity: newTotalQuantity,
-              status: newTotalQuantity > 0 ? 'Available' : 'Out of Stock',
+              status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
               updatedAt: Timestamp.now(),
             });
           }
@@ -1048,7 +1075,7 @@ export class InventoryService {
           batch.update(oldItemRef, {
             variants: oldVariants,
             quantity: oldNewTotal,
-            status: oldNewTotal > 0 ? 'Available' : 'Out of Stock',
+            status: oldNewTotal === 0 ? 'Out of Stock' : (oldNewTotal <= (oldItem.minQuantity || 0) ? 'Low Stock' : 'Available'),
             updatedAt: Timestamp.now(),
           });
         }
@@ -1062,7 +1089,7 @@ export class InventoryService {
           batch.update(newItemRef, {
             variants: newVariants,
             quantity: newTotalQuantity,
-            status: newTotalQuantity > 0 ? 'Available' : 'Out of Stock',
+            status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (newItem.minQuantity || 0) ? 'Low Stock' : 'Available'),
             updatedAt: Timestamp.now(),
           });
           batch.update(movementDoc.ref, {
@@ -1083,7 +1110,7 @@ export class InventoryService {
 
     } catch (error) {
       console.error('Error updating stock movement:', error);
-      // Don't throw if just a sync issue, but log it
+      throw error;
     }
 });
   }
@@ -1112,7 +1139,7 @@ export class InventoryService {
       await this.updateItem(itemId, {
         variants,
         quantity: newTotalQuantity,
-        status: newTotalQuantity > 0 ? 'Available' : 'Out of Stock',
+        status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
       });
     } catch (e) {
       console.error('Error inside adjustVariantQuantityOnly:', e);
@@ -1228,7 +1255,7 @@ export class InventoryService {
       const itemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
       const itemUpdate: Record<string, unknown> = {
         quantity: newTotal,
-        status: newTotal > 0 ? 'Available' : 'Out of Stock',
+        status: newTotal === 0 ? 'Out of Stock' : (newTotal <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
         updatedAt: Timestamp.now(),
       };
       if (updatedVariants !== undefined) itemUpdate.variants = updatedVariants;

@@ -682,6 +682,10 @@ export class FinanceService {
       }
       const parentTransaction = { id: parentDoc.id, ...parentDoc.data() } as Transaction;
 
+      if (parentTransaction.status === 'Reconciled') {
+        throw new Error('Cannot split a reconciled transaction');
+      }
+
       // Validate split amounts sum to parent amount
       const totalSplitAmount = splits.reduce((sum, split) => sum + split.amount, 0);
       if (Math.abs(totalSplitAmount - parentTransaction.amount) > 0.01) {
@@ -4224,26 +4228,33 @@ export class FinanceService {
     return withDevMode(
       () => [],
       async () => {
-        const q = onlyUnresolved
-          ? query(collection(db, COLLECTIONS.FINANCE_ALERTS), where('resolved', '==', false))
-          : collection(db, COLLECTIONS.FINANCE_ALERTS);
-        const snap = await getDocs(q);
-        return snap.docs.map(d => {
-          const data = d.data();
-          return {
-            id: d.id,
-            type: data.type ?? '',
-            message: data.message ?? '',
-            transactionId: data.transactionId,
-            billCode: data.billCode,
-            eventRegistrationId: data.eventRegistrationId,
-            paymentRequestId: data.paymentRequestId,
-            resolved: data.resolved ?? false,
-            resolvedAt: data.resolvedAt?.toDate?.()?.toISOString() ?? data.resolvedAt,
-            resolvedBy: data.resolvedBy,
-            createdAt: data.createdAt?.toDate?.()?.toISOString() ?? data.createdAt ?? new Date().toISOString(),
-          } as FinanceAlert;
-        });
+        const cacheKey = `${FINANCE_CACHE_PREFIX}alerts:unresolved`;
+        return apiCache.getOrSet<FinanceAlert[]>(
+          cacheKey,
+          async () => {
+            const q = onlyUnresolved
+              ? query(collection(db, COLLECTIONS.FINANCE_ALERTS), where('resolved', '==', false))
+              : collection(db, COLLECTIONS.FINANCE_ALERTS);
+            const snap = await getDocs(q);
+            return snap.docs.map(d => {
+              const data = d.data();
+              return {
+                id: d.id,
+                type: data.type ?? '',
+                message: data.message ?? '',
+                transactionId: data.transactionId,
+                billCode: data.billCode,
+                eventRegistrationId: data.eventRegistrationId,
+                paymentRequestId: data.paymentRequestId,
+                resolved: data.resolved ?? false,
+                resolvedAt: data.resolvedAt?.toDate?.()?.toISOString() ?? data.resolvedAt,
+                resolvedBy: data.resolvedBy,
+                createdAt: data.createdAt?.toDate?.()?.toISOString() ?? data.createdAt ?? new Date().toISOString(),
+              } as FinanceAlert;
+            });
+          },
+          60 * 1000
+        );
       }
     );
   }
@@ -4251,12 +4262,15 @@ export class FinanceService {
   static async resolveFinanceAlert(alertId: string, resolvedBy: string): Promise<void> {
     return withDevMode(
       () => {},
-      () => updateDoc(doc(db, COLLECTIONS.FINANCE_ALERTS, alertId), {
-        resolved: true,
-        resolvedAt: Timestamp.now(),
-        resolvedBy,
-        updatedAt: Timestamp.now(),
-      })
+      async () => {
+        await updateDoc(doc(db, COLLECTIONS.FINANCE_ALERTS, alertId), {
+          resolved: true,
+          resolvedAt: Timestamp.now(),
+          resolvedBy,
+          updatedAt: Timestamp.now(),
+        });
+        invalidateFinanceCache();
+      }
     );
   }
 
