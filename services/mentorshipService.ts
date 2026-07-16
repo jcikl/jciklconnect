@@ -6,6 +6,12 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  writeBatch,
+  arrayUnion,
+  arrayRemove,
+  serverTimestamp,
+  deleteField,
+  increment,
   query,
   where,
   orderBy,
@@ -252,17 +258,22 @@ export class MentorshipService {
 
           const match = { id: matchDoc.id, ...matchDoc.data() } as MentorMatch;
 
-          // Update match status
-          await updateDoc(matchRef, {
+          // P0-A fix: combine match + both member updates in one atomic batch
+          const batch = writeBatch(db);
+          batch.update(matchRef, {
             status: 'active',
-            startDate: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            startDate: serverTimestamp(),
+            updatedAt: serverTimestamp(),
           });
+          batch.update(doc(db, 'members', match.mentorId), {
+            menteeIds: arrayUnion(match.menteeId),
+          });
+          batch.update(doc(db, 'members', match.menteeId), {
+            mentorId: match.mentorId,
+          });
+          await batch.commit();
 
-          // Update member records
-          await MembersService.assignMentor(match.menteeId, match.mentorId);
-
-          // Send notifications
+          // Send notifications (fire-and-forget side effect after atomic commit)
           await this.sendMatchNotifications(match, approvedBy);
 
         } catch (error) {
@@ -387,11 +398,26 @@ export class MentorshipService {
       async () => {
         try {
           const matchRef = doc(db, 'mentorMatches', matchId);
-          await updateDoc(matchRef, {
+          const matchDoc = await getDoc(matchRef);
+          if (!matchDoc.exists()) {
+            throw new Error('Mentor match not found');
+          }
+          const match = { id: matchDoc.id, ...matchDoc.data() } as MentorMatch;
+
+          // P1-B fix: use serverTimestamp() for endDate; clean up member refs atomically
+          const batch = writeBatch(db);
+          batch.update(matchRef, {
             status: 'completed',
-            endDate: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            endDate: serverTimestamp(),
+            updatedAt: serverTimestamp(),
           });
+          batch.update(doc(db, 'members', match.mentorId), {
+            menteeIds: arrayRemove(match.menteeId),
+          });
+          batch.update(doc(db, 'members', match.menteeId), {
+            mentorId: deleteField(),
+          });
+          await batch.commit();
         } catch (error) {
           console.error('Error completing mentorship:', error);
           throw error;
@@ -445,6 +471,72 @@ export class MentorshipService {
       console.error('Error getting mentorship stats:', error);
       throw error;
     }
+  }
+
+  // P1-C: Log a mentoring session and increment sessionCount / totalHours on the match doc
+  static async logSession(matchId: string, hours: number): Promise<void> {
+    return withDevMode(
+      () => { console.log(`[Dev Mode] Would log session for match: ${matchId}, hours: ${hours}`); },
+      async () => {
+        try {
+          if (hours <= 0) {
+            throw new Error('Session hours must be a positive number');
+          }
+          const matchRef = doc(db, 'mentorMatches', matchId);
+          await updateDoc(matchRef, {
+            sessionCount: increment(1),
+            totalHours: increment(hours),
+            updatedAt: serverTimestamp(),
+          });
+        } catch (error) {
+          console.error('Error logging mentorship session:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // P1-D: Cancel an active or pending mentorship and remove member cross-references atomically
+  static async cancelMentorship(matchId: string, reason?: string): Promise<void> {
+    return withDevMode(
+      () => { console.log(`[Dev Mode] Would cancel mentorship: ${matchId}`); },
+      async () => {
+        try {
+          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchDoc = await getDoc(matchRef);
+          if (!matchDoc.exists()) {
+            throw new Error('Mentor match not found');
+          }
+          const match = { id: matchDoc.id, ...matchDoc.data() } as MentorMatch;
+
+          if (match.status !== 'active' && match.status !== 'pending' && match.status !== 'suggested') {
+            throw new Error(`Cannot cancel a match with status '${match.status}'`);
+          }
+
+          const batch = writeBatch(db);
+          batch.update(matchRef, {
+            status: 'cancelled',
+            cancellationReason: reason ?? '',
+            endDate: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          if (match.mentorId) {
+            batch.update(doc(db, 'members', match.mentorId), {
+              menteeIds: arrayRemove(match.menteeId),
+            });
+          }
+          if (match.menteeId) {
+            batch.update(doc(db, 'members', match.menteeId), {
+              mentorId: deleteField(),
+            });
+          }
+          await batch.commit();
+        } catch (error) {
+          console.error('Error cancelling mentorship:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Collect feedback on mentorship relationship

@@ -95,6 +95,14 @@ export const onSubmissionApproved = functions.firestore
                     });
                     data.starsUnlocked = totalStars;
                     data.lastUpdated = admin.firestore.FieldValue.serverTimestamp();
+                    // P1-B fix: write lastCalculatedAt so the dashboard can display when the
+                    // Cloud Function last ran. Without this field the UI always shows "never".
+                    data.lastCalculatedAt = admin.firestore.FieldValue.serverTimestamp();
+                    // P1-C: memberContributions — if granular per-member breakdowns are needed,
+                    // write them here as { [memberId]: score } (map keyed by memberId).
+                    // The LOStarProgress type does not yet include this field; add it to
+                    // types/gamification.ts and the LOStarDashboard UI before enabling.
+                    // TODO P1-C: data.memberContributions = { ...existingContributions, [submittingMemberId]: score };
 
                     t.set(progressRef, data, { merge: true });
                 }

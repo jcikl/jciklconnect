@@ -117,6 +117,9 @@ exports.onSubmissionApproved = functions.firestore
                 });
                 data.starsUnlocked = totalStars;
                 data.lastUpdated = admin.firestore.FieldValue.serverTimestamp();
+                // P1-B fix: write lastCalculatedAt so the dashboard can display when the
+                // Cloud Function last ran.
+                data.lastCalculatedAt = admin.firestore.FieldValue.serverTimestamp();
                 t.set(progressRef, data, { merge: true });
             }
         });

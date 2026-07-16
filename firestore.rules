@@ -189,18 +189,32 @@ service cloud.firestore {
     
     // Events collection
     match /events/{eventId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && 
-                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // FIX 2: split read so public events page returns results.
+      // resource.data is null during list queries, so any resource.data condition on allow read
+      // would silently block all list results. allow list: if true lets unauthenticated visitors
+      // see the public events page; the service layer where() clause filters by status.
+      allow get: if isAuthenticated();
+      allow list: if true;
+      // FIX 1: restrict writes to Board+; members may update only their own attendance fields
+      allow create, delete: if isBoard() || isAdmin();
+      allow update: if isBoard() || isAdmin() ||
+                       (isMember() &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['attendees', 'registeredMembers', 'updatedAt']));
     }
     
     // Projects collection
     match /projects/{projectId} {
-      // Public read for published/Active projects (guest events page); auth required for others
-      allow read: if isAuthenticated() || resource.data.status == 'Active';
-      // Allow create/update/delete for authenticated users (will be restricted by app logic)
-      allow create, update, delete: if isAuthenticated();
+      // FIX 1: split read — resource.data.status is null in list queries for unauthenticated users.
+      // Authenticated members can list all projects; guests only get individually-fetched Active docs.
+      allow get: if isAuthenticated() || resource.data.status == 'Active';
+      allow list: if isAuthenticated();
+      // FIX 1: restrict writes to Board+; members may update only their own attendance/registration fields
+      allow create, delete: if isBoard() || isAdmin();
+      allow update: if isBoard() || isAdmin() ||
+                       (isMember() &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['attendees', 'registeredMembers', 'updatedAt']));
     }
 
     // Flagship Projects collection
@@ -211,7 +225,13 @@ service cloud.firestore {
 
     // Project tasks collection (Kanban, Gantt)
     match /tasks/{taskId} {
-      allow read, create, update, delete: if isAuthenticated();
+      // FIX 12: any authenticated user (including GUEST) was previously able to create and delete tasks
+      allow read: if isMember();
+      allow create: if isMember() &&
+                       request.resource.data.keys().hasAll(['title', 'assignedTo', 'projectId', 'createdAt']);
+      allow update: if isBoard() || isAdmin() ||
+                       (isMember() && resource.data.assignedTo == request.auth.uid);
+      allow delete: if isBoard() || isAdmin();
     }
     
     // Treasurer: current board member whose position title contains "Treasurer", plus Admin override
@@ -425,10 +445,13 @@ service cloud.firestore {
     // Points collection
     match /points/{pointId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // FIX 3: any authenticated user was able to create point records for any member (self-score fraud).
+      // Admin can award any member; members may only self-submit with required fields present.
+      allow create: if isAdmin() ||
+                       (isMember() &&
+                        request.resource.data.memberId == request.auth.uid &&
+                        request.resource.data.keys().hasAll(['memberId', 'points', 'type', 'createdAt']));
+      allow update, delete: if isAdmin() || isBoard();
     }
     
     // Point Rules collection
@@ -511,10 +534,33 @@ service cloud.firestore {
     
     // Elections collection
     match /elections/{electionId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && 
-                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // FIX 7: use isAdmin() so SUPER_ADMIN is covered; delete restricted to admin only;
+      // restrict read to members (not GUEST/INACTIVE).
+      allow read: if isMember();
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
+
+      // Election ballots: immutable once cast; admin-only read to protect ballot privacy
+      match /electionBallots/{ballotId} {
+        allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
+        allow read: if isAdmin();
+        allow update, delete: if false;
+      }
+    }
+
+    // Votes collection (standalone voting records across all elections)
+    match /votes/{voteId} {
+      // FIX 4: split read — resource.data is null in list queries; protect ballot privacy
+      allow get: if isAdmin() || (isMember() && resource.data.voterId == request.auth.uid);
+      allow list: if isMember();
+      allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
+      allow update, delete: if false;  // votes are immutable once cast
+    }
+    match /voteCasts/{castId} {
+      // FIX 4: cast-level ballot detail is admin-only to prevent voter identification
+      allow read: if isAdmin();
+      allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
+      allow update, delete: if false;
     }
     
     // Proposals collection
@@ -528,10 +574,11 @@ service cloud.firestore {
     
     // Workflows collection
     match /workflows/{workflowId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && 
-                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // FIX 11: list rule must not use resource.data (null in list queries).
+      // Restricted to Board+; delete to Admin only — workflow deletion can silence automation.
+      allow read: if isBoard() || isAdmin();
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
     }
     
     // Workflow Executions collection
@@ -546,9 +593,10 @@ service cloud.firestore {
     // Automation Rules collection
     match /automationRules/{ruleId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && 
-                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      // FIX 9: delete restricted to Admin only — a BOARD member deleting a rule can silently
+      // disable automation (e.g. membership renewal reminders) with no audit trail.
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
     }
     
     // Inventory collection
@@ -798,13 +846,18 @@ service cloud.firestore {
     
     // Mentorship: mentorMatches, mentorshipFeedback (Mentor Matching / stats)
     match /mentorMatches/{docId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && 
+      // FIX 10: restrict read to isMember() — GUEST/INACTIVE should not see mentorship matches.
+      // list rule is safe (no resource.data condition); get for self or board.
+      allow get: if isAuthenticated() && (isBoard() || isAdmin() ||
+                     resource.data.mentorId == request.auth.uid ||
+                     resource.data.menteeId == request.auth.uid);
+      allow list: if isMember();
+      allow create: if isAuthenticated() &&
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                      (getUserRole() in ['BOARD', 'ADMIN'] ||
                       request.resource.data.mentorId == request.auth.uid ||
                       request.resource.data.menteeId == request.auth.uid);
-      allow update, delete: if isAuthenticated() && 
+      allow update, delete: if isAuthenticated() &&
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                      (getUserRole() in ['BOARD', 'ADMIN'] ||
                       resource.data.mentorId == request.auth.uid ||
@@ -884,20 +937,43 @@ service cloud.firestore {
 
     // Wolf-like Competition System Collections
     match /bounties/{bountyId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      // FIX 8: any authenticated user (including GUEST) was able to create/modify/delete bounties.
+      // Bounties are board-managed incentive instruments — restrict writes accordingly.
+      allow read: if isMember();
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
     }
     match /contracts/{contractId} {
-      allow read: if isAuthenticated() && (resource.data.memberId == request.auth.uid || getUserRole() in ['BOARD', 'ADMIN']);
-      allow create, update, delete: if isAuthenticated();
+      // FIX 13: split read (resource.data null in list); restrict writes; hasOnly for member signing.
+      allow get: if isAuthenticated() && (isAdmin() || isBoard() ||
+                     resource.data.memberId == request.auth.uid);
+      allow list: if isBoard() || isAdmin();
+      allow create: if isMember();
+      // Members may only update their own signature fields; board/admin unrestricted
+      allow update: if isAdmin() || isBoard() ||
+                       (isMember() &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['signerIds', 'status', 'proofUrl', 'updatedAt']));
+      allow delete: if isAdmin();
     }
     match /opportunityDrops/{dropId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated() && getUserRole() in ['BOARD', 'ADMIN'];
     }
     match /pointEscrow/{escrowId} {
-      allow read: if isAuthenticated() && (resource.data.memberId == request.auth.uid || getUserRole() in ['BOARD', 'ADMIN']);
-      allow create, update, delete: if isAuthenticated();
+      // FIX 5: split read (resource.data null in list); restrict create/update/delete.
+      // Any authenticated user was able to create and modify escrow records.
+      allow get: if isAuthenticated() && (isBoard() || isAdmin() ||
+                     resource.data.memberId == request.auth.uid);
+      allow list: if isBoard() || isAdmin();
+      allow create: if isAdmin() ||
+                       (isMember() && request.resource.data.memberId == request.auth.uid);
+      // Board can update status/release fields only; admin unrestricted
+      allow update: if isAdmin() ||
+                       (isBoard() &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['status', 'releasedAt', 'releasedBy', 'contractId', 'updatedAt']));
+      allow delete: if isAdmin();
     }
 
     // JCI Gamification & LO Star Rating (New)
@@ -912,18 +988,22 @@ service cloud.firestore {
     }
 
     match /incentiveSubmissions/{submissionId} {
-      allow read: if isAuthenticated() && (
-        resource.data.memberId == request.auth.uid || 
-        resource.data.loId == getMyLoId() ||
-        isBoard()
-      );
+      // FIX 6: resource.data is null in list queries, so the memberId/loId conditions always failed —
+      // members could never see their own submissions in list views.
+      // Split: get keeps the identity check; list trusts the service-layer where(memberId == uid) filter.
+      allow get: if isAuthenticated() && (isAdmin() || isBoard() ||
+                     resource.data.memberId == request.auth.uid);
+      allow list: if isMember();
       allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
-      allow update, delete: if isBoard();
+      allow update, delete: if isBoard() || isAdmin();
     }
 
     match /loStarProgress/{progressId} {
-      allow read: if isAuthenticated();
-      allow write: if isBoard();
+      // FIX 14: tighten read — members see own progress via get; list safe (no resource.data condition).
+      // isAdmin() covers SUPER_ADMIN which isBoard() does not always include.
+      allow get: if isAdmin() || (isMember() && resource.data.memberId == request.auth.uid) || isBoard();
+      allow list: if isMember();
+      allow write: if isBoard() || isAdmin();
     }
 
     // System configuration (e.g., birthday_processor)

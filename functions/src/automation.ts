@@ -188,16 +188,71 @@ async function executeAction(config: any, data: any): Promise<any> {
         return { pointsAwarded: true, points: config.points };
       }
       throw new Error('Invalid award_points configuration');
-      
+
+    // P1-C: Implement create_task action so automation rules that specify
+    // this action type actually produce a task document instead of throwing.
+    case 'create_task': {
+      const taskRef = await db.collection('tasks').add({
+        title: config.params?.title || config.title || 'Auto-created task',
+        assignedTo: config.params?.assignedTo || config.assignedTo || '',
+        projectId: config.params?.projectId || config.projectId || '',
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        _automationGenerated: true,
+        automationRuleId: data.ruleId || null,
+      });
+      return { taskCreated: true, documentId: taskRef.id };
+    }
+
     default:
       throw new Error(`Unknown action type: ${config.type}`);
   }
 }
 
+// Collections that automation actions write to — triggering this function from
+// these would cause an infinite loop (automation fires → writes points →
+// automation fires again → …).  Skip evaluation for all of them.
+const AUTOMATION_SIDE_EFFECT_COLLECTIONS = [
+  'points',
+  'pointTransactions',
+  'notifications',
+  'rule_executions',
+  'ruleExecutions',
+  'workflowExecutions',
+  'workflow_executions',
+  'automationLogs',
+  'tasks',
+];
+
+// TODO: Scheduled automation rules (triggerType: 'schedule') require a Cloud
+// Scheduler / Cloud Tasks trigger — not yet implemented.  Rules with a
+// schedule field are currently ignored by this Firestore-triggered function.
+
 // Function to evaluate automation rules
 export const evaluateAutomationRules = functions.firestore
   .document('{collection}/{documentId}')
   .onWrite(async (change, context) => {
+    // P0-A: Bail out early when the write came from an automation side-effect
+    // collection to prevent an infinite trigger loop.
+    const triggeredCollection: string = context.params.collection;
+    if (AUTOMATION_SIDE_EFFECT_COLLECTIONS.includes(triggeredCollection)) {
+      console.log(
+        'Skipping automation evaluation for side-effect collection:',
+        context.resource.name
+      );
+      return null;
+    }
+
+    // Also skip documents that were written by automation itself.
+    const afterData = change.after.exists ? change.after.data() : null;
+    if (afterData?._automationGenerated === true) {
+      console.log(
+        'Skipping automation evaluation for _automationGenerated document:',
+        context.resource.name
+      );
+      return null;
+    }
+
     // Get all active automation rules
     const rulesSnapshot = await db.collection('automationRules')
       .where('enabled', '==', true)
@@ -231,6 +286,13 @@ export const evaluateAutomationRules = functions.firestore
             documentId,
             document,
             ruleId: ruleDoc.id
+          });
+
+          // P1-B: Increment triggerCount on the rule so we have an accurate
+          // count of how many times each rule has fired.
+          await ruleDoc.ref.update({
+            lastTriggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+            triggerCount: admin.firestore.FieldValue.increment(1),
           });
 
           // Log rule execution

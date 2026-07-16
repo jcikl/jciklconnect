@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, limit, increment } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 
@@ -57,6 +57,14 @@ export interface ToyyibBillRecord {
   createdAt?: any;
   /** Written by webhook callback after payment confirmation */
   billExternalReferenceNo?: string;
+  /**
+   * P1-C: Set by the webhook's rollback path (billpaymentStatus='3') to the Firestore
+   * transaction ID that was reverted when the payment was reversed/refunded.
+   * Allows finance views to link the bill reversal to its income transaction.
+   */
+  refundTransactionId?: string;
+  /** Timestamp written by the webhook when a payment reversal (status=3) is processed. */
+  refundedAt?: any;
   updatedAt?: any;
 }
 
@@ -80,6 +88,13 @@ async function proxyCall(action: string, params: Record<string, string> = {}): P
 }
 
 export class ToyyibService {
+  /**
+   * P0-B (order guarantee): The ToyyibPay API is called FIRST via proxyCall.
+   * Only if the API call succeeds does this method write to Firestore (toyyibBills).
+   * Callers (e.g. useToyyibPayment) MUST update the member document AFTER this
+   * method returns — never before — so a failed API call never leaves stale bill
+   * codes on the member record.
+   */
   static async createBill(params: CreateBillParams): Promise<ToyyibBillResponse> {
     if (!TOYYIB_CONFIG.USER_SECRET_KEY || !TOYYIB_CONFIG.CATEGORY_CODE) {
       console.warn('ToyyibPay: Missing API keys, simulating response');
@@ -125,6 +140,19 @@ export class ToyyibService {
       if (params.memberId) billRecord.memberId = params.memberId;
       if (params.projectId) billRecord.projectId = params.projectId;
       await addDoc(collection(db, COLLECTIONS.TOYYIB_BILLS), billRecord);
+      // P1-D: Increment billCount on the parent category so it stays accurate
+      const usedCategoryCode = params.categoryCode || TOYYIB_CONFIG.CATEGORY_CODE;
+      if (usedCategoryCode) {
+        try {
+          await updateDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, usedCategoryCode), {
+            billCount: increment(1),
+            updatedAt: serverTimestamp(),
+          });
+        } catch {
+          // Category doc may not exist yet (e.g. legacy default code not seeded); non-fatal
+          console.warn('[ToyyibService] Could not increment billCount for category:', usedCategoryCode);
+        }
+      }
       return {
         billCode,
         paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${billCode}`
@@ -200,30 +228,50 @@ export class ToyyibService {
       .map(r => r.value!);
   }
 
-  private static async saveCategoryToFirestore(cat: Omit<ToyyibCategory, 'createdAt'>): Promise<void> {
+  private static async saveCategoryToFirestore(cat: Omit<ToyyibCategory, 'createdAt'> & { createdBy?: string }): Promise<void> {
     const payload: Record<string, any> = {
       categoryName: cat.categoryName,
       categoryDescription: cat.categoryDescription,
       createdAt: serverTimestamp(),
+      isActive: true,
     };
     if (cat.linkedType) payload.linkedType = cat.linkedType;
     if (cat.linkedProjectId) payload.linkedProjectId = cat.linkedProjectId;
     if (cat.linkedProjectName) payload.linkedProjectName = cat.linkedProjectName;
     if (cat.membershipType) payload.membershipType = cat.membershipType;
+    if (cat.createdBy) payload.createdBy = cat.createdBy;
     await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, cat.categoryCode), payload, { merge: true });
   }
 
-  static async createCategory(catname: string, catdescription: string): Promise<any[]> {
+  static async createCategory(catname: string, catdescription: string, currentUserId?: string): Promise<any[]> {
+    // TODO: Add 'description' field to the ToyyibCategory creation form in UI.
     const result = await proxyCall('createCategory', { catname, catdescription });
     // Save the new category code to Firestore so getCategories can find it
     if (Array.isArray(result) && result[0]?.CategoryCode) {
-      await ToyyibService.saveCategoryToFirestore({
+      const cat: Omit<ToyyibCategory, 'createdAt'> & { createdBy?: string } = {
         categoryCode: result[0].CategoryCode,
         categoryName: catname,
         categoryDescription: catdescription,
-      });
+      };
+      if (currentUserId) cat.createdBy = currentUserId;
+      await ToyyibService.saveCategoryToFirestore(cat);
     }
     return result;
+  }
+
+  /**
+   * Update mutable metadata fields on a category (name, description, link).
+   * Note: categoryCode is assigned by ToyyibPay and cannot be changed via API.
+   * If the category needs to be recreated, use deleteCategory + createCategory.
+   */
+  static async updateCategory(categoryCode: string, updateData: Partial<Omit<ToyyibCategory, 'categoryCode'>> & { categoryCode?: string }): Promise<void> {
+    if (updateData.categoryCode) {
+      // categoryCode is immutable — set only on creation by ToyyibPay API
+      delete updateData.categoryCode;
+      console.warn('[ToyyibService] Attempted to update categoryCode directly — ignored. categoryCode is set by ToyyibPay API.');
+    }
+    const payload: Record<string, any> = { ...updateData, updatedAt: serverTimestamp() };
+    await updateDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode), payload);
   }
 
   static async updateCategoryLink(
@@ -367,6 +415,7 @@ export class ToyyibService {
       collection(db, COLLECTIONS.TOYYIB_CATEGORIES),
       where('linkedType', '==', 'membership'),
       where('linkedYear', '==', String(year)),
+      where('isActive', '==', true),
       limit(1),
     ));
     if (!snap.empty) return snap.docs[0].id;
@@ -396,6 +445,7 @@ export class ToyyibService {
       collection(db, COLLECTIONS.TOYYIB_CATEGORIES),
       where('linkedType', '==', 'project'),
       where('linkedProjectId', '==', projectId),
+      where('isActive', '==', true),
       limit(1),
     ));
     if (!snap.empty) return snap.docs[0].id;

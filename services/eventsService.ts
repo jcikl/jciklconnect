@@ -161,7 +161,8 @@ export class EventsService {
           if (eventData.endDate != null) payload.endDate = eventData.endDate;
           if (eventData.time != null) payload.time = eventData.time;
           if (eventData.organizerId != null && eventData.organizerId !== '') payload.organizerId = eventData.organizerId;
-          if (eventData.predictedDemand != null) payload.predictedDemand = eventData.predictedDemand;
+          if (eventData.predictedDemand != null) payload.predictedDemand = eventData.predictedDemand; // predictedDemand is stored but not used for business decisions — reserved for future AI insights feature.
+          if (eventData.committee != null) payload.committee = eventData.committee; // P1-B: persist committee field
           payload.type = eventData.type;
 
           const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
@@ -304,6 +305,7 @@ export class EventsService {
               attendees: event.attendees + 1,
               registeredMembers: arrayUnion(memberId),
             });
+            this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
           } catch (counterError) {
             if (newRegistrationId) {
               try {
@@ -372,6 +374,32 @@ export class EventsService {
           this.invalidateEventsCache();
         } catch (error) {
           console.error('Error canceling registration:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // P1-A: Mark an event as Completed (no existing method existed)
+  static async completeEvent(eventId: string): Promise<void> {
+    return withDevMode(
+      () => {
+        const idx = this.mockEvents.findIndex(e => e.id === eventId);
+        if (idx !== -1) this.mockEvents[idx] = { ...this.mockEvents[idx], status: 'Completed' };
+      },
+      async () => {
+        try {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+          const batch = writeBatch(db);
+          batch.update(eventRef, {
+            status: 'Completed',
+            completedAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          await batch.commit();
+          this.invalidateEventsCache();
+        } catch (error) {
+          console.error('Error completing event:', error);
           throw error;
         }
       }
@@ -507,6 +535,9 @@ export class EventsService {
             const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id);
             const batch = writeBatch(db);
             batch.update(regRef, { status: 'checked_in', checkedInAt: at, updatedAt: now });
+            // P1-D: attendanceList is written to the event doc inside COLLECTIONS.PROJECTS (correct —
+            // events are stored as project documents). The authoritative per-member attendance record
+            // lives in eventRegistrations; attendanceList here is a denormalised lookup array on the event.
             batch.update(eventRef, { attendanceList: arrayUnion(memberId), updatedAt: now });
             await batch.commit();
           } else {

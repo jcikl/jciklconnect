@@ -2223,9 +2223,24 @@ export class FinanceService {
       },
       async () => {
         try {
+          // P1-B: Validate accountType enum before writing
+          const validAccountTypes: BankAccount['accountType'][] = ['Current', 'Savings', 'Investment', 'Fixed Deposit', 'Cash', 'Other'];
+          if (accountData.accountType && !validAccountTypes.includes(accountData.accountType)) {
+            throw new Error(`Invalid account type: "${accountData.accountType}". Valid values: ${validAccountTypes.join(', ')}`);
+          }
+
+          // P1-A: Ensure loId is captured; warn if missing (breaks LO-scoped filtering)
+          const loId = accountData.loId || null;
+          if (!loId) {
+            console.warn('BankAccount created without loId — LO filtering will not work for this account');
+          }
+
           const newAccount = {
             ...accountData,
+            loId,
+            // P2-C: balance stored here is a cached snapshot; always use calculateBalance() for accuracy
             lastReconciled: Timestamp.fromDate(new Date(accountData.lastReconciled)),
+            // TODO: Add createdAt, updatedAt, lastReconciledAt, lastReconciledBy to BankAccount type in types.ts
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           };

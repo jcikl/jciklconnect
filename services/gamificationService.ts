@@ -7,6 +7,7 @@ import {
     addDoc,
     updateDoc,
     deleteDoc,
+    writeBatch,
     query,
     where,
     orderBy,
@@ -32,6 +33,10 @@ export class GamificationService {
 
     /**
      * Create a new award.
+     *
+     * TODO: AwardMilestone.reward field is not surfaced in the badge creation form.
+     *       When the form is extended, ensure milestones[].reward is written here
+     *       alongside milestones[].threshold, milestones[].level, and milestones[].pointValue. (P1-D)
      */
     static async createAward(awardData: Omit<AwardDefinition, 'id'>): Promise<string> {
         return withDevMode(
@@ -129,6 +134,11 @@ export class GamificationService {
     /**
      * Award a specific recognition to a member.
      * This handles point distribution and updating the member's profile.
+     *
+     * Write ordering:
+     *   Batch 1 (atomic): badgeAwards record + member.badges array update
+     *   Separate: PointsService.awardPoints — kept outside batch due to its own
+     *             internal complexity; failure is logged but does not roll back the badge.
      */
     static async awardAward(
         awardId: string,
@@ -144,7 +154,17 @@ export class GamificationService {
                     const award = await this.getAwardById(awardId);
                     if (!award) throw new Error('Award definition not found');
 
-                    // 1. Create the award record
+                    // Read member data before opening the batch (needed to build the
+                    // UserBadge object and check for duplicates)
+                    const { MembersService } = await import('./membersService');
+                    const member = await MembersService.getMemberById(memberId);
+                    const currentBadges = member?.badges || [];
+                    const alreadyAwarded = currentBadges.some(b => b.id === awardId);
+
+                    // --- Atomic batch: write 1 (badge award record) + write 3 (member badges) ---
+                    const batch = writeBatch(db);
+
+                    // Write 1: Create the badge award record
                     const awardData: Omit<MemberAward, 'id'> = {
                         awardId,
                         memberId,
@@ -154,22 +174,11 @@ export class GamificationService {
                         metadata,
                         progress: 100, // Fully earned
                     };
-                    const docRef = await addDoc(collection(db, COLLECTIONS.BADGE_AWARDS), awardData);
+                    const badgeAwardRef = doc(collection(db, COLLECTIONS.BADGE_AWARDS));
+                    batch.set(badgeAwardRef, awardData);
 
-                    // 2. Award points if configured
-                    if (award.pointsReward > 0) {
-                        await PointsService.awardPoints(
-                            memberId,
-                            'achievement',
-                            award.pointsReward,
-                            `Award unlocked: ${award.name}`
-                        );
-                    }
-
-                    // 3. Update member's badge list for visual display
-                    const { MembersService } = await import('./membersService');
-                    const member = await MembersService.getMemberById(memberId);
-                    if (member) {
+                    // Write 3: Append badge to member's display list (skip if already present)
+                    if (member && !alreadyAwarded) {
                         const userBadge: UserBadge = {
                             id: awardId,
                             name: award.name,
@@ -177,16 +186,33 @@ export class GamificationService {
                             description: award.description,
                             earnedDate: new Date().toISOString()
                         };
-                        const currentBadges = member.badges || [];
-                        // Avoid duplicates
-                        if (!currentBadges.find(b => b.id === awardId)) {
-                            await MembersService.updateMember(memberId, {
-                                badges: [...currentBadges, userBadge],
-                            });
+                        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+                        batch.update(memberRef, { badges: [...currentBadges, userBadge] });
+                    }
+
+                    await batch.commit();
+
+                    // Write 2: Award points — separate from batch due to PointsService
+                    // internal complexity. If this fails, the badge record is already
+                    // committed, so we log the error rather than propagating it.
+                    if (award.pointsReward > 0) {
+                        try {
+                            await PointsService.awardPoints(
+                                memberId,
+                                'achievement',
+                                award.pointsReward,
+                                `Award unlocked: ${award.name}`
+                            );
+                        } catch (pointsError) {
+                            console.error(
+                                '[awardAward] Points award failed after badge was committed:',
+                                { awardId, memberId, pointsError }
+                            );
+                            // Badge is recorded; points failure is survivable — do not rethrow
                         }
                     }
 
-                    return docRef.id;
+                    return badgeAwardRef.id;
                 } catch (error) {
                     console.error('Error awarding recognition:', error);
                     throw error;
@@ -207,6 +233,22 @@ export class GamificationService {
     }
 
     static calculateAwardProgress(award: AwardDefinition, currentProgressValue: number): number {
+        // Guard unimplemented criteria types so they return 0 instead of silently
+        // falling through to the util with undefined behaviour (P1-C)
+        switch (award.criteria?.type) {
+            case 'consecutive_attendance':
+                console.warn('[GamificationService] consecutive_attendance badge criteria not yet implemented — returning 0 progress');
+                return 0;
+            case 'role_held':
+                console.warn('[GamificationService] role_held badge criteria not yet implemented — returning 0 progress');
+                return 0;
+            case 'training_completed':
+                console.warn('[GamificationService] training_completed badge criteria not yet implemented — returning 0 progress');
+                return 0;
+            case 'recruitment_count':
+                console.warn('[GamificationService] recruitment_count badge criteria not yet implemented — returning 0 progress');
+                return 0;
+        }
         return calculateAwardProgressUtil(award, currentProgressValue);
     }
 
@@ -293,7 +335,15 @@ export class GamificationService {
     static getAllBadges = this.getAllAwards;
     static getAllAchievements = this.getAllAwards;
     static awardBadge = this.awardAward;
+    /**
+     * @deprecated achievements collection has been migrated to the badges collection.
+     *             Use awardAward() (or the awardBadge alias) instead. (P2-E)
+     */
     static awardAchievement = (memberId: string, awardId: string) => this.awardAward(awardId, memberId);
+    /**
+     * @deprecated achievements collection has been migrated to the badges collection.
+     *             Use getAwardById() instead. (P2-E)
+     */
     static getBadgeById = this.getAwardById;
     static getAchievementById = this.getAwardById;
     static calculateAchievementProgress = this.calculateAwardProgress;

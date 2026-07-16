@@ -124,6 +124,10 @@ exports.handler = async (event) => {
     billpaymentStatus === '3' ? 'failed' :
     billpaymentStatus === '4' ? 'settling' :
     'pending';
+  // TODO (P1-D): Bills stuck in 'pending' (billpaymentStatus='2') for >24h should be auto-voided.
+  // Implement via Cloud Scheduler that queries toyyibBills where billpaymentStatus=='2'
+  // and updatedAt < 24h ago, then calls the ToyyibPay getBillTransactions API to re-verify;
+  // if still unresolved, mark the bill as void and release any held inventory/seats.
   const billExternalReferenceNo = verified.billExternalReferenceNo || data.billExternalReferenceNo || null;
   const billPaymentDate = verified.billpaymentDate || data.billPaymentDate || new Date().toISOString();
   const paidAmount = verified.billpaymentAmount != null ? Number(verified.billpaymentAmount) : null;
@@ -221,6 +225,21 @@ exports.handler = async (event) => {
         await db.collection('members').doc(billMemberId).update(memberUpdate)
           .catch(err => console.warn('[toyyibpay-callback] Could not sync membership status:', err));
       } else {
+        // ── P0-A: Idempotency check at transaction level (defense-in-depth) ────
+        // The outer toyyibpay_webhooks check guards the full request, but if two
+        // simultaneous retries race past that check, this prevents a second
+        // Membership transaction from being created for the same bill.
+        const membershipIdempotencyKey = `membership_${billCode}`;
+        const existingMembershipTxSnap = await db.collection('transactions')
+          .where('idempotencyKey', '==', membershipIdempotencyKey)
+          .limit(1)
+          .get();
+        if (!existingMembershipTxSnap.empty) {
+          console.log('[toyyibpay-callback] Duplicate webhook: membership tx already exists for billCode:', billCode);
+          await idempotencyRef.set({ processed: true, processedAt: Timestamp.now() }, { merge: true });
+          return { statusCode: 200, body: 'Already processed' };
+        }
+
         const txDescription = `Membership dues ${billYear} — ${billData?.billName || billCode}`;
         const newTxRef = await db.collection('transactions').add({
           type: 'Income',
@@ -235,6 +254,7 @@ exports.handler = async (event) => {
           description: txDescription,
           date: billPaymentDate ? billPaymentDate.split('T')[0] : new Date().toISOString().split('T')[0],
           referenceNumber: billExternalReferenceNo || transactionId,
+          idempotencyKey: membershipIdempotencyKey,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
           source: 'manual',
@@ -307,7 +327,20 @@ exports.handler = async (event) => {
           source: 'manual',
         };
 
-        const txRef = await db.collection('transactions').add(txData);
+        // ── P0-A: Idempotency check at transaction level (defense-in-depth) ────
+        const eventIdempotencyKey = `event_${billCode}`;
+        const existingEventTxSnap = await db.collection('transactions')
+          .where('idempotencyKey', '==', eventIdempotencyKey)
+          .limit(1)
+          .get();
+        let txRef;
+        if (!existingEventTxSnap.empty) {
+          console.log('[toyyibpay-callback] Duplicate webhook: event tx already exists for billCode:', billCode);
+          txRef = existingEventTxSnap.docs[0].ref;
+        } else {
+          txData.idempotencyKey = eventIdempotencyKey;
+          txRef = await db.collection('transactions').add(txData);
+        }
 
         // Link transaction ID back to eventRegistration
         evtUpdate.financeTransactionId = txRef.id;
@@ -321,6 +354,15 @@ exports.handler = async (event) => {
     // previously successful payment is reversed/refunded. Revert any records
     // this webhook wrote on the success path.
     if (!isSuccess && billpaymentStatus === '3') {
+      // P1-C: Mark the bill as refunded so finance views can surface it.
+      // refundTransactionId is set below once we know the reverted tx id.
+      if (!billsQuery.empty) {
+        await billsQuery.docs[0].ref.update({
+          refundedAt: Timestamp.now(),
+          billpaymentStatus: '3',
+          updatedAt: Timestamp.now(),
+        });
+      }
       // Revert membership dues income tx if it was already Cleared by a prior success callback
       if (billMemberId && billYear) {
         const clearedDuesQuery = await db.collection('transactions')
@@ -349,6 +391,12 @@ exports.handler = async (event) => {
               status: 'Pending',
               updatedAt: Timestamp.now(),
             });
+            // P1-C: Write refundTransactionId back to the bill so finance views can link the reversal.
+            if (!billsQuery.empty) {
+              await billsQuery.docs[0].ref.update({
+                refundTransactionId: duesTxDoc.id,
+              });
+            }
             // Sync membership status back to pending after refund — reset all payment fields
             await db.collection('members').doc(billMemberId).update({
               [`membership.${billYear}.status`]: 'pending',
@@ -379,6 +427,12 @@ exports.handler = async (event) => {
               await txRef.delete();
             } else if (txStatus === 'Cleared') {
               await txRef.update({ status: 'Pending', updatedAt: Timestamp.now() });
+              // P1-C: Write refundTransactionId back to the bill.
+              if (!billsQuery.empty) {
+                await billsQuery.docs[0].ref.update({
+                  refundTransactionId: evtRegData.financeTransactionId,
+                });
+              }
             } else {
               // Reconciled / Partially Reconciled — do NOT overwrite; bank reconciliation must not be
               // silently broken by a webhook. Write a finance_alerts record for manual review instead.

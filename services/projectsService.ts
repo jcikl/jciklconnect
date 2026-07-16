@@ -11,7 +11,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -70,16 +69,27 @@ export class ProjectsService {
   }
 
   // Create new project
-  static async createProject(projectData: Omit<Project, 'id'>): Promise<string> {
+  // P1-B: accept optional currentUserId so organizerId is reliably written
+  static async createProject(projectData: Omit<Project, 'id'>, currentUserId?: string): Promise<string> {
     try {
+      // P1-A: write both name and title for backward-compat callers that use either field
+      const resolvedName = projectData.name || projectData.title || '';
+      const resolvedTitle = projectData.title || projectData.name || '';
+
       const payload: Record<string, unknown> = {
-        name: projectData.name ?? null,
+        name: resolvedName,
+        title: resolvedTitle,
         lead: projectData.lead ?? null,
         status: projectData.status ?? 'Planning',
         budget: projectData.budget ?? 0,
         spent: projectData.spent ?? 0,
         completion: projectData.completion ?? 0,
         teamSize: projectData.teamSize ?? 0,
+        // P1-B: organizerId from caller-supplied auth user, falling back to data field
+        organizerId: currentUserId || projectData.organizerId || '',
+        // P1-D: initialise versioning fields
+        version: projectData.version ?? 1,
+        previousVersionId: projectData.previousVersionId ?? null,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
@@ -118,8 +128,26 @@ export class ProjectsService {
     }
   }
 
+  // Clone a project as a new version (P1-D)
+  static async cloneProject(originalId: string, overrides: Partial<Omit<Project, 'id'>> = {}, currentUserId?: string): Promise<string> {
+    const original = await this.getProjectById(originalId);
+    if (!original) throw new Error(`Project ${originalId} not found`);
+    const { id: _id, createdAt: _c, updatedAt: _u, ...rest } = original;
+    return this.createProject(
+      {
+        ...rest,
+        ...overrides,
+        version: (original.version ?? 1) + 1,
+        previousVersionId: originalId,
+        status: 'Draft',
+      },
+      currentUserId,
+    );
+  }
+
   // Update project
-  static async updateProject(projectId: string, updates: Partial<Project>): Promise<void> {
+  // P1-C: pass currentUserId so review approval/rejection stamps reviewedBy + reviewedDate together
+  static async updateProject(projectId: string, updates: Partial<Project>, currentUserId?: string): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
@@ -163,6 +191,17 @@ export class ProjectsService {
               updateData[key] = value;
             }
           });
+
+          // P1-C: when a review decision is made, stamp reviewedBy + reviewedDate atomically
+          const reviewStatus = updates.status as string | undefined;
+          if (
+            (reviewStatus === 'Approved' || reviewStatus === 'Rejected') &&
+            currentUserId
+          ) {
+            updateData.reviewedBy = currentUserId;
+            updateData.reviewedDate = new Date().toISOString();
+          }
+
           await updateDoc(projectRef, updateData);
           this.invalidateProjectsCache();
 
@@ -230,17 +269,90 @@ export class ProjectsService {
     );
   }
 
-  // Get tasks for a project
-  static async getProjectTasks(projectId: string): Promise<Task[]> {
+  // P1-E: Register a member with capacity guard
+  static async registerMember(projectId: string, memberId: string): Promise<void> {
     return withDevMode(
-      () => MOCK_TASKS.filter(task => task.projectId === projectId),
+      () => {},
       async () => {
         try {
-          const q = query(
+          const project = await this.getProjectById(projectId);
+          if (!project) throw new Error(`Project ${projectId} not found`);
+
+          const current = project.registeredMembers ?? [];
+          const max = project.maxAttendees ?? 500;
+
+          if (current.includes(memberId)) {
+            throw new Error('Member is already registered for this project.');
+          }
+          if (current.length >= max) {
+            throw new Error('Project has reached maximum capacity.');
+          }
+
+          const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+          await updateDoc(projectRef, {
+            registeredMembers: [...current, memberId],
+            updatedAt: Timestamp.now(),
+          });
+          this.invalidateProjectsCache();
+        } catch (error) {
+          console.error('Error registering member for project:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Unregister a member from a project
+  static async unregisterMember(projectId: string, memberId: string): Promise<void> {
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const project = await this.getProjectById(projectId);
+          if (!project) throw new Error(`Project ${projectId} not found`);
+
+          const current = (project.registeredMembers ?? []).filter((id: string) => id !== memberId);
+          const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+          await updateDoc(projectRef, {
+            registeredMembers: current,
+            updatedAt: Timestamp.now(),
+          });
+          this.invalidateProjectsCache();
+        } catch (error) {
+          console.error('Error unregistering member from project:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Get tasks for a project
+  // P1-C: supports optional filters (priority). Requires composite Firestore index on (projectId, priority).
+  // NOTE: Requires composite index on (projectId, priority) — add to firestore.indexes.json if filtering by priority.
+  static async getProjectTasks(projectId: string, filters?: { priority?: Task['priority'] }): Promise<Task[]> {
+    return withDevMode(
+      () => {
+        let tasks = MOCK_TASKS.filter(task => task.projectId === projectId);
+        if (filters?.priority) tasks = tasks.filter(t => t.priority === filters.priority);
+        return tasks;
+      },
+      async () => {
+        try {
+          let q = query(
             collection(db, 'tasks'),
             where('projectId', '==', projectId),
             orderBy('dueDate', 'asc')
           );
+
+          // P1-C: Firestore-side priority filter (avoids full collection scan)
+          if (filters?.priority) {
+            q = query(
+              collection(db, 'tasks'),
+              where('projectId', '==', projectId),
+              where('priority', '==', filters.priority),
+              orderBy('dueDate', 'asc')
+            );
+          }
 
           const snapshot = await getDocs(q);
           return snapshot.docs.map(doc => {
@@ -293,6 +405,12 @@ export class ProjectsService {
       () => taskId || `mock-task-${Date.now()}`,
       async () => {
         try {
+          // P1-D: prevent self-dependency
+          if (taskId && taskData.dependencies?.includes(taskId)) {
+            throw new Error('A task cannot depend on itself.');
+          }
+          // TODO: Implement full circular dependency detection for task chains.
+
           const now = Timestamp.now();
           const rawTask = {
             ...taskData,
@@ -359,6 +477,12 @@ export class ProjectsService {
       },
       async () => {
         try {
+          // P1-D: prevent self-dependency on update
+          if (updates.dependencies?.includes(taskId)) {
+            throw new Error('A task cannot depend on itself.');
+          }
+          // TODO: Implement full circular dependency detection for task chains.
+
           const taskRef = doc(db, 'tasks', taskId);
 
           // 获取现有任务数据以合并 statusHistory 和 remarks
@@ -377,8 +501,14 @@ export class ProjectsService {
             statusHistory[statusChangeId] = {
               status: updates.status,
               timestamp: new Date().toISOString(),
+              changedBy: (updates as any).changedBy || 'unknown',
             };
             updateData.statusHistory = statusHistory;
+
+            // P1-A: set completedAt when task transitions to Done
+            if (updates.status === 'Done') {
+              updateData.completedAt = Timestamp.now();
+            }
           }
 
           // 处理 remarks：如果提供了新的 remark，添加到 remarks map

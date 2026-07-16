@@ -6,16 +6,17 @@
  * Validates: Requirements 5.4, 5.5
  */
 
-import { 
-  Rule, 
-  RuleExecution, 
-  RuleConditionResult, 
+import {
+  Rule,
+  RuleExecution,
+  RuleConditionResult,
   RuleActionResult,
   Member,
   Event,
   Project,
   Transaction
 } from '../types';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface RuleTestData {
   member?: Partial<Member>;
@@ -453,8 +454,32 @@ class RuleExecutionService {
   }
 
   private async awardBadge(config: any, data: any): Promise<any> {
-    // Implementation would award badge to member
-    return { badgeId: config.badgeId, awarded: true };
+    const badgeId: string | undefined = config.badgeId;
+    const memberId: string | undefined = config.memberId || data.member?.id;
+
+    try {
+      if (!badgeId || !memberId) {
+        throw new Error(
+          `award_badge action requires badgeId and memberId; received badgeId=${badgeId}, memberId=${memberId}`
+        );
+      }
+      // Dynamically import to avoid circular dependency
+      const { GamificationService } = await import('./gamificationService');
+      const awardRecordId = await GamificationService.awardAward(
+        badgeId,
+        memberId,
+        'system',
+        config.reason
+      );
+      return { badgeId, memberId, awarded: true, awardRecordId };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      errorLoggingService.logError(err, {
+        action: 'ruleExecutionService.awardBadge',
+        additionalData: { badgeId, memberId, config },
+      });
+      return { awarded: false, error: err.message };
+    }
   }
 
   private async triggerWorkflow(config: any, data: any): Promise<any> {

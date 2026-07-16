@@ -20,6 +20,12 @@ import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants
 import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress, RadarPointsConfig } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
+import { apiCache } from './cacheService';
+
+// --- Cache key prefixes ---
+const CACHE_PREFIX_POINTS = 'points:';
+const CACHE_PREFIX_POINT_RULES = 'pointRules:';
+const CACHE_PREFIX_INCENTIVE = 'incentive:';
 
 export interface PointTransaction {
   id?: string;
@@ -92,6 +98,7 @@ export class PointsService {
       async () => {
         try {
           // Create point transaction - filter out undefined values
+          // Note: expiresAt is defined in types but not enforced; metadata is stored but not read.
           const transaction: Omit<PointTransaction, 'id'> = {
             memberId,
             points, // For backward compatibility
@@ -117,6 +124,9 @@ export class PointsService {
 
           // Update member's total points
           await this.updateMemberPoints(memberId, points);
+
+          // Invalidate caches after write
+          PointsService.invalidatePointsCache();
 
           return transactionRef.id;
         } catch (error) {
@@ -437,6 +447,9 @@ export class PointsService {
             tier,
             updatedAt: Timestamp.now(),
           });
+
+          // Invalidate members cache after write
+          MembersService.invalidateMembersCache();
         } catch (error) {
           console.error('Error updating member points:', error);
           throw error;
@@ -458,6 +471,21 @@ export class PointsService {
     }
   }
 
+  /** Invalidate all points transaction caches */
+  static invalidatePointsCache(): void {
+    apiCache.deleteByPrefix(CACHE_PREFIX_POINTS);
+  }
+
+  /** Invalidate all point rules caches */
+  static invalidatePointRulesCache(): void {
+    apiCache.deleteByPrefix(CACHE_PREFIX_POINT_RULES);
+  }
+
+  /** Invalidate all incentive program / standard / submission caches */
+  static invalidateIncentiveCache(): void {
+    apiCache.deleteByPrefix(CACHE_PREFIX_INCENTIVE);
+  }
+
   // Update leaderboard visibility
   static async updateLeaderboardVisibility(
     memberId: string,
@@ -475,6 +503,9 @@ export class PointsService {
             leaderboardVisibility: visibility, // backward compat during migration
             updatedAt: Timestamp.now(),
           });
+
+          // Invalidate members cache after write
+          MembersService.invalidateMembersCache();
         } catch (error) {
           console.error('Error updating leaderboard visibility:', error);
           throw error;
@@ -601,6 +632,7 @@ export class PointsService {
               ...rule,
               updatedAt: Timestamp.now(),
             });
+            PointsService.invalidatePointRulesCache();
             return ruleId;
           } else {
             // Create new rule
@@ -611,6 +643,7 @@ export class PointsService {
               updatedAt: Timestamp.now(),
             };
             const docRef = await addDoc(collection(db, COLLECTIONS.POINT_RULES), newRule);
+            PointsService.invalidatePointRulesCache();
             return docRef.id;
           }
         } catch (error) {
@@ -634,6 +667,7 @@ export class PointsService {
             active: false,
             updatedAt: Timestamp.now(),
           });
+          PointsService.invalidatePointRulesCache();
         } catch (error) {
           console.error('Error deleting point rule:', error);
           throw error;
@@ -1044,6 +1078,7 @@ export class PointsService {
       }
 
       await batch.commit();
+      PointsService.invalidateIncentiveCache();
       return newProgramRef.id;
     } catch (error) {
       console.error('Error cloning program:', error);
@@ -1071,6 +1106,8 @@ export class PointsService {
   }
 
   // Submit an incentive claim
+  // P1-C fix: enforce standard.maxClaims before allowing a new submission
+  // P1-D fix: enforce program.deadline so late submissions are rejected upfront
   static async submitIncentiveClaim(
     claim: Partial<IncentiveSubmission> & { standardId: string; loId: string; quantity: number }
   ): Promise<string> {
@@ -1079,6 +1116,45 @@ export class PointsService {
       return `mock-claim-${Date.now()}`;
     }
     try {
+      // P1-C + P1-D: pre-flight checks — fetch standard then program
+      const stdSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, claim.standardId));
+      if (stdSnap.exists()) {
+        const standard = stdSnap.data() as IncentiveStandard & { maxClaims?: number };
+
+        // P1-C: enforce per-member maxClaims limit
+        const maxClaims = (standard as any).maxClaims as number | undefined;
+        if (maxClaims !== undefined && claim.memberId) {
+          const existingQ = query(
+            collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+            where('memberId', '==', claim.memberId),
+            where('standardId', '==', claim.standardId),
+            where('status', 'in', ['PENDING', 'APPROVED'])
+          );
+          const existingSnap = await getDocs(existingQ);
+          if (existingSnap.size >= maxClaims) {
+            throw new Error('Maximum claims reached for this standard.');
+          }
+        }
+
+        // P1-D: enforce program deadline
+        const programId = standard.programId;
+        if (programId) {
+          const progSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, programId));
+          if (progSnap.exists()) {
+            const program = progSnap.data() as IncentiveProgram & { deadline?: any };
+            const deadline = (program as any).deadline;
+            if (deadline) {
+              const deadlineDate = typeof deadline.toDate === 'function'
+                ? deadline.toDate()
+                : new Date(deadline);
+              if (new Date() > deadlineDate) {
+                throw new Error('The incentive program deadline has passed.');
+              }
+            }
+          }
+        }
+      }
+
       const submission: Omit<IncentiveSubmission, 'id'> = {
         standardId: claim.standardId,
         loId: claim.loId,
@@ -1173,17 +1249,130 @@ export class PointsService {
   }
 
   // Approve a claim
+  // P0-A fix: atomically update submission status AND create a points transaction in one batch.
   static async approveClaim(submissionId: string, grantedPoints: number, approverId: string): Promise<void> {
     if (isDevMode()) {
       console.log(`[DEV MODE] Approved claim ${submissionId} with ${grantedPoints} points.`);
       return;
     }
     try {
-      await updateDoc(doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId), {
+      // Fetch submission to get memberId for points award
+      const submissionRef = doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId);
+      const submissionSnap = await getDoc(submissionRef);
+      if (!submissionSnap.exists()) throw new Error(`Submission ${submissionId} not found`);
+      const submission = submissionSnap.data() as IncentiveSubmission;
+
+      // TODO: milestone-level approval not yet implemented; milestoneId is present on the
+      // submission (submission.milestoneId) but sub-milestone score tracking is not supported yet.
+      // The full submission is approved as a whole for now.
+
+      // P1-B: if the caller passes 0 points, derive a sensible default from the standard's
+      // first milestone so scoreAwarded is never silently zeroed on approval.
+      let resolvedPoints = grantedPoints;
+      if (resolvedPoints === 0) {
+        try {
+          const stdSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, submission.standardId));
+          if (stdSnap.exists()) {
+            const std = stdSnap.data() as IncentiveStandard;
+            resolvedPoints = std.milestones?.[0]?.points || submission.scoreAwarded || 0;
+          }
+        } catch (stdErr) {
+          console.error('approveClaim: could not fetch standard for scoreAwarded fallback', stdErr);
+        }
+      }
+
+      const batch = writeBatch(db);
+
+      // 1. Update submission status to APPROVED
+      batch.update(submissionRef, {
         status: 'APPROVED',
-        scoreAwarded: grantedPoints,
-        approvedBy: approverId
+        scoreAwarded: resolvedPoints,
+        approvedBy: approverId,
       });
+
+      // 2. Create a points transaction for the member (if there is one)
+      // Note: expiresAt is defined in types but not enforced; metadata is stored but not read.
+      if (submission.memberId && resolvedPoints > 0) {
+        const txRef = doc(collection(db, COLLECTIONS.POINTS));
+        batch.set(txRef, {
+          memberId: submission.memberId,
+          points: resolvedPoints,
+          amount: resolvedPoints,
+          category: 'Incentive_Claim',
+          description: `Incentive claim approved (submission: ${submissionId})`,
+          relatedEntityId: submissionId,
+          relatedEntityType: 'incentiveSubmission',
+          sourceId: submissionId,           // backward compatibility
+          sourceType: 'incentiveSubmission', // backward compatibility
+          createdAt: Timestamp.now(),
+        });
+      }
+
+      await batch.commit();
+
+      // P0-A: Update loStarProgress inline to mirror Cloud Function onSubmissionApproved.
+      // The Cloud Function may not be deployed in all environments, so we replicate its logic
+      // here as a reliable fallback. Errors are non-fatal — loStarProgress is a derived cache.
+      if (submission.loId && resolvedPoints > 0) {
+        try {
+          const stdSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, submission.standardId));
+          if (stdSnap.exists()) {
+            const std = stdSnap.data() as IncentiveStandard;
+            const category = std.category;
+            const programId = std.programId;
+
+            const progSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, programId));
+            if (progSnap.exists()) {
+              const program = progSnap.data() as IncentiveProgram;
+              const minScore = program.categories?.[category]?.minScore ?? 250;
+              const year = program.year || new Date().getFullYear();
+
+              const progressRef = doc(db, COLLECTIONS.LO_STAR_PROGRESS, `${submission.loId}_${year}`);
+              await runTransaction(db, async (t) => {
+                const progressSnap = await t.get(progressRef);
+                const data: Record<string, any> = progressSnap.exists()
+                  ? { ...progressSnap.data() }
+                  : {
+                      loId: submission.loId,
+                      year,
+                      categories: {},
+                      details: {},
+                      totalPoints: 0,
+                      starsUnlocked: 0,
+                    };
+
+                if (!data.categories[category]) {
+                  data.categories[category] = { current: 0, total: minScore, stars: 0 };
+                }
+                const currentPoints = (data.categories[category].current || 0) + resolvedPoints;
+                data.categories[category].current = currentPoints;
+                data.categories[category].stars = currentPoints >= minScore ? 1 : 0;
+                data.totalPoints = (data.totalPoints || 0) + resolvedPoints;
+
+                let totalStars = 0;
+                Object.values(data.categories as Record<string, any>).forEach((cat: any) => {
+                  totalStars += cat.stars || 0;
+                });
+                data.starsUnlocked = totalStars;
+                data.lastUpdated = Timestamp.now();
+
+                t.set(progressRef, data, { merge: true });
+              });
+            }
+          }
+        } catch (loStarError) {
+          console.error('approveClaim: failed to update loStarProgress (non-fatal)', loStarError);
+        }
+      }
+
+      // Update member aggregate points total after batch commit
+      if (submission.memberId && resolvedPoints > 0) {
+        await this.updateMemberPoints(submission.memberId, resolvedPoints);
+      }
+
+      // Invalidate caches
+      PointsService.invalidatePointsCache();
+      PointsService.invalidateIncentiveCache();
     } catch (error) {
       console.error('Error approving claim:', error);
       throw error;
@@ -1197,11 +1386,15 @@ export class PointsService {
       return;
     }
     try {
+      // TODO: milestone-level rejection not yet implemented; milestoneId on the submission
+      // is ignored at this stage. The full submission is rejected as a whole.
       await updateDoc(doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId), {
         status: 'REJECTED',
         rejectionReason: reason,
         approvedBy: approverId
       });
+      // Invalidate cache after write
+      PointsService.invalidateIncentiveCache();
     } catch (error) {
       console.error('Error rejecting claim:', error);
       throw error;
@@ -1209,6 +1402,8 @@ export class PointsService {
   }
 
   // Create a new incentive program
+  // P0-B fix: if the new program is active, deactivate all existing active programs atomically
+  // in the same writeBatch so there is never more than one active program at a time.
   static async createIncentiveProgram(program: Omit<IncentiveProgram, 'id'>): Promise<string> {
     if (isDevMode()) {
       console.log('[DEV MODE] Creating incentive program:', program);
@@ -1222,12 +1417,41 @@ export class PointsService {
     }
     try {
       const { id: _, ...dataToSave } = program as any;
-      const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_PROGRAMS), {
+      const batch = writeBatch(db);
+
+      // If the new program is active, deactivate all currently active programs first
+      if (dataToSave.isActive) {
+        const activeQ = query(
+          collection(db, COLLECTIONS.INCENTIVE_PROGRAMS),
+          where('isActive', '==', true)
+        );
+        const activeSnap = await getDocs(activeQ);
+        activeSnap.docs.forEach(activeDoc => {
+          batch.update(
+            doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, activeDoc.id),
+            { isActive: false, updatedAt: Timestamp.now() }
+          );
+        });
+      }
+
+      // Create the new program document atomically in the same batch
+      const newProgramRef = doc(collection(db, COLLECTIONS.INCENTIVE_PROGRAMS));
+      batch.set(newProgramRef, {
         ...dataToSave,
         createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        updatedAt: Timestamp.now(),
       });
-      return docRef.id;
+
+      await batch.commit();
+      PointsService.invalidateIncentiveCache();
+      // TODO P1-A: Pre-initialize loStarProgress docs for every LO when a new program is
+      // created so LOStarDashboard never hits a "doc not found" error before the first
+      // approved submission. Requires fetching all distinct loIds from the members
+      // collection and setDoc-ing a skeleton { loId, year, categories:{}, totalPoints:0,
+      // starsUnlocked:0, lastUpdated } for each. Skipped here to avoid a large unbounded
+      // read on program creation; getLOStarProgress() now uses setDoc+merge:true as a
+      // lazy initialiser on first dashboard load (see P1-A fix in getLOStarProgress).
+      return newProgramRef.id;
     } catch (error) {
       console.error('Error creating incentive program:', error);
       throw error;
@@ -1250,6 +1474,7 @@ export class PointsService {
         ...data,
         updatedAt: Timestamp.now()
       });
+      PointsService.invalidateIncentiveCache();
     } catch (error) {
       console.error('Error updating incentive program:', error);
       throw error;
@@ -1277,6 +1502,12 @@ export class PointsService {
       batch.delete(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id));
 
       await batch.commit();
+      PointsService.invalidateIncentiveCache();
+      // TODO P1-D: cascade-delete loStarProgress docs for this program's year.
+      // Query loStarProgress where year == program.year and delete them (or set archived:true).
+      // Requires fetching the program doc before deletion to read its year field.
+      // Not implemented here because it requires an additional getDocs + batch outside the
+      // existing batch (Firestore batch limit is 500 writes).
     } catch (error) {
       console.error('Error deleting incentive program:', error);
       throw error;
@@ -1305,6 +1536,7 @@ export class PointsService {
           ...data,
           updatedAt: Timestamp.now()
         });
+        PointsService.invalidateIncentiveCache();
         return id;
       } else {
         const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_STANDARDS), {
@@ -1312,6 +1544,7 @@ export class PointsService {
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now()
         });
+        PointsService.invalidateIncentiveCache();
         return docRef.id;
       }
     } catch (error) {
@@ -1336,6 +1569,7 @@ export class PointsService {
         batch.delete(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id));
       }
       await batch.commit();
+      PointsService.invalidateIncentiveCache();
     } catch (error) {
       console.error('Error bulk deleting standards:', error);
       throw error;
@@ -1418,7 +1652,7 @@ export class PointsService {
         };
       });
 
-      return {
+      const progress: LOStarProgress = {
         loId,
         year,
         categories,
@@ -1427,6 +1661,24 @@ export class PointsService {
         starsUnlocked,
         lastUpdated: new Date().toISOString()
       };
+
+      // P1-A fix: persist computed progress so the loStarProgress document exists for
+      // Cloud Function incremental updates and LOStarDashboard reads. Using merge:true
+      // so we never overwrite incremental updates written by the Cloud Function with
+      // stale on-the-fly aggregated values — only missing fields are initialised.
+      try {
+        const progressRef = doc(db, COLLECTIONS.LO_STAR_PROGRESS, `${loId}_${year}`);
+        await setDoc(progressRef, {
+          loId,
+          year,
+          lastUpdated: progress.lastUpdated,
+        }, { merge: true });
+      } catch (persistErr) {
+        // Non-fatal: if the write fails the caller still gets the computed value
+        console.warn('[loStarProgress] Failed to persist progress snapshot:', persistErr);
+      }
+
+      return progress;
     } catch (error) {
       console.error('Error fetching LO star progress:', error);
       throw error;
@@ -1618,6 +1870,9 @@ export class PointsService {
         tier,
         updatedAt: Timestamp.now()
       });
+
+      // Invalidate members cache after write
+      MembersService.invalidateMembersCache();
 
       console.log(`Recalculated member ${memberId}:`, {
         leadership,

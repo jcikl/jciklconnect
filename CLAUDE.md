@@ -377,11 +377,94 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 
 **P0 待修（3条）：** `transactionSplits` E1（allow read loId 字段缺失→跨 LO 数据泄露）；`notifications` E1（allow list resource.data→会员永远看不到自己的通知）；`notifications` E2（_writeNotification type 硬编码→通知静默失败）
 
+**第二批高优先级扫描（2026-07-16）— P0×23 P1×101 P2×71 Total×195**
+
+| 集合 | 分析日期 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 关键P0摘要 |
+|------|----------|-----------------------|------------|-----------|-----------|
+| `workflows` | 2026-07-16 | 13（1/8/4）| 4 | 缺失 | 重复触发无防护→数据重复写入 |
+| `elections` | 2026-07-16 | 12（2/6/4）| 2 | 缺失 | 服务层为零（空壳）；双重投票无防护 |
+| `toyyibBills` | 2026-07-16 | 12（2/6/4）| 3 | 部分 | webhook 重复回调二次创建交易；账单创建失败不回滚members字段 |
+| `events` | 2026-07-16 | 11（2/7/2）| 4 | 部分 | 任意登录用户可删改任意活动；公开活动页永远空列表 |
+| `points` | 2026-07-16 | 11（2/6/3）| 3 | 部分 | 任意用户可刷积分；审批通过积分从不发放 |
+| `mentorMatches` | 2026-07-16 | 11（1/6/4）| 4 | 部分 | acceptMentorship 两步写入非批次 |
+| `incentiveSubmissions` | 2026-07-16 | 10（2/6/2）| 3 | 缺失 | 直接updateDoc不触发loStarProgress更新；allow list resource.data失效 |
+| `automationRules` | 2026-07-16 | 10（1/5/4）| 2 | 部分 | 规则触发自身→无限循环 |
+| `tasks` | 2026-07-16 | 10（0/5/5）| 2 | 缺失 | — |
+| `toyyibCategories` | 2026-07-16 | 10（0/5/5）| 2 | 缺失 | — |
+| `contracts` | 2026-07-16 | 10（1/4/5）| 2 | 部分 | signContract 三步非批次→积分锁定但合约不存在 |
+| `projects` | 2026-07-16 | 10（0/5/5）| 3 | 部分 | — |
+| `pointEscrow` | 2026-07-16 | 9（2/4/3）| 4 | 部分 | 任意用户可创建/修改托管记录；signContract三步非批次 |
+| `loStarProgress` | 2026-07-16 | 9（0/6/3）| 2 | 部分 | — |
+| `achievements` | 2026-07-16 | 8（1/6/1）| 2 | 缺失 | awardAward三步无批次→永久数据不一致 |
+| `incentivePrograms` | 2026-07-16 | 8（1/4/3）| 3 | 部分 | 多个program同时isActive=true |
+| `votes` | 2026-07-16 | 8（2/3/3）| 2 | 缺失 | 重复投票无防护；选票明文存储 |
+| `bounties` | 2026-07-16 | 8（2/4/2）| 0 | 缺失 | 服务层为零（空壳）；Firestore规则全开放 |
+| `badges` | 2026-07-16 | 7（1/2/4）| 2 | 部分 | ruleExecutionService.awardBadge返回假成功→自动化颁奖全部静默失败 |
+| `bankAccounts` | 2026-07-16 | 7（0/3/4）| 1 | 部分 | — |
+
 ### 已分析集合（collection-deps）
 
 | 集合 | 分析日期 | 联动集合数 | 强耦合 | 中耦合 | 弱耦合 | P0风险数 | P0风险摘要 |
 |------|----------|-----------|-------|-------|-------|---------|-----------|
 | `transactions` | 2026-07-16 | 10 | 3（`transactionSplits`, `members`, `projectTrx`）| 4（`paymentRequests`, `inventoryItems`, `notifications`, `reconciliations`）| 2（`financeAlerts`, `eventRegistrations`）+ 1 自引用 | 3 | rules `loId` 判断失效（全 LO 数据泄露）；`revertPaid` 非批次（PR 永久 Paid 但无交易）；删 Membership 交易不清 `members.transactionId[]` |
+
+---
+
+## CRUD 操作开发前置检查协议（Auto-enforced）
+
+**每次新增或修改任何 Firestore 读写操作（Create / Read / Update / Delete），必须在动笔写代码前，逐项回答以下四组问题。这是强制步骤，不能跳过。**
+
+### 写入前（Create / Update）
+
+**联动写：**
+- 这个操作写入集合 A 时，其他哪些集合需要同步写入？（例：创建 paymentRequest → 要不要同时写 notifications？）
+- 这些联动写是否放在同一个 `writeBatch` 里？如果不是，中途失败会导致什么数据不一致？
+
+**冗余字段同步：**
+- 被更新的字段，在其他集合里有没有冗余副本？（例：更新 member.name → eventRegistrations.memberName 是否跟着改？）
+- 如果有冗余副本，同步逻辑写在哪里？遗漏了会怎样？
+
+**缓存清理：**
+- 写完之后，必须调用哪些 `invalidateXxxCache()`？
+- 有没有按 LO / 按状态分组的独立缓存键也需要一起清？（只清主键、漏清分组键 = 分组查询读到旧数据）
+
+**前置校验：**
+- 写入前是否需要验证状态合法性？（例：paymentRequest 必须是 `pending` 才能 approve，不能从 `rejected` 直接跳）
+- Firestore 规则里有没有对应的字段白名单（`hasOnly([])`）或必填校验（`hasAll([])`）？
+
+### 删除前（Delete）
+
+**孤儿风险：**
+- 删除这条记录后，哪些其他集合里还有指向它 ID 的字段？（在 `types.ts` 里搜本集合的 `xxxId` 字段出现在哪些其他类型里）
+- 这些关联记录应该：级联删除 / 软标记为已删除 / 保留但断开引用？
+- 删除前是否需要先检查"这条记录是否仍被引用"？（例：删除 bankAccount 前先查是否有未结算 transactions 指向它）
+
+**退回路径：**
+- 删除操作可以撤回吗？（软删 vs 硬删）
+- 如果用软删（`isDeleted: true`），所有读取这个集合的查询是否都过滤了软删记录？
+
+### 任何写操作的通用规则
+
+| 规则 | 要求 |
+|------|------|
+| 多文档写入 | 必须用 `writeBatch`，绝不分开发送 |
+| 缓存清理 | 每个写路径（包括 batch 变体）都必须调用 `invalidateXxxCache()` |
+| 错误处理 | 失败必须通过 `errorLoggingService` 记录，不能静默吞掉 |
+| 副作用顺序 | 主文档写入成功后再触发副作用（通知、积分、同步），不能先触副作用再写主文档 |
+| Firestore 规则同步 | Service 层的权限判断改了，对应的 `firestore.rules` 必须同步改 |
+| Dev 模式路径 | 新增的 service 方法必须有 `isDevMode()` 检查和 mock 数据返回 |
+
+### 变体对称检查
+
+如果这个操作有"单个版"和"批量版"（或多个入口），两者必须对称：
+- 权限守卫相同？
+- 退回机制相同？
+- 联动写相同？
+- 缓存清理相同？
+
+不对称 = 修好了一个入口，另一个入口还有洞。
+
+---
 
 ### Firestore 权限规则注意事项
 
