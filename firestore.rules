@@ -538,22 +538,6 @@ service cloud.firestore {
       allow update, delete: if isBoard() || isAdmin();
     }
     
-    // Elections collection
-    match /elections/{electionId} {
-      // FIX 7: use isAdmin() so SUPER_ADMIN is covered; delete restricted to admin only;
-      // restrict read to members (not GUEST/INACTIVE).
-      allow read: if isMember();
-      allow create, update: if isBoard() || isAdmin();
-      allow delete: if isAdmin();
-
-      // Election ballots: immutable once cast; admin-only read to protect ballot privacy
-      match /electionBallots/{ballotId} {
-        allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
-        allow read: if isAdmin();
-        allow update, delete: if false;
-      }
-    }
-
     // Votes collection (standalone voting records across all elections)
     match /votes/{voteId} {
       // FIX 4: split read — resource.data is null in list queries; protect ballot privacy
@@ -951,14 +935,7 @@ service cloud.firestore {
     // this collection is intentionally NOT re-declared here to avoid re-opening the
     // isMember()-for-everything hole (see match /paymentRequests/{requestId} above).
 
-    // Wolf-like Competition System Collections
-    match /bounties/{bountyId} {
-      // FIX 8: any authenticated user (including GUEST) was able to create/modify/delete bounties.
-      // Bounties are board-managed incentive instruments — restrict writes accordingly.
-      allow read: if isMember();
-      allow create, update: if isBoard() || isAdmin();
-      allow delete: if isAdmin();
-    }
+    // Contract System Collections
     match /contracts/{contractId} {
       // FIX 13: split read (resource.data null in list); restrict writes; hasOnly for member signing.
       allow get: if isAuthenticated() && (isAdmin() || isBoard() ||

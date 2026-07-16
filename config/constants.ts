@@ -69,10 +69,9 @@ export const COLLECTIONS = {
   INCENTIVE_STANDARDS: 'incentiveStandards',
   INCENTIVE_SUBMISSIONS: 'incentiveSubmissions',
   LO_STAR_PROGRESS: 'loStarProgress',
-  /** Wolf-like Competition System Collections */
-  BOUNTIES: 'bounties',
+  /** Competition/Contract System Collections */
   CONTRACTS: 'contracts',
-  POINT_ESCROW: 'pointEscrow', // For holding funds during bounty/contract
+  POINT_ESCROW: 'pointEscrow', // For holding funds during contracts
   PUBLICATIONS: 'publications',
   PARTNERSHIPS: 'partnerships',
   BOARD_TERM_SETTINGS: 'boardTermSettings',
@@ -85,8 +84,6 @@ export const COLLECTIONS = {
   SYSTEM_LOGS: 'systemLogs',
   /** Governance: motions / resolutions voted on by board */
   VOTES: 'votes',
-  /** Governance: board elections with candidates and ballots */
-  ELECTIONS: 'elections',
   /** Project sub-tasks assigned to committee members */
   TASKS: 'tasks',
   /** Mentor–mentee pairings */

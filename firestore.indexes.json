@@ -169,20 +169,6 @@
       ]
     },
     {
-      "collectionGroup": "elections",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "votingEndDate",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "badgeAwards",
       "queryScope": "COLLECTION",
       "fields": [
@@ -1400,14 +1386,6 @@
       "fields": [
         { "fieldPath": "year", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "bounties",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {

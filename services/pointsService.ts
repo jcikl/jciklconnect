@@ -797,13 +797,13 @@ export class PointsService {
   }
 
   /**
-   * Lock points in Escrow (for Bounties/Contracts)
+   * Lock points in Escrow (for Contracts)
    * This triggers 'Loss Aversion' as points are deducted but not yet used.
    */
   static async lockPointsForEscrow(
     memberId: string,
     amount: number,
-    purpose: 'BOUNTY' | 'CONTRACT',
+    purpose: 'CONTRACT',
     relatedEntityId: string,
     description: string
   ): Promise<string> {
@@ -861,7 +861,7 @@ export class PointsService {
   }
 
   /**
-   * Release Escrow to a target (Completing a bounty)
+   * Release Escrow to a target (completing a contract)
    */
   static async releaseEscrow(
     escrowId: string,
@@ -900,9 +900,7 @@ export class PointsService {
 
             // Record receiving transaction
             const txRef = doc(collection(db, COLLECTIONS.POINTS));
-            const txDescription = purpose === 'CONTRACT'
-              ? `Contract fulfillment: ${description}`
-              : `Bounty payout for: ${description}`;
+            const txDescription = `Contract fulfillment: ${description}`;
 
             transaction.set(txRef, {
               memberId: targetMemberId,
