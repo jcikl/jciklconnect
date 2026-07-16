@@ -133,7 +133,7 @@ export class LearningPathsService {
               updatedAt: d.data().updatedAt?.toDate() || new Date(),
             })) as LearningPath[];
           } catch (error) {
-            errorLoggingService.logError(error as Error, { context: 'LearningPathsService.getAllLearningPaths' });
+            errorLoggingService.logError(error as Error, { action: 'LearningPathsService.getAllLearningPaths' });
             throw error;
           }
         }, CACHE_TTL)
@@ -152,7 +152,7 @@ export class LearningPathsService {
         updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
       } as LearningPath;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.getLearningPathById', pathId });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.getLearningPathById', additionalData: { pathId } });
       throw error;
     }
   }
@@ -177,7 +177,7 @@ export class LearningPathsService {
           completedAt: d.data().completedAt?.toDate() || undefined,
         })) as LearningProgress[];
       } catch (error) {
-        errorLoggingService.logError(error as Error, { context: 'LearningPathsService.getMemberProgress', memberId });
+        errorLoggingService.logError(error as Error, { action: 'LearningPathsService.getMemberProgress', userId: memberId });
         throw error;
       }
     }, CACHE_TTL);
@@ -203,7 +203,7 @@ export class LearningPathsService {
           issuedAt: d.data().issuedAt?.toDate() || new Date(),
         })) as Certificate[];
       } catch (error) {
-        errorLoggingService.logError(error as Error, { context: 'LearningPathsService.getMemberCertificates', memberId });
+        errorLoggingService.logError(error as Error, { action: 'LearningPathsService.getMemberCertificates', userId: memberId });
         throw error;
       }
     }, CACHE_TTL);
@@ -228,7 +228,7 @@ export class LearningPathsService {
         issuedAt: certDoc.data().issuedAt?.toDate() || new Date(),
       } as Certificate;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.verifyCertificate' });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.verifyCertificate' });
       throw error;
     }
   }
@@ -249,7 +249,7 @@ export class LearningPathsService {
       this.invalidateLearningPathsCache();
       return newRef.id;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.createLearningPath' });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.createLearningPath' });
       throw error;
     }
   }
@@ -263,7 +263,7 @@ export class LearningPathsService {
       });
       this.invalidateLearningPathsCache();
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.updateLearningPath', pathId });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.updateLearningPath', additionalData: { pathId } });
       throw error;
     }
   }
@@ -315,7 +315,7 @@ export class LearningPathsService {
         this.invalidateCertificatesCache(memberId);
       });
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.deleteLearningPath', pathId });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.deleteLearningPath', additionalData: { pathId } });
       throw error;
     }
   }
@@ -356,7 +356,7 @@ export class LearningPathsService {
         return newRef.id;
       });
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.startLearningPath', memberId, pathId });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.startLearningPath', userId: memberId, additionalData: { pathId } });
       throw error;
     } finally {
       this.invalidateProgressCache(memberId);
@@ -432,7 +432,7 @@ export class LearningPathsService {
       this.invalidateProgressCache(progress.memberId);
       if (isCompleted) this.invalidateCertificatesCache(progress.memberId);
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.updateProgress', progressId, moduleId });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.updateProgress', additionalData: { progressId, moduleId } });
       throw error;
     }
   }
@@ -503,7 +503,7 @@ export class LearningPathsService {
 
       return certRef.id;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'LearningPathsService.issueCertificate', memberId, pathId });
+      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.issueCertificate', userId: memberId, additionalData: { pathId } });
       throw error;
     }
   }

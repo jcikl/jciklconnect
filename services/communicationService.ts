@@ -433,19 +433,19 @@ export class CommunicationService {
         if (failedNotifications.length > 0) {
           console.error(`Failed to send notifications to ${failedNotifications.length} member(s).`);
         }
-
-          return {
-            postId,
-            emailsSent,
-            notificationsSent,
-            ...(failedNotifications.length > 0 ? { failedNotifications } : {}),
-          };
-        } catch (error) {
-          console.error('Error creating announcement:', error);
-          throw error;
-        }
       }
-    );
+
+      return {
+        postId,
+        emailsSent,
+        notificationsSent,
+      };
+      } catch (error) {
+        console.error('Error creating announcement:', error);
+        throw error;
+      }
+    }
+  );
   }
 
   /**

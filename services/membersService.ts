@@ -723,7 +723,7 @@ export class MembersService {
       console.warn('Board member display sync skipped:', err);
       logServiceError(
         err instanceof Error ? err : new Error(String(err)),
-        { component: 'MembersService', action: 'syncBoardMemberDisplayFields', memberId }
+        { component: 'MembersService', action: 'syncBoardMemberDisplayFields', additionalData: { memberId } }
       );
     }
   }
@@ -792,7 +792,7 @@ export class MembersService {
 
       const [boardSnap, bizSnap] = await Promise.all([
         getDocs(query(collection(db, 'boardMembers'), where('memberId', '==', memberId))),
-        getDocs(query(collection(db, COLLECTIONS.BUSINESS_DIRECTORY), where('memberId', '==', memberId))),
+        getDocs(query(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS), where('memberId', '==', memberId))),
       ]);
       if (!boardSnap.empty || !bizSnap.empty) {
         const cleanupBatch = writeBatch(db);
@@ -1164,7 +1164,7 @@ export class MembersService {
       // Clean up boardMembers and businessDirectory for all deleted members (E-01)
       const [boardSnaps, bizSnaps] = await Promise.all([
         getDocs(query(collection(db, 'boardMembers'), where('memberId', 'in', memberIds.slice(0, 30)))),
-        getDocs(query(collection(db, COLLECTIONS.BUSINESS_DIRECTORY), where('memberId', 'in', memberIds.slice(0, 30)))),
+        getDocs(query(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS), where('memberId', 'in', memberIds.slice(0, 30)))),
       ]);
       // Handle batches > 30 (Firestore 'in' limit is 30)
       const extraBoardSnaps = memberIds.length > 30
@@ -1177,7 +1177,7 @@ export class MembersService {
       const extraBizSnaps = memberIds.length > 30
         ? await Promise.all(
             Array.from({ length: Math.ceil((memberIds.length - 30) / 30) }, (_, i) =>
-              getDocs(query(collection(db, COLLECTIONS.BUSINESS_DIRECTORY), where('memberId', 'in', memberIds.slice(30 + i * 30, 60 + i * 30))))
+              getDocs(query(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS), where('memberId', 'in', memberIds.slice(30 + i * 30, 60 + i * 30))))
             )
           )
         : [];

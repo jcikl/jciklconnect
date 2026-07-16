@@ -97,7 +97,7 @@ export class WorkflowService {
             lastExecuted: d.data().lastExecuted?.toDate?.()?.toISOString() ?? d.data().lastExecuted,
           } as Workflow));
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'WorkflowService.getAllWorkflows' });
+          errorLoggingService.logError(error as Error, { action: 'WorkflowService.getAllWorkflows' });
           throw error;
         }
       }
@@ -124,7 +124,7 @@ export class WorkflowService {
             lastExecuted: data.lastExecuted?.toDate?.()?.toISOString() ?? data.lastExecuted,
           } as Workflow;
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'WorkflowService.getWorkflowById', workflowId });
+          errorLoggingService.logError(error as Error, { action: 'WorkflowService.getWorkflowById', additionalData: { workflowId } });
           throw error;
         }
       }
@@ -162,7 +162,7 @@ export class WorkflowService {
           const ref = await addDoc(collection(db, WF_COL()), payload);
           return ref.id;
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'WorkflowService.createWorkflow' });
+          errorLoggingService.logError(error as Error, { action: 'WorkflowService.createWorkflow' });
           throw error;
         }
       }
@@ -180,7 +180,7 @@ export class WorkflowService {
             updatedAt: serverTimestamp(),
           });
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'WorkflowService.updateWorkflow', workflowId });
+          errorLoggingService.logError(error as Error, { action: 'WorkflowService.updateWorkflow', additionalData: { workflowId } });
           throw error;
         }
       }
@@ -220,7 +220,7 @@ export class WorkflowService {
             if (execSnap.docs.length < 400) hasMore = false;
           }
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'WorkflowService.deleteWorkflow', workflowId });
+          errorLoggingService.logError(error as Error, { action: 'WorkflowService.deleteWorkflow', additionalData: { workflowId } });
           throw error;
         }
       }
@@ -434,15 +434,15 @@ export class WorkflowService {
               error: { message: msg, stack: error instanceof Error ? error.stack : undefined },
             });
             errorLoggingService.logError(error as Error, {
-              context: 'WorkflowService.executeWorkflow',
-              workflowId,
+              action: 'WorkflowService.executeWorkflow',
+              additionalData: { workflowId },
             });
             throw error;
           }
         } catch (error) {
           errorLoggingService.logError(error as Error, {
-            context: 'WorkflowService.executeWorkflow (outer)',
-            workflowId,
+            action: 'WorkflowService.executeWorkflow (outer)',
+            additionalData: { workflowId },
           });
           throw error;
         }
@@ -689,8 +689,8 @@ export class WorkflowService {
           } as WorkflowExecution));
         } catch (error) {
           errorLoggingService.logError(error as Error, {
-            context: 'WorkflowService.getExecutionLogs',
-            workflowId,
+            action: 'WorkflowService.getExecutionLogs',
+            additionalData: { workflowId },
           });
           throw error;
         }
@@ -715,8 +715,8 @@ export class WorkflowService {
           } as WorkflowExecution;
         } catch (error) {
           errorLoggingService.logError(error as Error, {
-            context: 'WorkflowService.getExecutionById',
-            executionId,
+            action: 'WorkflowService.getExecutionById',
+            additionalData: { executionId },
           });
           throw error;
         }

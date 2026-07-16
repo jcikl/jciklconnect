@@ -57,7 +57,7 @@ export class KnowledgeService {
               ...d.data(),
             } as TrainingModule));
           } catch (error) {
-            errorLoggingService.logError(error as Error, { context: 'KnowledgeService.getAllTrainingModules' });
+            errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getAllTrainingModules' });
             throw error;
           }
         }, CACHE_TTL)
@@ -73,7 +73,7 @@ export class KnowledgeService {
         if (!docSnap.exists()) return null;
         return { id: docSnap.id, ...docSnap.data() } as TrainingModule;
       } catch (error) {
-        errorLoggingService.logError(error as Error, { context: 'KnowledgeService.getTrainingModuleById', moduleId });
+        errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getTrainingModuleById', additionalData: { moduleId } });
         throw error;
       }
     }, CACHE_TTL);
@@ -100,7 +100,7 @@ export class KnowledgeService {
       this.invalidateTrainingModulesCache();
       return newRef.id;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'KnowledgeService.createTrainingModule' });
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.createTrainingModule' });
       throw error;
     }
   }
@@ -120,7 +120,7 @@ export class KnowledgeService {
       await batch.commit();
       this.invalidateTrainingModulesCache();
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'KnowledgeService.updateTrainingModule', moduleId });
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.updateTrainingModule', additionalData: { moduleId } });
       throw error;
     }
   }
@@ -153,7 +153,7 @@ export class KnowledgeService {
       await batch.commit();
       // No training-modules cache to invalidate — this is in LEARNING_PROGRESS
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'KnowledgeService.markModuleComplete', memberId, moduleId });
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.markModuleComplete', additionalData: { memberId, moduleId } });
       throw error;
     }
   }
@@ -180,7 +180,7 @@ export class KnowledgeService {
       }
       return result;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'KnowledgeService.getMemberModuleCompletions', memberId });
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getMemberModuleCompletions', additionalData: { memberId } });
       throw error;
     }
   }
@@ -202,7 +202,7 @@ export class KnowledgeService {
             uploadedDate: d.data().uploadedDate?.toDate?.()?.toISOString() || d.data().uploadedDate,
           } as Document));
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'KnowledgeService.getAllDocuments' });
+          errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getAllDocuments' });
           throw error;
         }
       }
@@ -224,7 +224,7 @@ export class KnowledgeService {
       await batch.commit();
       return newRef.id;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'KnowledgeService.createDocument' });
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.createDocument' });
       throw error;
     }
   }
@@ -235,7 +235,7 @@ export class KnowledgeService {
     try {
       await deleteDoc(doc(db, COLLECTIONS.DOCUMENTS, documentId));
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'KnowledgeService.deleteDocument', documentId });
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.deleteDocument', additionalData: { documentId } });
       throw error;
     }
   }
@@ -257,7 +257,7 @@ export class KnowledgeService {
         uploadedDate: d.data().uploadedDate?.toDate?.()?.toISOString() || d.data().uploadedDate,
       } as Document));
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'KnowledgeService.getDocumentsByCategory', category });
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getDocumentsByCategory', additionalData: { category } });
       throw error;
     }
   }

@@ -509,7 +509,7 @@ export class MentorshipService {
           }
           const match = { id: matchDoc.id, ...matchDoc.data() } as MentorMatch;
 
-          if (match.status !== 'active' && match.status !== 'pending' && match.status !== 'suggested') {
+          if (match.status !== 'active' && match.status !== 'suggested' && match.status !== 'approved') {
             throw new Error(`Cannot cancel a match with status '${match.status}'`);
           }
 

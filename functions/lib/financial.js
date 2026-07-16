@@ -205,7 +205,7 @@ exports.performBankReconciliation = functions.https.onCall(async (data, context)
     }
     // Create reconciliation record
     const reconciliationDoc = await db.collection('reconciliations').add({
-        accountId: accountId,
+        bankAccountId: accountId,
         reconciliationDate: reconDate,
         statementBalance: statementBalance,
         systemBalance: systemBalance,

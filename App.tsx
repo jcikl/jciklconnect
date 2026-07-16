@@ -338,6 +338,7 @@ export const JCIKLApp: React.FC = () => {
       })
       .map(m => ({
         id: `birthday-${m.id}-${today.toISOString().split('T')[0]}`,
+        memberId: m.id,
         title: `ðŸŽ‚ Member Birthday Today!`,
         message: `It's ${m.name}'s birthday today! Let's send them some warm wishes.`,
         type: 'info' as const,

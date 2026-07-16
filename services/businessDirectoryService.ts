@@ -126,7 +126,7 @@ export class BusinessDirectoryService {
           errorLoggingService.logError(error as Error, {
             component: 'BusinessDirectoryService',
             action: 'syncPublicListing',
-            memberId,
+            additionalData: { memberId },
           });
           // Re-throw so callers can decide whether to surface a warning.
           throw error;
@@ -197,7 +197,7 @@ export class BusinessDirectoryService {
             errorLoggingService.logError(error as Error, {
               component: 'BusinessDirectoryService',
               action: 'getBusinessById',
-              businessId,
+              additionalData: { businessId },
             });
             throw error;
           }

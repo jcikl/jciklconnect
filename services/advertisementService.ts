@@ -143,7 +143,7 @@ export class AdvertisementService {
                 return bDate.getTime() - aDate.getTime();
               });
             } catch (error) {
-              errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getAllAdvertisements' });
+              errorLoggingService.logError(error as Error, { action: 'AdvertisementService.getAllAdvertisements' });
               throw error;
             }
           },
@@ -193,7 +193,7 @@ export class AdvertisementService {
 
               return activeAds.sort((a, b) => (b.priority || 0) - (a.priority || 0));
             } catch (error) {
-              errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getActiveAdvertisements', placement });
+              errorLoggingService.logError(error as Error, { action: 'AdvertisementService.getActiveAdvertisements', additionalData: { placement } });
               throw error;
             }
           },
@@ -214,7 +214,7 @@ export class AdvertisementService {
           await updateDoc(adRef, { impressions: increment(1), updatedAt: Timestamp.now() });
         } catch (error) {
           // Metrics are best-effort; do not surface to user but do log
-          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.recordImpression', adId });
+          errorLoggingService.logError(error as Error, { action: 'AdvertisementService.recordImpression', additionalData: { adId } });
         }
       }
     );
@@ -229,7 +229,7 @@ export class AdvertisementService {
           const adRef = doc(db, COLL, adId);
           await updateDoc(adRef, { clicks: increment(1), updatedAt: Timestamp.now() });
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.recordClick', adId });
+          errorLoggingService.logError(error as Error, { action: 'AdvertisementService.recordClick', additionalData: { adId } });
         }
       }
     );
@@ -276,7 +276,7 @@ export class AdvertisementService {
           this.invalidateAdsCache();
           return docRef.id;
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.createAdvertisement' });
+          errorLoggingService.logError(error as Error, { action: 'AdvertisementService.createAdvertisement' });
           throw error;
         }
       }
@@ -315,7 +315,7 @@ export class AdvertisementService {
           await updateDoc(adRef, updateData);
           this.invalidateAdsCache();
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.updateAdvertisement', adId });
+          errorLoggingService.logError(error as Error, { action: 'AdvertisementService.updateAdvertisement', additionalData: { adId } });
           throw error;
         }
       }
@@ -331,7 +331,7 @@ export class AdvertisementService {
           await deleteDoc(doc(db, COLL, adId));
           this.invalidateAdsCache();
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.deleteAdvertisement', adId });
+          errorLoggingService.logError(error as Error, { action: 'AdvertisementService.deleteAdvertisement', additionalData: { adId } });
           throw error;
         }
       }
@@ -360,7 +360,7 @@ export class AdvertisementService {
                 updatedAt: d.data().updatedAt?.toDate() || new Date(),
               })) as PromotionPackage[];
             } catch (error) {
-              errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getPromotionPackages' });
+              errorLoggingService.logError(error as Error, { action: 'AdvertisementService.getPromotionPackages' });
               throw error;
             }
           },
@@ -399,7 +399,7 @@ export class AdvertisementService {
             usedAt: d.data().usedAt?.toDate?.() || d.data().usedAt,
           })) as BenefitUsage[];
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'AdvertisementService.getBenefitUsageHistory' });
+          errorLoggingService.logError(error as Error, { action: 'AdvertisementService.getBenefitUsageHistory' });
           return [];
         }
       }

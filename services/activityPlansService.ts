@@ -187,7 +187,7 @@ export class ActivityPlansService {
               errorLoggingService.logError(error as Error, {
                 component: 'ActivityPlansService',
                 action: 'getActivityPlanById',
-                planId,
+                additionalData: { planId },
               });
               throw error;
             }
@@ -236,7 +236,7 @@ export class ActivityPlansService {
               errorLoggingService.logError(error as Error, {
                 component: 'ActivityPlansService',
                 action: 'getActivityPlansByProjectId',
-                projectId,
+                additionalData: { projectId },
               });
               throw error;
             }
@@ -269,7 +269,7 @@ export class ActivityPlansService {
               errorLoggingService.logError(error as Error, {
                 component: 'ActivityPlansService',
                 action: 'getActivityPlansByStatus',
-                status,
+                additionalData: { status },
               });
               throw error;
             }
@@ -356,7 +356,7 @@ export class ActivityPlansService {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',
             action: 'updateActivityPlan',
-            planId,
+            additionalData: { planId },
           });
           throw error;
         }
@@ -389,7 +389,7 @@ export class ActivityPlansService {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',
             action: 'submitActivityPlan',
-            planId,
+            additionalData: { planId },
           });
           throw error;
         }
@@ -442,14 +442,14 @@ export class ActivityPlansService {
             errorLoggingService.logError(notifError as Error, {
               component: 'ActivityPlansService',
               action: 'reviewActivityPlan_notification',
-              planId,
+              additionalData: { planId },
             });
           }
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',
             action: 'reviewActivityPlan',
-            planId,
+            additionalData: { planId },
           });
           throw error;
         }
@@ -518,7 +518,7 @@ export class ActivityPlansService {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',
             action: 'createNewVersion',
-            planId,
+            additionalData: { planId },
           });
           throw error;
         }
@@ -540,7 +540,7 @@ export class ActivityPlansService {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',
             action: 'deleteActivityPlan',
-            planId,
+            additionalData: { planId },
           });
           throw error;
         }

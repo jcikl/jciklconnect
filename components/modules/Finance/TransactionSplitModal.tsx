@@ -427,7 +427,7 @@ export function TransactionSplitModal({
       await FinanceService.createTransactionSplit(
         transaction.id,
         splits,
-        user?.uid ?? user?.id ?? ''
+        user?.uid ?? ''
       );
       onSuccess();
       onClose();

@@ -710,7 +710,7 @@ export class EventsService {
       errorLoggingService.logError(error as Error, {
         component: 'EventsService',
         action: 'registerGuestForEvent',
-        eventId,
+        additionalData: { eventId },
       });
       throw error;
     }
@@ -736,7 +736,7 @@ export class EventsService {
           errorLoggingService.logError(error as Error, {
             component: 'EventsService',
             action: 'getGuestRegistrations',
-            eventId,
+            additionalData: { eventId },
           });
           throw error;
         }

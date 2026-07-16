@@ -129,7 +129,7 @@ export class PartnershipsService {
               // Guest users will hit permission-denied — fall back to mock data
               errorLoggingService.logWarning(
                 '[PartnershipsService] Cannot read advertisements (falling back to mock data)',
-                { error: String(error) }
+                { additionalData: { error: String(error) } }
               );
               return [...MOCK_PARTNERSHIPS];
             }
@@ -182,7 +182,7 @@ export class PartnershipsService {
           this.invalidatePartnershipsCache();
           return docRef.id;
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'PartnershipsService.createPartnership' });
+          errorLoggingService.logError(error as Error, { action: 'PartnershipsService.createPartnership' });
           throw error;
         }
       }
@@ -215,7 +215,7 @@ export class PartnershipsService {
           await updateDoc(docRef, updateData);
           this.invalidatePartnershipsCache();
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'PartnershipsService.updatePartnership', id });
+          errorLoggingService.logError(error as Error, { action: 'PartnershipsService.updatePartnership', additionalData: { id } });
           throw error;
         }
       }
@@ -235,7 +235,7 @@ export class PartnershipsService {
           await deleteDoc(docRef);
           this.invalidatePartnershipsCache();
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'PartnershipsService.deletePartnership', id });
+          errorLoggingService.logError(error as Error, { action: 'PartnershipsService.deletePartnership', additionalData: { id } });
           throw error;
         }
       }

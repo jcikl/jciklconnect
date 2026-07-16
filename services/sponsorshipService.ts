@@ -62,7 +62,7 @@ export class SponsorshipsService {
       apiCache.set(cacheKey, result, SPONSORSHIPS_CACHE_TTL);
       return result;
     } catch (error) {
-      logServiceError(error as Error, 'SponsorshipsService.getAllSponsorships');
+      logServiceError(error as Error, { action: 'SponsorshipsService.getAllSponsorships' });
       throw error;
     }
 });
@@ -98,7 +98,7 @@ export class SponsorshipsService {
       apiCache.set(cacheKey, result, SPONSORSHIPS_CACHE_TTL);
       return result;
     } catch (error) {
-      logServiceError(error as Error, 'SponsorshipsService.getSponsorshipsByMember');
+      logServiceError(error as Error, { action: 'SponsorshipsService.getSponsorshipsByMember' });
       throw error;
     }
 });
@@ -113,7 +113,7 @@ export class SponsorshipsService {
         try {
           await PointsService.recalculateMemberRadarStats(data.memberId);
         } catch (radarErr) {
-          logServiceError(radarErr as Error, '[DEV] SponsorshipsService.createSponsorship → recalculateMemberRadarStats');
+          logServiceError(radarErr as Error, { action: '[DEV] SponsorshipsService.createSponsorship → recalculateMemberRadarStats' });
         }
         return mockId;
       },
@@ -129,11 +129,11 @@ export class SponsorshipsService {
       try {
         await PointsService.recalculateMemberRadarStats(data.memberId);
       } catch (radarErr) {
-        logServiceError(radarErr as Error, 'SponsorshipsService.createSponsorship → recalculateMemberRadarStats');
+        logServiceError(radarErr as Error, { action: 'SponsorshipsService.createSponsorship → recalculateMemberRadarStats' });
       }
       return docRef.id;
     } catch (error) {
-      logServiceError(error as Error, 'SponsorshipsService.createSponsorship');
+      logServiceError(error as Error, { action: 'SponsorshipsService.createSponsorship' });
       throw error;
     }
 });
@@ -166,11 +166,11 @@ export class SponsorshipsService {
         try {
           await PointsService.recalculateMemberRadarStats(mid);
         } catch (radarErr) {
-          logServiceError(radarErr as Error, `SponsorshipsService.updateSponsorship → recalculateMemberRadarStats(${mid})`);
+          logServiceError(radarErr as Error, { action: `SponsorshipsService.updateSponsorship → recalculateMemberRadarStats(${mid})` });
         }
       }
     } catch (error) {
-      logServiceError(error as Error, 'SponsorshipsService.updateSponsorship');
+      logServiceError(error as Error, { action: 'SponsorshipsService.updateSponsorship' });
       throw error;
     }
 });
@@ -191,10 +191,10 @@ export class SponsorshipsService {
       try {
         await PointsService.recalculateMemberRadarStats(memberId);
       } catch (radarErr) {
-        logServiceError(radarErr as Error, 'SponsorshipsService.deleteSponsorship → recalculateMemberRadarStats');
+        logServiceError(radarErr as Error, { action: 'SponsorshipsService.deleteSponsorship → recalculateMemberRadarStats' });
       }
     } catch (error) {
-      logServiceError(error as Error, 'SponsorshipsService.deleteSponsorship');
+      logServiceError(error as Error, { action: 'SponsorshipsService.deleteSponsorship' });
       throw error;
     }
 });

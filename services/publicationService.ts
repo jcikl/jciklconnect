@@ -124,7 +124,7 @@ export class PublicationService {
                   return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
                 });
               } catch (innerErr) {
-                errorLoggingService.logError(innerErr as Error, { context: 'PublicationService.getAll' });
+                errorLoggingService.logError(innerErr as Error, { action: 'PublicationService.getAll' });
                 throw innerErr;
               }
             }
@@ -164,7 +164,7 @@ export class PublicationService {
                 const all = await PublicationService.getAll();
                 return all.filter(p => p.status === 'Published');
               } catch (innerErr) {
-                errorLoggingService.logError(innerErr as Error, { context: 'PublicationService.getPublished' });
+                errorLoggingService.logError(innerErr as Error, { action: 'PublicationService.getPublished' });
                 throw innerErr;
               }
             }
@@ -191,7 +191,7 @@ export class PublicationService {
           this.invalidatePublicationsCache();
           return docRef.id;
         } catch (err) {
-          errorLoggingService.logError(err as Error, { context: 'PublicationService.create' });
+          errorLoggingService.logError(err as Error, { action: 'PublicationService.create' });
           throw err;
         }
       }
@@ -210,7 +210,7 @@ export class PublicationService {
           });
           this.invalidatePublicationsCache();
         } catch (err) {
-          errorLoggingService.logError(err as Error, { context: 'PublicationService.update', id });
+          errorLoggingService.logError(err as Error, { action: 'PublicationService.update', additionalData: { id } });
           throw err;
         }
       }
@@ -226,7 +226,7 @@ export class PublicationService {
           await deleteDoc(doc(db, COLL, id));
           this.invalidatePublicationsCache();
         } catch (err) {
-          errorLoggingService.logError(err as Error, { context: 'PublicationService.delete', id });
+          errorLoggingService.logError(err as Error, { action: 'PublicationService.delete', additionalData: { id } });
           throw err;
         }
       }

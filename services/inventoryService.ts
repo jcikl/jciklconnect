@@ -625,7 +625,7 @@ export class InventoryService {
       const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
       const transactionSnap = await getDoc(transactionRef);
       const transaction = transactionSnap.exists()
-        ? { id: transactionSnap.id, ...transactionSnap.data() }
+        ? { id: transactionSnap.id, ...transactionSnap.data() } as { id: string; amount?: number }
         : null;
 
       if (!transaction) {
@@ -1341,7 +1341,7 @@ export class InventoryService {
         status: newTotalQuantity === 0 ? 'Out of Stock' : (newTotalQuantity <= (item.minQuantity || 0) ? 'Low Stock' : 'Available'),
       });
     } catch (e) {
-      errorLoggingService.logError(e as Error, 'InventoryService.adjustVariantQuantityOnly');
+      errorLoggingService.logError(e as Error, { action: 'InventoryService.adjustVariantQuantityOnly' });
       throw e;
     }
   }

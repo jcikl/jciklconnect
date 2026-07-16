@@ -149,7 +149,7 @@ export class BehavioralNudgingService {
 
           return nudges;
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.checkAndGenerateNudges', memberId });
+          errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.checkAndGenerateNudges', additionalData: { memberId } });
           return [];
         }
       }
@@ -197,7 +197,7 @@ export class BehavioralNudgingService {
             });
           }
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.sendNudgesAsNotifications', memberId });
+          errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.sendNudgesAsNotifications', additionalData: { memberId } });
         }
       }
     );
@@ -254,7 +254,7 @@ export class BehavioralNudgingService {
           this.invalidateNudgeRulesCache();
           return docRef.id;
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.createNudgeRule' });
+          errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.createNudgeRule' });
           throw error;
         }
       }
@@ -320,7 +320,7 @@ export class BehavioralNudgingService {
 
           this.invalidateNudgeRulesCache();
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.updateNudgeRule', ruleId });
+          errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.updateNudgeRule', additionalData: { ruleId } });
           throw error;
         }
       }
@@ -340,7 +340,7 @@ export class BehavioralNudgingService {
 
           this.invalidateNudgeRulesCache();
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.deleteNudgeRule', ruleId });
+          errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.deleteNudgeRule', additionalData: { ruleId } });
           throw error;
         }
       }
@@ -374,7 +374,7 @@ export class BehavioralNudgingService {
             updatedAt: new Date(),
           });
         } catch (error) {
-          errorLoggingService.logError(error as Error, { context: 'BehavioralNudgingService.updateGuestPageStats', pageId });
+          errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.updateGuestPageStats', additionalData: { pageId } });
           throw error;
         }
       }

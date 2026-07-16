@@ -240,7 +240,7 @@ export const EventRegistrationService = {
       () => {
         const idx = MOCK_REGISTRATIONS.findIndex((r) => r.id === registrationId);
         if (idx !== -1) MOCK_REGISTRATIONS.splice(idx, 1);
-        return { pointsReversalNeeded: false, memberId: null, eventId: null };
+        return { pointsReversalNeeded: false as boolean, memberId: null, eventId: null };
       },
       async () => {
         const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);

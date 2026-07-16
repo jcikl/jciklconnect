@@ -132,7 +132,7 @@ export class VotesService {
         VotesService.mapDoc(snap.id, snap.data() as Record<string, unknown>)
       );
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.getVoteById', voteId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.getVoteById', additionalData: { voteId } });
       throw error;
     }
   }
@@ -184,7 +184,7 @@ export class VotesService {
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.updateVote', voteId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.updateVote', additionalData: { voteId } });
       throw error;
     }
   }
@@ -194,7 +194,7 @@ export class VotesService {
     try {
       await deleteDoc(doc(db, COLLECTIONS.VOTES, voteId));
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.deleteVote', voteId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.deleteVote', additionalData: { voteId } });
       throw error;
     }
   }
@@ -292,7 +292,7 @@ export class VotesService {
         });
       });
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.castVote', voteId, voterId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.castVote', additionalData: { voteId, voterId } });
       throw error;
     }
   }
@@ -307,7 +307,7 @@ export class VotesService {
       );
       return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VoteCastDoc));
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.getVoteCasts', voteId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.getVoteCasts', additionalData: { voteId } });
       throw error;
     }
   }
@@ -400,7 +400,7 @@ export class VotesService {
 
       return { success: true, results, winner };
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.tallyVotes', voteId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.tallyVotes', additionalData: { voteId } });
       throw error;
     }
   }
@@ -420,7 +420,7 @@ export class VotesService {
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.activateVote', voteId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.activateVote', additionalData: { voteId } });
       throw error;
     }
   }
@@ -438,7 +438,7 @@ export class VotesService {
       const data = snap.data() as VoteDoc;
       return data.eligibleVoters?.includes(memberId) ?? false;
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.isEligibleVoter', voteId, memberId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.isEligibleVoter', additionalData: { voteId, memberId } });
       return false;
     }
   }
@@ -453,7 +453,7 @@ export class VotesService {
       const snap = await getDoc(castRef);
       return snap.exists();
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'VotesService.hasAlreadyVoted', voteId, memberId });
+      errorLoggingService.logError(error as Error, { action: 'VotesService.hasAlreadyVoted', additionalData: { voteId, memberId } });
       return false;
     }
   }

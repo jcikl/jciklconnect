@@ -77,7 +77,7 @@ export class HobbyClubsService {
           errorLoggingService.logError(error as Error, {
             component: 'HobbyClubsService',
             action: 'getClubById',
-            clubId,
+            additionalData: { clubId },
           });
           throw error;
         }
@@ -126,7 +126,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'updateClub',
-        clubId,
+        additionalData: { clubId },
       });
       throw error;
     }
@@ -149,7 +149,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'deleteClub',
-        clubId,
+        additionalData: { clubId },
       });
       throw error;
     }
@@ -188,8 +188,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'joinClub',
-        clubId,
-        memberId,
+        additionalData: { clubId, memberId },
       });
       throw error;
     }
@@ -224,8 +223,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'leaveClub',
-        clubId,
-        memberId,
+        additionalData: { clubId, memberId },
       });
       throw error;
     }
@@ -250,7 +248,7 @@ export class HobbyClubsService {
           errorLoggingService.logError(error as Error, {
             component: 'HobbyClubsService',
             action: 'getClubsByCategory',
-            category,
+            additionalData: { category },
           });
           throw error;
         }
@@ -300,7 +298,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'addActivity',
-        clubId,
+        additionalData: { clubId },
       });
       throw error;
     }
@@ -319,8 +317,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'updateActivity',
-        clubId,
-        activityId,
+        additionalData: { clubId, activityId },
       });
       throw error;
     }
@@ -336,8 +333,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'deleteActivity',
-        clubId,
-        activityId,
+        additionalData: { clubId, activityId },
       });
       throw error;
     }
@@ -358,7 +354,7 @@ export class HobbyClubsService {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
         action: 'getClubMembers',
-        clubId,
+        additionalData: { clubId },
       });
       throw error;
     }

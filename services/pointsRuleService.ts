@@ -61,7 +61,7 @@ export class PointsRuleService {
             updatedAt: d.data().updatedAt?.toDate?.()?.toISOString() || d.data().updatedAt,
           } as PointsRule));
         } catch (error) {
-          errorLoggingService.logError(error as Error, 'PointsRuleService.getAllPointsRules');
+          errorLoggingService.logError(error as Error, { action: 'PointsRuleService.getAllPointsRules' });
           throw error;
         }
       },
@@ -140,7 +140,7 @@ export class PointsRuleService {
       invalidatePointsRulesCache();
       return savedId;
     } catch (error) {
-      errorLoggingService.logError(error as Error, 'PointsRuleService.savePointsRule');
+      errorLoggingService.logError(error as Error, { action: 'PointsRuleService.savePointsRule' });
       throw error;
     }
   }
@@ -169,7 +169,7 @@ export class PointsRuleService {
       await batch.commit();
       invalidatePointsRulesCache();
     } catch (error) {
-      errorLoggingService.logError(error as Error, 'PointsRuleService.deletePointsRule');
+      errorLoggingService.logError(error as Error, { action: 'PointsRuleService.deletePointsRule' });
       throw error;
     }
   }
@@ -379,7 +379,7 @@ export class PointsRuleService {
 
       return executions;
     } catch (error) {
-      errorLoggingService.logError(error as Error, 'PointsRuleService.executeRules');
+      errorLoggingService.logError(error as Error, { action: 'PointsRuleService.executeRules' });
       throw error;
     }
   }

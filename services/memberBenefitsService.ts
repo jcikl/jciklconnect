@@ -134,7 +134,7 @@ export class MemberBenefitsService {
               })) as MemberBenefit[];
             } catch (error) {
               errorLoggingService.logError(error as Error, {
-                context: 'MemberBenefitsService.getMemberBenefits',
+                action: 'MemberBenefitsService.getMemberBenefits',
               });
               throw error;
             }
@@ -170,8 +170,8 @@ export class MemberBenefitsService {
               })) as BenefitUsage[];
             } catch (error) {
               errorLoggingService.logError(error as Error, {
-                context: 'MemberBenefitsService.getBenefitUsage',
-                memberId,
+                action: 'MemberBenefitsService.getBenefitUsage',
+                additionalData: { memberId },
               });
               throw error;
             }
@@ -289,9 +289,8 @@ export class MemberBenefitsService {
         } catch (error) {
           if ((error as Error).message === 'Limit reached') throw error;
           errorLoggingService.logError(error as Error, {
-            context: 'MemberBenefitsService.claimBenefit',
-            memberId,
-            benefitId,
+            action: 'MemberBenefitsService.claimBenefit',
+            additionalData: { memberId, benefitId },
           });
           throw error;
         }
@@ -340,7 +339,7 @@ export class MemberBenefitsService {
           })) as BenefitUsage[];
         } catch (error) {
           errorLoggingService.logError(error as Error, {
-            context: 'MemberBenefitsService.getBenefitUsageHistory',
+            action: 'MemberBenefitsService.getBenefitUsageHistory',
           });
           throw error;
         }

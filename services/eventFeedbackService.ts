@@ -92,9 +92,8 @@ export class EventFeedbackService {
           return docRef.id;
         } catch (error) {
           errorLoggingService.logError(error as Error, {
-            context: 'EventFeedbackService.submitFeedback',
-            eventId: feedback.eventId,
-            memberId: feedback.memberId,
+            action: 'EventFeedbackService.submitFeedback',
+            additionalData: { eventId: feedback.eventId, memberId: feedback.memberId },
           });
           throw error;
         }
@@ -196,7 +195,7 @@ export class EventFeedbackService {
         feedbacks,
       };
     } catch (error) {
-      errorLoggingService.logError(error as Error, { context: 'EventFeedbackService.getFeedbackSummary', eventId });
+      errorLoggingService.logError(error as Error, { action: 'EventFeedbackService.getFeedbackSummary', additionalData: { eventId } });
       throw error;
     }
   }
@@ -218,9 +217,8 @@ export class EventFeedbackService {
           return !snapshot.empty;
         } catch (error) {
           errorLoggingService.logError(error as Error, {
-            context: 'EventFeedbackService.hasMemberSubmittedFeedback',
-            eventId,
-            memberId,
+            action: 'EventFeedbackService.hasMemberSubmittedFeedback',
+            additionalData: { eventId, memberId },
           });
           return false;
         }

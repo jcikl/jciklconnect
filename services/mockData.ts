@@ -233,9 +233,9 @@ export const MOCK_FLAGSHIP_PROJECTS: FlagshipProject[] = [
 ];
 
 export const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: 'n1', title: 'Churn Risk Alert', message: 'Michael Ross has missed 3 consecutive meetings. Suggested action: Assign mentor.', type: 'ai', read: false, timestamp: '2h ago' },
-  { id: 'n2', title: 'Budget Approval', message: 'Business Expo budget approved by Treasurer.', type: 'success', read: false, timestamp: '5h ago' },
-  { id: 'n3', title: 'Membership Dues', message: 'Automatic renewal processing started for 2024. 78% collected.', type: 'info', read: true, timestamp: '1d ago' },
+  { id: 'n1', memberId: '', title: 'Churn Risk Alert', message: 'Michael Ross has missed 3 consecutive meetings. Suggested action: Assign mentor.', type: 'ai', read: false, timestamp: '2h ago' },
+  { id: 'n2', memberId: '', title: 'Budget Approval', message: 'Business Expo budget approved by Treasurer.', type: 'success', read: false, timestamp: '5h ago' },
+  { id: 'n3', memberId: '', title: 'Membership Dues', message: 'Automatic renewal processing started for 2024. 78% collected.', type: 'info', read: true, timestamp: '1d ago' },
 ];
 
 export const MOCK_TRANSACTIONS: Transaction[] = [
