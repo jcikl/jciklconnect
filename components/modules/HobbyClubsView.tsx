@@ -108,9 +108,9 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
             <Card noPadding>
                 <div className="px-4 md:px-6 pt-4">
                     <Tabs
-                        tabs={['Clubs', 'Activities']}
-                        activeTab={activeTab === 'clubs' ? 'Clubs' : 'Activities'}
-                        onTabChange={(tab) => setActiveTab(tab === 'Clubs' ? 'clubs' : 'activities')}
+                        tabs={[{id: 'clubs', label: 'Clubs'}, {id: 'activities', label: 'Activities'}]}
+                        activeTab={activeTab}
+                        onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
                     />
                 </div>
                 <div className="p-4">

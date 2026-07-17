@@ -1,12 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { 
-  DataImportResult, 
-  DataExportRequest, 
-  DataImportError, 
+import {
+  DataImportResult,
+  DataExportRequest,
+  DataImportError,
   ImportTemplate,
-  DataExportFilter 
+  DataExportFilter
 } from '../../../types';
 import { DataImportExportService } from '../../../services/dataImportExportService';
+import { Tabs } from '../../ui/Common';
 
 interface DataImportExportProps {
   onImportComplete?: (result: DataImportResult) => void;
@@ -215,28 +216,12 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200 mb-6">
-        <button
-          onClick={() => setActiveTab('import')}
-          className={`px-4 py-2 font-medium text-sm ${
-            activeTab === 'import'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Import Data
-        </button>
-        <button
-          onClick={() => setActiveTab('export')}
-          className={`px-4 py-2 font-medium text-sm ${
-            activeTab === 'export'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Export Data
-        </button>
-      </div>
+      <Tabs
+        tabs={[{id: 'import', label: 'Import Data'}, {id: 'export', label: 'Export Data'}]}
+        activeTab={activeTab}
+        onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+        className="mb-6"
+      />
 
       {/* Import Tab */}
       {activeTab === 'import' && (

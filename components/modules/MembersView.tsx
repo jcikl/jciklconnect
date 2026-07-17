@@ -1,7 +1,7 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  Trash2, Settings, X, ChevronDown, Sparkles, ArrowLeft, Phone, Mail,
+  Trash2, Settings, X, Sparkles, ArrowLeft, Phone, Mail,
   Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users,
   TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw,
   Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
@@ -38,7 +38,7 @@ import {
 } from '../../services/membershipConfigService';
 import { MembersService } from '../../services/membersService';
 
-/** å‡ºå¸­å¯¹æ¯”ï¼šå½“å¹´ç­¾åˆ°æ¬¡æ•° vs å·²è¿‡æœˆä»½ï¼ˆå…¥ä¼šå¹´ä»½ä»Žå…¥ä¼šæœˆèµ·ç®—ï¼‰ï¼Œæ¯å¹´é‡ç®— */
+/** å‡ºå¸­å¯¹æ¯"ï¼šå½"å¹´ç­¾åˆ°æ¬¡æ•° vs å·²è¿‡æœˆä»½ï¼ˆå…¥ä¼šå¹´ä»½ä»Žå…¥ä¼šæœˆèµ·ç®—ï¼‰ï¼Œæ¯å¹´é‡ç®— */
 const getAttendanceDisplay = (m: Member) => {
   const year = new Date().getFullYear();
   const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate || m.joinDate);
@@ -125,7 +125,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [lastImportResult, setLastImportResult] = useState<any | null>(null);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loIdFilter, setLoIdFilter] = useState<string | null>(null);
-  const [showTabSheet, setShowTabSheet] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [roleFilters, setRoleFilters] = useState<UserRole[]>([]);
   const [membershipTypeFilters, setMembershipTypeFilters] = useState<MembershipType[]>([]);
@@ -431,13 +430,24 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     { id: 'duplicates', label: 'Duplicates', short: 'Duplicates', icon: AlertCircle },
   ] as const;
 
-  const activeTabConfig = TAB_CONFIG.find(t => t.id === activeTab) ?? TAB_CONFIG[0];
+  const memberTabItems = TAB_CONFIG.map(t => {
+    const Icon = t.icon;
+    const showBadge = t.id === 'directory' && filteredMembers.length > 0;
+    return {
+      id: t.id,
+      label: t.label,
+      icon: <Icon size={15} />,
+      badge: showBadge
+        ? <span className="bg-jci-blue text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">{filteredMembers.length}</span>
+        : undefined,
+    };
+  });
 
   return (
     <div className="space-y-0 pb-24 md:pb-0">
       {!selectedMember ? (
         <>
-          {/* â”€â”€ PAGE HEADER â”€â”€ */}
+          {/* â"€â"€ PAGE HEADER â"€â"€ */}
           <PageHeader
             title="Member Directory"
             description="Manage membership, tiers, and engagement."
@@ -492,77 +502,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             ) : undefined}
           />
 
-          {/* â”€â”€ TAB NAVIGATION â”€â”€ */}
-          {/* Desktop: scrollable icon+label tabs */}
-          <div className="hidden md:flex items-center gap-1 overflow-x-auto pb-1 mb-4 scrollbar-none border-b border-slate-100">
-            {TAB_CONFIG.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-t-xl text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-[1px] ${isActive
-                    ? 'text-jci-blue border-jci-blue bg-jci-blue/5'
-                    : 'text-slate-500 border-transparent hover:text-slate-800 hover:bg-slate-50'
-                    }`}
-                >
-                  <Icon size={15} />
-                  {tab.label}
-                  {isActive && tab.id === 'directory' && (
-                    <span className="ml-1 bg-jci-blue text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                      {filteredMembers.length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Mobile: current tab pill â†’ tap â†’ bottom sheet */}
-          <div className="md:hidden mb-4">
-            <button
-              onClick={() => setShowTabSheet(true)}
-              className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4 py-2.5 shadow-sm w-full mb-4"
-            >
-              {React.createElement(activeTabConfig.icon, { size: 16, className: 'text-jci-blue shrink-0' })}
-              <span className="font-bold text-slate-800 flex-1 text-left text-sm">{activeTabConfig.label}</span>
-              {activeTab === 'directory' && (
-                <span className="bg-jci-blue/10 text-jci-blue text-xs font-black px-2 py-0.5 rounded-full">{filteredMembers.length}</span>
-              )}
-              <ChevronDown size={16} className="text-slate-400 shrink-0" />
-            </button>
-          </div>
-
-          {/* Mobile tab bottom sheet */}
-          {showTabSheet && (
-            <>
-              <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setShowTabSheet(false)} />
-              <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white rounded-t-3xl shadow-2xl pb-24">
-                <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-4" />
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest px-6 mb-2">Switch View</p>
-                <div className="divide-y divide-slate-50 pb-6">
-                  {TAB_CONFIG.map(tab => {
-                    const Icon = tab.icon;
-                    const isActive = activeTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => { setActiveTab(tab.id as any); setShowTabSheet(false); }}
-                        className={`w-full flex items-center gap-4 px-6 py-3.5 transition-colors ${isActive ? 'bg-jci-blue/5' : 'hover:bg-slate-50'}`}
-                      >
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isActive ? 'bg-jci-blue text-white' : 'bg-slate-100 text-slate-500'}`}>
-                          <Icon size={17} />
-                        </div>
-                        <span className={`font-semibold text-sm flex-1 text-left ${isActive ? 'text-jci-blue' : 'text-slate-700'}`}>{tab.label}</span>
-                        {isActive && <CheckCircle size={16} className="text-jci-blue" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
+          {/* TAB NAVIGATION */}
+          <Tabs
+            variant="underline"
+            tabs={memberTabItems}
+            activeTab={activeTab}
+            onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+            mobileFallback="select"
+            className="mb-4"
+          />
 
           <div>
             {activeTab === 'directory' && (
@@ -722,7 +670,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         }}
       />
 
-      {/* Export Modal â€“ Export Data (migrated from Import/Export tab) */}
+      {/* Export Modal â€" Export Data (migrated from Import/Export tab) */}
       <Modal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}

@@ -31,7 +31,7 @@ import {
   MentorshipStats
 } from '../../../services/mentorshipService';
 import { MembersService } from '../../../services/membersService';
-import { useToast } from '../../ui/Common';
+import { useToast, Tabs } from '../../ui/Common';
 import * as Forms from '../../ui/Form';
 
 interface MentorMatchingProps {
@@ -260,26 +260,17 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-slate-200">
-          <nav className="flex space-x-8 px-6">
-            {[
-              { id: 'overview', label: 'Overview', icon: BarChart3 },
-              { id: 'matching', label: 'Smart Matching', icon: Zap },
-              { id: 'relationships', label: 'Relationships', icon: Heart },
-            ].map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === id
-                  ? 'border-b-2 border-jci-blue text-jci-blue'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-                  }`}
-              >
-                <Icon size={16} />
-                {label}
-              </button>
-            ))}
-          </nav>
+        <div className="px-2 pt-2">
+          <Tabs
+            variant="underline"
+            tabs={[
+              { id: 'overview', label: 'Overview', icon: <BarChart3 size={16} /> },
+              { id: 'matching', label: 'Smart Matching', icon: <Zap size={16} /> },
+              { id: 'relationships', label: 'Relationships', icon: <Heart size={16} /> },
+            ]}
+            activeTab={activeTab}
+            onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+          />
         </div>
 
         <div className="p-4">

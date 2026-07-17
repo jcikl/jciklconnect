@@ -22,16 +22,12 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
     availableTabs.push({ id: 'nudging', label: 'Behavioral Nudging' });
   }
 
-  const tabLabels = availableTabs.map(t => t.label);
-  const getTabLabel = (id: string) => availableTabs.find(t => t.id === id)?.label || 'LO Star Rating';
-  const getTabId = (label: string) => availableTabs.find(t => t.label === label)?.id || 'lo_star';
-
   return (
     <div className="space-y-4 sm:space-y-6">
       <Tabs
-        tabs={tabLabels}
-        activeTab={getTabLabel(activeTab)}
-        onTabChange={(tab) => setActiveTab(getTabId(tab))}
+        tabs={availableTabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       {activeTab === 'rules' ? (

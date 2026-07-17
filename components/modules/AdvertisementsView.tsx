@@ -208,19 +208,9 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       <Card noPadding>
         <div className="px-4 md:px-6 pt-4">
           <Tabs
-            tabs={['Partnerships', 'Promotion Packages', 'Analytics', 'Guest Analytics']}
-            activeTab={
-              activeTab === 'ads' ? 'Partnerships' :
-                activeTab === 'packages' ? 'Promotion Packages' :
-                  activeTab === 'guest' ? 'Guest Analytics' :
-                    'Analytics'
-            }
-            onTabChange={(tab) => {
-              if (tab === 'Partnerships') setActiveTab('ads');
-              else if (tab === 'Promotion Packages') setActiveTab('packages');
-              else if (tab === 'Guest Analytics') setActiveTab('guest');
-              else setActiveTab('analytics');
-            }}
+            tabs={[{id: 'ads', label: 'Partnerships'}, {id: 'packages', label: 'Promotion Packages'}, {id: 'analytics', label: 'Analytics'}, {id: 'guest', label: 'Guest Analytics'}]}
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
           />
         </div>
         <div className="p-4">

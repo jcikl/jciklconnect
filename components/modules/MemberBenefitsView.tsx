@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Gift, Users, Calendar, CheckCircle, Clock, Sparkles, Star } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast } from '../ui/Common';
+import { Button, Card, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
@@ -175,21 +175,12 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       )}
 
       {/* Filter chips */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
-        {FILTER_TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveFilter(tab.key)}
-            className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${
-              activeFilter === tab.key
-                ? 'bg-jci-blue text-white border-jci-blue'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        variant="button"
+        tabs={FILTER_TABS.map(t => ({ id: t.key, label: t.label }))}
+        activeTab={activeFilter}
+        onTabChange={(id) => setActiveFilter(id as FilterTab)}
+      />
 
       {/* Grid */}
       <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits match this filter">

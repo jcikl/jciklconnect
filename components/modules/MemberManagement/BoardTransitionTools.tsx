@@ -25,7 +25,7 @@ import type {
 import { UserRole } from '../../../types';
 import { BoardManagementService } from '../../../services/boardManagementService';
 import { MembersService } from '../../../services/membersService';
-import { useToast } from '../../ui/Common';
+import { useToast, Tabs } from '../../ui/Common';
 import * as Forms from '../../ui/Form';
 
 interface BoardTransitionToolsProps {
@@ -246,26 +246,17 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
-            {[
-              { id: 'current', label: 'Current Board', icon: Users },
-              { id: 'transition', label: 'Transition', icon: ArrowRight },
-              { id: 'history', label: 'History', icon: History },
-            ].map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                <Icon size={16} />
-                {label}
-              </button>
-            ))}
-          </nav>
+        <div className="px-2 pt-2">
+          <Tabs
+            variant="underline"
+            tabs={[
+              { id: 'current', label: 'Current Board', icon: <Users size={16} /> },
+              { id: 'transition', label: 'Transition', icon: <ArrowRight size={16} /> },
+              { id: 'history', label: 'History', icon: <History size={16} /> },
+            ]}
+            activeTab={activeTab}
+            onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+          />
         </div>
 
         <div className="p-4">

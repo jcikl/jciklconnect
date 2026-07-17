@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Handshake, Plus, Edit, Trash2, DollarSign, Users, Building2, TrendingUp, Search } from 'lucide-react';
-import { Button, Card, StatCard, StatCardsContainer, Badge, Modal, useToast } from '../ui/Common';
+import { Button, Card, StatCard, StatCardsContainer, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { Input, Textarea } from '../ui/Form';
 import { useSponsorships } from '../../hooks/useSponsorships';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -200,7 +200,7 @@ export const SponsorshipView: React.FC<{ searchQuery?: string }> = ({ searchQuer
     { id: 'records', label: 'All Records' },
     { id: 'by_sponsor', label: 'By Sponsor' },
     { id: 'analytics', label: 'Analytics' },
-  ] as const;
+  ];
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
@@ -229,21 +229,11 @@ export const SponsorshipView: React.FC<{ searchQuery?: string }> = ({ searchQuer
       </StatCardsContainer>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
-              activeTab === t.id
-                ? 'border-b-2 border-violet-500 text-violet-600 dark:text-violet-400'
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+      />
 
       {/* Search bar (records tab only) */}
       {activeTab === 'records' && (

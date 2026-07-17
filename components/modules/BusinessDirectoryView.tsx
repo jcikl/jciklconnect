@@ -412,22 +412,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          {/* Mobile: segmented control in white bordered container */}
-          <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex-shrink-0">
             <Tabs
-              variant="button"
-              fullWidth
-              tabs={['Local Businesses', 'International Network']}
-              activeTab={activeTab === 'local' ? 'Local Businesses' : 'International Network'}
-              onTabChange={(tab) => setActiveTab(tab === 'Local Businesses' ? 'local' : 'international')}
-            />
-          </div>
-          {/* Desktop: underline tabs */}
-          <div className="hidden md:block flex-shrink-0">
-            <Tabs
-              tabs={['Local Businesses', 'International Network']}
-              activeTab={activeTab === 'local' ? 'Local Businesses' : 'International Network'}
-              onTabChange={(tab) => setActiveTab(tab === 'Local Businesses' ? 'local' : 'international')}
+              tabs={[{id: 'local', label: 'Local Businesses'}, {id: 'international', label: 'International Network'}]}
+              activeTab={activeTab}
+              onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
+              mobileFallback="select"
               className="border-none"
             />
           </div>

@@ -3,7 +3,7 @@ import { CreditCard, ExternalLink, Plus, RefreshCw, Download, AlertCircle, Link2
 import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
-import { Card, Button, Badge, Modal, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED, Tabs } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { ToyyibService, ToyyibBillRecord, ToyyibCategory } from '../../services/toyyibService';
 import { ProjectsService } from '../../services/projectsService';
@@ -1311,21 +1311,12 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
         </div>
       </div>
 
-      {/* Tab bar — scrollable on mobile */}
-      <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-none -mx-3 px-3 md:mx-0 md:px-0">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => { setActiveTab(t.key); setShowSettings(false); }}
-            className={`flex-shrink-0 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === t.key
-              ? 'border-jci-blue text-jci-blue'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tab bar */}
+      <Tabs
+        tabs={TABS.map(t => ({ id: t.key, label: t.label }))}
+        activeTab={activeTab}
+        onTabChange={(tab) => { setActiveTab(tab as typeof activeTab); setShowSettings(false); }}
+      />
 
       {/* Content */}
       <div>

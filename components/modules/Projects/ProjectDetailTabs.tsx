@@ -114,27 +114,13 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
   return (
     <>
       <Card noPadding>
-        {/* Mobile: select dropdown */}
-        <div className="md:hidden px-4 pt-4 pb-2 border-b border-slate-100">
-          <select
-            value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value as typeof activeTab)}
-            className="w-full text-sm font-semibold border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:ring-2 focus:ring-jci-blue focus:border-jci-blue outline-none appearance-none cursor-pointer text-slate-800"
-          >
-            {TAB_ITEMS.map(t => (
-              <option key={t.key} value={t.key}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-        {/* Desktop: horizontal underline tabs with short labels */}
-        <div className="hidden md:block px-6 pt-4 border-b border-slate-100">
+        {/* Tabs — mobile: select dropdown, desktop: underline tabs with short labels */}
+        <div className="px-6 pt-4 border-b border-slate-100">
           <Tabs
-            tabs={TAB_ITEMS.map(t => t.shortLabel)}
-            activeTab={TAB_ITEMS.find(t => t.key === activeTab)?.shortLabel ?? 'Plan'}
-            onTabChange={(tab) => {
-              const found = TAB_ITEMS.find(t => t.shortLabel === tab);
-              if (found) setActiveTab(found.key);
-            }}
+            tabs={TAB_ITEMS.map(t => ({ id: t.key, label: t.label, shortLabel: t.shortLabel }))}
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
+            mobileFallback="select"
             className="border-b-0"
           />
         </div>

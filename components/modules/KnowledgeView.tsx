@@ -138,13 +138,9 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             <Card noPadding>
                 <div className="px-4 md:px-6 pt-4">
                     <Tabs
-                        tabs={['Learning Paths', 'Documents', 'My Certificates']}
-                        activeTab={activeTab === 'learning' ? 'Learning Paths' : activeTab === 'documents' ? 'Documents' : 'My Certificates'}
-                        onTabChange={(tab) => {
-                            if (tab === 'Learning Paths') setActiveTab('learning');
-                            else if (tab === 'Documents') setActiveTab('documents');
-                            else setActiveTab('certificates');
-                        }}
+                        tabs={[{id: 'learning', label: 'Learning Paths'}, {id: 'documents', label: 'Documents'}, {id: 'certificates', label: 'My Certificates'}]}
+                        activeTab={activeTab}
+                        onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
                     />
                 </div>
                 <div className="p-4">

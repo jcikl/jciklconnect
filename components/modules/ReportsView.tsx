@@ -589,9 +589,9 @@ export const ReportsView: React.FC = () => {
       <Card noPadding>
         <div className="px-4 pt-4">
           <Tabs
-            tabs={TAB_LABELS}
-            activeTab={TAB_LABELS[TAB_IDS.indexOf(activeTab)]}
-            onTabChange={(tab) => setActiveTab(TAB_IDS[TAB_LABELS.indexOf(tab)])}
+            tabs={TAB_IDS.map((id, i) => ({ id, label: TAB_LABELS[i] }))}
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as ReportTab)}
           />
         </div>
         <div className="p-4">

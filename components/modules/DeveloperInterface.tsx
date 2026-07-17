@@ -93,18 +93,9 @@ export const DeveloperInterface: React.FC = () => {
       <Card noPadding>
         <div className="px-6 pt-4">
           <Tabs
-            tabs={['API Documentation', 'Webhooks', 'API Keys', 'Integration Logs']}
-            activeTab={
-              activeTab === 'api' ? 'API Documentation' :
-                activeTab === 'webhooks' ? 'Webhooks' :
-                  activeTab === 'keys' ? 'API Keys' : 'Integration Logs'
-            }
-            onTabChange={(tab) => {
-              if (tab === 'API Documentation') setActiveTab('api');
-              else if (tab === 'Webhooks') setActiveTab('webhooks');
-              else if (tab === 'API Keys') setActiveTab('keys');
-              else setActiveTab('logs');
-            }}
+            tabs={[{id: 'api', label: 'API Documentation'}, {id: 'webhooks', label: 'Webhooks'}, {id: 'keys', label: 'API Keys'}, {id: 'logs', label: 'Integration Logs'}]}
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
           />
         </div>
 

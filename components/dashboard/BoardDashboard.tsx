@@ -459,18 +459,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
 
       <Tabs
-        tabs={['Overview', 'Analytics', 'Reports', 'Insights']}
-        activeTab={
-          activeTab === 'overview' ? 'Overview' :
-            activeTab === 'analytics' ? 'Analytics' :
-              activeTab === 'reports' ? 'Reports' : 'Insights'
-        }
-        onTabChange={(tab) => {
-          if (tab === 'Overview') setActiveTab('overview');
-          else if (tab === 'Analytics') setActiveTab('analytics');
-          else if (tab === 'Reports') setActiveTab('reports');
-          else setActiveTab('insights');
-        }}
+        tabs={[{id: 'overview', label: 'Overview'}, {id: 'analytics', label: 'Analytics'}, {id: 'reports', label: 'Reports'}, {id: 'insights', label: 'Insights'}]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
       />
 
       <div>
