@@ -443,6 +443,7 @@ export class MembersService {
       if (!memberData.email?.trim()) throw new Error('Member email is required');
       const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!EMAIL_RE.test(memberData.email)) throw new Error('Invalid email format');
+      if (memberData.idNumber && !/^\d{12}$/.test(memberData.idNumber)) throw new Error('IC number must be 12 digits');
 
       // VAL-01: check email uniqueness before writing
       const existing = await this.getMemberByEmail(memberData.email);

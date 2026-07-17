@@ -225,6 +225,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       showToast('Please upload an image file', 'error');
       return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be smaller than 5 MB', 'error');
+      return;
+    }
 
     setAvatarUploading(true);
     setAvatarUploadProgress(0);
