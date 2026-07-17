@@ -37,10 +37,9 @@
   node_bundler = "esbuild"
 
 # CFG-008: Declare the birthday-notifications scheduled function using Netlify's
-# scheduler syntax. The exports.config = { schedule: ... } line in the .js file
-# uses Firebase Cloud Functions syntax and is ignored by Netlify.
-[[functions]]
-  name = "birthday-notifications"
+# scheduler syntax. [functions."name"] is the correct TOML form — [[functions]]
+# conflicts with the [functions] table above.
+[functions."birthday-notifications"]
   schedule = "0 0 * * *"
 
 [[plugins]]
