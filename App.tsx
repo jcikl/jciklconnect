@@ -1148,12 +1148,12 @@ export const JCIKLApp: React.FC = () => {
                       title="Toggle Board Dashboard"
                       className="h-9 flex items-center justify-center shrink-0 transition-all duration-200 hover:opacity-80"
                     >
-                      <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
+                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
                       <span className={`ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap ${showBoardDashboard ? 'text-amber-300' : 'text-white'}`}>JCI KL Connect</span>
                     </button>
                   ) : (
                     <div className="h-9 flex items-center justify-center shrink-0">
-                      <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
+                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
                       <span className="ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap text-white">JCI KL Connect</span>
                     </div>
                   )}
