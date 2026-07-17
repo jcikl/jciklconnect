@@ -20,6 +20,7 @@ import {
   getDocs,
   query,
   where,
+  limit,
   Timestamp,
   writeBatch,
   runTransaction,
@@ -75,10 +76,12 @@ export class EventPaymentMatchingService {
     const summary: EventMatchSummary = { matched: [], unmatched: [], errors: [] };
 
     // Fetch Pending event income transactions (those with eventRegistrationId set)
+    // Fix 15: cap at 500 to prevent unbounded reads on large datasets.
     const incomeQuery = query(
       collection(db, COLLECTIONS.TRANSACTIONS),
       where('type', '==', 'Income'),
       where('status', '==', 'Pending'),
+      limit(500),
     );
 
     // Fetch bank-imported transactions (unmatched or partially matched)

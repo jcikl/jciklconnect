@@ -300,9 +300,10 @@ export class FinanceService {
       },
       async () => {
         try {
-          // TODO PERF7: Replace with a dedicated 'transactionYears' summary document updated atomically on tx create.
-          // Current approach reads up to 1000 docs just to get year integers.
-          const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000));
+          // TODO: Replace with a finance/meta summary document storing a sorted year array,
+          // updated via arrayUnion on each transaction creation.
+          // STOPGAP: limit raised to 5000 from 1000 — truncation risk remains for large datasets.
+          const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(5000));
           const snapshot = await getDocs(q);
           const years = new Set<number>();
           snapshot.docs.forEach(doc => {
@@ -529,15 +530,6 @@ export class FinanceService {
 
           const cleanTransaction = removeUndefined(newTransaction);
 
-          // Sync with Member Membership BEFORE creating the transaction (best-effort: non-blocking)
-          if (transactionData.category === 'Membership' && transactionData.memberId) {
-            try {
-              await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
-            } catch (syncErr) {
-              console.error('createTransaction: membership pre-sync failed (non-blocking):', syncErr);
-            }
-          }
-
           // SYNC-002: write tx + increment bankAccount.currentBalance atomically
           const txRef = doc(collection(db, COLLECTIONS.TRANSACTIONS));
           const amountDelta = transactionData.type === 'Income'
@@ -568,6 +560,15 @@ export class FinanceService {
           createBatch.set(txRef, cleanTransaction);
           createBatch.update(bankAccountRef, { currentBalance: increment(amountDelta) });
           await createBatch.commit();
+
+          // Fix 17: syncMemberMembership moved AFTER batch.commit() so the tx exists before sync runs.
+          if (transactionData.category === 'Membership' && transactionData.memberId) {
+            try {
+              await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
+            } catch (syncErr) {
+              console.error('createTransaction: membership post-sync failed (non-blocking):', syncErr);
+            }
+          }
 
           // Sync with inventory AFTER the transaction is committed so the tx ID is available
           await this.syncTransactionWithInventory({ ...transactionData, id: txRef.id });
@@ -1172,6 +1173,8 @@ export class FinanceService {
   }
 
   // Get transactions by type (including splits)
+  // TODO: Replace getAllTransactions/getAllTransactionSplits fan-out with a targeted composite
+  // index query on (category, date) to avoid O(N) full-collection scans.
   static async getTransactionsByType(filter: TransactionType | 'Projects & Activities' | 'Membership' | 'Administrative'): Promise<Transaction[]> {
     return withDevMode(
       () => localMockTransactions.filter(t => t.transactionType === filter),
@@ -1237,88 +1240,65 @@ export class FinanceService {
       }
       const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
 
-      // Fetch current transaction to check for changes and merge
-      const currentDoc = await getDoc(transactionRef);
-      if (!currentDoc.exists()) {
-        throw new Error('Transaction not found');
-      }
-      const currentTransaction = currentDoc.data() as Transaction;
+      // Fix 18: wrap status-check read and the main write in a runTransaction so the guard
+      // and the mutation are atomic — two concurrent callers can't both pass the status check.
+      let currentTransaction!: Transaction;
+      await runTransaction(db, async (txn) => {
+        const currentDoc = await txn.get(transactionRef);
+        if (!currentDoc.exists()) throw new Error('Transaction not found');
+        currentTransaction = currentDoc.data() as Transaction;
 
-      if (currentTransaction.status === 'Reconciled' || currentTransaction.status === 'Partially Reconciled') {
-        throw new Error(`Cannot edit a ${currentTransaction.status} transaction. Unmatch it first before making changes.`);
-      }
-
-      const updateData = {
-        ...removeUndefined(updates),
-        updatedAt: Timestamp.now(),
-      } as Partial<Transaction>;
-
-      if (updates.date) {
-        (updateData as Record<string, unknown>).date = Timestamp.fromDate(new Date(updates.date));
-      }
-
-      // SYNC-005: if amount or type changed (and transaction is not already Voided), adjust
-      // bankAccount.currentBalance by the delta so the stored balance stays accurate.
-      const amountChanged = updates.amount !== undefined && updates.amount !== currentTransaction.amount;
-      const typeChanged = updates.type !== undefined && updates.type !== currentTransaction.type;
-      const notVoided = currentTransaction.status !== 'Voided';
-      const bankAccountId = updates.bankAccountId ?? currentTransaction.bankAccountId;
-      let balanceDeltaUpdate: Record<string, unknown> | null = null;
-      if (notVoided && bankAccountId && (amountChanged || typeChanged)) {
-        const oldType = currentTransaction.type as string;
-        const newType = (updates.type ?? currentTransaction.type) as string;
-        const oldAmount = currentTransaction.amount ?? 0;
-        const newAmount = updates.amount ?? currentTransaction.amount ?? 0;
-        const oldDelta = oldType === 'Income' ? oldAmount : -Math.abs(oldAmount);
-        const newDelta = newType === 'Income' ? newAmount : -Math.abs(newAmount);
-        const balanceAdjustment = newDelta - oldDelta;
-        if (balanceAdjustment !== 0) {
-          balanceDeltaUpdate = { bankAccountId, balanceAdjustment };
+        if (currentTransaction.status === 'Reconciled' || currentTransaction.status === 'Partially Reconciled') {
+          throw new Error(`Cannot edit a ${currentTransaction.status} transaction. Unmatch it first before making changes.`);
         }
-      }
 
-      // If transaction type is updated, propagate to all splits in the same batch
+        const updateData: Record<string, unknown> = {
+          ...removeUndefined(updates),
+          updatedAt: Timestamp.now(),
+        };
+        if (updates.date) {
+          updateData.date = Timestamp.fromDate(new Date(updates.date));
+        }
+
+        // SYNC-005: if amount or type changed (and transaction is not Voided), adjust
+        // bankAccount.currentBalance by the delta so the stored balance stays accurate.
+        const amountChanged = updates.amount !== undefined && updates.amount !== currentTransaction.amount;
+        const typeChanged = updates.type !== undefined && updates.type !== currentTransaction.type;
+        const notVoided = currentTransaction.status !== 'Voided';
+        const bankAccountId = updates.bankAccountId ?? currentTransaction.bankAccountId;
+        if (notVoided && bankAccountId && (amountChanged || typeChanged)) {
+          const oldType = currentTransaction.type as string;
+          const newType = (updates.type ?? currentTransaction.type) as string;
+          const oldAmount = currentTransaction.amount ?? 0;
+          const newAmount = updates.amount ?? currentTransaction.amount ?? 0;
+          const oldDelta = oldType === 'Income' ? oldAmount : -Math.abs(oldAmount);
+          const newDelta = newType === 'Income' ? newAmount : -Math.abs(newAmount);
+          const balanceAdjustment = newDelta - oldDelta;
+          if (balanceAdjustment !== 0) {
+            const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, bankAccountId);
+            txn.update(baRef, { currentBalance: increment(balanceAdjustment) });
+          }
+        }
+
+        txn.update(transactionRef, updateData as Partial<Transaction>);
+      });
+
+      // Propagate type change to all splits outside the transaction (acceptable; status is already guarded above)
       if (updates.type) {
         const splits = await this.getTransactionSplits(transactionId);
         if (splits.length > 0) {
           const typeBatch = writeBatch(db);
-          typeBatch.update(transactionRef, updateData);
           for (const split of splits) {
             typeBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
               type: updates.type,
               updatedAt: Timestamp.now(),
             });
           }
-          if (balanceDeltaUpdate) {
-            const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, balanceDeltaUpdate.bankAccountId as string);
-            typeBatch.update(baRef, { currentBalance: increment(balanceDeltaUpdate.balanceAdjustment as number) });
-          }
           await typeBatch.commit();
-          invalidateFinanceCache();
-        } else {
-          if (balanceDeltaUpdate) {
-            const balBatch = writeBatch(db);
-            balBatch.update(transactionRef, updateData);
-            const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, balanceDeltaUpdate.bankAccountId as string);
-            balBatch.update(baRef, { currentBalance: increment(balanceDeltaUpdate.balanceAdjustment as number) });
-            await balBatch.commit();
-          } else {
-            await updateDoc(transactionRef, updateData);
-          }
-          invalidateFinanceCache();
         }
-      } else {
-        if (balanceDeltaUpdate) {
-          const balBatch = writeBatch(db);
-          balBatch.update(transactionRef, updateData);
-          const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, balanceDeltaUpdate.bankAccountId as string);
-          balBatch.update(baRef, { currentBalance: increment(balanceDeltaUpdate.balanceAdjustment as number) });
-          await balBatch.commit();
-        } else {
-          await updateDoc(transactionRef, updateData);
-        }
-        invalidateFinanceCache();
       }
+
+      invalidateFinanceCache();
 
       // Sync with Inventory if needed
       // Logic: If inventory fields changed OR if it seems unsynced (check item)

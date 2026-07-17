@@ -30,6 +30,7 @@ import {
   RecordTransactionData
 } from '../../../services/projectFinancialService';
 import * as Forms from '../../ui/Form';
+import { useToast } from '../../ui/Common';
 
 interface ProjectFinancialAccountProps {
   project: Project;
@@ -50,6 +51,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
   project,
   onClose,
 }) => {
+  const { showToast } = useToast();
   const [account, setAccount] = useState<ProjectFinancialAccount | null>(null);
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
   const [transactions, setTransactions] = useState<ProjectTransaction[]>([]);
@@ -96,6 +98,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
       }
     } catch (error) {
       console.error('Error loading project financial data:', error);
+      showToast('Failed to load financial data', 'error');
     } finally {
       setLoading(false);
     }
@@ -115,6 +118,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
       await loadProjectFinancialData();
     } catch (error) {
       console.error('Error creating project financial account:', error);
+      showToast('Failed to create account', 'error');
     }
   };
 
@@ -143,6 +147,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
       });
     } catch (error) {
       console.error('Error adding transaction:', error);
+      showToast('Failed to add transaction', 'error');
     }
   };
 

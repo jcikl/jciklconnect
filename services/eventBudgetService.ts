@@ -7,6 +7,10 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  setDoc,
+  runTransaction,
+  arrayUnion,
+  arrayRemove,
   query,
   where,
   orderBy,
@@ -126,31 +130,19 @@ export class EventBudgetService {
       },
       async () => {
         try {
-          const existingBudget = await this.getEventBudget(budgetData.eventId);
-
-          if (existingBudget && existingBudget.id) {
-            // Update existing budget
-            await updateDoc(doc(db, COLLECTIONS.EVENT_BUDGETS, existingBudget.id), {
-              ...budgetData,
-              updatedAt: Timestamp.now(),
-            });
-            EventsService.invalidateEventsCache();
-            return existingBudget.id;
-          } else {
-            // Create new budget
-            const newBudget: any = {
-              ...budgetData,
-              createdAt: Timestamp.now(),
-              updatedAt: Timestamp.now(),
-            };
-            if (budgetData.approvedAt) {
-              newBudget.approvedAt = Timestamp.fromDate(budgetData.approvedAt as Date);
-            }
-
-            const docRef = await addDoc(collection(db, COLLECTIONS.EVENT_BUDGETS), newBudget);
-            EventsService.invalidateEventsCache();
-            return docRef.id;
+          // Fix 11: use setDoc with deterministic doc ID (eventId) + merge:true so the
+          // operation is idempotent and avoids the read-then-create/update race condition.
+          const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, budgetData.eventId);
+          const payload: any = {
+            ...budgetData,
+            updatedAt: Timestamp.now(),
+          };
+          if (budgetData.approvedAt) {
+            payload.approvedAt = Timestamp.fromDate(budgetData.approvedAt as Date);
           }
+          await setDoc(budgetRef, { ...payload, createdAt: Timestamp.now() }, { merge: true });
+          EventsService.invalidateEventsCache();
+          return budgetData.eventId;
         } catch (error) {
           console.error('Error saving event budget:', error);
           throw error;
@@ -160,55 +152,69 @@ export class EventBudgetService {
   }
 
   // Add budget item
+  // Fix 12a: use arrayUnion instead of read-then-overwrite to avoid concurrency issues.
   static async addBudgetItem(eventId: string, item: Omit<BudgetItem, 'id'>): Promise<void> {
-    const budget = await this.getEventBudget(eventId);
-    if (!budget) {
-      throw new Error('Event budget not found');
-    }
-
     const newItem: BudgetItem = {
       ...item,
       id: `bi-${Date.now()}`,
     };
-
-    const updatedItems = [...(budget.budgetItems || []), newItem];
-    
-    await this.saveEventBudget({
-      ...budget,
-      budgetItems: updatedItems,
-    });
+    return withDevMode(
+      async () => { console.log('[DEV MODE] addBudgetItem', newItem); },
+      async () => {
+        const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
+        await updateDoc(budgetRef, {
+          budgetItems: arrayUnion(newItem),
+          updatedAt: Timestamp.now(),
+        });
+        EventsService.invalidateEventsCache();
+      }
+    );
   }
 
   // Update budget item
+  // Fix 12b: use runTransaction to read-modify-write the budgetItems array atomically.
   static async updateBudgetItem(eventId: string, itemId: string, updates: Partial<BudgetItem>): Promise<void> {
-    const budget = await this.getEventBudget(eventId);
-    if (!budget) {
-      throw new Error('Event budget not found');
-    }
-
-    const updatedItems = budget.budgetItems.map(item =>
-      item.id === itemId ? { ...item, ...updates } : item
+    return withDevMode(
+      async () => { console.log('[DEV MODE] updateBudgetItem', itemId, updates); },
+      async () => {
+        const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
+        await runTransaction(db, async (txn) => {
+          const snap = await txn.get(budgetRef);
+          if (!snap.exists()) throw new Error('Event budget not found');
+          const data = snap.data() as EventBudget;
+          const updatedItems = (data.budgetItems || []).map(item =>
+            item.id === itemId ? { ...item, ...updates } : item
+          );
+          txn.update(budgetRef, { budgetItems: updatedItems, updatedAt: Timestamp.now() });
+        });
+        EventsService.invalidateEventsCache();
+      }
     );
-
-    await this.saveEventBudget({
-      ...budget,
-      budgetItems: updatedItems,
-    });
   }
 
   // Delete budget item
+  // Fix 12c: use arrayRemove instead of read-then-overwrite.
   static async deleteBudgetItem(eventId: string, itemId: string): Promise<void> {
-    const budget = await this.getEventBudget(eventId);
-    if (!budget) {
-      throw new Error('Event budget not found');
-    }
-
-    const updatedItems = budget.budgetItems.filter(item => item.id !== itemId);
-
-    await this.saveEventBudget({
-      ...budget,
-      budgetItems: updatedItems,
-    });
+    return withDevMode(
+      async () => { console.log('[DEV MODE] deleteBudgetItem', itemId); },
+      async () => {
+        // arrayRemove requires exact object equality; use runTransaction to find and remove by id.
+        const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
+        await runTransaction(db, async (txn) => {
+          const snap = await txn.get(budgetRef);
+          if (!snap.exists()) throw new Error('Event budget not found');
+          const data = snap.data() as EventBudget;
+          const itemToRemove = (data.budgetItems || []).find(i => i.id === itemId);
+          if (itemToRemove) {
+            txn.update(budgetRef, {
+              budgetItems: arrayRemove(itemToRemove),
+              updatedAt: Timestamp.now(),
+            });
+          }
+        });
+        EventsService.invalidateEventsCache();
+      }
+    );
   }
 
   // Reconcile event budget with financial transactions
@@ -218,24 +224,9 @@ export class EventBudgetService {
     transactions: Transaction[];
   }> {
     try {
-      // 1. Get transactions directly assigned to this event (project ID matches eventId, which includes split virtual transactions)
-      const directTransactions = await FinanceService.getBankTransactionsByProject(eventId);
-
-      // 2. Get all transactions to filter by description containing eventId (for backward compatibility)
-      const allTransactions = await FinanceService.getAllTransactions();
-      const descriptionMatchTransactions = allTransactions.filter(
-        t => (t.description && t.description.toLowerCase().includes(eventId.toLowerCase())) && !t.isSplit
-      );
-
-      // 3. Combine them using a Map to avoid duplicates by ID
-      const mergedTransactionsMap = new Map<string, Transaction>();
-      
-      // Add description matches first
-      descriptionMatchTransactions.forEach(t => mergedTransactionsMap.set(t.id, t));
-      // Add project-linked transactions (which includes splits as virtual transactions)
-      directTransactions.forEach(t => mergedTransactionsMap.set(t.id, t));
-
-      const eventTransactions = Array.from(mergedTransactionsMap.values());
+      // Fix 14: removed full getAllTransactions() scan and description-match fallback —
+      // they caused an O(N) full-collection read. Use only the targeted project query.
+      const eventTransactions = await FinanceService.getBankTransactionsByProject(eventId);
 
       const totalSpent = eventTransactions
         .filter(t => t.type === 'Expense')
@@ -267,18 +258,29 @@ export class EventBudgetService {
   }
 
   // Approve budget
+  // Fix 13: wrap in runTransaction with status pre-check so double-approval is impossible.
   static async approveBudget(eventId: string, approvedBy: string): Promise<void> {
-    const budget = await this.getEventBudget(eventId);
-    if (!budget) {
-      throw new Error('Event budget not found');
-    }
-
-    await this.saveEventBudget({
-      ...budget,
-      status: 'Approved',
-      approvedBy,
-      approvedAt: new Date(),
-    });
+    return withDevMode(
+      async () => { console.log('[DEV MODE] approveBudget', eventId, approvedBy); },
+      async () => {
+        const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
+        await runTransaction(db, async (txn) => {
+          const snap = await txn.get(budgetRef);
+          if (!snap.exists()) throw new Error('Event budget not found');
+          const currentStatus = (snap.data() as EventBudget).status;
+          if (currentStatus !== 'Draft' && currentStatus !== 'Active') {
+            throw new Error(`Cannot approve a budget with status "${currentStatus}" — only Draft or Active budgets can be approved.`);
+          }
+          txn.update(budgetRef, {
+            status: 'Approved',
+            approvedBy,
+            approvedAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+        });
+        EventsService.invalidateEventsCache();
+      }
+    );
   }
 }
 

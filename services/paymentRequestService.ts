@@ -58,18 +58,19 @@ export class PaymentRequestService {
         return `${REFERENCE_NUMBER_PREFIX}-${loId}-${today}-${String(seq).padStart(3, '0')}`;
       },
       async () => {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const startOfDay = new Date();
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const q = query(
-      collection(db, COLLECTIONS.PAYMENT_REQUESTS),
-      where('loId', '==', loId),
-      where('createdAt', '>=', Timestamp.fromDate(startOfDay)),
-      orderBy('createdAt', 'desc'),
-      limit(500)
-    );
-    const snapshot = await getDocs(q);
-    const seq = snapshot.size + 1;
+    // Fix 4: use an atomic counter document to avoid race conditions when two PRs
+    // are created simultaneously on the same day.
+    const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = dateStr.replace(/-/g, '');
+    const counterRef = doc(db, 'counters', `pr_${loId}_${dateStr}`);
+    let seq = 1;
+    await runTransaction(db, async (txn) => {
+      const counterSnap = await txn.get(counterRef);
+      if (counterSnap.exists()) {
+        seq = (counterSnap.data().value as number) + 1;
+      }
+      txn.set(counterRef, { value: seq });
+    });
     const seqStr = String(seq).padStart(3, '0');
     return `${REFERENCE_NUMBER_PREFIX}-${loId}-${today}-${seqStr}`;
   });
@@ -424,17 +425,20 @@ export class PaymentRequestService {
         }
       },
       async () => {
-        // P1-fix: guard against marking non-approved PRs as paid.
+        // Fix 1: wrap status check + update in runTransaction so concurrent webhook
+        // callbacks can't both mark the same PR as paid.
         const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
-        const prSnap = await getDoc(prRef);
-        if (!prSnap.exists()) throw new Error('Payment request not found');
-        if ((prSnap.data() as PaymentRequest).status !== 'approved') {
-          throw new Error('只有 approved 状态的付款申请可以标记为已付款');
-        }
-        await updateDoc(prRef, {
-          status: 'paid',
-          paidAt: bankTxDate,
-          updatedAt: Timestamp.now(),
+        await runTransaction(db, async (txn) => {
+          const prSnap = await txn.get(prRef);
+          if (!prSnap.exists()) throw new Error('Payment request not found');
+          if ((prSnap.data() as PaymentRequest).status !== 'approved') {
+            throw new Error('只有 approved 状态的付款申请可以标记为已付款');
+          }
+          txn.update(prRef, {
+            status: 'paid',
+            paidAt: bankTxDate,
+            updatedAt: Timestamp.now(),
+          });
         });
         invalidateFinanceCache();
         // Notify applicant (AA)
@@ -460,10 +464,20 @@ export class PaymentRequestService {
         }
       },
       async () => {
-        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
-          status: 'approved',
-          paidAt: null,
-          updatedAt: Timestamp.now(),
+        // Fix 2: wrap status check + update in runTransaction to prevent reverting
+        // a PR that was never paid.
+        const prRef2 = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
+        await runTransaction(db, async (txn) => {
+          const prSnap = await txn.get(prRef2);
+          if (!prSnap.exists()) throw new Error('Payment request not found');
+          if ((prSnap.data() as PaymentRequest).status !== 'paid') {
+            throw new Error('只有 paid 状态的付款申请可以撤销为 approved');
+          }
+          txn.update(prRef2, {
+            status: 'approved',
+            paidAt: null,
+            updatedAt: Timestamp.now(),
+          });
         });
         invalidateFinanceCache();
         // E6: notify applicant that the confirmed payment was reversed so they are not left in the dark.
@@ -531,6 +545,16 @@ export class PaymentRequestService {
   // Idempotent: skips if a transaction already references this PR.
   private static async _createExpenseTransaction(pr: PaymentRequest, approvedBy: string): Promise<void> {
     try {
+      // Fix 5: dev-mode idempotency — skip if an expense tx for this PR already exists.
+      const existingQ = query(
+        collection(db, COLLECTIONS.TRANSACTIONS),
+        where('paymentRequestId', '==', pr.id),
+        where('type', '==', 'Expense'),
+        limit(1)
+      );
+      const existingSnap = await getDocs(existingQ);
+      if (!existingSnap.empty) return;
+
       const category = pr.category === 'projects_activities' ? 'Projects & Activities' : 'Administrative';
       const projectId = pr.activityId || pr.activityRef || undefined;
       const year = new Date(pr.date || pr.createdAt).getFullYear();
@@ -668,7 +692,23 @@ export class PaymentRequestService {
         if (pr) await this._notifyApplicant(pr, 'cancelled');
       },
       async () => {
-        // P0-fix: find linked expense transaction BEFORE writing, then cancel PR + delete tx atomically.
+        // Fix 3: validate status before cancelling — only submitted/approved PRs can be cancelled.
+        const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
+        await runTransaction(db, async (txn) => {
+          const prSnap = await txn.get(prRef);
+          if (!prSnap.exists()) throw new Error('Payment request not found');
+          const currentStatus = (prSnap.data() as PaymentRequest).status;
+          if (currentStatus !== 'submitted' && currentStatus !== 'approved') {
+            throw new Error(`Cannot cancel a payment request with status "${currentStatus}" — only submitted or approved requests can be cancelled.`);
+          }
+          txn.update(prRef, {
+            status: 'cancelled',
+            updatedAt: Timestamp.now(),
+            updatedBy: userId,
+          });
+        });
+
+        // After status update succeeds, delete linked expense transactions atomically.
         const expenseQ = query(
           collection(db, COLLECTIONS.TRANSACTIONS),
           where('paymentRequestId', '==', id),
@@ -677,12 +717,6 @@ export class PaymentRequestService {
         const expenseSnap = await getDocs(expenseQ);
 
         const batch = writeBatch(db);
-        const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
-        batch.update(prRef, {
-          status: 'cancelled',
-          updatedAt: Timestamp.now(),
-          updatedBy: userId,
-        });
         for (const txDoc of expenseSnap.docs) {
           const tx = txDoc.data() as Transaction;
           if (tx.status !== 'Reconciled' && tx.status !== 'Partially Reconciled') {

@@ -552,6 +552,17 @@ export class PromotionService {
 
     await batch.commit();
 
+    // Fix 4: invalidate members cache after promotion write
+    MembersService.invalidateMembersCache();
+
+    // Fix 5: sync board member display fields (non-fatal — log only)
+    // member was fetched above at the top of this method
+    try {
+      await (MembersService as any).syncBoardMemberDisplayFields(memberId, { ...member, membershipType: 'Official', role: 'MEMBER' });
+    } catch (syncErr) {
+      console.warn('[promoteToOfficialMember] syncBoardMemberDisplayFields failed (non-fatal):', syncErr);
+    }
+
     // Send notification AFTER batch succeeds
     await this.sendPromotionNotification(promotion);
 
@@ -901,21 +912,9 @@ export class PromotionService {
       if (!snap.exists()) throw new Error(`Manual promotion request ${requestId} not found`);
       const requestData = { ...snap.data(), id: requestId } as ManualPromotionRequest;
 
-      // Trigger promotion first; update status only after success to keep them in sync
-      try {
-        await this.promoteToOfficialMember(requestData.memberId, approvedBy, 'manual');
-      } catch (promotionError) {
-        // Promotion failed — ensure request remains 'pending' (rollback)
-        await updateDoc(requestRef, { status: 'pending' }).catch(() => {});
-        throw promotionError;
-      }
-
-      // Mark approved only after successful promotion
-      await updateDoc(requestRef, {
-        status: 'approved',
-        approvedBy,
-        approvedAt: serverTimestamp()
-      });
+      // Pass requestId so the request status update is included in the same writeBatch
+      // inside promoteToOfficialMember — making member promotion and request approval atomic.
+      await this.promoteToOfficialMember(requestData.memberId, approvedBy, 'manual', undefined, requestId);
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'approveManualPromotionRequest', additionalData: { requestId, approvedBy } });
       throw error;
@@ -982,8 +981,8 @@ export class PromotionService {
   }
 
   private static async getPromotionSettings(): Promise<PromotionSettings> {
-    // Simulate getting settings
-    return {
+    // Default values used both as dev mock and as fallback when Firestore doc doesn't exist
+    const defaults: PromotionSettings = {
       id: 'promotion_settings',
       automaticPromotionEnabled: true,
       requireAllFourRequirements: true,
@@ -995,6 +994,17 @@ export class PromotionService {
       updatedAt: new Date(),
       updatedBy: 'system'
     };
+
+    if (isDevMode()) return defaults;
+
+    try {
+      const snap = await getDoc(doc(db, 'system', 'promotionSettings'));
+      if (snap.exists()) return snap.data() as PromotionSettings;
+    } catch (e) {
+      // Fall through to defaults if Firestore is unavailable
+      console.warn('[getPromotionSettings] Could not read from Firestore, using defaults:', e);
+    }
+    return defaults;
   }
 
   // FIX 3 (P1): real Firestore query instead of stub
@@ -1019,8 +1029,28 @@ export class PromotionService {
   }
 
   private static async calculateAveragePromotionTime(): Promise<number> {
-    // Simulate calculating average time from Probation to Full Member
-    return 180; // 180 days average
+    if (isDevMode()) return 180; // 180 days average (mock)
+
+    try {
+      const snap = await getDocs(collection(db, COLLECTIONS.PROMOTION_HISTORY));
+      if (snap.empty) return 0;
+
+      const days: number[] = [];
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const promotionTs = data.promotionDate?.toMillis?.();
+        const joinTs = data.joinDate?.toMillis?.();
+        if (promotionTs && joinTs && promotionTs > joinTs) {
+          days.push((promotionTs - joinTs) / 86400000);
+        }
+      });
+
+      if (days.length === 0) return 0;
+      return Math.round(days.reduce((sum, d) => sum + d, 0) / days.length);
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'calculateAveragePromotionTime' });
+      return 0;
+    }
   }
 }
 

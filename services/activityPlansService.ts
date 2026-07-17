@@ -535,18 +535,24 @@ export class ActivityPlansService {
       () => {},
       async () => {
         try {
-          // P2 FIX: query and batch-delete any docs whose previousVersionId points to this plan,
-          // preventing orphaned version-chain references after deletion.
-          const versionChainSnap = await getDocs(
-            query(
+          // P2 FIX: iteratively walk full version chain to prevent orphaned descendants.
+          const toDelete = [planId];
+          let currentIds = [planId];
+          while (currentIds.length > 0) {
+            const q = query(
               collection(db, COLLECTIONS.ACTIVITY_PLANS),
-              where('previousVersionId', '==', planId)
-            )
-          );
+              where('previousVersionId', 'in', currentIds)
+            );
+            const snap = await getDocs(q);
+            if (snap.empty) break;
+            const childIds = snap.docs.map(d => d.id);
+            toDelete.push(...childIds);
+            currentIds = childIds;
+            if (toDelete.length >= 490) break; // safety cap
+          }
 
           const batch = writeBatch(db);
-          versionChainSnap.docs.forEach(d => batch.delete(d.ref));
-          batch.delete(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId));
+          toDelete.forEach(id => batch.delete(doc(db, COLLECTIONS.ACTIVITY_PLANS, id)));
           await batch.commit();
 
           this.invalidateActivityPlansCache(); // FIX P1

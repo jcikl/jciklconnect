@@ -15,13 +15,19 @@ export interface WorkflowStepModalProps {
 export const WorkflowStepModal: React.FC<WorkflowStepModalProps> = ({ step, members, onSave, onClose }) => {
   const [stepType, setStepType] = useState<WorkflowStep['type']>(step.type);
   const [config, setConfig] = useState<Record<string, any>>(step.config || {});
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    onSave({
-      ...step,
-      type: stepType,
-      config,
-    });
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await Promise.resolve(onSave({
+        ...step,
+        type: stepType,
+        config,
+      }));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -273,8 +279,8 @@ export const WorkflowStepModal: React.FC<WorkflowStepModalProps> = ({ step, memb
         )}
 
         <div className="flex gap-3 pt-4 border-t">
-          <Button onClick={handleSave} className="flex-1">
-            <Save size={16} className="mr-2" /> Save Step
+          <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+            <Save size={16} className="mr-2" /> {isSaving ? 'Saving…' : 'Save Step'}
           </Button>
           <Button variant="ghost" onClick={onClose}>
             Cancel

@@ -161,6 +161,7 @@ export const useMessaging = () => {
 
     const unsubscribe = MessagingService.subscribeToMessages(selectedConversation.id, (newMessages) => {
       setMessages(newMessages);
+      setLoading(false);
     });
 
     return () => {

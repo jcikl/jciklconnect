@@ -22,7 +22,8 @@ import {
   getDocs,
   query,
   where,
-  orderBy
+  orderBy,
+  limit
 } from 'firebase/firestore';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -745,6 +746,7 @@ class ProjectFinancialService {
       },
       async () => {
     try {
+      // TODO: Add year filter or limit(200) to scope this query.
       // Fetch projects that are not in draft/submitted status
       const projectsSnapshot = await getDocs(
         query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
@@ -845,8 +847,9 @@ class ProjectFinancialService {
       },
       async () => {
     try {
+      // Fix 21: cap at 500 to prevent unbounded reads.
       const snapshot = await getDocs(
-        query(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), orderBy('date', 'desc'))
+        query(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), orderBy('date', 'desc'), limit(500))
       );
 
       return snapshot.docs.map(doc => ({

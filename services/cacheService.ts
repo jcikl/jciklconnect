@@ -283,7 +283,7 @@ export const userDataCache = new CacheService({
 export const staticDataCache = new CacheService({
   ttl: 60 * 60 * 1000, // 1 hour for static data
   maxSize: 30,
-  useLocalStorage: true
+  useLocalStorage: false // Firestore Timestamps cannot be safely serialised to JSON; keep in memory only
 });
 
 /**

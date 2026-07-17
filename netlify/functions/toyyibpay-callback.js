@@ -240,17 +240,17 @@ exports.handler = async (event) => {
       })[0];
 
       if (yearMatchTx) {
-        await yearMatchTx.ref.update({
+        // Sync membership status — server-side equivalent of syncMemberMembership
+        const memberSnap = await db.collection('members').doc(billMemberId).get().catch(() => null);
+        const memberData = memberSnap?.exists ? memberSnap.data() : null;
+        const txDescription = yearMatchTx.data().description || yearMatchTx.data().purpose || '';
+        const txUpdate = {
           status: 'Cleared',
           paymentMethod: 'toyyib',
           toyyibBillCode: billCode,
           referenceNumber: billExternalReferenceNo || transactionId,
           updatedAt: Timestamp.now(),
-        });
-        // Sync membership status — server-side equivalent of syncMemberMembership
-        const memberSnap = await db.collection('members').doc(billMemberId).get().catch(() => null);
-        const memberData = memberSnap?.exists ? memberSnap.data() : null;
-        const txDescription = yearMatchTx.data().description || yearMatchTx.data().purpose || '';
+        };
         const memberUpdate = {
           [`membership.${billYear}.status`]: 'paid',
           [`membership.${billYear}.amount`]: duesAmount,
@@ -266,7 +266,11 @@ exports.handler = async (event) => {
           memberUpdate['hasPaidInitiationFee'] = true;
           memberUpdate['jciCareer.hasPaidInitiationFee'] = true;
         }
-        await db.collection('members').doc(billMemberId).update(memberUpdate)
+        // Use a batch so transaction + member updates are atomic — if one fails, both roll back.
+        const batch = db.batch();
+        batch.update(yearMatchTx.ref, txUpdate);
+        batch.update(db.collection('members').doc(billMemberId), memberUpdate);
+        await batch.commit()
           .catch(err => console.warn('[toyyibpay-callback] Could not sync membership status:', err));
       } else {
         // ── P0-A: Idempotency check at transaction level (defense-in-depth) ────

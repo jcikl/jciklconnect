@@ -35,6 +35,7 @@ export class EventsService {
 
   static invalidateEventsCache(): void {
     apiCache.delete(CACHE_KEY_ALL_EVENTS);
+    apiCache.deleteByPrefix('events:id:');
   }
 
   private static projectDocToEvent(d: { id: string; data: () => Record<string, unknown> }): Event {
@@ -114,18 +115,23 @@ export class EventsService {
       () => this.mockEvents.find(e => e.id === eventId) || null,
       async () => {
         try {
+          const cached = apiCache.get<Event | null>(`events:id:${eventId}`);
+          if (cached !== null) return cached;
+
           const docRef = doc(db, COLLECTIONS.PROJECTS, eventId);
           const docSnap = await getDoc(docRef);
 
+          let eventData: Event | null = null;
           if (docSnap.exists()) {
             const d = docSnap.data();
             const hasDate = d?.eventStartDate != null || d?.date != null;
             const isBannedStatus = ['Planning', 'Draft', 'Submitted', 'Under Review', 'Rejected', 'Cancelled'].includes(d?.status);
             if (hasDate && !isBannedStatus) {
-              return this.projectDocToEvent({ id: docSnap.id, data: () => d });
+              eventData = this.projectDocToEvent({ id: docSnap.id, data: () => d });
             }
           }
-          return null;
+          apiCache.set(`events:id:${eventId}`, eventData, 180);
+          return eventData;
         } catch (error) {
           console.error('Error fetching event:', error);
           throw error;
@@ -414,7 +420,7 @@ export class EventsService {
               updatedAt: Timestamp.now(),
             });
             batch.update(eventRef, {
-              attendees: Math.max(0, event.attendees - 1),
+              attendees: increment(-1),
               registeredMembers: arrayRemove(memberId),
             });
             await batch.commit();

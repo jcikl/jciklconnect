@@ -378,6 +378,7 @@ class RuleExecutionService {
     }
 
     // P1 fix: persist to Firestore (best-effort — never block the rule execution flow)
+    // NOTE: This collection requires an authenticated-user create rule in firestore.rules. See: workflow_executions allow create: if isAuthenticated();
     if (!isDevMode()) {
       addDoc(collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS), {
         ...execution,
@@ -449,7 +450,8 @@ class RuleExecutionService {
   private async sendEmail(_config: any, _data: any): Promise<ActionResult> {
     // P1 fix: was returning hard-coded ok:true (stub). Now returns a visible failure so
     // automation dashboards can detect that email delivery is not yet wired up.
-    return { ok: false, reason: 'action type not yet implemented' };
+    console.warn('[AutomationService] Stub action type: send_email — configure or implement before enabling automation rules that use this type.');
+    return { ok: false, reason: 'send_email action not yet wired to email provider' };
   }
 
   private async sendNotification(config: any, data: any): Promise<ActionResult> {
@@ -482,11 +484,13 @@ class RuleExecutionService {
   }
 
   private async updateField(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: false, reason: 'action type not yet implemented' };
+    console.warn('[AutomationService] Stub action type: update_field — configure or implement before enabling automation rules that use this type.');
+    return { ok: false, reason: 'update_field action not yet implemented' };
   }
 
   private async createTask(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: false, reason: 'action type not yet implemented' };
+    console.warn('[AutomationService] Stub action type: create_task — configure or implement before enabling automation rules that use this type.');
+    return { ok: false, reason: 'create_task action not yet implemented' };
   }
 
   private async awardPoints(config: any, data: any): Promise<ActionResult> {
@@ -549,15 +553,18 @@ class RuleExecutionService {
   }
 
   private async triggerWorkflow(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: false, reason: 'action type not yet implemented' };
+    console.warn('[AutomationService] Stub action type: trigger_workflow — configure or implement before enabling automation rules that use this type.');
+    return { ok: false, reason: 'trigger_workflow action not yet implemented' };
   }
 
   private async callWebhook(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: false, reason: 'action type not yet implemented' };
+    console.warn('[AutomationService] Stub action type: call_webhook — configure or implement before enabling automation rules that use this type.');
+    return { ok: false, reason: 'call_webhook action not yet implemented' };
   }
 
   private async logEvent(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: false, reason: 'action type not yet implemented' };
+    console.warn('[AutomationService] Stub action type: log_event — configure or implement before enabling automation rules that use this type.');
+    return { ok: false, reason: 'log_event action not yet implemented' };
   }
 }
 

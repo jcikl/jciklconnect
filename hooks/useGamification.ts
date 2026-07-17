@@ -1,5 +1,5 @@
 // useGamification.ts - Unified Hook for Awards (Achievements + Badges)
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -72,7 +72,7 @@ export const useGamification = (memberId?: string) => {
 
     const loadAllAwards = () => queryClient.invalidateQueries({ queryKey: ['awards'] });
 
-    const awardAward = async (awardId: string, targetMemberId: string, reason?: string) => {
+    const awardAward = useCallback(async (awardId: string, targetMemberId: string, reason?: string) => {
         try {
             await GamificationService.awardAward(awardId, targetMemberId, memberId, reason);
             showToast('Recognition awarded successfully!', 'success');
@@ -80,9 +80,9 @@ export const useGamification = (memberId?: string) => {
             showToast('Failed to award recognition', 'error');
             throw err;
         }
-    };
+    }, [memberId, showToast]);
 
-    const createAward = async (awardData: Omit<AwardDefinition, 'id'>) => {
+    const createAward = useCallback(async (awardData: Omit<AwardDefinition, 'id'>) => {
         try {
             await GamificationService.createAward(awardData);
             showToast('Award definition created!', 'success');
@@ -91,9 +91,9 @@ export const useGamification = (memberId?: string) => {
             showToast('Failed to create award definition', 'error');
             throw err;
         }
-    };
+    }, [showToast, loadAllAwards]);
 
-    const updateAward = async (awardId: string, awardData: Partial<AwardDefinition>) => {
+    const updateAward = useCallback(async (awardId: string, awardData: Partial<AwardDefinition>) => {
         try {
             await GamificationService.updateAward(awardId, awardData);
             showToast('Award definition updated!', 'success');
@@ -102,9 +102,9 @@ export const useGamification = (memberId?: string) => {
             showToast('Failed to update award definition', 'error');
             throw err;
         }
-    };
+    }, [showToast, loadAllAwards]);
 
-    const deleteAward = async (awardId: string) => {
+    const deleteAward = useCallback(async (awardId: string) => {
         try {
             await GamificationService.deleteAward(awardId);
             showToast('Award definition deleted!', 'success');
@@ -113,7 +113,7 @@ export const useGamification = (memberId?: string) => {
             showToast('Failed to delete award definition', 'error');
             throw err;
         }
-    };
+    }, [showToast, loadAllAwards]);
 
     return {
         awards,

@@ -652,7 +652,7 @@ export const JCIKLApp: React.FC = () => {
     return (
       <>
         <GuestAnalyticsTracker />
-        <Suspense fallback={<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue" aria-hidden /></div>}>
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue" aria-hidden /></div>}>
           <Routes>
             <Route path="/" element={<GuestLandingPage {...guestPageProps} />} />
             <Route path="/events" element={<GuestEventsPage {...guestPageProps} />} />

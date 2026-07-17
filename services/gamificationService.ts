@@ -179,30 +179,32 @@ export class GamificationService {
                     const badgeAwardRef = doc(collection(db, COLLECTIONS.BADGE_AWARDS));
                     batch.set(badgeAwardRef, awardData);
 
-                    // Write 3: Append badge to member's display list (skip if already present)
-                    // P1 fix: use arrayUnion instead of spread to avoid concurrent overwrites
-                    // where two simultaneous badge awards could each read the same stale
-                    // currentBadges array and the second write loses the first badge.
-                    if (member && !alreadyAwarded) {
-                        const userBadge: UserBadge = {
-                            id: awardId,
-                            name: award.name,
-                            icon: award.icon,
-                            description: award.description,
-                            earnedDate: new Date().toISOString()
-                        };
-                        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-                        batch.update(memberRef, { badges: arrayUnion(userBadge) });
-                    }
-
-                    // P1 fix: inline points award in the same batch so the badge record
-                    // and the member's point balance are always committed together.
+                    // Fix 6 & 7: inline points award, tier recalculation, and badge arrayUnion
+                    // in a single batch.update call to avoid two separate updates on the same doc.
                     if (award.pointsReward > 0 && member) {
                         const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-                        batch.update(memberRef, {
+                        const currentPoints: number = (member as any).points || 0;
+                        const newPoints = currentPoints + award.pointsReward;
+                        const newTier = PointsService.calculateTier(newPoints);
+
+                        // Merge badges arrayUnion + points increment + tier into ONE update call
+                        const memberUpdate: Record<string, any> = {
                             points: increment(award.pointsReward),
+                            tier: newTier,
                             updatedAt: Timestamp.now(),
-                        });
+                        };
+                        if (member && !alreadyAwarded) {
+                            const userBadge: UserBadge = {
+                                id: awardId,
+                                name: award.name,
+                                icon: award.icon,
+                                description: award.description,
+                                earnedDate: new Date().toISOString()
+                            };
+                            memberUpdate.badges = arrayUnion(userBadge);
+                        }
+                        batch.update(memberRef, memberUpdate);
+
                         // Also create a points transaction record in the same batch
                         const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
                         batch.set(pointsTxRef, {

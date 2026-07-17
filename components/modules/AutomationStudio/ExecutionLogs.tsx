@@ -3,7 +3,7 @@ import {
   Play, Clock, RefreshCw, FileText, Eye,
   Calendar, Filter, Webhook as WebhookIcon,
 } from 'lucide-react';
-import { Card, Button, Badge, Modal } from '../../ui/Common';
+import { Card, Button, Badge, Modal, useToast } from '../../ui/Common';
 import { Select } from '../../ui/Form';
 import { Workflow, AutomationService } from '../../../services/automationService';
 import { WorkflowExecution } from '../../../types';
@@ -133,6 +133,7 @@ export const ExecutionLogs: React.FC<ExecutionLogsProps> = ({ workflows }) => {
   const [loading, setLoading] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<WorkflowExecution | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     loadExecutions();
@@ -145,6 +146,7 @@ export const ExecutionLogs: React.FC<ExecutionLogsProps> = ({ workflows }) => {
       setExecutions(logs);
     } catch (err) {
       console.error('Failed to load executions:', err);
+      showToast('Failed to load execution logs', 'error');
     } finally {
       setLoading(false);
     }

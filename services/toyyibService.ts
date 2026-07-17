@@ -471,7 +471,8 @@ export class ToyyibService {
       where('isActive', '==', true),
       limit(1),
     ));
-    if (!snap.empty) return snap.docs[0].id;
+    // Fix 9: return stored categoryCode field (doc ID is now deterministic, not the code)
+    if (!snap.empty) return (snap.docs[0].data().categoryCode as string) || snap.docs[0].id;
 
     const catName = `${year} Membership`;
     const result = await proxyCall('createCategory', { catname: catName, catdescription: catName });
@@ -479,11 +480,15 @@ export class ToyyibService {
       throw new Error(`Failed to create ToyyibPay category for ${catName}`);
     }
     const categoryCode: string = result[0].CategoryCode;
-    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode), {
+    // Fix 9: use deterministic doc ID so concurrent callers write the same document
+    // (setDoc with merge:true is idempotent).
+    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${year}_membership`), {
+      categoryCode,
       categoryName: catName,
       categoryDescription: catName,
       linkedType: 'membership',
       linkedYear: String(year),
+      isActive: true,
       createdAt: serverTimestamp(),
     }, { merge: true });
     return categoryCode;
@@ -501,19 +506,24 @@ export class ToyyibService {
       where('isActive', '==', true),
       limit(1),
     ));
-    if (!snap.empty) return snap.docs[0].id;
+    // Fix 10: return stored categoryCode field (doc ID is now deterministic, not the code)
+    if (!snap.empty) return (snap.docs[0].data().categoryCode as string) || snap.docs[0].id;
 
     const result = await proxyCall('createCategory', { catname: projectTitle, catdescription: projectTitle });
     if (!Array.isArray(result) || !result[0]?.CategoryCode) {
       throw new Error(`Failed to create ToyyibPay category for ${projectTitle}`);
     }
     const categoryCode: string = result[0].CategoryCode;
-    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode), {
+    // Fix 10: use deterministic doc ID so concurrent callers write the same document
+    // (setDoc with merge:true is idempotent).
+    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${projectId}_category`), {
+      categoryCode,
       categoryName: projectTitle,
       categoryDescription: projectTitle,
       linkedType: 'project',
       linkedProjectId: projectId,
       linkedProjectName: projectTitle,
+      isActive: true,
       createdAt: serverTimestamp(),
     }, { merge: true });
     return categoryCode;

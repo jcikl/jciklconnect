@@ -9,7 +9,7 @@ import { buildCategoryFields, buildCategoryCleanupUpdates } from '../../../utils
 import { MembershipType, MembershipRuleConfig } from '../../../types';
 import * as Forms from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
-import { Modal, Button } from '../../ui/Common';
+import { Modal, Button, useToast } from '../../ui/Common';
 
 interface TransactionSplitModalProps {
   transaction: Transaction;
@@ -51,6 +51,7 @@ export function TransactionSplitModal({
   projectPurposes = [],
 }: TransactionSplitModalProps) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const currentYear = new Date().getFullYear();
   const [splits, setSplits] = useState<SplitItem[]>([
     { category: 'Projects & Activities', year: currentYear, projectId: '', memberId: '', purpose: '', paymentRequestId: '', amount: 0, description: '', id: undefined },
@@ -172,6 +173,7 @@ export function TransactionSplitModal({
           }
         } catch (e) {
           console.error('Failed to load splits', e);
+          showToast('Failed to load split records', 'error');
         }
       }
       setLoadedSplits([]);

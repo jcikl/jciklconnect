@@ -34,6 +34,7 @@ export const WorkflowVisualDesigner: React.FC<WorkflowVisualDesignerProps> = ({
   const [isConfigModalOpen, setConfigModalOpen] = useState(false);
   const [workflowName, setWorkflowName] = useState(workflow?.name || '');
   const [workflowDescription, setWorkflowDescription] = useState(workflow?.description || '');
+  const [isSaving, setIsSaving] = useState(false);
   const [draggedNode, setDraggedNode] = useState<WorkflowNode | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
@@ -162,6 +163,7 @@ export const WorkflowVisualDesigner: React.FC<WorkflowVisualDesignerProps> = ({
       }
     }
 
+    setIsSaving(true);
     try {
       const workflowData: Omit<Workflow, 'id'> = {
         name: workflowName,
@@ -180,6 +182,8 @@ export const WorkflowVisualDesigner: React.FC<WorkflowVisualDesignerProps> = ({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save workflow';
       showToast(errorMessage, 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -339,9 +343,9 @@ export const WorkflowVisualDesigner: React.FC<WorkflowVisualDesignerProps> = ({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={isSaving}>
               <Save size={16} className="mr-2" />
-              Save Workflow
+              {isSaving ? 'Saving…' : 'Save Workflow'}
             </Button>
           </div>
         </div>

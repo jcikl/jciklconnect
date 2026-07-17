@@ -56,7 +56,7 @@ export interface EventFeedbackSummary {
   feedbacks: EventFeedback[];
 }
 
-const FEEDBACK_COLLECTION = () => COLLECTIONS.EVENT_FEEDBACK || 'eventFeedback';
+const FEEDBACK_COLLECTION = COLLECTIONS.EVENT_FEEDBACK;
 
 export class EventFeedbackService {
   // Submit feedback for an event — P0: duplicate guard at service layer
@@ -73,7 +73,7 @@ export class EventFeedbackService {
           // to the same Firestore document, preventing race-condition duplicates.
           // A getDoc pre-check gives a friendly error for the common sequential retry case.
           const deterministicId = `${feedback.eventId}_${feedback.memberId}`;
-          const docRef = doc(db, FEEDBACK_COLLECTION(), deterministicId);
+          const docRef = doc(db, FEEDBACK_COLLECTION, deterministicId);
 
           // P0 FIX: wrap existence check + write in runTransaction to eliminate the
           // race window between getDoc and setDoc in concurrent submissions.
@@ -114,7 +114,7 @@ export class EventFeedbackService {
           async () => {
             const snapshot = await getDocs(
               query(
-                collection(db, FEEDBACK_COLLECTION()),
+                collection(db, FEEDBACK_COLLECTION),
                 where('eventId', '==', eventId)
               )
             );
@@ -210,7 +210,7 @@ export class EventFeedbackService {
       async () => {
         try {
           // P2 FIX: use deterministic doc ID for O(1) point-read instead of a collection query.
-          const snap = await getDoc(doc(db, FEEDBACK_COLLECTION(), `${eventId}_${memberId}`));
+          const snap = await getDoc(doc(db, FEEDBACK_COLLECTION, `${eventId}_${memberId}`));
           return snap.exists();
         } catch (error) {
           errorLoggingService.logError(error as Error, {

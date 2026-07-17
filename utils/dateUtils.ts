@@ -34,22 +34,31 @@ export const formatDateToDDMMMYYYY = (date: any): string => {
   if (!date) return '—';
 
   // Handle Firestore Timestamp objects ({ seconds, nanoseconds } or with .toDate())
-  if (typeof date === 'object' && 'seconds' in date) {
-    date = typeof date.toDate === 'function' ? date.toDate() : new Date(date.seconds * 1000);
+  let d: Date;
+  if (date instanceof Timestamp) {
+    d = date.toDate();
+  } else if (typeof date === 'object' && 'seconds' in date) {
+    d = typeof date.toDate === 'function' ? date.toDate() : new Date(date.seconds * 1000);
+  } else {
+    d = new Date(date);
   }
 
-  const d = new Date(date);
-  
   // Check if date is valid
   if (isNaN(d.getTime())) {
     return String(date);
   }
-  
-  const day = d.getDate().toString().padStart(2, '0');
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = months[d.getMonth()];
-  const year = d.getFullYear();
-  
+
+  // Use MYT timezone like all other date functions in this file
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Asia/Kuala_Lumpur',
+  }).formatToParts(d);
+  const day = parts.find(p => p.type === 'day')?.value ?? '01';
+  const month = parts.find(p => p.type === 'month')?.value ?? 'Jan';
+  const year = parts.find(p => p.type === 'year')?.value ?? '2024';
+
   return `${day} ${month} ${year}`;
 };
 

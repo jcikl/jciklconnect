@@ -477,7 +477,9 @@ export class PointsService {
   }
 
   /**
-   * @deprecated SYNC-003 — Do NOT call this method after a batch has already been committed.
+   * @deprecated Use awardPoints() instead. This method does not update member.tier.
+   *
+   * SYNC-003 — Do NOT call this method after a batch has already been committed.
    * If the standalone updateDoc here fails, the points record will exist but the member
    * aggregate total will be stale. Use the awardPoints batch pattern instead: include a
    * `batch.update(memberRef, { points: increment(delta) })` inside the same writeBatch that
@@ -497,6 +499,7 @@ export class PointsService {
         try {
           const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
           // P0 fix: atomic increment — eliminates the read-modify-write race condition.
+          // TODO: Add tier recalculation — see approveClaim() for the pattern.
           // Tier recalculation is intentionally omitted here; callers that need tier
           // updates (e.g. approveClaim) handle it in their own batch.
           await updateDoc(memberRef, {
@@ -1475,6 +1478,11 @@ export class PointsService {
 
         // P0 fix: calculate new tier based on current + awarded points so member.tier
         // is always in sync after claim approval.
+        // TODO (Fix 8): The getDoc→batch.commit sequence has a narrow race window — if another
+        // awardPoints call commits between this getDoc and batch.commit(), the tier written here
+        // will be computed from a stale points total. Acceptable for now because incentive claim
+        // approvals are low-frequency admin actions. To eliminate the race, refactor to use
+        // runTransaction so the read and write are atomic.
         const memberSnap = await getDoc(memberRef);
         const currentPoints: number = memberSnap.exists() ? (memberSnap.data().points || 0) : 0;
         const newTier = PointsService.calculateTier(currentPoints + resolvedPoints);

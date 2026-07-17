@@ -1,5 +1,5 @@
 // Communication Data Hook
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { CommunicationService } from '../services/communicationService';
 import { NewsPost, Notification } from '../types';
 import { useToast } from '../components/ui/Common';
@@ -14,6 +14,7 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 export const useCommunication = () => {
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
   const { showToast } = useToast();
+  const isSubmittingRef = useRef(false);
 
   // Only fetch when auth has resolved, member is logged in, and not in dev mode
   const enabled = !authLoading && !!member && !isDevMode() && !isDevModeFromAuth;
@@ -39,6 +40,8 @@ export const useCommunication = () => {
   }, [reloadPosts, reloadNotifications]);
 
   const createPost = async (postData: Omit<NewsPost, 'id' | 'timestamp'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await CommunicationService.createPost(postData);
       await loadData();
@@ -48,6 +51,8 @@ export const useCommunication = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create post';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

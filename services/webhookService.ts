@@ -166,18 +166,20 @@ export class WebhookService {
       () => { console.log('[Dev Mode] Would delete webhook:', webhookId); },
       async () => {
         try {
-          // Delete all webhook_logs for this webhook first (up to 400 per batch)
-          const logsSnap = await getDocs(
-            query(
-              collection(db, COLLECTIONS.WEBHOOK_LOGS || 'webhook_logs'),
-              where('webhookId', '==', webhookId),
-              limit(400)
-            )
-          );
-          if (!logsSnap.empty) {
-            const batch = writeBatch(db);
-            logsSnap.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
+          // Delete all webhook_logs for this webhook first, in pages of 400
+          while (true) {
+            const logsSnap = await getDocs(
+              query(
+                collection(db, COLLECTIONS.WEBHOOK_LOGS || 'webhook_logs'),
+                where('webhookId', '==', webhookId),
+                limit(400)
+              )
+            );
+            if (logsSnap.empty) break;
+            const logBatch = writeBatch(db);
+            logsSnap.docs.forEach(d => logBatch.delete(d.ref));
+            await logBatch.commit();
+            if (logsSnap.size < 400) break;
           }
 
           const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);

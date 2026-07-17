@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Package, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 import { InventoryService } from '../../../services/inventoryService';
-import { Modal, Button } from '../../ui/Common';
+import { Modal, Button, useToast } from '../../ui/Common';
 
 interface MerchandiseReconciliationModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ export const MerchandiseReconciliationModal: React.FC<MerchandiseReconciliationM
   isOpen,
   onClose,
 }) => {
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [reconciliationData, setReconciliationData] = useState<{
     totalItems: number;
@@ -42,6 +43,7 @@ export const MerchandiseReconciliationModal: React.FC<MerchandiseReconciliationM
     } catch (err: any) {
       setError(err.message || 'Failed to reconcile merchandise inventory');
       console.error(err);
+      showToast('Reconciliation failed', 'error');
     } finally {
       setLoading(false);
     }

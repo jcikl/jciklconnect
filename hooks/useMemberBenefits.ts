@@ -12,8 +12,10 @@ export const useMemberBenefits = (memberId?: string) => {
   const [benefits, setBenefits] = useState<MemberBenefit[]>([]);
   const [usageHistory, setUsageHistory] = useState<BenefitUsage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usageLoading, setUsageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const isClaimingRef = useRef(false);
 
   // Prevents state updates after the component has unmounted.
   const mountedRef = useRef(true);
@@ -38,12 +40,15 @@ export const useMemberBenefits = (memberId?: string) => {
 
   const loadUsageHistory = useCallback(async () => {
     if (!memberId) return;
+    if (mountedRef.current) setUsageLoading(true);
     try {
       const data = await MemberBenefitsService.getBenefitUsage(memberId);
       if (mountedRef.current) setUsageHistory(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load usage history';
       if (mountedRef.current) showToast(msg, 'error');
+    } finally {
+      if (mountedRef.current) setUsageLoading(false);
     }
   }, [memberId, showToast]);
 
@@ -57,6 +62,8 @@ export const useMemberBenefits = (memberId?: string) => {
 
   const claimBenefit = async (benefitId: string, details?: string) => {
     if (!memberId) throw new Error('memberId is required to claim a benefit');
+    if (isClaimingRef.current) return;
+    isClaimingRef.current = true;
     try {
       await MemberBenefitsService.claimBenefit(memberId, benefitId, details);
       await loadUsageHistory();
@@ -65,6 +72,8 @@ export const useMemberBenefits = (memberId?: string) => {
       const msg = err instanceof Error ? err.message : 'Failed to claim benefit';
       showToast(msg, 'error');
       throw err;
+    } finally {
+      isClaimingRef.current = false;
     }
   };
 
@@ -82,6 +91,7 @@ export const useMemberBenefits = (memberId?: string) => {
     benefits,
     usageHistory,
     loading,
+    usageLoading,
     error,
     loadBenefits,
     loadUsageHistory,

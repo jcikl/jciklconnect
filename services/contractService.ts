@@ -229,7 +229,7 @@ export class ContractService {
     const bonus = Math.floor(data.stakedPoints * (data.multiplier - 1));
     if (bonus > 0) {
       try {
-        await PointsService.awardPoints(data.memberId, bonus, 'ROLE_FULFILLMENT', `Commitment Bonus: ${data.goalTitle}`);
+        await PointsService.awardPoints(data.memberId, 'ROLE_FULFILLMENT', bonus, `Commitment Bonus: ${data.goalTitle}`, contractId, 'contract');
       } catch (bonusErr) {
         console.error('ContractService.fulfillContract: bonus awardPoints failed', bonusErr);
         // P1 — write a finance_alert so admin can manually award the missed bonus

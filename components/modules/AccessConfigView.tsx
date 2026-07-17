@@ -3,6 +3,8 @@ import { Save, Shield } from 'lucide-react';
 import { Button, useToast, Tabs } from '../ui/Common';
 import { usePermissions } from '../../hooks/usePermissions';
 import { UserRole } from '../../types';
+import { db } from '../../config/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 // Reuse same Toggle as MembershipConfigView
 const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }> = ({ checked, onChange, disabled }) => (
@@ -80,12 +82,16 @@ export const AccessConfigView: React.FC = () => {
   });
 
   const handleSave = async () => {
-    console.warn('[TODO] AccessConfigView.handleSave: implement real Firestore persistence');
+    if (!isAdmin) {
+      showToast('Admin permission required', 'error');
+      return;
+    }
     setSaving(true);
     try {
-      await new Promise(r => setTimeout(r, 800));
-      showToast('访问配置持久化尚未实现，此更改仅在当前会话有效', 'warning');
+      await setDoc(doc(db, 'system', 'accessConfig'), { boardPerms, rolePerms, updatedAt: new Date() }, { merge: true });
+      showToast('Access configuration saved', 'success');
     } catch (e) {
+      console.error('[AccessConfigView] Failed to save access config:', e);
       showToast('Failed to update access permissions', 'error');
     } finally {
       setSaving(false);

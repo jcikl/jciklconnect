@@ -217,6 +217,7 @@ export class ProjectsService {
 
           await updateDoc(projectRef, updateData);
           this.invalidateProjectsCache();
+          (await import('./eventsService')).EventsService.invalidateEventsCache();
 
           // SYNC-006: Sync project.budget → projectFinancialAccount.budget.
           // In production, projectFinancialService.getProjectFinancialAccount derives budget
@@ -298,6 +299,7 @@ export class ProjectsService {
 
           this.invalidateProjectsCache();
           invalidateFinanceCache();
+          (await import('./eventsService')).EventsService.invalidateEventsCache();
 
           // Recalculate radar stats for affected members (revocation)
           if (memberIdsToRecalculate.size > 0) {
@@ -383,7 +385,7 @@ export class ProjectsService {
       async () => {
         try {
           let q = query(
-            collection(db, 'tasks'),
+            collection(db, COLLECTIONS.TASKS),
             where('projectId', '==', projectId),
             orderBy('dueDate', 'asc')
           );
@@ -391,7 +393,7 @@ export class ProjectsService {
           // P1-C: Firestore-side priority filter (avoids full collection scan)
           if (filters?.priority) {
             q = query(
-              collection(db, 'tasks'),
+              collection(db, COLLECTIONS.TASKS),
               where('projectId', '==', projectId),
               where('priority', '==', filters.priority),
               orderBy('dueDate', 'asc')
@@ -424,7 +426,7 @@ export class ProjectsService {
       () => MOCK_TASKS.find(t => t.id === taskId) || null,
       async () => {
         try {
-          const taskDoc = await getDoc(doc(db, 'tasks', taskId));
+          const taskDoc = await getDoc(doc(db, COLLECTIONS.TASKS, taskId));
           if (!taskDoc.exists()) {
             return null;
           }
@@ -474,7 +476,7 @@ export class ProjectsService {
 
           // 如果提供了 taskId，使用 setDoc 创建/更新（使用指定的文档 ID）
           if (taskId) {
-            const taskRef = doc(db, 'tasks', taskId);
+            const taskRef = doc(db, COLLECTIONS.TASKS, taskId);
             const existingTask = await getDoc(taskRef);
 
             // 如果 task 已存在，保留原有的 createdAt，只更新其他字段
@@ -494,7 +496,7 @@ export class ProjectsService {
             return taskId;
           } else {
             // 否则使用 addDoc 让 Firestore 自动生成 ID
-            const docRef = await addDoc(collection(db, 'tasks'), newTask);
+            const docRef = await addDoc(collection(db, COLLECTIONS.TASKS), newTask);
             return docRef.id;
           }
         } catch (error) {
@@ -527,7 +529,7 @@ export class ProjectsService {
           }
           // TODO: Implement DFS cycle detection with visited set to prevent infinite loops in task chains
 
-          const taskRef = doc(db, 'tasks', taskId);
+          const taskRef = doc(db, COLLECTIONS.TASKS, taskId);
 
           // 获取现有任务数据以合并 statusHistory 和 remarks
           const existingTask = await getDoc(taskRef);

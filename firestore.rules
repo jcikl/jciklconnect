@@ -1151,7 +1151,7 @@ service cloud.firestore {
     // FIX: new block added; without this, auditLog had zero rules (default deny — all writes silently failed)
     match /auditLog/{logId} {
       allow read: if isAdmin();
-      allow create: if isBoard() || isAdmin();
+      allow create: if isAdmin();
       allow update: if false;
       allow delete: if false;
     }

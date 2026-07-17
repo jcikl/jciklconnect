@@ -170,7 +170,8 @@ exports.handler = async (event) => {
       messageId = data.id || `mg-${Date.now()}`;
     }
 
-    console.log(`[send-email] Sent via ${provider} to ${toAddress}, messageId=${messageId}`);
+    const toArr = Array.isArray(toAddress) ? toAddress : [toAddress];
+    console.log('[send-email] Sent via', provider, '| recipients:', toArr.length, '| messageId:', messageId);
     return {
       statusCode: 200,
       headers: cors,

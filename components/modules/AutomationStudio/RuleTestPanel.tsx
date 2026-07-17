@@ -15,6 +15,7 @@ import {
 import { Rule, RuleExecution } from '../../../types';
 import { ruleExecutionService, RuleTestData } from '../../../services/ruleExecutionService';
 import * as Forms from '../../ui/Form';
+import { useToast } from '../../ui/Common';
 
 interface RuleTestPanelProps {
   rule: Rule;
@@ -65,6 +66,7 @@ const SAMPLE_TEST_DATA: Record<string, RuleTestData> = {
 };
 
 export const RuleTestPanel: React.FC<RuleTestPanelProps> = ({ rule, onClose }) => {
+  const { showToast } = useToast();
   const [testData, setTestData] = useState<RuleTestData>(SAMPLE_TEST_DATA.member_scenario);
   const [customTestData, setCustomTestData] = useState<string>('');
   const [useCustomData, setUseCustomData] = useState(false);
@@ -111,6 +113,7 @@ export const RuleTestPanel: React.FC<RuleTestPanelProps> = ({ rule, onClose }) =
       loadExecutionHistory();
     } catch (error) {
       console.error('Rule execution failed:', error);
+      showToast('Rule execution failed', 'error');
       // Create a failed execution result for display
       setExecutionResult({
         id: `test_${Date.now()}`,

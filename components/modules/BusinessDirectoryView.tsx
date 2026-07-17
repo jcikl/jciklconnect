@@ -17,7 +17,14 @@ import { useAuth } from '../../hooks/useAuth';
 import { Input, Textarea, Select } from '../ui/Form';
 import { submitInquiry } from '../../services/inquiryService';
 
-// Mock Sister Chapter Members
+// Generate an inline SVG data URI with initials — avoids external ui-avatars.com requests blocked by CSP
+const getInitialsSvg = (name: string, size = 44): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
+// DEV MOCK: These Unsplash URLs will fail under CSP in production. Replace with Firebase Storage URLs or locally-bundled placeholders.
 const MOCK_SISTER_CHAPTER_MEMBERS = [
   {
     id: "scm1",
@@ -464,7 +471,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       const mobileDividerLabel = thisMobileScore === 1 ? 'Suggested for You' : 'All Businesses';
                       const mobileDividerStyle = thisMobileScore === 1 ? 'text-sky-500' : 'text-slate-400';
                       const ownerMember = members.find(m => m.id === biz.memberId);
-                      const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
+                      const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || getInitialsSvg(biz.ownerName || '');
                       const chineseName = ownerMember?.general?.chineseName;
                       const position = ownerMember?.business?.position || 'Representative';
                       const intlStatus = biz.acceptsInternationalBusiness;
@@ -613,7 +620,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                         const dividerLabel = thisScore === 1 ? 'Suggested for You' : 'All Businesses';
                         const dividerStyle = thisScore === 1 ? 'text-sky-500' : 'text-slate-400';
                         const ownerMember = members.find(m => m.id === biz.memberId);
-                        const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
+                        const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || getInitialsSvg(biz.ownerName || '');
                         const chineseName = ownerMember?.general?.chineseName;
                         const position = ownerMember?.business?.position || 'Representative';
                         const intlStatus = biz.acceptsInternationalBusiness;
@@ -761,7 +768,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
           {(() => {
             const biz = detailBiz;
             const ownerMember = members.find(m => m.id === biz.memberId);
-            const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(biz.ownerName)}&background=0097D7&color=fff`;
+            const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || getInitialsSvg(biz.ownerName || '');
             const chineseName = ownerMember?.general?.chineseName;
             const position = ownerMember?.business?.position || 'Representative';
             const intlStatus = biz.acceptsInternationalBusiness;
@@ -839,7 +846,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
             <div className="space-y-4 border-b md:border-b-0 md:border-r border-slate-100 pb-6 md:pb-0 md:pr-6">
               <div className="flex items-start gap-4 mb-4 mt-2">
                 <img
-                  src={selectedBiz.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedBiz.companyName)}&background=0097D7&color=fff`}
+                  src={selectedBiz.logo || getInitialsSvg(selectedBiz.companyName || '')}
                   alt={selectedBiz.companyName}
                   className="w-16 h-16 rounded-lg object-cover border border-slate-200 shadow-sm"
                 />

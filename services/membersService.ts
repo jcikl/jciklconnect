@@ -651,7 +651,9 @@ export class MembersService {
       try {
         await this.syncBoardMemberDisplayFields(memberId, mergedMember as Member);
       } catch (syncErr) {
-        // P2 fix: sync failure must not abort the member update — log and continue.
+        // Note: sync failure is intentionally non-fatal. The calling UI hook (useMemberMutations)
+        // shows a toast on any error returned. Developer visibility is provided via console.warn.
+        console.warn('[updateMember] syncBoardMemberDisplayFields failed (non-fatal):', syncErr);
         errorLoggingService.logError(syncErr as Error, { component: 'updateMember', additionalData: { action: 'syncBoardMemberDisplayFields', memberId } });
       }
 

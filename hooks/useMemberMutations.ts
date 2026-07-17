@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { MembersService } from '../services/membersService';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
@@ -19,8 +19,11 @@ interface UseMemberMutationsOptions {
 export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}) => {
   const { showToast } = useToast();
   const { user } = useAuth();
+  const isSubmittingRef = useRef(false);
 
   const createMember = useCallback(async (data: MemberCreateInput): Promise<string> => {
+    if (isSubmittingRef.current) return '' as string;
+    isSubmittingRef.current = true;
     try {
       const id = await MembersService.createMember(data, user?.uid ?? undefined);
       showToast('Member created successfully', 'success');
@@ -29,10 +32,14 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create member', 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [user?.uid, onSuccess, showToast]);
 
   const updateMember = useCallback(async (memberId: string, updates: Partial<Member>): Promise<void> => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await MembersService.updateMember(memberId, updates, user?.uid ?? undefined);
       showToast('Member updated successfully', 'success');
@@ -40,10 +47,14 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update member', 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [user?.uid, onSuccess, showToast]);
 
   const deleteMember = useCallback(async (memberId: string): Promise<void> => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await MembersService.deleteMember(memberId);
       showToast('Member deleted successfully', 'success');
@@ -56,10 +67,14 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
         showToast(err instanceof Error ? err.message : 'Failed to delete member', 'error');
       }
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [onSuccess, showToast]);
 
   const batchUpdateMembers = useCallback(async (memberIds: string[], updates: Partial<Member>): Promise<void> => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await MembersService.batchUpdateMembers(memberIds, updates);
       showToast(`Successfully updated ${memberIds.length} members`, 'success');
@@ -67,10 +82,14 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update members', 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [onSuccess, showToast]);
 
   const batchDeleteMembers = useCallback(async (memberIds: string[]): Promise<void> => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await MembersService.batchDeleteMembers(memberIds);
       showToast(`Successfully deleted ${memberIds.length} members`, 'success');
@@ -78,6 +97,8 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete members', 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [onSuccess, showToast]);
 

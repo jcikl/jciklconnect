@@ -72,15 +72,9 @@ export const EventRegistrationService = {
     return withDevMode(
       () => MOCK_REGISTRATIONS.find((r) => r.eventId === eventId && r.memberId === memberId) ?? null,
       async () => {
-        const q = query(
-          collection(db, COLLECTIONS.EVENT_REGISTRATIONS),
-          where('eventId', '==', eventId),
-          where('memberId', '==', memberId),
-          limit(1)
-        );
-        const snapshot = await getDocs(q);
-        const d = snapshot.docs[0];
-        if (!d) return null;
+        const ballotId = `${eventId}_${memberId}`;
+        const d = await getDoc(doc(db, COLLECTIONS.EVENT_REGISTRATIONS, ballotId));
+        if (!d.exists()) return null;
         const data = d.data();
         return {
           id: d.id,

@@ -48,6 +48,8 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   }, [currentYear]);
 
   const getMockBoardData = (year: string) => {
+    // TODO: Replace Unsplash/pravatar URLs below with Firebase Storage URLs from boardMember.photoURL
+    // These external image URLs will fail under CSP in production.
     const data: Record<string, Array<{ position: string; name: string; avatar?: string; company?: string }>> = {
       '2026': [
         { position: 'President', name: 'Eric Wong', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', company: 'TechNova Solutions' },

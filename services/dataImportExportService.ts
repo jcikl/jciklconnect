@@ -1,6 +1,8 @@
 ﻿// Data Import/Export Service
 import Papa from 'papaparse';
-import { auth } from '../config/firebase';
+import { collection, doc, writeBatch } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 // xlsx is dynamically imported inside importFromFile() and exportToExcel() to avoid eager loading
 import {
   DataImportResult,
@@ -463,33 +465,56 @@ export class DataImportExportService {
       return { row: normalizedRow, originalIndex: index };
     });
 
-    // Process in batches of 500; throw on batch failure and record how many batches succeeded
-    const BATCH_SIZE = 500;
-    let completedBatches = 0;
-    for (let batchStart = 0; batchStart < normalizedRows.length; batchStart += BATCH_SIZE) {
-      const batch = normalizedRows.slice(batchStart, batchStart + BATCH_SIZE);
-      try {
-        for (const { row: normalizedRow, originalIndex } of batch) {
-          try {
-            const existingId = await this.checkIfRecordExists(normalizedRow, entityType, existingMemberEmailToId);
-            if (existingId) {
-              await this.updateRecord(existingId, normalizedRow, entityType);
-              summary.updated++;
-            } else {
-              await this.createRecord(normalizedRow, entityType);
-              summary.created++;
-            }
-          } catch (error) {
-            summary.skipped++;
-            const errorMessage = error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error during persistence';
-            errors.push({ row: originalIndex + 2, message: errorMessage, severity: 'error' });
-          }
-        }
-        completedBatches++;
-      } catch (batchError) {
-        const batchErrorMessage = batchError instanceof Error ? batchError.message : 'Batch write failed';
-        throw new Error(`导入中断：已成功提交 ${completedBatches} 批（${completedBatches * BATCH_SIZE} 行），当前批次失败：${batchErrorMessage}`);
+    // Process rows using Firestore WriteBatch (max 499 ops per batch).
+    // NOTE: This bypasses service-layer side effects (e.g. point initialization).
+    // For complex entities, callers should use the service methods directly after bulk import.
+    const FIRESTORE_BATCH_LIMIT = 499;
+    let currentBatch = writeBatch(db);
+    let opsInCurrentBatch = 0;
+    let committedBatches = 0;
+
+    const getCollectionName = (et: string): string => {
+      if (et === 'members') return COLLECTIONS.MEMBERS;
+      if (et === 'events') return COLLECTIONS.EVENTS;
+      return et;
+    };
+
+    const flushBatch = async () => {
+      if (opsInCurrentBatch > 0) {
+        await currentBatch.commit();
+        committedBatches++;
+        currentBatch = writeBatch(db);
+        opsInCurrentBatch = 0;
       }
+    };
+
+    for (const { row: normalizedRow, originalIndex } of normalizedRows) {
+      try {
+        const existingId = await this.checkIfRecordExists(normalizedRow, entityType, existingMemberEmailToId);
+        const colName = getCollectionName(entityType);
+        if (existingId) {
+          currentBatch.update(doc(db, colName, existingId), normalizedRow);
+          summary.updated++;
+        } else {
+          currentBatch.set(doc(collection(db, colName)), normalizedRow);
+          summary.created++;
+        }
+        opsInCurrentBatch++;
+        if (opsInCurrentBatch >= FIRESTORE_BATCH_LIMIT) {
+          await flushBatch();
+        }
+      } catch (error) {
+        summary.skipped++;
+        const errorMessage = error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error during persistence';
+        errors.push({ row: originalIndex + 2, message: errorMessage, severity: 'error' });
+      }
+    }
+
+    try {
+      await flushBatch();
+    } catch (batchError) {
+      const batchErrorMessage = batchError instanceof Error ? batchError.message : 'Batch write failed';
+      throw new Error(`导入中断：已成功提交 ${committedBatches} 批，最后批次失败：${batchErrorMessage}`);
     }
 
     const status = errors.length > 0 ? 'partial' : 'success';

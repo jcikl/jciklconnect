@@ -92,6 +92,8 @@ export const COLLECTIONS = {
   MANUAL_PROMOTION_REQUESTS: 'manualPromotionRequests',
   /** Immutable audit trail for sensitive business actions (role changes, deletes, reversals, etc.) */
   AUDIT_LOG: 'auditLog',
+  /** Elections and ballot subcollections */
+  ELECTIONS: 'elections',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */
@@ -101,7 +103,8 @@ export const TOYYIB_CONFIG = {
   ENDPOINT: 'https://toyyibpay.com/index.php/api',
   SANDBOX_ENDPOINT: 'https://dev.toyyibpay.com/index.php/api',
   IS_SANDBOX: true,
-  USER_SECRET_KEY: 'tl5be74e-pazq-kti6-xci2-bh6npgb4gcjv', // To be filled in via environment or dashboard
+  // WARNING: Do NOT put real secrets here. The Netlify function reads TOYYIBPAY_SECRET_KEY from process.env. The client never needs this value.
+  USER_SECRET_KEY: '',
   CATEGORY_CODE: '6x9mw99z',    // To be filled in via environment or dashboard
   RETURN_URL_SUFFIX: '/payment-return',
   CALLBACK_URL_SUFFIX: '/api/webhooks/toyyibpay'

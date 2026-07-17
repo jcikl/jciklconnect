@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, ProgressBar, Badge, Button } from '../ui/Common';
+import { Card, ProgressBar, Badge, Button, useToast } from '../ui/Common';
 import { Star, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { PointsService } from '../../services/pointsService';
 import { useAuth } from '../../hooks/useAuth';
@@ -9,6 +9,7 @@ import { LoadingState } from '../ui/Loading';
 
 export const LOStarDashboard: React.FC = () => {
     const { member } = useAuth();
+    const { showToast } = useToast();
     const [progress, setProgress] = useState<LOStarProgress | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,7 @@ export const LOStarDashboard: React.FC = () => {
         } catch (err) {
             console.error('Failed to load LO Star progress:', err);
             setError('Failed to calculate progress. Please try again.');
+            showToast('Failed to load LO Star progress', 'error');
         } finally {
             setLoading(false);
         }

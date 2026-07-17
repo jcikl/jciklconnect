@@ -550,7 +550,7 @@ export function useFinanceData(searchQuery?: string) {
     };
     loadSelectedProjectTransactions();
     return () => { ignore = true; };
-  }, [selectedProjectFilter]);
+  }, [selectedProjectFilter, showToast]);
 
   useEffect(() => {
     // RC-008: ignore flag prevents a stale response (triggered by the previous
@@ -1066,9 +1066,11 @@ export function useFinanceData(searchQuery?: string) {
   }, [reportYear, loadData]);
 
   useEffect(() => {
+    let ignore = false;
     if (moduleTab === 'Project Account') {
       loadProjectAccounts(projectAccountYearFilter);
     }
+    return () => { ignore = true; };
   }, [moduleTab, projectAccountYearFilter, loadProjectAccounts]);
 
   useEffect(() => {
@@ -1076,9 +1078,11 @@ export function useFinanceData(searchQuery?: string) {
   }, [reportYear]);
 
   useEffect(() => {
+    let ignore = false;
     if (moduleTab === 'Membership' || (editingTransaction?.category === 'Membership' && isEditModalOpen) || (isModalOpen && recordFormCategory === 'Membership')) {
       loadMembers();
     }
+    return () => { ignore = true; };
   }, [moduleTab, editingTransaction?.category, isEditModalOpen, isModalOpen, recordFormCategory, loadMembers]);
 
   useEffect(() => {
@@ -1294,7 +1298,7 @@ export function useFinanceData(searchQuery?: string) {
       } else if (code === 'unavailable' || code === 'deadline-exceeded') {
         showToast('Network error — please check your connection and try again.', 'error');
       } else {
-        showToast('Failed to record transaction', 'error');
+        showToast(err instanceof Error ? err.message : 'Failed to record transaction', 'error');
       }
     } finally {
       isAddingTransactionRef.current = false;
@@ -1363,7 +1367,7 @@ export function useFinanceData(searchQuery?: string) {
       showToast('Transaction deleted successfully', 'success');
       await loadData();
     } catch (err) {
-      showToast('Failed to delete transaction', 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to delete transaction', 'error');
     }
   }, [transactions, showToast, loadData]);
 
@@ -1743,7 +1747,7 @@ export function useFinanceData(searchQuery?: string) {
       setEditingMembershipYear(new Date().getFullYear());
       await loadData();
     } catch (err) {
-      showToast('Failed to update transaction', 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to update transaction', 'error');
     } finally {
       isUpdatingTransactionRef.current = false;
     }

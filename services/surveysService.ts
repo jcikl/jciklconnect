@@ -376,7 +376,13 @@ export class SurveysService {
       // Update survey record with distribution channels and optional shareable link
       await this.updateSurvey(surveyId, {
         distributionChannels: channels,
-        shareableLink: channels.includes('link') ? `${import.meta.env.VITE_APP_BASE_URL || 'https://jci-kl.app'}/survey/${surveyId}` : undefined,
+        shareableLink: channels.includes('link') ? (() => {
+          const baseUrl = import.meta.env.VITE_APP_BASE_URL;
+          if (!baseUrl) {
+            console.warn('[SurveysService] VITE_APP_BASE_URL is not set. Shareable links will be broken.');
+          }
+          return baseUrl ? `${baseUrl}/survey/${surveyId}` : undefined;
+        })() : undefined,
       });
 
       return { emailsSent: 0, notificationsSent };

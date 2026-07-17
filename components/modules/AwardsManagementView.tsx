@@ -106,6 +106,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
             handleCloseModal();
         } catch (err) {
             console.error('Error saving award:', err);
+            showToast('Failed to save award', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -123,6 +124,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
                     await deleteAward(id);
                 } catch (err) {
                     console.error('Error deleting award:', err);
+                    showToast('Failed to delete award', 'error');
                 }
             },
         });

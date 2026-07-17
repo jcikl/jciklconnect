@@ -529,14 +529,12 @@ export class AutomationService {
         }
         break;
 
-      case 'update_data':
-        // Generic data update - would need to know the collection and document
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Data update step:', step.config, context);
-        }
-        // This would require more context about what data to update
-        // Could be implemented based on step.config.collection, step.config.docId, etc.
+      case 'update_data': {
+        const { collection: col, docId, fields } = step.config || {};
+        if (!col || !docId || !fields) throw new Error('update_data requires config.collection, config.docId, and config.fields');
+        await updateDoc(doc(db, col, docId), fields);
         break;
+      }
 
       case 'award_points':
         // Integrate with PointsService

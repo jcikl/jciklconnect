@@ -1,5 +1,5 @@
 // Members Data Hook
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DocumentSnapshot } from 'firebase/firestore';
 import { MembersService } from '../services/membersService';
 import { Member, MemberCreateInput } from '../types';
@@ -23,6 +23,11 @@ export interface UseMembersResult {
 export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
   const { showToast } = useToast();
   const { user, member: currentMember, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
+  const isCreatingRef = useRef(false);
+  const isUpdatingRef = useRef(false);
+  const isDeletingRef = useRef(false);
+  const isBatchUpdatingRef = useRef(false);
+  const isBatchDeletingRef = useRef(false);
 
   const inDevMode = isDevMode() || isDevModeFromAuth;
   const isFullMember = !!(currentMember && ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(currentMember.role as string));
@@ -35,6 +40,8 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
   });
 
   const createMember = async (memberData: MemberCreateInput) => {
+    if (isCreatingRef.current) return '' as string;
+    isCreatingRef.current = true;
     try {
       const id = await MembersService.createMember(memberData, user?.uid ?? undefined);
       await loadMembers();
@@ -44,10 +51,14 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create member';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isCreatingRef.current = false;
     }
   };
 
   const updateMember = async (memberId: string, updates: Partial<Member>) => {
+    if (isUpdatingRef.current) return;
+    isUpdatingRef.current = true;
     try {
       await MembersService.updateMember(memberId, updates, user?.uid ?? undefined);
       await loadMembers();
@@ -56,10 +67,14 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update member';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isUpdatingRef.current = false;
     }
   };
 
   const deleteMember = async (memberId: string) => {
+    if (isDeletingRef.current) return;
+    isDeletingRef.current = true;
     try {
       await MembersService.deleteMember(memberId);
       await loadMembers();
@@ -72,10 +87,14 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
         showToast(err instanceof Error ? err.message : 'Failed to delete member', 'error');
       }
       throw err;
+    } finally {
+      isDeletingRef.current = false;
     }
   };
 
   const batchUpdateMembers = async (memberIds: string[], updates: Partial<Member>) => {
+    if (isBatchUpdatingRef.current) return;
+    isBatchUpdatingRef.current = true;
     try {
       await MembersService.batchUpdateMembers(memberIds, updates);
       await loadMembers();
@@ -83,10 +102,14 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update members', 'error');
       throw err;
+    } finally {
+      isBatchUpdatingRef.current = false;
     }
   };
 
   const batchDeleteMembers = async (memberIds: string[]) => {
+    if (isBatchDeletingRef.current) return;
+    isBatchDeletingRef.current = true;
     try {
       await MembersService.batchDeleteMembers(memberIds);
       await loadMembers();
@@ -94,6 +117,8 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete members', 'error');
       throw err;
+    } finally {
+      isBatchDeletingRef.current = false;
     }
   };
 

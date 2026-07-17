@@ -247,6 +247,8 @@ export class IncentiveCalculatorService {
 
         // P1 fix: events are stored as project documents in COLLECTIONS.PROJECTS.
         // Filter by eventStartDate != null to exclude non-event project documents.
+        // TODO: Confirm 'Completed' is the correct status enum for completed events stored in
+        // COLLECTIONS.PROJECTS. If events use a different status value, update this where clause.
         const q = query(
             collection(db, COLLECTIONS.PROJECTS),
             where('loId', '==', loId),
@@ -318,6 +320,30 @@ export class IncentiveCalculatorService {
                     scoreAwarded: score,
                     updatedAt: Timestamp.now()
                 });
+
+                // Fix 12: re-award the score delta when an existing APPROVED auto-calculated
+                // submission is updated so member points stay in sync with the recalculation.
+                const delta = score - (subData.scoreAwarded || 0);
+                if (delta > 0 && subData.loId) {
+                    try {
+                        // Award delta points to the LO's members — loId is stored on the submission.
+                        // If a specific memberId is not set on the submission, we award to the LO
+                        // via incentiveCalculator context; use PointsService.awardPoints per member
+                        // when memberId is available.
+                        if (subData.memberId) {
+                            await PointsService.awardPoints(
+                                subData.memberId,
+                                delta,
+                                'INCENTIVE_ADJUSTMENT',
+                                'Score recalculation',
+                                sub.id,
+                                'incentive'
+                            );
+                        }
+                    } catch (deltaErr) {
+                        console.warn('[syncSubmission] Failed to award delta points (non-fatal):', deltaErr);
+                    }
+                }
             }
         }
     }

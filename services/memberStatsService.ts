@@ -138,12 +138,17 @@ export class MemberStatsService {
       }
 
       // Engagement metrics
+      // Fix 11: prefer computed attendanceCheckins/attendanceMonths fields over legacy attendanceRate
+      const getEffectiveAttendanceRate = (m: any): number => {
+        const rate = ((m.attendanceCheckins ?? 0) / Math.max(m.attendanceMonths ?? 1, 1)) * 100;
+        return rate > 0 ? rate : (m.attendanceRate ?? 0);
+      };
       const engagementMetrics = {
-        highlyEngaged: membersInPeriod.filter(m => m.attendanceRate > 80).length,
+        highlyEngaged: membersInPeriod.filter(m => getEffectiveAttendanceRate(m) > 80).length,
         moderatelyEngaged: membersInPeriod.filter(
-          m => m.attendanceRate >= 50 && m.attendanceRate <= 80
+          m => { const r = getEffectiveAttendanceRate(m); return r >= 50 && r <= 80; }
         ).length,
-        lowEngaged: membersInPeriod.filter(m => m.attendanceRate < 50).length,
+        lowEngaged: membersInPeriod.filter(m => getEffectiveAttendanceRate(m) < 50).length,
       };
 
       // Top performers (top 10 by points)

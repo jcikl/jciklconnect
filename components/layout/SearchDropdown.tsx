@@ -1,5 +1,12 @@
 import React from 'react';
 import { Search, Calendar, Briefcase, Building2 } from 'lucide-react';
+
+// Generate an inline SVG data URI with initials — avoids external ui-avatars.com requests blocked by CSP
+const getInitialsSvg = (name: string, size = 36): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 import { useMembers } from '../../hooks/useMembers';
 import { useEvents } from '../../hooks/useEvents';
 import { useProjects } from '../../hooks/useProjects';
@@ -86,7 +93,7 @@ export const SearchDropdown: React.FC<{
               {filteredMembers.map(m => (
                 <ResultRow key={m.id}
                   onClick={() => { onNavigate('MEMBERS', m.id); onClose(); }}
-                  icon={<img src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=0097D7&color=fff`} className="w-9 h-9 rounded-xl object-cover" alt="" />}
+                  icon={<img src={m.avatar || getInitialsSvg(m.name || '')} className="w-9 h-9 rounded-xl object-cover" alt="" />}
                   title={m.name}
                   meta={m.email}
                 />
