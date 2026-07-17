@@ -1431,7 +1431,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                           <p className="text-[10px] text-slate-400 font-medium">
                             Target: RM {record.dues || 0}
                           </p>
-                          {record.dues > 0 && record.amount >= record.dues && (
+                          {Number(record.dues) > 0 && record.amount >= Number(record.dues) && (
                             <p className="text-[10px] text-green-600 font-bold">{'✓'} Fulfilled</p>
                           )}
                         </div>
