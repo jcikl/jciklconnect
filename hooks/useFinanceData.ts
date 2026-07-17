@@ -1245,7 +1245,7 @@ export function useFinanceData(searchQuery?: string) {
       const year = parseInt((formData.get('year') as string) || String(new Date().getFullYear()), 10);
       const rules = category === 'Membership' ? await MembershipConfigService.getRules() : undefined;
       const catFields = buildCategoryFields({
-        category,
+        category: category as import('../utils/transactionCategoryUtils').TransactionCategory,
         amount,
         year,
         memberId: (formData.get('memberId') as string)?.trim() || undefined,
@@ -1686,7 +1686,7 @@ export function useFinanceData(searchQuery?: string) {
       : editingTransaction.purpose;
 
     const catFields = buildCategoryFields({
-      category,
+      category: category as import('../utils/transactionCategoryUtils').TransactionCategory,
       amount,
       year: category === 'Membership' ? editingMembershipYear : editingAdministrativeYear,
       memberId: memberIdInput,

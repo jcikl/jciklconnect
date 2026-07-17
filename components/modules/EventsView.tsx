@@ -150,7 +150,7 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
                     member={member}
                     registerForEvent={registerForEvent}
                     markAttendance={markAttendance}
-                    onClick={handleSelectEvent}
+                    onClick={() => handleSelectEvent(event)}
                   />
                 ))}
               </div>
@@ -180,7 +180,7 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
                     member={member}
                     registerForEvent={registerForEvent}
                     markAttendance={markAttendance}
-                    onClick={handleSelectEvent}
+                    onClick={() => handleSelectEvent(event)}
                   />
                 ))}
               </div>

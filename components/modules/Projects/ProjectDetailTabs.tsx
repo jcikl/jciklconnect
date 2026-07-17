@@ -6,7 +6,7 @@ import { Project } from '../../../types';
 import { ProjectReportService, ProjectReport } from '../../../services/projectReportService';
 // BUNDLE-005: lazy-load gantt-task-react (~200KB) so it is not parsed for users who never open the Gantt tab
 const ProjectGanttChart = lazy(() =>
-  import('../ProjectManagement/ProjectGanttChart').then(m => ({ default: (m as any).ProjectGanttChart ?? (m as any).default }))
+  import('../ProjectManagement/ProjectGanttChart').then(m => ({ default: m.ProjectGanttChart }))
 );
 import { ProjectKanban } from './ProjectKanban';
 import { ProjectFinancialAccountView as ProjectFinancialAccount } from '../ProjectManagement/ProjectFinancialAccount';

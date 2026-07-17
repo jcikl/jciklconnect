@@ -216,23 +216,23 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       setSelectedMemberRecord(member);
 
       const pp = member?.promotionProgress || ({} as MemberPromotionProgress);
-      const bodMeeting = parseDatedDetail(pp.bodMeetingAttended);
-      const organizingCommittee = parseDatedDetail(pp.eventOrganizerParticipation);
-      const [eventParticipation1, eventParticipation2] = splitEventParticipation(pp.eventParticipation);
-      const courseCompletion = parseCourseCompletion(pp.jciInspireCompleted);
+      const bodMeeting = parseDatedDetail(String(pp.bodMeetingAttended ?? ''));
+      const organizingCommittee = parseDatedDetail(String(pp.eventOrganizerParticipation ?? ''));
+      const [eventParticipation1, eventParticipation2] = splitEventParticipation(String(pp.eventParticipation ?? ''));
+      const courseCompletion = parseCourseCompletion(String(pp.jciInspireCompleted ?? ''));
       setEditValues({
-        'bod_meeting_attendance': pp.bodMeetingAttended || '',
+        'bod_meeting_attendance': String(pp.bodMeetingAttended ?? ''),
         'bod_meeting_attendance_detail': bodMeeting.detail,
         'bod_meeting_attendance_date': bodMeeting.date,
-        'event_organizing_committee': pp.eventOrganizerParticipation || '',
+        'event_organizing_committee': String(pp.eventOrganizerParticipation ?? ''),
         'event_organizing_committee_detail': organizingCommittee.detail,
         'event_organizing_committee_date': organizingCommittee.date,
-        'event_participation': pp.eventParticipation || '',
+        'event_participation': String(pp.eventParticipation ?? ''),
         'event_participation_1': eventParticipation1.detail,
         'event_participation_1_date': eventParticipation1.date,
         'event_participation_2': eventParticipation2.detail,
         'event_participation_2_date': eventParticipation2.date,
-        'jci_inspire_completion': pp.jciInspireCompleted || '',
+        'jci_inspire_completion': String(pp.jciInspireCompleted ?? ''),
         'jci_inspire_completion_course': courseCompletion.course,
         'jci_inspire_completion_date': courseCompletion.date
       });

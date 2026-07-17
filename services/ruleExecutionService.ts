@@ -250,14 +250,15 @@ class RuleExecutionService {
       try {
         const result = await this.executeAction(action, data, testMode);
         if (!result.ok) {
-          errorLoggingService.logError(new Error(result.reason), {
+          const failReason = 'reason' in result ? (result as { ok: false; reason: string }).reason : 'Action failed';
+          errorLoggingService.logError(new Error(failReason), {
             action: 'ruleExecutionService.executeActions',
             additionalData: { actionId: action.id, actionType: action.type },
           });
           results.push({
             actionId: action.id,
             status: 'failed',
-            error: result.reason,
+            error: failReason,
             duration: Date.now() - startTime,
           });
         } else {

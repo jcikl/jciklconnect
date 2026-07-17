@@ -302,7 +302,7 @@ export class PaymentRequestService {
 
           // BUD-001: guard against overspending a project budget before writing anything.
           if (projectId) {
-            const projectDoc = await projectFinancialService.getProjectById(projectId).catch(() => null);
+            const projectDoc = await projectFinancialService.getProjectFinancialAccount(projectId).catch(() => null);
             if (projectDoc && typeof projectDoc.budget === 'number' && projectDoc.budget > 0) {
               const currentExpenses = typeof projectDoc.totalExpenses === 'number'
                 ? projectDoc.totalExpenses

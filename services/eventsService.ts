@@ -575,7 +575,7 @@ export class EventsService {
                 CommunicationService.createNotification({
                   memberId: reg.memberId,
                   title: 'Event Cancelled',
-                  message: `The event "${event.title || event.name || eventId}" has been cancelled. Any fees paid will be refunded.`,
+                  message: `The event "${event.title || eventId}" has been cancelled. Any fees paid will be refunded.`,
                   type: 'warning',
                 })
               )

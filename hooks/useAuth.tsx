@@ -305,7 +305,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           email: mockUser.email || '',
           displayName: mockUser.displayName || '',
         },
-        member: MOCK_DEV_ADMIN,
       });
 
       return;
@@ -422,7 +421,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           email: mockUser.email,
           displayName: mockUser.displayName || name,
         },
-        member: mockMember,
       });
 
       return;
@@ -635,7 +633,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             email: user.email || '',
             displayName: user.displayName || '',
           },
-          member: updatedMember,
         });
       }
       return;

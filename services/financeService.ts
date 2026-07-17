@@ -560,7 +560,7 @@ export class FinanceService {
               });
               errorLoggingService.logError(
                 new Error(`Transaction would result in negative balance (${projectedBalance}) for account ${transactionData.bankAccountId}`),
-                { component: 'financeService', action: 'createTransaction', severity: 'warning' }
+                { component: 'financeService', action: 'createTransaction' }
               );
             }
           }
@@ -1457,12 +1457,13 @@ export class FinanceService {
             skipped.push(txId);
             continue;
           }
-          const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
+          const finalCategoryRaw = categoryUpdates.category ?? currentTransaction?.category;
+          const finalCategory = (finalCategoryRaw as string) === '' ? undefined : finalCategoryRaw as import('../utils/transactionCategoryUtils').TransactionCategory;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
           const updateData = {
             ...removeUndefined(categoryUpdates),
-            ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category, explicitKeys }),
+            ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category as import('../utils/transactionCategoryUtils').TransactionCategory | undefined, explicitKeys }),
             updatedAt: new Date().toISOString(),
           } as Partial<Transaction>;
 
@@ -1523,12 +1524,13 @@ export class FinanceService {
             return;
           }
 
-          const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
+          const finalCategoryRaw = categoryUpdates.category ?? currentTransaction?.category;
+          const finalCategory = (finalCategoryRaw as string) === '' ? undefined : finalCategoryRaw as import('../utils/transactionCategoryUtils').TransactionCategory;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
           const updateData = {
             ...removeUndefined(categoryUpdates),
-            ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category, explicitKeys }),
+            ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category as import('../utils/transactionCategoryUtils').TransactionCategory | undefined, explicitKeys }),
             updatedAt: Timestamp.now(),
           } as Partial<Transaction>;
 

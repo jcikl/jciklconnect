@@ -101,13 +101,13 @@ import { GuestAnalyticsTracker } from './components/layout/GuestAnalyticsTracker
 // --- Helper Components (GuestHeader, GuestFooter, SidebarItem, NotificationDrawer, SearchDropdown, GuestAnalyticsTracker imported from components/layout/) ---
 
 // --- Guest Page Components (lazy-loaded — authenticated users pay no parse cost) ---
-const GuestLandingPage = lazy(() => import('./components/pages/guest/GuestLandingPage').then(m => ({ default: m.GuestLandingPage ?? m.default })));
-const GuestEventsPage = lazy(() => import('./components/pages/guest/GuestEventsPage').then(m => ({ default: m.GuestEventsPage ?? m.default })));
-const FlagshipProjectsPage = lazy(() => import('./components/pages/guest/FlagshipProjectsPage').then(m => ({ default: m.FlagshipProjectsPage ?? m.default })));
-const GuestAboutPage = lazy(() => import('./components/pages/guest/GuestAboutPage').then(m => ({ default: m.GuestAboutPage ?? m.default })));
-const GuestEnewslettersPage = lazy(() => import('./components/pages/guest/GuestEnewslettersPage').then(m => ({ default: m.GuestEnewslettersPage ?? m.default })));
-const GuestDirectoryPage = lazy(() => import('./components/pages/guest/GuestDirectoryPage').then(m => ({ default: m.GuestDirectoryPage ?? m.default })));
-const GuestPartnershipPage = lazy(() => import('./components/pages/guest/GuestPartnershipPage').then(m => ({ default: m.GuestPartnershipPage ?? m.default })));
+const GuestLandingPage = lazy(() => import('./components/pages/guest/GuestLandingPage').then(m => ({ default: m.GuestLandingPage })));
+const GuestEventsPage = lazy(() => import('./components/pages/guest/GuestEventsPage').then(m => ({ default: m.GuestEventsPage })));
+const FlagshipProjectsPage = lazy(() => import('./components/pages/guest/FlagshipProjectsPage').then(m => ({ default: m.FlagshipProjectsPage })));
+const GuestAboutPage = lazy(() => import('./components/pages/guest/GuestAboutPage').then(m => ({ default: m.GuestAboutPage })));
+const GuestEnewslettersPage = lazy(() => import('./components/pages/guest/GuestEnewslettersPage').then(m => ({ default: m.GuestEnewslettersPage })));
+const GuestDirectoryPage = lazy(() => import('./components/pages/guest/GuestDirectoryPage').then(m => ({ default: m.GuestDirectoryPage })));
+const GuestPartnershipPage = lazy(() => import('./components/pages/guest/GuestPartnershipPage').then(m => ({ default: m.GuestPartnershipPage })));
 const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
 // REMOVED: inline GuestLandingPage definition (moved to components/pages/guest/GuestLandingPage.tsx)

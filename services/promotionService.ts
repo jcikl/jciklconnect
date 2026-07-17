@@ -230,22 +230,22 @@ export class PromotionService {
 
     switch (requirementType) {
       case 'bod_meeting_attendance': {
-        const value = progress?.bodMeetingAttended;
-        return value?.trim()
+        const value = String(progress?.bodMeetingAttended ?? '');
+        return value.trim()
           ? { completedAt: new Date(), details: { meetingId: value }, evidence: [] }
           : null;
       }
 
       case 'event_organizing_committee': {
-        const value = progress?.eventOrganizerParticipation;
-        return value?.trim()
+        const value = String(progress?.eventOrganizerParticipation ?? '');
+        return value.trim()
           ? { completedAt: new Date(), details: { eventName: value }, evidence: [] }
           : null;
       }
 
       case 'event_participation': {
-        const value = progress?.eventParticipation;
-        if (!value?.trim()) return null;
+        const value = String(progress?.eventParticipation ?? '');
+        if (!value.trim()) return null;
 
         const events = value.split(/[,\n;]+/).filter(e => e.trim().length > 0);
         return events.length >= 2
@@ -254,8 +254,8 @@ export class PromotionService {
       }
 
       case 'jci_inspire_completion': {
-        const value = progress?.jciInspireCompleted;
-        return value?.trim()
+        const value = String(progress?.jciInspireCompleted ?? '');
+        return value.trim()
           ? { completedAt: new Date(), details: { courseName: value }, evidence: [] }
           : null;
       }
@@ -798,7 +798,7 @@ export class PromotionService {
 
   private static async checkBODMeetingAttendance(memberId: string) {
     const member = await this.getMemberById(memberId);
-    const value = member?.promotionProgress?.bodMeetingAttended;
+    const value = String(member?.promotionProgress?.bodMeetingAttended ?? '');
     if (value && value.trim()) {
       return {
         completedAt: new Date(),
@@ -811,7 +811,7 @@ export class PromotionService {
 
   private static async checkEventOrganizingCommittee(memberId: string) {
     const member = await this.getMemberById(memberId);
-    const value = member?.promotionProgress?.eventOrganizerParticipation;
+    const value = String(member?.promotionProgress?.eventOrganizerParticipation ?? '');
     if (value && value.trim()) {
       return {
         completedAt: new Date(),
@@ -824,7 +824,7 @@ export class PromotionService {
 
   private static async checkEventParticipation(memberId: string) {
     const member = await this.getMemberById(memberId);
-    const value = member?.promotionProgress?.eventParticipation;
+    const value = String(member?.promotionProgress?.eventParticipation ?? '');
     if (value && value.trim()) {
       // Check for at least 2 events separated by comma, semicolon, or newline
       const events = value.split(/[,\n;]+/).filter(e => e.trim().length > 0);
@@ -841,7 +841,7 @@ export class PromotionService {
 
   private static async checkJCIInspireCompletion(memberId: string) {
     const member = await this.getMemberById(memberId);
-    const value = member?.promotionProgress?.jciInspireCompleted;
+    const value = String(member?.promotionProgress?.jciInspireCompleted ?? '');
     if (value && value.trim()) {
       return {
         completedAt: new Date(),
