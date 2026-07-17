@@ -197,7 +197,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setMember({ id: firebaseUser.uid, ...snap.data() } as Member);
                   }
                 },
-                (err) => console.warn('[auth] member onSnapshot error:', err)
+                (err) => {
+                  // Suppress permission errors fired during sign-out (token already invalidated)
+                  if (!auth.currentUser) return;
+                  console.warn('[auth] member onSnapshot error:', err);
+                }
               );
             } else if (!memberData && isMounted && !checkDevMode()) {
               // Still no member record — sign out, unless we're mid-signup (doc not written yet)
