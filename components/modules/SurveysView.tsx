@@ -31,6 +31,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     const [distributingSurvey, setDistributingSurvey] = useState<Survey | null>(null);
     const [selectedChannels, setSelectedChannels] = useState<('email' | 'in-app' | 'link')[]>(['in-app']);
     const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
+    const [isSaving, setIsSaving] = useState(false);
     const { surveys, loading, error, createSurvey, submitResponse, updateSurvey, deleteSurvey, getSurveyResponses } = useSurveys();
     const { member } = useAuth();
     const { isAdmin, isBoard } = usePermissions();
@@ -101,6 +102,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             return;
         }
 
+        setIsSaving(true);
         try {
             await createSurvey({
                 title: formData.get('title') as string,
@@ -117,6 +119,8 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
             e.currentTarget.reset();
         } catch (err) {
             // Error handled in the hook
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -389,7 +393,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 drawerOnMobile
                 footer={
                     <div className="flex gap-3">
-                        <Button className="flex-1" type="submit" form="create-survey-form" disabled={questions.length === 0}>
+                        <Button className="flex-1" type="submit" form="create-survey-form" disabled={questions.length === 0 || isSaving} isLoading={isSaving}>
                             Create Survey
                             {questions.length > 0 && (
                                 <span className="ml-2 text-[11px] bg-white/20 px-1.5 py-0.5 rounded-full">{questions.length}Q</span>

@@ -14,6 +14,7 @@ import {
   startAfter,
   Timestamp,
   writeBatch,
+  increment,
   getDoc as getFirestoreDoc,
   documentId,
   DocumentSnapshot,
@@ -528,10 +529,19 @@ export class FinanceService {
             }
           }
 
-          const docRef = await addDoc(collection(db, COLLECTIONS.TRANSACTIONS), cleanTransaction);
+          // SYNC-002: write tx + increment bankAccount.currentBalance atomically
+          const txRef = doc(collection(db, COLLECTIONS.TRANSACTIONS));
+          const amountDelta = transactionData.type === 'Income'
+            ? transactionData.amount
+            : -Math.abs(transactionData.amount);
+          const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, transactionData.bankAccountId);
+          const createBatch = writeBatch(db);
+          createBatch.set(txRef, cleanTransaction);
+          createBatch.update(bankAccountRef, { currentBalance: increment(amountDelta) });
+          await createBatch.commit();
 
           invalidateFinanceCache();
-          return docRef.id;
+          return txRef.id;
         } catch (error) {
           console.error('Error creating transaction:', error);
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'financeService', action: 'createTransaction' });
@@ -1756,6 +1766,14 @@ export class FinanceService {
             deletionBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
           }
           deletionBatch.delete(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+          // SYNC-002: reverse the currentBalance increment atomically with the deletion
+          if (transaction?.bankAccountId && transaction?.amount && transaction?.type) {
+            const amountDelta = transaction.type === 'Income'
+              ? transaction.amount
+              : -Math.abs(transaction.amount);
+            const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, transaction.bankAccountId);
+            deletionBatch.update(bankAccountRef, { currentBalance: increment(-amountDelta) });
+          }
           await deletionBatch.commit();
 
           // Clean up split side-effects after the batch succeeds
@@ -2319,25 +2337,33 @@ export class FinanceService {
               } as BankAccount));
             }
 
-            // TODO: Store runningBalance on bankAccount doc, update atomically with each transaction write — eliminates full transaction scan
-            const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
-              getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
-              getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000)))
-            ]);
-            // TODO PERF8: Store running balance on bankAccount document, updated atomically on tx create/update/delete.
-            if (transactionsSnapshot.size >= 1000) {
-              console.error('[financeService] PERF8: Transaction count hit 1000 cap — bank balances will be understated. Migrate to running balance on bankAccount documents.');
-            }
-
+            // SYNC-002: fetch accounts first; only scan transactions for accounts that
+            // predate the currentBalance field (migration fallback). Once all accounts
+            // have currentBalance stored, the transaction scan never runs.
+            const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
             const accounts = accountsSnapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data(),
               lastReconciled: doc.data().lastReconciled?.toDate?.()?.toISOString() || doc.data().lastReconciled,
             } as BankAccount));
 
-            const transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
+            const needsScan = accounts.some(a => a.currentBalance === undefined);
+            let transactions: Transaction[] = [];
+            if (needsScan) {
+              // TODO: remove this scan fallback after a one-time migration that backfills
+              // currentBalance on all existing bankAccount documents.
+              const transactionsSnapshot = await getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000)));
+              if (transactionsSnapshot.size >= 1000) {
+                console.error('[financeService] SYNC-002: Transaction scan hit 1000 cap — balances for legacy accounts will be understated. Run currentBalance migration to eliminate this scan.');
+              }
+              transactions = transactionsSnapshot.docs.map(doc => doc.data() as Transaction);
+            }
 
             return accounts.map(account => {
+              if (account.currentBalance !== undefined) {
+                return { ...account, balance: (account.initialBalance || 0) + account.currentBalance };
+              }
+              // Scan fallback for accounts without stored currentBalance
               const accountTransactions = transactions.filter(t => t.bankAccountId === account.id && !t.isSplitChild && t.status !== 'Voided');
               const transactionSum = accountTransactions.reduce((sum, t) => {
                 return sum + (t.type === 'Income' ? t.amount : -Math.abs(t.amount));

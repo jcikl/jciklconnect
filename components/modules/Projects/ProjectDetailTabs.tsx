@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { Card, Tabs, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import React, { useState, lazy, Suspense } from 'react';
+import { Card, Tabs, useToast, ConfirmDialog, CONFIRM_CLOSED, Spinner } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
 import { Project } from '../../../types';
 import { ProjectReportService, ProjectReport } from '../../../services/projectReportService';
-import { ProjectGanttChart } from '../ProjectManagement/ProjectGanttChart';
+// BUNDLE-005: lazy-load gantt-task-react (~200KB) so it is not parsed for users who never open the Gantt tab
+const ProjectGanttChart = lazy(() =>
+  import('../ProjectManagement/ProjectGanttChart').then(m => ({ default: (m as any).ProjectGanttChart ?? (m as any).default }))
+);
 import { ProjectKanban } from './ProjectKanban';
 import { ProjectFinancialAccountView as ProjectFinancialAccount } from '../ProjectManagement/ProjectFinancialAccount';
 import { ProjectActivityPlanTab } from './ProjectActivityPlanTab';
@@ -104,11 +107,13 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
             <ProjectKanban projectId={projectId} projectName={projectName} project={project} />
           )}
           {activeTab === 'gantt' && (
-            <ProjectGanttChart
-              project={project}
-              onUpdateProject={onUpdateProject}
-              onClose={() => setActiveTab('kanban')}
-            />
+            <Suspense fallback={<div className="flex justify-center p-8"><Spinner /></div>}>
+              <ProjectGanttChart
+                project={project}
+                onUpdateProject={onUpdateProject}
+                onClose={() => setActiveTab('kanban')}
+              />
+            </Suspense>
           )}
           {activeTab === 'finance' && (
             <ProjectFinancialAccount

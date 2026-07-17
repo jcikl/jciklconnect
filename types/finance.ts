@@ -82,6 +82,7 @@ export interface BankAccount {
   name: string;
   balance?: number;
   initialBalance?: number;
+  currentBalance?: number; // SYNC-002: running balance maintained atomically by createTransaction/deleteTransaction
   currency: string;
   lastReconciled: string;
   accountNumber?: string;

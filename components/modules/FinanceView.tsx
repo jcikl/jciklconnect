@@ -104,7 +104,7 @@ const FinanceAlertsPanel: React.FC<{ userId: string }> = ({ userId }) => {
   );
 };
 
-export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ searchQuery }) => {
   const helpModal = useHelpModal();
 
   const {
@@ -1670,4 +1670,5 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
       </Modal>
     </div>
   );
-};
+});
+FinanceView.displayName = 'FinanceView';

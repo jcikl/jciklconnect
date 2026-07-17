@@ -1,3 +1,10 @@
+// TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders
+// on any state update. Planned refactor: split into three focused hooks —
+//   • useFinanceCoreData   — transactions, accounts, projects, splits (heavy Firestore data)
+//   • useFinanceFilters    — search/filter/pagination state (debouncedSearchTerm, txCategoryFilter, etc.)
+//   • useFinanceUI         — modal open/close flags, selected items, tab state
+// Do not attempt the split without a dedicated test pass; the hooks are deeply coupled via
+// computed memos that depend on both data and filter state.
 import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import { useToast } from '../components/ui/Common';
 import { usePermissions } from './usePermissions';

@@ -19,6 +19,8 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     const [selectedDocument, setSelectedDocument] = useState<DocumentWithVersions | null>(null);
     const [myProgress, setMyProgress] = useState<LearningProgress[]>([]);
     const [myCertificates, setMyCertificates] = useState<Certificate[]>([]);
+    const [certsLoading, setCertsLoading] = useState(false);
+    const [certsError, setCertsError] = useState<string | null>(null);
     const [isPathModalOpen, setIsPathModalOpen] = useState(false);
     const [isDocModalOpen, setIsDocModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -95,11 +97,16 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
 
     const loadMyCertificates = async () => {
         if (!member) return;
+        setCertsLoading(true);
+        setCertsError(null);
         try {
             const certs = await LearningPathsService.getMemberCertificates(member.id);
             setMyCertificates(certs);
         } catch (err) {
-            // Error handled silently
+            setCertsError('Failed to load certificates');
+            showToast('Failed to load certificates', 'error');
+        } finally {
+            setCertsLoading(false);
         }
     };
 
@@ -171,7 +178,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                         />
                     )}
                     {activeTab === 'certificates' && (
-                        <CertificatesTab certificates={myCertificates} />
+                        <CertificatesTab certificates={myCertificates} loading={certsLoading} error={certsError} />
                     )}
                 </div>
             </Card>
@@ -436,11 +443,13 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
 
 interface CertificatesTabProps {
     certificates: Certificate[];
+    loading?: boolean;
+    error?: string | null;
 }
 
-const CertificatesTab: React.FC<CertificatesTabProps> = ({ certificates }) => {
+const CertificatesTab: React.FC<CertificatesTabProps> = ({ certificates, loading = false, error = null }) => {
     return (
-        <LoadingState loading={false} error={null} empty={certificates.length === 0} emptyMessage="No certificates earned yet">
+        <LoadingState loading={loading} error={error} empty={certificates.length === 0} emptyMessage="No certificates earned yet">
             <div className="grid md:grid-cols-2 gap-6">
                 {certificates.map(cert => (
                     <Card key={cert.id} className="hover:shadow-md transition-shadow">

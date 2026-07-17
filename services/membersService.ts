@@ -585,6 +585,11 @@ export class MembersService {
 
       const normalizedUpdates = this.normalizeMemberData(cleanUpdates, currentData);
 
+      // SYNC-004 NOTE: If updates contain membership[year].amount (e.g. admin correction),
+      // membership[year].status is NOT automatically recomputed here — callers must explicitly
+      // call financeService.syncMemberMembership(memberId, `${year} membership`) afterwards.
+      // TODO (SYNC-004): Detect membership.amount changes here and trigger syncMemberMembership
+      // via dynamic import to avoid circular dependency.
       await updateDoc(memberRef, normalizedUpdates);
       const _frames = (new Error().stack ?? '').split('\n').slice(2);
       const _named = _frames
@@ -1290,6 +1295,14 @@ export class MembersService {
 
   /**
    * Set dues on each member's first membership year to RM350 and recalculate status from paid amount.
+   *
+   * SYNC-004 NOTE: This method intentionally bypasses financeService.syncMemberMembership.
+   * It replicates the same status-from-amount formula locally for bulk efficiency (calling
+   * syncMemberMembership per member would trigger N×Firestore query fans and risk a circular
+   * import). Acceptable here because this is an admin correction tool, not a payment flow.
+   * If the status formula in syncMemberMembership changes, update statusFromMembershipAmount here too.
+   * TODO (SYNC-004): Consider extracting the shared status formula into a pure utility function
+   * in membershipConfig.ts so both paths stay in sync automatically.
    */
   static async fixFirstMembershipDuesTo350(loIdFilter?: string | null): Promise<{
     scanned: number;
@@ -1557,6 +1570,12 @@ export class MembersService {
   /**
    * Batch-sync members.membership[year] from each member's membershipType + Membership Config.
    * Recalculates status from existing paid amount. Does not change membershipType.
+   *
+   * SYNC-004 NOTE: Intentionally bypasses financeService.syncMemberMembership for the same
+   * reasons as fixFirstMembershipDuesTo350 (bulk performance, circular import). Status is
+   * computed inline via statusFromMembershipAmount. If syncMemberMembership's status formula
+   * changes, this method must be updated in sync.
+   * TODO (SYNC-004): Extract shared status formula into membershipConfig.ts utility.
    */
   static async batchSyncMembershipRecords(options: {
     year: number;

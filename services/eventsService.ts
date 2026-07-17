@@ -16,6 +16,7 @@ import {
   Timestamp,
   arrayUnion,
   arrayRemove,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
@@ -311,24 +312,21 @@ export class EventsService {
           }
 
           if (existing && existing.status === 'cancelled') {
-            // Reactivation path: two separate ops with rollback guard.
-            await EventRegistrationService.updateStatus(existing.id, 'registered', {
-              registeredBy: extraFields?.registeredBy,
-              registeredByName: extraFields?.registeredByName,
+            // Reactivation path: atomic writeBatch so registration status and event
+            // counter always land together.
+            const reactivateBatch = writeBatch(db);
+            const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, existing.id);
+            reactivateBatch.update(regRef, {
+              status: 'registered',
+              updatedAt: Timestamp.now(),
+              ...(extraFields?.registeredBy ? { registeredBy: extraFields.registeredBy } : {}),
+              ...(extraFields?.registeredByName ? { registeredByName: extraFields.registeredByName } : {}),
             });
-            try {
-              await updateDoc(eventRef, {
-                attendees: event.attendees + 1,
-                registeredMembers: arrayUnion(memberId),
-              });
-            } catch (counterError) {
-              try {
-                await EventRegistrationService.updateStatus(existing.id, 'cancelled', {});
-              } catch (rollbackError) {
-                console.error('Error rolling back reactivated registration:', rollbackError);
-              }
-              throw counterError;
-            }
+            reactivateBatch.update(eventRef, {
+              attendees: increment(1),
+              registeredMembers: arrayUnion(memberId),
+            });
+            await reactivateBatch.commit();
           } else {
             // P0 FIX: new registration — use setDoc + writeBatch so the registration
             // doc and event counter update land atomically. addDoc cannot participate

@@ -845,6 +845,49 @@ class ProjectFinancialService {
   }
 
   /**
+   * Sync an approved PR expense into the project financial account.
+   * In dev mode: updates the in-memory account balance so the budget dashboard reflects the approval.
+   * In production: no-op — the account is computed dynamically from the transactions Firestore
+   * collection, so the expense transaction written by the batch already flows through automatically.
+   */
+  async addTransaction(
+    projectId: string,
+    data: { type: 'expense' | 'income'; amount: number; description: string; transactionId?: string; date: Date }
+  ): Promise<void> {
+    if (!isDevMode()) return; // production derives totals from Firestore — nothing extra needed
+
+    const account = Array.from(this.accounts.values()).find(acc => acc.projectId === projectId);
+    if (!account) return; // no account initialised for this project in this session
+
+    const now = data.date.toISOString();
+    const transaction: ProjectTransaction = {
+      id: data.transactionId ?? `proj_trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      projectId,
+      financialAccountId: account.id,
+      type: data.type,
+      amount: data.amount,
+      description: data.description,
+      date: now.split('T')[0],
+      createdBy: 'system',
+      createdAt: now,
+    };
+
+    if (data.type === 'expense') {
+      account.currentBalance -= data.amount;
+      account.totalExpenses += data.amount;
+    } else {
+      account.currentBalance += data.amount;
+      account.totalIncome += data.amount;
+    }
+    account.updatedAt = now;
+    this.accounts.set(account.id, account);
+
+    const accountTransactions = this.transactions.get(account.id) || [];
+    accountTransactions.push(transaction);
+    this.transactions.set(account.id, accountTransactions);
+  }
+
+  /**
    * Delete project financial account
    */
   async deleteProjectFinancialAccount(financialAccountId: string): Promise<boolean> {

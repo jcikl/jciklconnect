@@ -30,6 +30,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
 import { useState, useEffect, useRef } from 'react';
+// TODO BUNDLE-009: Swiper (~60KB gz) is statically imported here but only used for the conditional ads
+// carousel. If the carousel grows in complexity, extract it into a lazy AdsCarousel component and
+// wrap with React.lazy/Suspense. The vite chunk config (BUNDLE-011) already puts swiper in its own
+// cached chunk, so this is P2 — skip the lazy refactor until the carousel gets more features.
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';

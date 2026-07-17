@@ -8,6 +8,11 @@ import { ToastProvider } from './components/ui/Common';
 import { errorLoggingService } from './services/errorLoggingService';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// TODO BUNDLE-004: @tanstack/react-query is loaded for all users but currently only used by
+// useGamification.ts. Either migrate the top 5 heaviest data hooks (useMembers, useEvents,
+// useProjects, useFinanceData, useCommunication) to useQuery/useMutation to justify the ~13KB cost,
+// or remove react-query and rewrite useGamification.ts with useState+useEffect.
+// Decision deferred — evaluate after React perf improvements (PERF-A-004) are shipped.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

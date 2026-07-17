@@ -17,6 +17,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
     const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
     const [selectedClub, setSelectedClub] = useState<HobbyClub | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'clubs' | 'activities'>('clubs');
     const { clubs, loading, error, createClub, updateClub, deleteClub, joinClub, leaveClub, scheduleActivity, updateActivity, deleteActivity, getClubMembers } = useHobbyClubs();
     const { member } = useAuth();
@@ -60,6 +61,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
 
         const formData = new FormData(e.currentTarget);
 
+        setIsSaving(true);
         try {
             await updateClub(selectedClub.id, {
                 name: formData.get('name') as string,
@@ -70,6 +72,8 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
             setSelectedClub(null);
         } catch (err) {
             // Error is handled in the hook
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -115,7 +119,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 </div>
                 <div className="p-4">
                     {activeTab === 'clubs' ? (
-                        <LoadingState loading={loading} error={error} empty={false} emptyMessage="No hobby clubs found">
+                        <LoadingState loading={loading} error={error} empty={filteredClubs.length === 0} emptyMessage="No hobby clubs found">
                             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {/* Start new club card */}
                                 <button
@@ -290,7 +294,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                         ]} defaultValue={selectedClub.category} required />
                         <Input name="image" label="Image URL" type="url" defaultValue={selectedClub.image} />
                         <div className="pt-4">
-                            <Button className="w-full" type="submit">Update Club</Button>
+                            <Button className="w-full" type="submit" disabled={isSaving} isLoading={isSaving}>Update Club</Button>
                         </div>
                     </form>
                 </Modal>

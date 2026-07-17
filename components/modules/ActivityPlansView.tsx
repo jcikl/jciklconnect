@@ -20,6 +20,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [activeTab, setActiveTab] = useState<'all' | 'draft' | 'submitted' | 'approved' | 'rejected'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [isSaving, setIsSaving] = useState(false);
   const { plans, loading, error, createPlan, updatePlan, submitPlan, reviewPlan, createNewVersion, deletePlan } = useActivityPlans();
   const { member } = useAuth();
   const { isBoard, isAdmin } = usePermissions();
@@ -84,6 +85,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
       submittedBy: member.name,
     };
 
+    setIsSaving(true);
     try {
       if (selectedPlan) {
         await updatePlan(selectedPlan.id!, planData);
@@ -95,6 +97,8 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
       e.currentTarget.reset();
     } catch (err) {
       // Error handled by hook
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -118,12 +122,15 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
     const decision = formData.get('decision') as 'Approved' | 'Rejected';
     const comments = formData.get('comments') as string;
 
+    setIsSaving(true);
     try {
       await reviewPlan(selectedPlan.id!, decision, member.name, comments);
       setIsReviewModalOpen(false);
       setSelectedPlan(null);
     } catch (err) {
       // Error handled by hook
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -141,12 +148,15 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
       expectedImpact: formData.get('expectedImpact') as string || selectedPlan.expectedImpact,
     };
 
+    setIsSaving(true);
     try {
       await createNewVersion(selectedPlan.id!, updates, member.name);
       setIsVersionModalOpen(false);
       setSelectedPlan(null);
     } catch (err) {
       // Error handled by hook
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -421,7 +431,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
             rows={3}
           />
           <div className="flex gap-3 pt-4">
-            <Button className="flex-1" type="submit">
+            <Button className="flex-1" type="submit" disabled={isSaving} isLoading={isSaving}>
               {selectedPlan ? 'Update Plan' : 'Create Plan'}
             </Button>
             <Button
@@ -470,7 +480,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
               rows={4}
             />
             <div className="flex gap-3 pt-4">
-              <Button className="flex-1" type="submit">
+              <Button className="flex-1" type="submit" disabled={isSaving} isLoading={isSaving}>
                 Submit Review
               </Button>
               <Button
@@ -549,7 +559,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
               required
             />
             <div className="flex gap-3 pt-4">
-              <Button className="flex-1" type="submit">
+              <Button className="flex-1" type="submit" disabled={isSaving} isLoading={isSaving}>
                 Create New Version
               </Button>
               <Button

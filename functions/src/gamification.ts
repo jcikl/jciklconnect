@@ -164,8 +164,11 @@ async function evaluateBadgeCriteria(criteria: any, memberId: string): Promise<{
 
 // Helper function to check event attendance criteria
 async function checkEventAttendanceCriteria(criteria: any, memberId: string): Promise<{ eligible: boolean; progress: any }> {
-  const eventsSnapshot = await db.collection('events')
-    .where('attendees', 'array-contains', memberId)
+  // BIZ-005 fix: 'attendees' on the events collection is an integer counter, not an array.
+  // Query eventRegistrations with status 'checked_in' instead to get accurate attendance count.
+  const eventsSnapshot = await db.collection('eventRegistrations')
+    .where('memberId', '==', memberId)
+    .where('status', '==', 'checked_in')
     .get();
 
   const attendedCount = eventsSnapshot.size;
@@ -349,11 +352,14 @@ async function calculateAchievementProgress(achievement: any, memberId: string):
   const completedMilestones: string[] = [];
 
   // Example: Event attendance achievement
+  // BIZ-005 fix: 'attendees' on events is an integer counter, not an array.
+  // Use eventRegistrations with status 'checked_in' for accurate attendance count.
   if (achievement.category === 'participation') {
-    const eventsSnapshot = await db.collection('events')
-      .where('attendees', 'array-contains', memberId)
+    const eventsSnapshot = await db.collection('eventRegistrations')
+      .where('memberId', '==', memberId)
+      .where('status', '==', 'checked_in')
       .get();
-    
+
     current = eventsSnapshot.size;
   }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../components/ui/Common';
 
 interface UseFirestoreCollectionOptions<T> {
@@ -31,6 +31,10 @@ export function useFirestoreCollection<T>({
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  // Keep a ref to the latest loader so reload() never captures a stale closure.
+  const loaderRef = useRef(loader);
+  loaderRef.current = loader;
+
   const reload = useCallback(async () => {
     if (!enabled) {
       setData([]);
@@ -41,7 +45,7 @@ export function useFirestoreCollection<T>({
     try {
       setLoading(true);
       setError(null);
-      setData(await loader());
+      setData(await loaderRef.current());
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load data';
       setError(msg);
@@ -50,8 +54,7 @@ export function useFirestoreCollection<T>({
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, ...deps]);
+  }, [enabled]);
 
   useEffect(() => {
     let ignore = false;

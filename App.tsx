@@ -99,14 +99,14 @@ import { GuestAnalyticsTracker } from './components/layout/GuestAnalyticsTracker
 
 // --- Helper Components (GuestHeader, GuestFooter, SidebarItem, NotificationDrawer, SearchDropdown, GuestAnalyticsTracker imported from components/layout/) ---
 
-// --- Guest Page Components (extracted) ---
-import { GuestLandingPage } from './components/pages/guest/GuestLandingPage';
-import { GuestEventsPage } from './components/pages/guest/GuestEventsPage';
-import { FlagshipProjectsPage } from './components/pages/guest/FlagshipProjectsPage';
-import { GuestAboutPage } from './components/pages/guest/GuestAboutPage';
-import { GuestEnewslettersPage } from './components/pages/guest/GuestEnewslettersPage';
-import { GuestDirectoryPage } from './components/pages/guest/GuestDirectoryPage';
-import { GuestPartnershipPage } from './components/pages/guest/GuestPartnershipPage';
+// --- Guest Page Components (lazy-loaded — authenticated users pay no parse cost) ---
+const GuestLandingPage = lazy(() => import('./components/pages/guest/GuestLandingPage').then(m => ({ default: m.GuestLandingPage ?? m.default })));
+const GuestEventsPage = lazy(() => import('./components/pages/guest/GuestEventsPage').then(m => ({ default: m.GuestEventsPage ?? m.default })));
+const FlagshipProjectsPage = lazy(() => import('./components/pages/guest/FlagshipProjectsPage').then(m => ({ default: m.FlagshipProjectsPage ?? m.default })));
+const GuestAboutPage = lazy(() => import('./components/pages/guest/GuestAboutPage').then(m => ({ default: m.GuestAboutPage ?? m.default })));
+const GuestEnewslettersPage = lazy(() => import('./components/pages/guest/GuestEnewslettersPage').then(m => ({ default: m.GuestEnewslettersPage ?? m.default })));
+const GuestDirectoryPage = lazy(() => import('./components/pages/guest/GuestDirectoryPage').then(m => ({ default: m.GuestDirectoryPage ?? m.default })));
+const GuestPartnershipPage = lazy(() => import('./components/pages/guest/GuestPartnershipPage').then(m => ({ default: m.GuestPartnershipPage ?? m.default })));
 
 // REMOVED: inline GuestLandingPage definition (moved to components/pages/guest/GuestLandingPage.tsx)
 // REMOVED: inline GuestEventsPage definition (moved to components/pages/guest/GuestEventsPage.tsx)
@@ -644,17 +644,19 @@ export const JCIKLApp: React.FC = () => {
     return (
       <>
         <GuestAnalyticsTracker />
-        <Routes>
-          <Route path="/" element={<GuestLandingPage {...guestPageProps} />} />
-          <Route path="/events" element={<GuestEventsPage {...guestPageProps} />} />
-          <Route path="/projects" element={<FlagshipProjectsPage {...guestPageProps} />} />
-          <Route path="/about" element={<GuestAboutPage {...guestPageProps} />} />
-          <Route path="/enewsletters" element={<GuestEnewslettersPage {...guestPageProps} />} />
-          <Route path="/directory" element={<GuestDirectoryPage {...guestPageProps} />} />
-          <Route path="/partnerships" element={<GuestPartnershipPage {...guestPageProps} />} />
-          <Route path="/roadmap" element={<div />} />
-          <Route path="*" element={<GuestLandingPage {...guestPageProps} />} />
-        </Routes>
+        <Suspense fallback={<div />}>
+          <Routes>
+            <Route path="/" element={<GuestLandingPage {...guestPageProps} />} />
+            <Route path="/events" element={<GuestEventsPage {...guestPageProps} />} />
+            <Route path="/projects" element={<FlagshipProjectsPage {...guestPageProps} />} />
+            <Route path="/about" element={<GuestAboutPage {...guestPageProps} />} />
+            <Route path="/enewsletters" element={<GuestEnewslettersPage {...guestPageProps} />} />
+            <Route path="/directory" element={<GuestDirectoryPage {...guestPageProps} />} />
+            <Route path="/partnerships" element={<GuestPartnershipPage {...guestPageProps} />} />
+            <Route path="/roadmap" element={<div />} />
+            <Route path="*" element={<GuestLandingPage {...guestPageProps} />} />
+          </Routes>
+        </Suspense>
         <LoginModal
           isOpen={isLoginModalOpen}
           onClose={closeLogin}

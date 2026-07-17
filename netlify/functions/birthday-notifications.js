@@ -45,9 +45,13 @@ async function sendFcmPush(memberId, title, body, type, extraData = {}) {
 }
 
 exports.handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+  }
+
   const cronSecret = process.env.CRON_SECRET;
   const requestSecret = event.headers['x-cron-secret'] || event.headers['X-Cron-Secret'];
-  if (cronSecret && requestSecret !== cronSecret) {
+  if (!cronSecret || requestSecret !== cronSecret) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
 
@@ -96,7 +100,7 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: msg };
   } catch (err) {
     console.error('Birthday function error:', err);
-    return { statusCode: 500, body: String(err) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) };
   }
 };
 

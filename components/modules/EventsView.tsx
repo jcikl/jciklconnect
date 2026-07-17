@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown, Leaf, QrCode } from 'lucide-react';
 import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar, PageHeader } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
@@ -37,12 +37,15 @@ type ViewMode = 'list' | 'calendar';
 export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedEventId, onClearSelection }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeTab, setActiveTab] = useState('Upcoming');
+  const [completedLimit, setCompletedLimit] = useState(30);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const { events, loading, error, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents();
   const { member } = useAuth();
   const { showToast } = useToast();
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
   const { members: memberOptions } = useMembers(loId);
+
+  const handleSelectEvent = useCallback((event: Event) => setSelectedEvent(event), []);
 
   useEffect(() => {
     if (initialSelectedEventId && events.length > 0) {
@@ -53,6 +56,9 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
       }
     }
   }, [initialSelectedEventId, events, onClearSelection]);
+
+  // Reset completed limit when switching back to Completed tab or when search changes.
+  useEffect(() => { setCompletedLimit(30); }, [activeTab, searchQuery]);
 
   const filteredEvents = useMemo(() => {
     const today = new Date();
@@ -137,17 +143,24 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
               emptyMessage="No events found in this category."
             >
               <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredEvents.map(event => (
+                {(activeTab === 'Completed' ? filteredEvents.slice(0, completedLimit) : filteredEvents).map(event => (
                   <EventRow
                     key={event.id}
                     event={event}
                     member={member}
-                    onRegister={() => member && registerForEvent(event.id, member.id)}
-                    onCheckIn={() => member && markAttendance(event.id, member.id)}
-                    onClick={() => setSelectedEvent(event)}
+                    registerForEvent={registerForEvent}
+                    markAttendance={markAttendance}
+                    onClick={handleSelectEvent}
                   />
                 ))}
               </div>
+              {activeTab === 'Completed' && filteredEvents.length > completedLimit && (
+                <div className="hidden md:flex justify-center pb-4">
+                  <Button variant="outline" size="sm" onClick={() => setCompletedLimit(prev => prev + 30)}>
+                    Load more ({filteredEvents.length - completedLimit} remaining)
+                  </Button>
+                </div>
+              )}
             </LoadingState>
           </Card>
 
@@ -160,17 +173,24 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
               emptyMessage="No events found in this category."
             >
               <div className="grid grid-cols-1 gap-4">
-                {filteredEvents.map(event => (
+                {(activeTab === 'Completed' ? filteredEvents.slice(0, completedLimit) : filteredEvents).map(event => (
                   <EventRow
                     key={event.id}
                     event={event}
                     member={member}
-                    onRegister={() => member && registerForEvent(event.id, member.id)}
-                    onCheckIn={() => member && markAttendance(event.id, member.id)}
-                    onClick={() => setSelectedEvent(event)}
+                    registerForEvent={registerForEvent}
+                    markAttendance={markAttendance}
+                    onClick={handleSelectEvent}
                   />
                 ))}
               </div>
+              {activeTab === 'Completed' && filteredEvents.length > completedLimit && (
+                <div className="md:hidden flex justify-center pt-2">
+                  <Button variant="outline" size="sm" onClick={() => setCompletedLimit(prev => prev + 30)}>
+                    Load more ({filteredEvents.length - completedLimit} remaining)
+                  </Button>
+                </div>
+              )}
             </LoadingState>
           </div>
         </div>

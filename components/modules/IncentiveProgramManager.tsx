@@ -14,6 +14,7 @@ export const IncentiveProgramManager: React.FC = () => {
     const [allPrograms, setAllPrograms] = useState<IncentiveProgram[]>([]);
     const [standards, setStandards] = useState<IncentiveStandard[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [isCalculating, setIsCalculating] = useState(false);
     const [isNewYearModalOpen, setNewYearModalOpen] = useState(false);
     const [newYearValue, setNewYearValue] = useState(new Date().getFullYear() + 1);
@@ -43,6 +44,7 @@ export const IncentiveProgramManager: React.FC = () => {
 
     const loadActiveProgram = async (year?: number) => {
         setLoading(true);
+        setLoadError(null);
         try {
             const all = await PointsService.getIncentivePrograms();
 
@@ -78,6 +80,7 @@ export const IncentiveProgramManager: React.FC = () => {
             }
         } catch (err) {
             showToast('Failed to load program configuration', 'error');
+            setLoadError('Failed to load program configuration. Please refresh to try again.');
         } finally {
             setLoading(false);
         }
@@ -367,7 +370,24 @@ export const IncentiveProgramManager: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {!program ? (
+            {loadError ? (
+                <div className="p-12 text-center max-w-md mx-auto">
+                    <div className="bg-white rounded-3xl p-10 shadow-xl border border-red-100 flex flex-col items-center">
+                        <div className="w-20 h-20 bg-red-50 rounded-2xl flex items-center justify-center mb-6">
+                            <RefreshCw size={40} className="text-red-400" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-2">Unable to Load</h3>
+                        <p className="text-slate-500 mb-8 leading-relaxed">{loadError}</p>
+                        <Button
+                            size="lg"
+                            className="w-full bg-red-600 hover:bg-red-700 shadow-lg shadow-red-100 py-6 rounded-2xl font-bold font-sans"
+                            onClick={() => loadActiveProgram()}
+                        >
+                            <RefreshCw size={16} className="mr-2" /> Retry
+                        </Button>
+                    </div>
+                </div>
+            ) : !program ? (
                 <div className="p-12 text-center max-w-md mx-auto">
                     <div className="bg-white rounded-3xl p-10 shadow-xl border border-slate-100 flex flex-col items-center">
                         <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">

@@ -39,6 +39,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
     } = useGamification();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [editingAward, setEditingAward] = useState<AwardDefinition | null>(null);
     const [formData, setFormData] = useState<Omit<AwardDefinition, 'id'>>({
         name: '',
@@ -95,6 +96,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSaving(true);
         try {
             if (editingAward?.id) {
                 await updateAward(editingAward.id, formData);
@@ -104,6 +106,8 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
             handleCloseModal();
         } catch (err) {
             console.error('Error saving award:', err);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -353,7 +357,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <Button variant="ghost" onClick={handleCloseModal} type="button">Cancel</Button>
-                        <Button variant="primary" type="submit">
+                        <Button variant="primary" type="submit" disabled={isSaving} isLoading={isSaving}>
                             {editingAward ? 'Update Award' : 'Create Award'}
                         </Button>
                     </div>

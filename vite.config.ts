@@ -72,11 +72,13 @@ export default defineConfig(({ mode }) => {
             'vendor-charts':   ['recharts'],
             'vendor-icons':    ['lucide-react'],
 'vendor-motion':   ['framer-motion'],
-            // pdf libs: dynamically imported in PaymentRequestsView, named here for readability
-            'vendor-pdf':      ['jspdf', 'pdf-lib'],
+            // pdf libs: split into separate chunks for finer-grained caching
+            'vendor-jspdf':    ['jspdf'],
+            'vendor-pdf-lib':  ['pdf-lib'],
             // xlsx removed: now dynamically imported, will be split automatically
-            // PERF10: Keep AI SDK out of main bundle — it is dynamically imported inside aiPredictionService methods
-            'vendor-ai': ['@google/generative-ai'],
+            // Gemini API is called server-side via Netlify function only, not bundled for browser
+            'vendor-swiper':   ['swiper'],
+            'vendor-gantt':    ['gantt-task-react'],
           },
         },
       },

@@ -23,6 +23,7 @@ import { removeUndefined } from '../utils/dataUtils';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_PAYMENT_REQUESTS } from './mockData';
 import { FinanceService, invalidateFinanceCache } from './financeService';
+import { projectFinancialService } from './projectFinancialService';
 import { errorLoggingService } from './errorLoggingService';
 
 /** Board positions authorised to approve/reject PRs (情景 25) */
@@ -324,6 +325,30 @@ export class PaymentRequestService {
           batch.update(ref, prUpdatePayload);
           await batch.commit();
           invalidateFinanceCache();
+
+          // BIZ-003: Sync project financial account balance if this PR is tied to a project.
+          // Production: projectFinancialService derives totals dynamically from Firestore, so
+          // this is a no-op there — the expense transaction written above is already the source.
+          // Dev mode: the in-memory account balance must be updated explicitly.
+          if (projectId) {
+            try {
+              await projectFinancialService.addTransaction(projectId, {
+                type: 'expense',
+                amount: pr.totalAmount ?? pr.amount ?? 0,
+                description: description || pr.referenceNumber,
+                transactionId: txRef.id,
+                date: new Date(),
+              });
+            } catch (syncError) {
+              // Do not roll back the PR approval — log and flag for manual sync.
+              errorLoggingService.logError(
+                syncError instanceof Error ? syncError : new Error(String(syncError)),
+                { component: 'paymentRequestService', action: 'approveRequest.projectSync' }
+              );
+              // Mark the PR so the UI can surface a retry banner.
+              await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), { projectBudgetSyncFailed: true }).catch(() => {});
+            }
+          }
         } else {
           // E-5: query linked expense txs first, then batch status update + deletions atomically
           const linkedQ = query(

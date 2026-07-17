@@ -10,12 +10,11 @@ const db = admin.firestore();
  */
 export const onSubmissionApproved = functions.firestore
     .document('incentiveSubmissions/{submissionId}')
-    .onUpdate(async (change, context) => {
-        const before = change.before.data();
-        const after = change.after.data();
+    .onCreate(async (snap, context) => {
+        const after = snap.data();
 
-        // Only proceed if status changed from something else to APPROVED
-        if (before.status === 'APPROVED' || after.status !== 'APPROVED') {
+        // Only proceed if the submission was created with APPROVED status
+        if (after.status !== 'APPROVED') {
             return null;
         }
 

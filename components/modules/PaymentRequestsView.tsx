@@ -73,7 +73,9 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const [myList, setMyList] = useState<PaymentRequest[]>([]);
   const [financeList, setFinanceList] = useState<PaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [myListError, setMyListError] = useState<string | null>(null);
   const [financeLoading, setFinanceLoading] = useState(false);
+  const [financeListError, setFinanceListError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [submitPreselectedProjectId, setSubmitPreselectedProjectId] = useState<string | undefined>();
@@ -88,6 +90,9 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const [pdfPreviewFileName, setPdfPreviewFileName] = useState<string>('payment-request.pdf');
   const [searchRef, setSearchRef] = useState('');
   const [statusFilter, setStatusFilter] = useState<PaymentRequestStatus | ''>('');
+  const [financeListLimit, setFinanceListLimit] = useState(50);
+  // Reset pagination when filters change so results aren't artificially truncated.
+  useEffect(() => { setFinanceListLimit(50); }, [searchQuery, statusFilter]);
 
   const canViewFinance = hasPermission('canViewFinance');
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
@@ -127,11 +132,13 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const loadMyList = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
+    setMyListError(null);
     try {
       const { items } = await PaymentRequestService.list({ applicantId: user.uid, pageSize: 100 });
       setMyList(items);
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load', 'error');
+      setMyListError('Failed to load requests. Click to retry.');
     } finally {
       setLoading(false);
     }
@@ -140,6 +147,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const loadFinanceList = useCallback(async () => {
     if (!canViewFinance) return;
     setFinanceLoading(true);
+    setFinanceListError(null);
     try {
       const { items } = await PaymentRequestService.list({
         loId,
@@ -151,6 +159,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       setFinanceList(items);
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load finance list', 'error');
+      setFinanceListError('Failed to load requests. Click to retry.');
     } finally {
       setFinanceLoading(false);
     }
@@ -728,6 +737,16 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         <div>
           {activeTab === 'my' ? (
             loading ? <ListSkeleton /> :
+              myListError ? (
+                <div className="text-center py-14 bg-red-50 rounded-xl border border-dashed border-red-200">
+                  <RefreshCw className="mx-auto text-red-300 mb-3" size={36} />
+                  <p className="text-slate-600 font-semibold">Could not load your requests</p>
+                  <p className="text-slate-400 text-sm mt-1">{myListError}</p>
+                  <Button variant="ghost" size="sm" onClick={() => loadMyList()} className="mt-3 text-red-600 hover:bg-red-100">
+                    <RefreshCw size={14} className="mr-1" /> Retry
+                  </Button>
+                </div>
+              ) :
               filteredMyList.length === 0 ? (
                 <div className="text-center py-14 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                   <FileText className="mx-auto text-slate-300 mb-3" size={36} />
@@ -922,6 +941,16 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
               )
           ) : (
             financeLoading ? <ListSkeleton /> :
+              financeListError ? (
+                <div className="text-center py-14 bg-red-50 rounded-xl border border-dashed border-red-200">
+                  <RefreshCw className="mx-auto text-red-300 mb-3" size={36} />
+                  <p className="text-slate-600 font-semibold">Could not load applications</p>
+                  <p className="text-slate-400 text-sm mt-1">{financeListError}</p>
+                  <Button variant="ghost" size="sm" onClick={() => loadFinanceList()} className="mt-3 text-red-600 hover:bg-red-100">
+                    <RefreshCw size={14} className="mr-1" /> Retry
+                  </Button>
+                </div>
+              ) :
               filteredFinanceList.length === 0 ? (
                 <div className="text-center py-14 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                   <FileText className="mx-auto text-slate-300 mb-3" size={36} />
@@ -943,7 +972,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {filteredFinanceList.map((pr) => (
+                        {filteredFinanceList.slice(0, financeListLimit).map((pr) => (
                           <React.Fragment key={pr.id}>
                             <tr
                               className={`group hover:bg-slate-50/80 transition-colors cursor-pointer ${expandedId === pr.id ? 'bg-sky-50/40' : ''}`}
@@ -1068,10 +1097,17 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                       </tbody>
                     </table>
                   </div>
+                  {filteredFinanceList.length > financeListLimit && (
+                    <div className="hidden md:flex justify-center pt-3">
+                      <Button variant="outline" size="sm" onClick={() => setFinanceListLimit(prev => prev + 50)}>
+                        Load more ({filteredFinanceList.length - financeListLimit} remaining)
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Mobile list */}
                   <div className="md:hidden divide-y divide-slate-100">
-                    {filteredFinanceList.map((pr) => (
+                    {filteredFinanceList.slice(0, financeListLimit).map((pr) => (
                       <div key={pr.id}>
                         <button
                           type="button"
@@ -1148,6 +1184,13 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                         )}
                       </div>
                     ))}
+                    {filteredFinanceList.length > financeListLimit && (
+                      <div className="md:hidden flex justify-center pt-3 pb-1">
+                        <Button variant="outline" size="sm" onClick={() => setFinanceListLimit(prev => prev + 50)}>
+                          Load more ({filteredFinanceList.length - financeListLimit} remaining)
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </>
               )

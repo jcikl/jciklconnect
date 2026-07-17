@@ -209,6 +209,31 @@ export class ProjectsService {
           await updateDoc(projectRef, updateData);
           this.invalidateProjectsCache();
 
+          // SYNC-006: Sync project.budget → projectFinancialAccount.budget.
+          // In production, projectFinancialService.getProjectFinancialAccount derives budget
+          // directly from the projects Firestore document (project.budget || project.proposedBudget),
+          // so there is no separate document to update — the read is always fresh after this updateDoc.
+          // In dev mode, projectFinancialService holds an in-memory Map; sync it if budget changed.
+          if (updates.budget !== undefined && isDevMode()) {
+            try {
+              const { projectFinancialService } = await import('./projectFinancialService');
+              const existingAcc = await projectFinancialService.getProjectFinancialAccount(projectId);
+              if (existingAcc) {
+                // Patch the in-memory account directly so dev-mode reads stay consistent.
+                (projectFinancialService as any).accounts?.set(existingAcc.id, {
+                  ...existingAcc,
+                  budget: updates.budget,
+                  startingBalance: updates.budget,
+                });
+              }
+            } catch (syncErr) {
+              // Non-fatal: dev-mode in-memory sync only. Budget reads in production are always live.
+              console.warn('SYNC-006: dev-mode projectFinancialAccount budget sync failed (non-fatal):', syncErr);
+            }
+          }
+          // TODO (SYNC-006): If a separate projectFinancialAccounts Firestore collection is ever
+          // introduced, add a batch.update here to keep its budget field in sync with project.budget.
+
           // Recalculate radar stats for affected members
           if (memberIdsToRecalculate.size > 0) {
             for (const memberId of memberIdsToRecalculate) {

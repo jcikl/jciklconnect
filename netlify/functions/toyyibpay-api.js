@@ -110,8 +110,11 @@ exports.handler = async (event) => {
 
   const { action, ...params } = body;
 
-  // createCategory is admin-only; all other actions require only authentication
-  if (action === 'createCategory' && !['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)) {
+  // createCategory and createBill are BOARD+-only; all other actions require only authentication
+  if (
+    (action === 'createCategory' || action === 'createBill') &&
+    !['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)
+  ) {
     return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
   }
 
@@ -132,15 +135,36 @@ exports.handler = async (event) => {
         result = await callToyyib('createCategory', { catname: params.catname, catdescription: params.catdescription });
         break;
       case 'createBill': {
+        // NET-008: Input validation before forwarding to ToyyibPay
+        const rawAmount = Number(params.billAmount);
+        if (!params.billAmount || isNaN(rawAmount) || rawAmount <= 0) {
+          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billAmount must be a positive number' }) };
+        }
+        if (!params.billName || String(params.billName).length > 255) {
+          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billName is required and must be ≤255 characters' }) };
+        }
+        if (!params.billDescription || String(params.billDescription).length > 255) {
+          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billDescription is required and must be ≤255 characters' }) };
+        }
+        if (params.billEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(params.billEmail)) {
+          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billEmail has an invalid format' }) };
+        }
+
         // FIX 3: Only forward explicitly allowlisted params; lock callback/return URLs
         const sanitized = {};
         for (const key of CREATE_BILL_ALLOWED_PARAMS) {
           if (params[key] !== undefined) sanitized[key] = params[key];
         }
-        // Lock callback URL to our own webhook — never accept from caller
-        sanitized.billCallbackUrl =
+        // Lock callback URL to our own webhook — never accept from caller.
+        // NET-005: Append ?secret=... so the callback handler can verify the request
+        // originated from ToyyibPay via a shared-secret we control.
+        const baseCallbackUrl =
           process.env.TOYYIBPAY_CALLBACK_URL ||
           'https://app.jcikl.cc/.netlify/functions/toyyibpay-callback';
+        const webhookSecret = process.env.TOYYIBPAY_WEBHOOK_SECRET;
+        sanitized.billCallbackUrl = webhookSecret
+          ? `${baseCallbackUrl}?secret=${encodeURIComponent(webhookSecret)}`
+          : baseCallbackUrl;
         // Restrict return URL to our own domain
         const returnUrl = params.billReturnUrl || '';
         const isAllowedReturn =
@@ -183,7 +207,8 @@ exports.handler = async (event) => {
     return {
       statusCode: 502,
       headers: { ...cors, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: err.message }),
+      // NET-003: never expose internal error details to the caller
+      body: JSON.stringify({ error: 'Upstream payment service error' }),
     };
   }
 };

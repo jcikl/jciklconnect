@@ -68,6 +68,24 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
+  // NET-005: Shared-secret webhook verification.
+  // ToyyibPay does not sign webhooks natively; we append ?secret=... to the
+  // callback URL at bill creation time (toyyibpay-api.js createBill case) so
+  // only our own webhook endpoint receives calls with the correct secret.
+  const webhookSecret = process.env.TOYYIBPAY_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    const receivedSecret = event.queryStringParameters?.secret;
+    if (receivedSecret !== webhookSecret) {
+      console.warn('[toyyibpay-callback] Webhook secret mismatch — rejecting callback');
+      return { statusCode: 401, body: 'Unauthorized' };
+    }
+  } else {
+    // TODO (NET-005): Set TOYYIBPAY_WEBHOOK_SECRET in Netlify env vars and append
+    // ?secret=<value> to billCallbackUrl in toyyibpay-api.js createBill to enforce
+    // shared-secret verification. Without it any party can POST to this endpoint.
+    console.warn('[toyyibpay-callback] TOYYIBPAY_WEBHOOK_SECRET not set — skipping secret verification');
+  }
+
   let data = {};
   const ct = event.headers['content-type'] || '';
   try {
@@ -166,6 +184,8 @@ exports.handler = async (event) => {
       // Extract year from billName e.g. "2026 Renewal Membership"
       const yearMatch = (billData.billName || '').match(/^(\d{4})\s/);
       if (yearMatch) billYear = yearMatch[1];
+      // BIZ-004 fallback: if billName doesn't start with "YYYY ", read from dedicated year field
+      if (!billYear && billData.year) billYear = String(billData.year);
 
       const billUpdate = {
         billpaymentStatus,
@@ -304,6 +324,38 @@ exports.handler = async (event) => {
         });
         // Sync membership status atomically with the new transaction — both succeed or both fail.
         await membershipBatch.commit();
+
+        // BIZ-001: Create incentiveSubmission for dues payment so loStarProgress stays in sync.
+        // Wrapped in try/catch so a failure here never affects the already-committed membership update.
+        try {
+          const memberSnap2 = await db.collection('members').doc(billMemberId).get().catch(() => null);
+          const memberData2 = memberSnap2?.exists ? memberSnap2.data() : null;
+          const loId = memberData2?.loId || null;
+          const programSnap = await db.collection('incentivePrograms').where('isActive', '==', true).limit(1).get();
+          if (!programSnap.empty && loId) {
+            const programDoc = programSnap.docs[0];
+            const programData = programDoc.data();
+            const standards = Array.isArray(programData.standards) ? programData.standards : [];
+            const duesStandard = standards.find(s => s.autoLogicId === 'MEMBERSHIP_DUES_PAID');
+            if (duesStandard) {
+              await db.collection('incentiveSubmissions').add({
+                memberId: billMemberId,
+                loId,
+                programId: programDoc.id,
+                standardId: duesStandard.id || duesStandard.standardId || null,
+                status: 'APPROVED',
+                submittedAt: Timestamp.now(),
+                autoApproved: true,
+                source: 'dues_payment',
+                billCode,
+              });
+            } else {
+              console.log('[toyyibpay-callback] No MEMBERSHIP_DUES_PAID standard found in active program — skipping incentiveSubmission');
+            }
+          }
+        } catch (incentiveErr) {
+          console.warn('[toyyibpay-callback] Could not create incentiveSubmission for dues payment:', incentiveErr);
+        }
       }
     }
 

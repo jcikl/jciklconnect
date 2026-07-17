@@ -139,7 +139,7 @@ export class ToyyibService {
     if (Array.isArray(data) && data.length > 0) {
       const billCode = data[0].BillCode;
       // Persist to Firestore for per-category aggregation
-      const billRecord: Omit<ToyyibBillRecord, 'createdAt'> & { createdAt: any } = {
+      const billRecord: Omit<ToyyibBillRecord, 'createdAt'> & { createdAt: any; year?: number } = {
         billCode,
         categoryCode: effectiveCategoryCode,
         billName: params.billName,
@@ -148,6 +148,9 @@ export class ToyyibService {
         billTo: params.billTo,
         billEmail: params.billEmail,
         billpaymentStatus: '2',
+        // BIZ-004: dedicated year field so the webhook can extract billYear even when
+        // billName doesn't start with "YYYY " (e.g. "JCI KL Membership 2026").
+        year: new Date().getFullYear(),
         createdAt: serverTimestamp(),
       };
       if (params.memberId) billRecord.memberId = params.memberId;

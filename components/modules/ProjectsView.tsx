@@ -1,5 +1,5 @@
 ﻿﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = () => crypto.randomUUID();
 import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers, Image, MoreVertical, Info, Tag, ExternalLink } from 'lucide-react';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, Drawer, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
@@ -70,7 +70,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const [newGalleryUrl, setNewGalleryUrl] = useState('');
 
   const { projects, loading, error, createProject, updateProject, deleteProject } = useProjects();
-  const { eventTemplates, loading: templatesLoading, createEventTemplate, updateEventTemplate, deleteEventTemplate } = useTemplates();
+  const { eventTemplates, loading: templatesLoading, error: templatesError, createEventTemplate, updateEventTemplate, deleteEventTemplate } = useTemplates();
   const { member } = useAuth();
   const { isBoard, isAdmin, isDeveloper } = usePermissions();
   const isPrivileged = isBoard || isAdmin || isDeveloper;
@@ -299,6 +299,22 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     const allIds = displayedProjects.map(p => p.id).filter(id => !!id) as string[];
     setSelectedProjectIds(new Set(allIds));
   }, [displayedProjects]);
+
+  const handleNewProposal = useCallback(() => {
+    setCreateProjectStep(1);
+    setProposalModalOpen(true);
+  }, []);
+
+  const handleImport = useCallback(() => setImportModalOpen(true), []);
+
+  const handleToggleSelection = useCallback((id: string) => {
+    setSelectedProjectIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -582,18 +598,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                   loading={loading}
                   error={error}
                   onSelect={setSelectedProjectId}
-                  onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
-                  onImport={() => setImportModalOpen(true)}
+                  onNewProposal={handleNewProposal}
+                  onImport={handleImport}
                   isAdminOrBoard={isBoard || isAdmin}
                   selectedIds={selectedProjectIds}
-                  onToggleSelection={(id) => {
-                    setSelectedProjectIds(prev => {
-                      const next = new Set(prev);
-                      if (next.has(id)) next.delete(id);
-                      else next.add(id);
-                      return next;
-                    });
-                  }}
+                  onToggleSelection={handleToggleSelection}
                   onSelectAll={handleSelectAll}
                   projectAccounts={projectAccounts}
                   projectTrackerTransactions={projectTrackerTransactions}
@@ -626,7 +635,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                     className="w-48"
                   />
                 </div>
-                <LoadingState loading={templatesLoading} error={null} empty={false}>
+                <LoadingState loading={templatesLoading} error={templatesError} empty={eventTemplates.filter(t => (!templateSearchTerm || t.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) || (t.description?.toLowerCase().includes(templateSearchTerm.toLowerCase()) ?? false)) && (templateFilterType === 'all' || t.type === templateFilterType)).length === 0} emptyMessage="No templates found. Create your first template to get started.">
                   <div className="divide-y divide-slate-100">
                     {(isBoard || isAdmin) && (
                       <div onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}
@@ -756,7 +765,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                       className="w-48"
                     />
                   </div>
-                  <LoadingState loading={templatesLoading} error={null} empty={false}>
+                  <LoadingState loading={templatesLoading} error={templatesError} empty={eventTemplates.filter(t => (!templateSearchTerm || t.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) || (t.description?.toLowerCase().includes(templateSearchTerm.toLowerCase()) ?? false)) && (templateFilterType === 'all' || t.type === templateFilterType)).length === 0} emptyMessage="No templates found. Create your first template to get started.">
                     <div className="divide-y divide-slate-100">
                       {(isBoard || isAdmin) && (
                         <div onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}

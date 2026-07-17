@@ -1,5 +1,5 @@
 // Authentication Hook
-import React, { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext, useCallback, useMemo, ReactNode } from 'react';
 import {
   User,
   signInWithEmailAndPassword,
@@ -236,7 +236,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [isDevMode]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     // Developer mock login — credentials set via VITE_DEV_EMAIL / VITE_DEV_PASSWORD env vars
     // TODO SEC-003: These vars should not be VITE_ prefixed. Move to .env.local with DEV_EMAIL / DEV_PASSWORD prefix.
     const devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
@@ -334,9 +334,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       // Note: Linking is handled by onAuthStateChanged listener
     }
-  };
+  }, [isDevMode]);
 
-  const signUp = async (email: string, password: string, name: string, additionalData?: Record<string, any>) => {
+  const signUp = useCallback(async (email: string, password: string, name: string, additionalData?: Record<string, any>) => {
     // Check if in developer mode
     const _devEmailForSignUp = import.meta.env.VITE_DEV_EMAIL as string | undefined;
     if (checkDevMode() || (_devEmailForSignUp && email === _devEmailForSignUp)) {
@@ -494,9 +494,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Update local state
     setUser(userCredential!.user);
     setMember({ id: userCredential!.user.uid, ...newMember } as Member);
-  };
+  }, [isDevMode]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     let userCredential;
     if (Capacitor.isNativePlatform()) {
       // WebView 内 Google 禁止 OAuth 弹窗（disallowed_useragent），改走原生登录换取 idToken
@@ -536,9 +536,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       // Note: Linking to UID is handled automatically by the onAuthStateChanged listener above
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     setSimulatedRole(null);
     setOriginalRole(null);
     if (isDevMode) {
@@ -553,13 +553,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await firebaseSignOut(auth);
     // Clear any stored state (though Firebase handles this)
     clearAuthState();
-  };
+  }, [isDevMode]);
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
     await sendPasswordResetEmail(auth, email);
-  };
+  }, []);
 
-  const updateMemberProfile = async (updates: Partial<Member>) => {
+  const updateMemberProfile = useCallback(async (updates: Partial<Member>) => {
     if (!user) throw new Error('User not authenticated');
 
     // In dev mode, just update local state
@@ -591,9 +591,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (member) {
       setMember({ ...member, ...updates });
     }
-  };
+  }, [user, member, isDevMode]);
 
-  const simulateRole = (role: UserRole | null) => {
+  const simulateRole = useCallback((role: UserRole | null) => {
     if (!member) return;
 
     let currentOriginal = originalRole;
@@ -632,9 +632,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setMember({ ...member, role, ...membershipTypePatch });
       }
     }
-  };
+  }, [member, originalMember, originalRole, simulatedMemberId, isDevMode]);
 
-  const simulateAsMember = async (memberId: string, _roleHint: UserRole) => {
+  const simulateAsMember = useCallback(async (memberId: string, _roleHint: UserRole) => {
     if (!member) return;
 
     // Only allow if in dev mode OR current role is ADMIN
@@ -655,26 +655,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setSimulatedMemberId(memberId);
     setSimulatedRole(effectiveRole);
     setMember({ ...targetMember, role: effectiveRole });
-  };
+  }, [member, originalMember, originalRole, isDevMode]);
+
+  const contextValue = useMemo(() => ({
+    user,
+    member,
+    loading,
+    isDevMode,
+    simulatedRole,
+    simulatedMemberId,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signOut,
+    resetPassword,
+    updateMemberProfile,
+    simulateRole,
+    simulateAsMember,
+    authError,
+  }), [
+    user, member, loading, isDevMode, simulatedRole, simulatedMemberId, authError,
+    signIn, signUp, signInWithGoogle, signOut, resetPassword, updateMemberProfile, simulateRole, simulateAsMember,
+  ]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      member,
-      loading,
-      isDevMode,
-      simulatedRole,
-      simulatedMemberId,
-      signIn,
-      signUp,
-      signInWithGoogle,
-      signOut,
-      resetPassword,
-      updateMemberProfile,
-      simulateRole,
-      simulateAsMember,
-      authError,
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

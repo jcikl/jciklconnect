@@ -50,7 +50,17 @@ const EventRowBase: React.FC<{
   onClick?: () => void;
   showLocation?: boolean;
   horizontal?: boolean;
-}> = ({ event, member, onRegister, onCheckIn, onClick, showLocation = true, horizontal = false }) => {
+  registerForEvent?: (eventId: string, memberId: string) => void;
+  markAttendance?: (eventId: string, memberId: string) => void;
+}> = ({ event, member, onRegister, onCheckIn, onClick, showLocation = true, horizontal = false, registerForEvent, markAttendance }) => {
+  const handleRegister = registerForEvent && member
+    ? (e: React.MouseEvent) => { e.stopPropagation(); registerForEvent(event.id, member.id); }
+    : onRegister
+      ? (e: React.MouseEvent) => { e.stopPropagation(); onRegister(); }
+      : undefined;
+  const handleCheckIn = markAttendance && member
+    ? () => markAttendance(event.id, member.id)
+    : onCheckIn;
   const date = new Date(event.date);
   const isUpcoming = date >= new Date(new Date().setHours(0, 0, 0, 0));
   const isRegistered = member && event.registeredMembers?.includes(member.id);
@@ -100,13 +110,13 @@ const EventRowBase: React.FC<{
               <span>{event.attendees}{event.maxAttendees ? `/${event.maxAttendees}` : ''} registered</span>
             </div>
           </div>
-          {isUpcoming && onRegister && (
+          {isUpcoming && handleRegister && (
             <Button
               size="sm"
               variant={isRegistered ? "success" : "primary"}
               disabled={!!isRegistered}
               className="mt-auto w-full text-xs"
-              onClick={(e) => { e.stopPropagation(); onRegister(); }}
+              onClick={handleRegister}
             >
               {isRegistered ? 'Registered' : 'Register'}
             </Button>
@@ -161,13 +171,13 @@ const EventRowBase: React.FC<{
             <span>{event.attendees}{event.maxAttendees ? `/${event.maxAttendees}` : ''} registered</span>
           </div>
         </div>
-        {isUpcoming && onRegister && (
+        {isUpcoming && handleRegister && (
           <Button
             size="sm"
             variant={isRegistered ? "success" : "primary"}
             disabled={!!isRegistered}
             className="mt-auto w-full"
-            onClick={(e) => { e.stopPropagation(); onRegister(); }}
+            onClick={handleRegister}
           >
             {isRegistered ? 'Registered' : 'Register'}
           </Button>

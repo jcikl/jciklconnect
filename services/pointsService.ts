@@ -458,7 +458,18 @@ export class PointsService {
     }
   }
 
-  // Update member's total points
+  /**
+   * @deprecated SYNC-003 — Do NOT call this method after a batch has already been committed.
+   * If the standalone updateDoc here fails, the points record will exist but the member
+   * aggregate total will be stale. Use the awardPoints batch pattern instead: include a
+   * `batch.update(memberRef, { points: increment(delta) })` inside the same writeBatch that
+   * writes the points document, so both succeed or both fail together.
+   *
+   * Any remaining call sites that call this as the *only* write (no preceding separate
+   * batch commit) are lower-risk but should be migrated to the batch pattern in a future
+   * refactor — see TODO comments at each such call site.
+   */
+  // TODO: remove this method once all callers have been migrated to the awardPoints batch pattern (SYNC-003)
   static async updateMemberPoints(memberId: string, pointsDelta: number): Promise<void> {
     return withDevMode(
       () => {

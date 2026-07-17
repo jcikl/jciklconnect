@@ -514,6 +514,10 @@ export class BoardManagementService {
       const startDate = `${year}-01-01`;
       const endDate = `${year}-12-31`;
 
+      // Build all boardMember payloads first (requires async display-field fetches),
+      // then write them atomically so the boardMembers doc and member.role always
+      // land together (SYNC-005: addDoc cannot join a batch).
+      const boardMemberEntries: Array<{ newRef: ReturnType<typeof doc>; data: Omit<BoardMember, 'id'>; memberId: string }> = [];
       for (const { memberId, position, commissionDirectorIds, boardAvatarUrl, commissionDirectorAvatars } of assignments) {
         if (!memberId || !position) continue;
 
@@ -527,7 +531,7 @@ export class BoardManagementService {
           if (dirDisplay.memberName) commissionDirectorNames[dirId] = dirDisplay.memberName;
         }
 
-        const newMember: Omit<BoardMember, 'id'> = {
+        const newMemberData: Omit<BoardMember, 'id'> = {
           memberId,
           position,
           term: year,
@@ -543,8 +547,19 @@ export class BoardManagementService {
           createdAt: now,
           updatedAt: now,
         };
-        await addDoc(boardMembersRef, newMember);
+        boardMemberEntries.push({ newRef: doc(boardMembersRef), data: newMemberData, memberId });
       }
+
+      // Single atomic batch: boardMembers creation + member.role elevation
+      const boardBatch = writeBatch(db);
+      for (const { newRef, data, memberId } of boardMemberEntries) {
+        boardBatch.set(newRef, data);
+        boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+          role: UserRole.BOARD,
+          updatedAt: now,
+        });
+      }
+      await boardBatch.commit();
 
           await this.syncMemberDocumentsForTerm(year, assignments, existing);
         } catch (error) {
