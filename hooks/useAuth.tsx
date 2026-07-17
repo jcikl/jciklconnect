@@ -501,7 +501,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Save to the new UID (this links the Firebase Auth user to the profile data)
     await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);
-    isSigningUpRef.current = false;
 
     // pendingRegistrations write removed — GuestManagementView queries PROBATION members directly.
 
@@ -516,9 +515,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
 
-    // Update local state
+    // Update local state — reset the sign-up guard AFTER state is committed so
+    // onAuthStateChanged never sees isSigningUpRef=false with member still null.
     setUser(userCredential!.user);
     setMember({ id: userCredential!.user.uid, ...newMember } as Member);
+    isSigningUpRef.current = false;
   }, [isDevMode]);
 
   const signInWithGoogle = useCallback(async () => {
@@ -658,8 +659,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setOriginalRole(currentOriginal);
     }
 
-    // Only allow if in dev mode OR original role is ADMIN
-    if (!isDevMode && currentOriginal !== UserRole.ADMIN) {
+    // Only allow if in dev mode OR original role is ADMIN / SUPER_ADMIN
+    if (!isDevMode && currentOriginal !== UserRole.ADMIN && currentOriginal !== UserRole.SUPER_ADMIN) {
       return;
     }
 

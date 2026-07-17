@@ -4,7 +4,7 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
+  setDoc,
   updateDoc,
   query,
   where,
@@ -67,16 +67,16 @@ export class EventFeedbackService {
       },
       async () => {
         try {
-          // P0 — duplicate feedback check before writing
-          const existing = await getDocs(
-            query(
-              collection(db, FEEDBACK_COLLECTION()),
-              where('eventId', '==', feedback.eventId),
-              where('memberId', '==', feedback.memberId)
-            )
-          );
-          if (!existing.empty) {
-            throw new Error('Feedback already submitted for this event.');
+          // P1 fix: use a deterministic document ID (eventId_memberId) instead of
+          // addDoc with a random ID. This collapses concurrent duplicate submissions
+          // to the same Firestore document, preventing race-condition duplicates.
+          // A getDoc pre-check gives a friendly error for the common sequential retry case.
+          const deterministicId = `${feedback.eventId}_${feedback.memberId}`;
+          const docRef = doc(db, FEEDBACK_COLLECTION(), deterministicId);
+
+          const existingSnap = await getDoc(docRef);
+          if (existingSnap.exists()) {
+            throw new Error('您已提交过此活动的反馈');
           }
 
           const feedbackData = {
@@ -84,12 +84,12 @@ export class EventFeedbackService {
             submittedAt: Timestamp.now(),
           };
 
-          const docRef = await addDoc(collection(db, FEEDBACK_COLLECTION()), feedbackData);
+          await setDoc(docRef, feedbackData);
 
           // P1 — invalidate cache so subsequent reads reflect new submission
           invalidateFeedbackCache(feedback.eventId);
 
-          return docRef.id;
+          return deterministicId;
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             action: 'EventFeedbackService.submitFeedback',

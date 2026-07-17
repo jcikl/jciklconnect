@@ -100,6 +100,16 @@ export class ContractService {
         await PointsService.releaseEscrow(escrowId, memberId);
       } catch (releaseErr) {
         console.error('ContractService.signContract: rollback releaseEscrow failed', releaseErr);
+        // P1 — write a finance_alert so an admin can manually release the locked points
+        try {
+          await addDoc(collection(db, 'finance_alerts'), {
+            type: 'escrow_orphan',
+            message: '托管已锁定但合约未创建，请手动释放',
+            escrowId,
+            memberId,
+            createdAt: serverTimestamp(),
+          });
+        } catch {}
       }
       throw err;
     }
@@ -217,7 +227,22 @@ export class ContractService {
     // 2. Award bonus points (The 20% "Greed" reward)
     const bonus = Math.floor(data.stakedPoints * (data.multiplier - 1));
     if (bonus > 0) {
-      await PointsService.awardPoints(data.memberId, bonus, 'ROLE_FULFILLMENT', `Commitment Bonus: ${data.goalTitle}`);
+      try {
+        await PointsService.awardPoints(data.memberId, bonus, 'ROLE_FULFILLMENT', `Commitment Bonus: ${data.goalTitle}`);
+      } catch (bonusErr) {
+        console.error('ContractService.fulfillContract: bonus awardPoints failed', bonusErr);
+        // P1 — write a finance_alert so admin can manually award the missed bonus
+        try {
+          await addDoc(collection(db, 'finance_alerts'), {
+            type: 'contract_bonus_missing',
+            message: `合约质押已退回但奖励积分未发放，请手动补发 ${bonus} 分给 ${data.memberId}`,
+            contractId,
+            memberId: data.memberId,
+            bonusPoints: bonus,
+            createdAt: serverTimestamp(),
+          });
+        } catch {}
+      }
     }
 
     // 3. Update status — wrapped in try/catch (E3 safety net):

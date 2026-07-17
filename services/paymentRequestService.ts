@@ -48,6 +48,7 @@ function filterPaymentRequests(
 
 export class PaymentRequestService {
   /** Generate unique reference number: PR-{loId}-{YYYYMMDD}-{seq} */
+  // TODO: replace snapshot.size with atomic counter for production safety
   static async generateReferenceNumber(loId: string): Promise<string> {
     return withDevMode(
       () => {
@@ -659,25 +660,24 @@ export class PaymentRequestService {
         if (pr) await this._notifyApplicant(pr, 'cancelled');
       },
       async () => {
-        // Attempt to delete linked expense transaction (情景 G).
-        // Non-finance applicants lack the Firestore delete permission on transactions, so we
-        // catch that error, still cancel the PR, and flag expenseTxFailed so finance can clean up.
-        let expenseTxCleanupFailed = false;
-        try {
-          await this._deleteExpenseTransactionForPR(id);
-        } catch (err) {
-          console.warn('[PaymentRequestService.cancel] Could not delete expense tx (permission denied?)', err);
-          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: 'cancel._deleteExpenseTx' });
-          expenseTxCleanupFailed = true;
-        }
-
+        // Update PR status first so the cancellation is recorded even if expense tx cleanup fails.
         await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
           status: 'cancelled',
           updatedAt: Timestamp.now(),
           updatedBy: userId,
-          ...(expenseTxCleanupFailed ? { expenseTxFailed: true } : {}),
         });
         invalidateFinanceCache();
+
+        // Attempt to delete linked expense transaction (情景 G).
+        // Non-finance applicants lack the Firestore delete permission on transactions, so we
+        // catch that error and warn — the PR status is already correctly 'cancelled'.
+        try {
+          await this._deleteExpenseTransactionForPR(id);
+        } catch (err) {
+          console.warn('[PaymentRequestService.cancel] Could not delete expense tx (permission denied?); PR is cancelled but expense tx may need manual cleanup', err);
+          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: 'cancel._deleteExpenseTx' });
+        }
+
         // Notify applicant (AA)
         const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
         if (snap.exists()) await this._notifyApplicant({ id: snap.id, ...snap.data() } as PaymentRequest, 'cancelled');

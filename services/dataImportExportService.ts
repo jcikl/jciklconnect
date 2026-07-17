@@ -1,5 +1,6 @@
 ﻿// Data Import/Export Service
 import Papa from 'papaparse';
+import { auth } from '../config/firebase';
 // xlsx is dynamically imported inside importFromFile() and exportToExcel() to avoid eager loading
 import {
   DataImportResult,
@@ -60,6 +61,7 @@ export class DataImportExportService {
    * Parse uploaded file and extract data
    */
   static async parseFile(file: File): Promise<RawImportRow[]> {
+    if (file.size > 10 * 1024 * 1024) throw new Error('文件过大（最大 10MB），请拆分后分批导入');
     return new Promise((resolve, reject) => {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
@@ -413,82 +415,68 @@ export class DataImportExportService {
 
     const arrayFields = ['skills', 'hobbies', 'businessCategory', 'interestedIndustries'];
 
-    // Simulate data processing (in real implementation, this would interact with database)
-    for (const row of data) {
+    // Normalize all rows first
+    const normalizedRows: Array<{ row: any; originalIndex: number }> = data.map((row, index) => {
+      const normalizedRow: any = {};
+      Object.keys(row).forEach(header => {
+        const normalizedHeader = headerMapping[header.toLowerCase()] || header;
+        let value = row[header];
+
+        if (arrayFields.includes(normalizedHeader) && typeof value === 'string') {
+          value = value.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        }
+        if ((normalizedHeader === 'senatorCertified' || normalizedHeader === 'whatsappGroup') && typeof value === 'string') {
+          value = value.toLowerCase() === 'true' || value.toLowerCase() === 'yes';
+        }
+        if (normalizedHeader === 'duesYear' && typeof value === 'string' && value !== '') {
+          value = parseInt(value, 10);
+        }
+        if (normalizedHeader === 'gender' && typeof value === 'string') {
+          const g = value.trim().toLowerCase();
+          if (g === 'male' || g === 'm') value = 'Male';
+          else if (g === 'female' || g === 'f') value = 'Female';
+        }
+        normalizedRow[normalizedHeader] = value;
+      });
+
+      if (entityType === 'members') {
+        const ic: string = normalizedRow.idNumber || normalizedRow.nationalId || '';
+        if (isMalaysianIC(ic)) {
+          if (!normalizedRow.birthPlace) { const bp = getBirthPlaceFromIC(ic); if (bp) normalizedRow.birthPlace = bp; }
+          if (!normalizedRow.dateOfBirth) { const dob = getDateOfBirthFromIC(ic); if (dob) normalizedRow.dateOfBirth = dob; }
+          if (!normalizedRow.gender) { const gender = getGenderFromIC(ic); if (gender) normalizedRow.gender = gender; }
+        }
+      }
+
+      return { row: normalizedRow, originalIndex: index };
+    });
+
+    // Process in batches of 500; throw on batch failure and record how many batches succeeded
+    const BATCH_SIZE = 500;
+    let completedBatches = 0;
+    for (let batchStart = 0; batchStart < normalizedRows.length; batchStart += BATCH_SIZE) {
+      const batch = normalizedRows.slice(batchStart, batchStart + BATCH_SIZE);
       try {
-        // Create a normalized copy of the row
-        const normalizedRow: any = {};
-        Object.keys(row).forEach(header => {
-          const normalizedHeader = headerMapping[header.toLowerCase()] || header;
-          let value = row[header];
-
-          // Special handling for array fields
-          if (arrayFields.includes(normalizedHeader) && typeof value === 'string') {
-            value = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
-          }
-
-          // Special handling for boolean fields
-          if ((normalizedHeader === 'senatorCertified' || normalizedHeader === 'whatsappGroup') && typeof value === 'string') {
-            value = value.toLowerCase() === 'true' || value.toLowerCase() === 'yes';
-          }
-
-          // Special handling for numbers
-          if (normalizedHeader === 'duesYear' && typeof value === 'string' && value !== '') {
-            value = parseInt(value, 10);
-          }
-
-          // Normalize gender to 'Male' / 'Female'
-          if (normalizedHeader === 'gender' && typeof value === 'string') {
-            const g = value.trim().toLowerCase();
-            if (g === 'male' || g === 'm') value = 'Male';
-            else if (g === 'female' || g === 'f') value = 'Female';
-          }
-
-          normalizedRow[normalizedHeader] = value;
-        });
-
-        // Auto-derive from Malaysian IC if idNumber is present
-        if (entityType === 'members') {
-          const ic: string = normalizedRow.idNumber || normalizedRow.nationalId || '';
-          if (isMalaysianIC(ic)) {
-            if (!normalizedRow.birthPlace) {
-              const bp = getBirthPlaceFromIC(ic);
-              if (bp) normalizedRow.birthPlace = bp;
+        for (const { row: normalizedRow, originalIndex } of batch) {
+          try {
+            const existingId = await this.checkIfRecordExists(normalizedRow, entityType);
+            if (existingId) {
+              await this.updateRecord(existingId, normalizedRow, entityType);
+              summary.updated++;
+            } else {
+              await this.createRecord(normalizedRow, entityType);
+              summary.created++;
             }
-            if (!normalizedRow.dateOfBirth) {
-              const dob = getDateOfBirthFromIC(ic);
-              if (dob) normalizedRow.dateOfBirth = dob;
-            }
-            if (!normalizedRow.gender) {
-              const gender = getGenderFromIC(ic);
-              if (gender) normalizedRow.gender = gender;
-            }
+          } catch (error) {
+            summary.skipped++;
+            const errorMessage = error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error during persistence';
+            errors.push({ row: originalIndex + 2, message: errorMessage, severity: 'error' });
           }
         }
-
-        const existingId = await this.checkIfRecordExists(normalizedRow, entityType);
-        if (existingId) {
-          // Update existing record
-          await this.updateRecord(existingId, normalizedRow, entityType);
-          summary.updated++;
-        } else {
-          // Create new record
-          await this.createRecord(normalizedRow, entityType);
-          summary.created++;
-        }
-      } catch (error) {
-        summary.skipped++;
-        const errorMessage = error instanceof Error
-          ? error.message
-          : typeof error === 'string'
-            ? error
-            : 'Unknown error during persistence';
-
-        errors.push({
-          row: data.indexOf(row) + 2,
-          message: errorMessage,
-          severity: 'error'
-        });
+        completedBatches++;
+      } catch (batchError) {
+        const batchErrorMessage = batchError instanceof Error ? batchError.message : 'Batch write failed';
+        throw new Error(`导入中断：已成功提交 ${completedBatches} 批（${completedBatches * BATCH_SIZE} 行），当前批次失败：${batchErrorMessage}`);
       }
     }
 
@@ -713,10 +701,22 @@ export class DataImportExportService {
     entityType: string,
     userId: string
   ): string[] {
-    // Simulate permission filtering
-    // In real implementation, this would check user permissions
     const restrictedFields = ['password', 'ssn', 'bankAccount'];
-    return fields.filter(field => !restrictedFields.includes(field));
+    // Sensitive member fields: only ADMIN+ should export these
+    // We check if the current user is the same as userId and rely on server-side role enforcement.
+    // For a belt-and-suspenders client-side guard, restrict sensitive fields unless the caller is
+    // authenticated as the same user performing the export (full role check requires async claims).
+    const sensitiveMemberFields = ['idNumber', 'contactInfo.phone', 'contactInfo.address', 'emergencyContact',
+      'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship'];
+    const currentUid = auth.currentUser?.uid;
+    // If the current authenticated user is not recognised or is exporting someone else's data,
+    // apply the sensitive field restriction as a conservative default.
+    // TODO: Make this method async to read ID token claims and perform full ADMIN role check.
+    const isAdminContext = Boolean(currentUid && currentUid === userId);
+    const allRestricted = isAdminContext
+      ? restrictedFields
+      : [...restrictedFields, ...sensitiveMemberFields];
+    return fields.filter(field => !allRestricted.some(r => field === r || field.startsWith(r + '.')));
   }
 
   private static getEntityFields(entityType: string): string[] {

@@ -6,13 +6,13 @@
 import {
   collection,
   doc,
+  getDoc,
   addDoc,
   getDocs,
-  getCountFromServer,
   query,
   where,
   orderBy,
-  writeBatch,
+  runTransaction,
   increment,
   Timestamp,
 } from 'firebase/firestore';
@@ -200,90 +200,56 @@ export class MemberBenefitsService {
       },
       async () => {
         try {
-          // 1. Check per-member usage limit before writing.
-          //    We fetch the benefit to get usageLimit, then count existing usage.
-          const benefitSnap = await getDocs(
-            query(
-              collection(db, COLLECTIONS.MEMBER_BENEFITS || 'memberBenefits'),
-              where('__name__', '==', benefitId)
-            )
-          );
+          // 1. Determine which collection holds this benefit (outside transaction — fast pre-check).
+          const mbRef = doc(db, COLLECTIONS.MEMBER_BENEFITS || 'memberBenefits', benefitId);
+          const adsRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', benefitId);
+          const [mbDoc, adDoc] = await Promise.all([getDoc(mbRef), getDoc(adsRef)]);
+          const isMemberBenefit = mbDoc.exists();
+          const benefitRef = isMemberBenefit ? mbRef : adsRef;
 
-          // Simpler: use doc reference directly.
-          const benefitRef = doc(db, COLLECTIONS.MEMBER_BENEFITS || 'memberBenefits', benefitId);
+          // 2. Atomic runTransaction: re-read benefit for usageLimit, count existing usage,
+          //    check limit, then write usage record + increment counter in one transaction.
+          await runTransaction(db, async (transaction) => {
+            // Re-read the benefit doc inside the transaction to get the freshest usageLimit.
+            const freshBenefitSnap = await transaction.get(benefitRef);
+            const usageLimit = freshBenefitSnap.data()?.usageLimit as number | undefined;
 
-          // Count existing claims by this member for this benefit.
-          const usageCountSnap = await getCountFromServer(
-            query(
-              collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
-              where('memberId', '==', memberId),
-              where('benefitId', '==', benefitId)
-            )
-          );
-          const currentMemberUsageCount = usageCountSnap.data().count;
-
-          // Retrieve usageLimit from the benefit doc (if it exists).
-          // We use getDocs on the advertisements collection as well as memberBenefits
-          // because the view stores benefits in advertisements.
-          // Check memberBenefits collection first.
-          let usageLimit: number | undefined;
-          const benefitDoc = (await getDocs(
-            query(
-              collection(db, COLLECTIONS.MEMBER_BENEFITS || 'memberBenefits'),
-              where('__name__', '==', benefitId)
-            )
-          )).docs[0];
-
-          if (benefitDoc?.exists()) {
-            usageLimit = benefitDoc.data().usageLimit as number | undefined;
-          } else {
-            // Fall back to advertisements collection (view uses ads as benefits).
-            const adDoc = (await getDocs(
+            // Count existing claims for this member+benefit.
+            // getDocs inside a transaction callback is outside transaction isolation but
+            // provides a reliable second check that eliminates most concurrent duplicate claims.
+            const usageSnap = await getDocs(
               query(
-                collection(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements'),
-                where('__name__', '==', benefitId)
+                collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
+                where('memberId', '==', memberId),
+                where('benefitId', '==', benefitId)
               )
-            )).docs[0];
-            if (adDoc?.exists()) {
-              usageLimit = adDoc.data().usageLimit as number | undefined;
+            );
+
+            if (usageLimit !== undefined && usageSnap.size >= usageLimit) {
+              throw new Error('Limit reached');
             }
-          }
 
-          if (usageLimit !== undefined && currentMemberUsageCount >= usageLimit) {
-            throw new Error('Limit reached');
-          }
+            // Write usage record using a pre-generated ref (addDoc not available in transaction).
+            const usageRef = doc(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'));
+            transaction.set(usageRef, {
+              memberId,
+              benefitId,
+              usedAt: Timestamp.now(),
+              ...(details ? { details } : {}),
+            });
 
-          // 2. Atomic write: benefitUsage doc + increment usageCount on the benefit.
-          const batch = writeBatch(db);
-
-          // Write the usage record.
-          const usageRef = doc(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'));
-          batch.set(usageRef, {
-            memberId,
-            benefitId,
-            usedAt: Timestamp.now(),
-            ...(details ? { details } : {}),
+            // Increment counter on the owning collection.
+            if (isMemberBenefit) {
+              transaction.update(benefitRef, { currentUsage: increment(1), updatedAt: Timestamp.now() });
+            } else {
+              // advertisements collection uses `clicks` as the usage counter.
+              transaction.update(benefitRef, { clicks: increment(1), updatedAt: Timestamp.now() });
+            }
           });
 
-          // Increment usageCount on whichever collection holds this benefit.
-          // Try advertisements first (the view's primary source), then memberBenefits.
-          const adsRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', benefitId);
-          const mbRef = doc(db, COLLECTIONS.MEMBER_BENEFITS || 'memberBenefits', benefitId);
-
-          if (benefitDoc?.exists()) {
-            batch.update(mbRef, { currentUsage: increment(1), updatedAt: Timestamp.now() });
-          } else {
-            // advertisements collection uses `clicks` field as the usage counter
-            // (consistent with recordClick pattern in advertisementService).
-            batch.update(adsRef, { clicks: increment(1), updatedAt: Timestamp.now() });
-          }
-
-          await batch.commit();
-
-          // 3. Invalidate caches after successful write.
+          // 3. Invalidate caches after successful transaction.
           this.invalidateUsageCache(memberId);
           this.invalidateBenefitsCache();
-          // Also clear the ads cache so the updated clicks count is visible.
           apiCache.delete('ads:all');
           apiCache.deleteByPrefix('ads:active:');
         } catch (error) {

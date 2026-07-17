@@ -37,6 +37,8 @@ export interface CreateBillParams {
   memberId?: string;
   /** Project ID — used for duplicate-bill detection on event payments */
   projectId?: string;
+  /** Membership year this bill covers, e.g. 2026 (falls back to current year if omitted) */
+  membershipYear?: number;
 }
 
 export interface ToyyibBillResponse {
@@ -172,7 +174,7 @@ export class ToyyibService {
         billpaymentStatus: '2',
         // BIZ-004: dedicated year field so the webhook can extract billYear even when
         // billName doesn't start with "YYYY " (e.g. "JCI KL Membership 2026").
-        year: new Date().getFullYear(),
+        year: params.membershipYear ?? new Date().getFullYear(),
         createdAt: serverTimestamp(),
       };
       if (params.memberId) billRecord.memberId = params.memberId;

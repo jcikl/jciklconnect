@@ -7,6 +7,7 @@ import {
   DataExportFilter
 } from '../../../types';
 import { DataImportExportService } from '../../../services/dataImportExportService';
+import { useAuth } from '../../../hooks/useAuth';
 import { Tabs, useToast } from '../../ui/Common';
 
 interface DataImportExportProps {
@@ -31,6 +32,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
   const { showToast } = useToast();
 
   const entityTypes = [
@@ -88,7 +90,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
       const result = await DataImportExportService.importData(
         data,
         importEntityType,
-        'current-user-id', // In real app, get from auth context
+        user?.uid ?? '',
         importFile.name
       );
 
@@ -125,7 +127,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
           exportEntityType,
           exportFields,
           [], // No filters for now
-          'current-user-id'
+          user?.uid ?? ''
         );
         filename = `${exportEntityType}_export_${new Date().toISOString().split('T')[0]}.csv`;
         mimeType = 'text/csv';
@@ -134,7 +136,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
           exportEntityType,
           exportFields,
           [], // No filters for now
-          'current-user-id'
+          user?.uid ?? ''
         );
         filename = `${exportEntityType}_export_${new Date().toISOString().split('T')[0]}.xlsx`;
         mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -157,7 +159,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
         entityType: exportEntityType as any,
         format: exportFormat,
         fields: exportFields,
-        requestedBy: 'current-user-id',
+        requestedBy: user?.uid ?? '',
         requestedAt: new Date(),
         status: 'completed',
         downloadUrl: url

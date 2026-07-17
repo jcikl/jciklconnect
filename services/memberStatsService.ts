@@ -67,8 +67,9 @@ export class MemberStatsService {
 
       // Basic counts
       const totalMembers = membersInPeriod.length;
+      const currentYearStr = String(currentYear);
       const activeMembers = membersInPeriod.filter(
-        m => m.duesStatus === 'Paid' && m.attendanceRate > 0
+        m => m.membership?.[currentYearStr]?.status === 'paid' && (m.attendanceCheckins ?? 0) > 0
       ).length;
 
       // New members
@@ -107,7 +108,11 @@ export class MemberStatsService {
       const totalPoints = membersInPeriod.reduce((sum, m) => sum + m.points, 0);
       const averagePoints = totalMembers > 0 ? totalPoints / totalMembers : 0;
 
-      const totalAttendance = membersInPeriod.reduce((sum, m) => sum + m.attendanceRate, 0);
+      const totalAttendance = membersInPeriod.reduce((sum, m) => {
+        const checkins = m.attendanceCheckins ?? 0;
+        const months = Math.max(m.attendanceMonths ?? 1, 1);
+        return sum + (checkins / months) * 100;
+      }, 0);
       const averageAttendanceRate = totalMembers > 0 ? totalAttendance / totalMembers : 0;
 
       // Churn risk distribution

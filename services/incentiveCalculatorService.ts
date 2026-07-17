@@ -161,8 +161,10 @@ export class IncentiveCalculatorService {
      * Logic: BOD Meeting frequency
      */
     private static async calcBODMeetings(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: IncentiveMilestone[] }> {
+        // P1 fix: BOD meetings are stored as project documents in COLLECTIONS.PROJECTS,
+        // not in COLLECTIONS.EVENTS (which is an alias). Use PROJECTS to match actual data.
         const q = query(
-            collection(db, COLLECTIONS.EVENTS),
+            collection(db, COLLECTIONS.PROJECTS),
             where('loId', '==', loId),
             where('type', '==', 'Meeting'),
             where('status', '==', 'Completed')
@@ -243,13 +245,17 @@ export class IncentiveCalculatorService {
 
         const achieved: IncentiveMilestone[] = [];
 
+        // P1 fix: events are stored as project documents in COLLECTIONS.PROJECTS.
+        // Filter by eventStartDate != null to exclude non-event project documents.
         const q = query(
-            collection(db, COLLECTIONS.EVENTS),
+            collection(db, COLLECTIONS.PROJECTS),
             where('loId', '==', loId),
             where('status', '==', 'Completed')
         );
         const snapshot = await getDocs(q);
-        const events = snapshot.docs.map(d => d.data());
+        const events = snapshot.docs
+            .map(d => d.data())
+            .filter(d => d.eventStartDate != null || d.date != null);
 
         for (const ms of standard.milestones) {
             if (!ms.activityType) continue;
@@ -286,17 +292,21 @@ export class IncentiveCalculatorService {
 
         if (snapshot.empty) {
             // Create new auto-approved submission
+            // P1 fix: submitIncentiveClaim creates the record as PENDING (it doesn't write
+            // APPROVED directly). We must call approveClaim afterwards to update the status,
+            // award points, and update loStarProgress atomically.
             const submission: any = {
                 standardId: standard.id,
                 loId,
                 quantity,
                 scoreAwarded: score,
-                status: 'APPROVED',
+                status: 'PENDING',
                 evidenceText: `Auto-calculated${milestoneId ? ` for milestone ${milestoneId}` : ''} by system on ${new Date().toLocaleDateString()}`
             };
             if (milestoneId) submission.milestoneId = milestoneId;
 
-            await PointsService.submitIncentiveClaim(submission);
+            const submissionId = await PointsService.submitIncentiveClaim(submission);
+            await PointsService.approveClaim(submissionId, score, 'system');
         } else {
             // Update existing if it was an auto-submission
             const sub = snapshot.docs[0];

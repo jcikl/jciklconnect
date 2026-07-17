@@ -104,8 +104,8 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   useEffect(() => {
-    ProjectsService.getAllProjects().then(setProjects).catch(() => { });
-    FinanceService.getAllBankAccounts(false).then(setBankAccounts).catch(() => { });
+    ProjectsService.getAllProjects().then(setProjects).catch((e) => { console.error(e); showToast('参考数据加载失败，部分字段可能显示为空', 'warning'); });
+    FinanceService.getAllBankAccounts(false).then(setBankAccounts).catch((e) => { console.error(e); showToast('参考数据加载失败，部分字段可能显示为空', 'warning'); });
   }, []);
 
   // Check for auto-open and preselected values from Events Management page
@@ -278,6 +278,12 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   };
 
   const handleDeletePR = async (id: string) => {
+    const DELETABLE_STATUSES: PaymentRequestStatus[] = ['draft', 'cancelled', 'rejected'];
+    const pr = [...myList, ...financeList].find(p => p.id === id);
+    if (pr && !DELETABLE_STATUSES.includes(pr.status)) {
+      showToast('只能删除草稿、已取消或已拒绝的申请', 'error');
+      return;
+    }
     if (!confirm('Permanently delete this payment request? This cannot be undone.')) return;
     setActioningId(id);
     try {

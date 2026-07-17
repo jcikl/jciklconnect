@@ -10,8 +10,10 @@ export const trimCloudinaryImage = (url: string): string => {
   return url.replace('/image/upload/', '/image/upload/e_trim/');
 };
 
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'drpa1zcmp';
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'jciklconnect';
+const CLOUD_NAME: string = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+if (!CLOUD_NAME) throw new Error('VITE_CLOUDINARY_CLOUD_NAME env var is not set');
+const UPLOAD_PRESET: string = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+if (!UPLOAD_PRESET) throw new Error('VITE_CLOUDINARY_UPLOAD_PRESET env var is not set');
 const MEMBER_AVATAR_ASSET_ROOT = import.meta.env.VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT || 'jciklconnect';
 
 type MemberAvatarFolderSource = {
@@ -228,23 +230,10 @@ export const uploadToCloudinary = (
  */
 export const getPublicIdFromUrl = (url: string): string | null => {
   try {
-    const parts = url.split('/image/upload/');
-    if (parts.length < 2) return null;
-    
-    let path = parts[1];
-    const firstSlashIndex = path.indexOf('/');
-    if (firstSlashIndex !== -1) {
-      const maybeVersion = path.substring(0, firstSlashIndex);
-      if (maybeVersion.startsWith('v') && /^\d+$/.test(maybeVersion.substring(1))) {
-        path = path.substring(firstSlashIndex + 1);
-      }
-    }
-    
-    const dotIndex = path.lastIndexOf('.');
-    if (dotIndex !== -1) {
-      path = path.substring(0, dotIndex);
-    }
-    
+    // Support image, video, and raw resource types; optionally skip version segment (vNNNNNN/)
+    const match = url.match(/(?:image|video|raw)\/upload\/(?:v\d+\/)?(.+)/);
+    if (!match) return null;
+    const path = match[1].replace(/\.[^/.]+$/, '');
     return decodeURIComponent(path);
   } catch (err) {
     console.error('Failed to parse Cloudinary public ID:', err);

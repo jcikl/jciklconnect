@@ -14,6 +14,7 @@
 
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
 
 if (!getApps().length) {
   initializeApp({
@@ -52,7 +53,13 @@ exports.handler = async (event) => {
   }
   const idToken = authHeader.split('Bearer ')[1];
   try {
-    await getAuth().verifyIdToken(idToken);
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const memberDoc = await getFirestore().collection('members').doc(decodedToken.uid).get();
+    const role = memberDoc.data()?.role;
+    const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
+    if (!memberDoc.exists || !ALLOWED_ROLES.includes(role)) {
+      return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Insufficient permissions' }) };
+    }
   } catch {
     return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
   }

@@ -31,6 +31,7 @@ import {
   MentorshipStats
 } from '../../../services/mentorshipService';
 import { MembersService } from '../../../services/membersService';
+import { useAuth } from '../../../hooks/useAuth';
 import { useToast, Tabs } from '../../ui/Common';
 import * as Forms from '../../ui/Form';
 
@@ -53,6 +54,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'matching' | 'relationships'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [matchingCriteria, setMatchingCriteria] = useState<MentorshipCriteria>({});
+  const { user } = useAuth();
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -118,12 +120,12 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
         menteeId,
         score,
         factors,
-        'current-user' // In real app, get from auth context
+        user?.uid ?? ''
       );
 
       // Auto-approve high-scoring matches
       if (score >= 70) {
-        await MentorshipService.approveMentorMatch(match.id, 'current-user');
+        await MentorshipService.approveMentorMatch(match.id, user?.uid ?? '');
         showToast('High-quality match created and approved automatically', 'success');
       } else {
         showToast('Match suggestion created for review', 'info');

@@ -433,7 +433,9 @@ class RuleExecutionService {
 
   // Action implementation methods
   private async sendEmail(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: true, data: { messageId: `email_${Date.now()}`, sent: true } };
+    // P1 fix: was returning hard-coded ok:true (stub). Now returns a visible failure so
+    // automation dashboards can detect that email delivery is not yet wired up.
+    return { ok: false, reason: 'action type not yet implemented' };
   }
 
   private async sendNotification(config: any, data: any): Promise<ActionResult> {
@@ -465,16 +467,42 @@ class RuleExecutionService {
     }
   }
 
-  private async updateField(config: any, _data: any): Promise<ActionResult> {
-    return { ok: true, data: { updated: true, fieldPath: config.field } };
+  private async updateField(_config: any, _data: any): Promise<ActionResult> {
+    return { ok: false, reason: 'action type not yet implemented' };
   }
 
   private async createTask(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: true, data: { taskId: `task_${Date.now()}`, created: true } };
+    return { ok: false, reason: 'action type not yet implemented' };
   }
 
   private async awardPoints(config: any, data: any): Promise<ActionResult> {
-    return { ok: true, data: { pointsAwarded: config.points, memberId: data.member?.id } };
+    const memberId: string | undefined = config.memberId || data.member?.id;
+    const points: number | undefined = config.points;
+    if (!memberId || !points) {
+      return { ok: false, reason: `award_points requires memberId and points; got memberId=${memberId}, points=${points}` };
+    }
+    if (isDevMode()) {
+      return { ok: true, data: { pointsAwarded: points, memberId } };
+    }
+    try {
+      const { PointsService } = await import('./pointsService');
+      const txId = await PointsService.awardPoints(
+        memberId,
+        points,
+        config.category || 'automation',
+        config.description || 'Awarded by automation rule',
+        config.relatedEntityId,
+        config.relatedEntityType
+      );
+      return { ok: true, data: { pointsAwarded: points, memberId, txId } };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      errorLoggingService.logError(err, {
+        action: 'ruleExecutionService.awardPoints',
+        additionalData: { memberId, points, config },
+      });
+      return { ok: false, reason: err.message };
+    }
   }
 
   private async awardBadge(config: any, data: any): Promise<ActionResult> {
@@ -506,16 +534,16 @@ class RuleExecutionService {
     }
   }
 
-  private async triggerWorkflow(config: any, _data: any): Promise<ActionResult> {
-    return { ok: true, data: { workflowId: config.workflowId, triggered: true } };
+  private async triggerWorkflow(_config: any, _data: any): Promise<ActionResult> {
+    return { ok: false, reason: 'action type not yet implemented' };
   }
 
   private async callWebhook(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: true, data: { status: 200, response: 'OK' } };
+    return { ok: false, reason: 'action type not yet implemented' };
   }
 
   private async logEvent(_config: any, _data: any): Promise<ActionResult> {
-    return { ok: true, data: { eventId: `log_${Date.now()}`, logged: true } };
+    return { ok: false, reason: 'action type not yet implemented' };
   }
 }
 

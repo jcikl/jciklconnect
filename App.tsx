@@ -146,6 +146,8 @@ export const JCIKLApp: React.FC = () => {
   const [initialSelectedProjectId, setInitialSelectedProjectId] = useState<string | null>(null);
   const [initialSelectedBusinessId, setInitialSelectedBusinessId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   const { isBatchMode } = useBatchMode();
   const { showBanner: showInstallBanner, triggerInstall, dismiss: dismissInstall } = useInstallPrompt();
@@ -437,7 +439,8 @@ export const JCIKLApp: React.FC = () => {
 
         // If the current view is a GUEST view, switch to DASHBOARD
         // Otherwise, keep the current view (likely restored from localStorage)
-        if (view.startsWith('GUEST')) {
+        // Read viewRef.current to avoid stale closure without adding view to deps
+        if (viewRef.current.startsWith('GUEST')) {
           setView('DASHBOARD');
         }
         setSearchQuery('');

@@ -1082,6 +1082,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                   <Input
                     type="number"
                     step="0.01"
+                    min="0.01"
                     placeholder="0.00"
                     value={projectTrxAddForm.amount || ''}
                     onChange={(e) => setProjectTrxAddForm({ ...projectTrxAddForm, amount: parseFloat(e.target.value) || undefined })}
@@ -1121,7 +1122,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                 <div className="md:col-span-2 flex gap-2">
                   <Button
                     type="button"
-                    onClick={handleAddProjectTrx}
+                    onClick={() => {
+                      const amt = projectTrxAddForm.amount;
+                      if (!amt || amt <= 0) { showToast('金额必须大于 0', 'error'); return; }
+                      handleAddProjectTrx();
+                    }}
                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2"
                   >
                     Add
@@ -1277,6 +1282,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                                 <Input
                                   type="number"
                                   step="0.01"
+                                  min="0.01"
                                   className="py-1 px-2 text-xs text-right"
                                   value={projectTrxEditForm.amount || ''}
                                   onChange={(e) => setProjectTrxEditForm({ ...projectTrxEditForm, amount: parseFloat(e.target.value) || undefined })}

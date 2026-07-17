@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useToast } from '../components/ui/Common';
 import {
   collection,
   query,
@@ -27,6 +28,7 @@ export function useNotifications(memberId: string | undefined): UseNotifications
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (!memberId) {
@@ -72,17 +74,32 @@ export function useNotifications(memberId: string | undefined): UseNotifications
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAsRead = useCallback(async (notificationId: string) => {
-    await CommunicationService.markNotificationAsRead(notificationId);
-  }, []);
+    try {
+      await CommunicationService.markNotificationAsRead(notificationId);
+    } catch (err) {
+      console.error('[useNotifications] markAsRead error:', err);
+      showToast('操作失败，请重试', 'error');
+    }
+  }, [showToast]);
 
   const markAllAsRead = useCallback(async () => {
     if (!memberId) return;
-    await CommunicationService.markAllAsRead(memberId);
-  }, [memberId]);
+    try {
+      await CommunicationService.markAllAsRead(memberId);
+    } catch (err) {
+      console.error('[useNotifications] markAllAsRead error:', err);
+      showToast('操作失败，请重试', 'error');
+    }
+  }, [memberId, showToast]);
 
   const deleteNotification = useCallback(async (notificationId: string) => {
-    await CommunicationService.deleteNotification(notificationId);
-  }, []);
+    try {
+      await CommunicationService.deleteNotification(notificationId);
+    } catch (err) {
+      console.error('[useNotifications] deleteNotification error:', err);
+      showToast('操作失败，请重试', 'error');
+    }
+  }, [showToast]);
 
   return { notifications, unreadCount, loading, error, markAsRead, markAllAsRead, deleteNotification };
 }

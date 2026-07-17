@@ -8,6 +8,7 @@ import {
     updateDoc,
     deleteDoc,
     writeBatch,
+    arrayUnion,
     query,
     where,
     orderBy,
@@ -178,6 +179,9 @@ export class GamificationService {
                     batch.set(badgeAwardRef, awardData);
 
                     // Write 3: Append badge to member's display list (skip if already present)
+                    // P1 fix: use arrayUnion instead of spread to avoid concurrent overwrites
+                    // where two simultaneous badge awards could each read the same stale
+                    // currentBadges array and the second write loses the first badge.
                     if (member && !alreadyAwarded) {
                         const userBadge: UserBadge = {
                             id: awardId,
@@ -187,7 +191,7 @@ export class GamificationService {
                             earnedDate: new Date().toISOString()
                         };
                         const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-                        batch.update(memberRef, { badges: [...currentBadges, userBadge] });
+                        batch.update(memberRef, { badges: arrayUnion(userBadge) });
                     }
 
                     await batch.commit();

@@ -84,14 +84,30 @@ exports.handler = async (event) => {
     const otherMemberIds = allSnap.docs.map(d => d.id).filter(id => !birthdayIds.has(id));
     const birthdayNames = birthdayMembers.map(m => m.name).join(' & ');
 
+    const today = now.toISOString().split('T')[0];
+
+    const sendIfNotSent = async (memberId, sendFn) => {
+      const sentKey = memberId + '_' + today;
+      const sentRef = db.collection('birthdayNotificationsSent').doc(sentKey);
+      const alreadySent = await sentRef.get();
+      if (alreadySent.exists) {
+        console.log(`Already sent to ${memberId} today, skipping.`);
+        return;
+      }
+      await sendFn();
+      await sentRef.set({ sentAt: new Date().toISOString() });
+    };
+
     await Promise.all([
       ...birthdayMembers.map(({ id, name }) =>
-        sendFcmPush(id, `Happy Birthday, ${name}!`, 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.', 'birthday_self')
-          .catch(err => console.error(`Push failed for ${id}:`, err))
+        sendIfNotSent(id, () =>
+          sendFcmPush(id, `Happy Birthday, ${name}!`, 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.', 'birthday_self')
+        ).catch(err => console.error(`Push failed for ${id}:`, err))
       ),
       ...otherMemberIds.map(id =>
-        sendFcmPush(id, 'Birthday Today!', `Today is ${birthdayNames}'s birthday! Send them your wishes.`, 'birthday_announcement', { names: birthdayNames })
-          .catch(err => console.error(`Announcement failed for ${id}:`, err))
+        sendIfNotSent(id, () =>
+          sendFcmPush(id, 'Birthday Today!', `Today is ${birthdayNames}'s birthday! Send them your wishes.`, 'birthday_announcement', { names: birthdayNames })
+        ).catch(err => console.error(`Announcement failed for ${id}:`, err))
       ),
     ]);
 

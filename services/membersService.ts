@@ -138,10 +138,13 @@ export class MembersService {
             orderBy('updatedAt', 'desc')
           );
         } else {
-          q = query(collection(db, COLLECTIONS.MEMBERS));
+          q = query(collection(db, COLLECTIONS.MEMBERS), limit(500));
         }
         const snapshot = await getDocs(q);
         const docs = snapshot.docs.map(d => ({ ...(d.data() as Omit<Member, 'id'>), id: d.id } as Member));
+        if (docs.length === 500) {
+          console.warn('[MembersService] getAllMembers hit limit(500), results may be incomplete');
+        }
 
         if (docs.length === 0 && isDevMode()) {
           const list = normalised

@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
+import { getAuth } from 'firebase/auth';
 import { errorLoggingService } from '../../services/errorLoggingService';
 
 interface Props {
@@ -64,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
       url: window.location.href,
-      userId: localStorage.getItem('userId') || 'anonymous',
+      userId: getAuth().currentUser?.uid ?? 'anonymous',
       errorId: this.state.errorId
     };
 

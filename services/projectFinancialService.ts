@@ -82,6 +82,7 @@ class ProjectFinancialService {
     data: CreateProjectAccountData,
     createdBy: string
   ): Promise<ProjectFinancialAccount> {
+    if (!isDevMode()) throw new Error('[ProjectFinancialService] This method is not implemented for production. Data will not persist. Please use Firestore directly or contact the development team.');
     const accountId = `proj_acc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
@@ -146,6 +147,7 @@ class ProjectFinancialService {
     data: RecordTransactionData,
     createdBy: string
   ): Promise<ProjectTransaction> {
+    if (!isDevMode()) throw new Error('[ProjectFinancialService] This method is not implemented for production. Data will not persist. Please use Firestore directly or contact the development team.');
     const account = this.accounts.get(financialAccountId);
     if (!account) {
       throw new Error('Project financial account not found');
@@ -477,6 +479,7 @@ class ProjectFinancialService {
     categoryId: string,
     updates: Partial<Pick<BudgetCategory, 'name' | 'allocatedAmount' | 'description' | 'color'>>
   ): Promise<BudgetCategory> {
+    if (!isDevMode()) throw new Error('[ProjectFinancialService] This method is not implemented for production. Data will not persist. Please use Firestore directly or contact the development team.');
     const account = this.accounts.get(financialAccountId);
     if (!account) {
       throw new Error('Project financial account not found');
@@ -505,6 +508,7 @@ class ProjectFinancialService {
     financialAccountId: string,
     categoryData: Omit<BudgetCategory, 'id' | 'spentAmount'>
   ): Promise<BudgetCategory> {
+    if (!isDevMode()) throw new Error('[ProjectFinancialService] This method is not implemented for production. Data will not persist. Please use Firestore directly or contact the development team.');
     const account = this.accounts.get(financialAccountId);
     if (!account) {
       throw new Error('Project financial account not found');
@@ -891,6 +895,7 @@ class ProjectFinancialService {
    * Delete project financial account
    */
   async deleteProjectFinancialAccount(financialAccountId: string): Promise<boolean> {
+    if (!isDevMode()) throw new Error('[ProjectFinancialService] This method is not implemented for production. Data will not persist. Please use Firestore directly or contact the development team.');
     const deleted = this.accounts.delete(financialAccountId);
     this.transactions.delete(financialAccountId);
     return deleted;

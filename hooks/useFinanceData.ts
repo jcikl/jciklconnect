@@ -6,6 +6,9 @@
 // Do not attempt the split without a dedicated test pass; the hooks are deeply coupled via
 // computed memos that depend on both data and filter state.
 import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
+import { writeBatch, doc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 import { useToast } from '../components/ui/Common';
 import { usePermissions } from './usePermissions';
 import { useAuth } from './useAuth';
@@ -886,35 +889,36 @@ export function useFinanceData(searchQuery?: string) {
 
     const sorted = [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    let rb = 0;
-    if (bankAccountFilter !== 'All') {
-      const selectedAccount = accounts.find(acc => acc.id === bankAccountFilter);
-      const initBal = selectedAccount?.initialBalance || 0;
-      const prevFlow = historicalNetFlows[bankAccountFilter] || 0;
-      rb = initBal + prevFlow;
-    } else {
-      const initBal = accounts.reduce((sum, acc) => sum + (acc.initialBalance || 0), 0);
-      const prevFlow = Object.values(historicalNetFlows).reduce((sum, val) => sum + val, 0);
-      rb = initBal + prevFlow;
-    }
-
-    const withBalance = sorted.map(tx => {
-      const amountChange = tx.type === 'Income' ? tx.amount : -tx.amount;
-      rb += amountChange;
-      return { ...tx, runningBalance: rb };
-    });
-
-    const totalTransactions = [...withBalance].reverse();
+    // Running balance is calculated in visibleTransactions after txType/txStatus filters are applied
+    // so that it reflects only the transactions the user actually sees.
+    const totalTransactions = [...sorted].reverse();
     return totalTransactions.slice(0, transactionLimit);
   }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, accounts, projects, transactionSplits, transactionLimit, historicalNetFlows, searchQuery]);
 
   const visibleTransactions = useMemo(() => {
-    return displayTransactions.filter(tx => {
+    const filtered = displayTransactions.filter(tx => {
       if (txTypeFilter !== 'All' && tx.type !== txTypeFilter) return false;
       if (txStatusFilter !== 'All' && tx.status !== txStatusFilter) return false;
       return true;
     });
-  }, [displayTransactions, txTypeFilter, txStatusFilter]);
+
+    // Running balance is computed here — after ALL filters (category, bank, search, type, status)
+    // are applied — so it reflects exactly what the user sees, oldest to newest, then reversed.
+    const chronological = [...filtered].reverse();
+    let rb = 0;
+    if (bankAccountFilter !== 'All') {
+      const selectedAccount = accounts.find(acc => acc.id === bankAccountFilter);
+      rb = (selectedAccount?.initialBalance || 0) + (historicalNetFlows[bankAccountFilter] || 0);
+    } else {
+      rb = accounts.reduce((sum, acc) => sum + (acc.initialBalance || 0), 0)
+        + Object.values(historicalNetFlows).reduce((sum, val) => sum + val, 0);
+    }
+    const withBalance = chronological.map(tx => {
+      rb += tx.type === 'Income' ? tx.amount : -tx.amount;
+      return { ...tx, runningBalance: rb };
+    });
+    return [...withBalance].reverse();
+  }, [displayTransactions, txTypeFilter, txStatusFilter, bankAccountFilter, accounts, historicalNetFlows]);
 
   const groupedTransactions = useMemo(() => {
     const groups: { key: string; label: string; txs: typeof visibleTransactions }[] = [];
@@ -1133,7 +1137,7 @@ export function useFinanceData(searchQuery?: string) {
           );
         }
 
-        const allTx = await FinanceService.getAllTransactions();
+        const allTx = await FinanceService.getAllTransactions(reportYear);
         allTx.forEach(t => {
           if (t.projectId === projectId && t.purpose) purposes.add(t.purpose);
         });
@@ -1168,7 +1172,7 @@ export function useFinanceData(searchQuery?: string) {
     loadPurposesForProject();
     return () => { ignore = true; };
   // editingProjectPurposesByProject intentionally excluded — fetchedProjectPurposesRef guards re-fetch
-  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category, showToast]);
+  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category, reportYear, showToast]);
 
   useEffect(() => {
     let ignore = false;
@@ -1341,14 +1345,18 @@ export function useFinanceData(searchQuery?: string) {
 
     try {
       const tx = transactions.find(t => t.id === transactionId);
+      const batch = writeBatch(db);
+
       if (tx?.isSplit) {
         const splits = await FinanceService.getTransactionSplits(transactionId);
-        for (const split of splits) {
-          await FinanceService.deleteTransactionSplit(split.id);
-        }
+        splits.forEach(split => {
+          batch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
+        });
       }
 
-      await FinanceService.deleteTransaction(transactionId);
+      batch.delete(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+      await batch.commit();
+
       showToast('Transaction deleted successfully', 'success');
       await loadData();
     } catch (err) {
@@ -1491,12 +1499,16 @@ export function useFinanceData(searchQuery?: string) {
         txResults.push(...chunkResults);
       }
 
-      const splitResults = Array.from(selectedSplitIds).map(() => {
+      // Split-level approve is not supported — splits inherit the parent transaction's status.
+      // Notify the user and skip (do not count as success).
+      if (selectedSplitIds.size > 0) {
+        showToast('Split 状态更新暂不支持，请通过父交易操作', 'warning');
+      }
+      Array.from(selectedSplitIds).forEach(() => {
         setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-        return { success: true };
       });
 
-      successCount = txResults.filter(r => r.success).length + splitResults.length;
+      successCount = txResults.filter(r => r.success).length;
       failCount = txResults.filter(r => !r.success).length;
 
       showToast(

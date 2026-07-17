@@ -180,6 +180,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [pendingOnly, setPendingOnly] = useState(false);
   const [promotingConfirmId, setPromotingConfirmId] = useState<string | null>(null);
   const [quickPromotingId, setQuickPromotingId] = useState<string | null>(null);
+  const [isPromoting, setIsPromoting] = useState(false);
   const { member: currentUser } = useAuth();
   const { showToast } = useToast();
 
@@ -389,7 +390,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       const results = await EngagementAutoSuggestService.runAutoSuggest(
         selectedMemberId,
         selectedEngagementYear,
-        'bod' // placeholder â€” replace with actual user ID from auth context
+        currentUser?.id ?? ''
       );
       const suggested = results.filter(r => !r.skipped).length;
       const skipped = results.filter(r => r.skipped).length;
@@ -423,7 +424,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         selectedMemberId,
         selectedEngagementYear,
         requirementKey,
-        'bod'
+        currentUser?.id ?? ''
       );
       showToast('Suggestion approved', 'success');
       const refreshed = await MembersService.getMemberById(selectedMemberId);
@@ -454,7 +455,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         selectedMemberId,
         selectedEngagementYear,
         requirementKey,
-        'bod'
+        currentUser?.id ?? ''
       );
       showToast('Suggestion rejected', 'success');
       const refreshed = await MembersService.getMemberById(selectedMemberId);
@@ -481,7 +482,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     const k = `${memberId}_${requirementKey}`;
     setInlineApprovingKey(k);
     try {
-      await EngagementAutoSuggestService.approveSuggestion(memberId, year, requirementKey, 'bod');
+      await EngagementAutoSuggestService.approveSuggestion(memberId, year, requirementKey, currentUser?.id ?? '');
       showToast('Suggestion approved', 'success');
       const refreshed = await MembersService.getMemberById(memberId);
       if (refreshed) {
@@ -503,7 +504,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     const k = `${memberId}_${requirementKey}`;
     setInlineRejectingKey(k);
     try {
-      await EngagementAutoSuggestService.rejectSuggestion(memberId, year, requirementKey, 'bod');
+      await EngagementAutoSuggestService.rejectSuggestion(memberId, year, requirementKey, currentUser?.id ?? '');
       showToast('Suggestion rejected', 'success');
       const refreshed = await MembersService.getMemberById(memberId);
       if (refreshed) {
@@ -562,7 +563,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     for (let i = 0; i < members.length; i++) {
       setBulkProgress({ current: i + 1, total: members.length });
       try {
-        const results = await EngagementAutoSuggestService.runAutoSuggest(members[i].id, year, 'bod');
+        const results = await EngagementAutoSuggestService.runAutoSuggest(members[i].id, year, currentUser?.id ?? '');
         suggested += results.filter(r => !r.skipped).length;
       } catch { /* skip member on error */ }
     }
@@ -573,6 +574,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   };
 
   const handlePromoteMember = async (memberId: string, method: 'automatic' | 'manual' = 'automatic') => {
+    setIsPromoting(true);
     try {
       const promotion = await PromotionService.promoteToOfficialMember(
         memberId,
@@ -590,6 +592,8 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to promote member', 'error');
+    } finally {
+      setIsPromoting(false);
     }
   };
 
@@ -1225,9 +1229,9 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             {/* Action Buttons */}
             <div className="flex gap-3">
               {promotionProgress.isEligibleForPromotion ? (
-                <Button className="flex-1" onClick={() => handlePromoteMember(promotionProgress.memberId, 'automatic')}>
+                <Button className="flex-1" disabled={isPromoting} onClick={() => handlePromoteMember(promotionProgress.memberId, 'automatic')}>
                   <Award size={16} className="mr-2" />
-                  Promote to Full Member
+                  {isPromoting ? '晋升中...' : 'Promote to Full Member'}
                 </Button>
               ) : (
                 <Button variant="outline" className="flex-1" onClick={() => setShowManualPromotionModal(true)}>

@@ -95,8 +95,8 @@ export class PointsService {
       relatedEntityType = sourceTypeOrRelatedEntityType;
     }
 
-    if (!Number.isFinite(points) || points <= 0) {
-      throw new Error('Points must be a positive finite number');
+    if (!Number.isFinite(points) || points === 0) {
+      throw new Error('Points must be a non-zero finite number');
     }
 
     return withDevMode(
@@ -146,12 +146,13 @@ export class PointsService {
           const yearlyField = `yearlyPoints.${awardYear}`;
 
           // Atomic batch: create points record + update member totals in one commit
+          // Use increment() for points and yearlyField to avoid read-then-write race conditions.
           const batch = writeBatch(db);
           batch.set(pointsDocRef, transaction);
           batch.update(memberRef, {
-            points: newPoints,
+            points: increment(points),
             tier,
-            [yearlyField]: (memberSnap.data()[`yearlyPoints`]?.[awardYear] || 0) + points,
+            [yearlyField]: increment(points),
             updatedAt: Timestamp.now(),
           });
           await batch.commit();
@@ -2080,6 +2081,11 @@ export class PointsService {
       const tier = this.calculateTier(totalPoints);
 
       // 6. Update Member doc
+      // P0 fix: do NOT write points or tier here — those fields are owned exclusively
+      // by awardPoints. Writing them here would overwrite the canonical accumulated value
+      // with a radar-computed approximation, erasing all non-radar points.
+      // Store the radar aggregate in a separate field (radarTotalPoints) so it can be
+      // displayed on the radar chart without interfering with the points ledger.
       await updateDoc(memberRef, {
         'jciCareer.radarStats': {
           leadership,
@@ -2095,8 +2101,7 @@ export class PointsService {
           sponsorship,
           events
         },
-        points: totalPoints,
-        tier,
+        radarTotalPoints: totalPoints,
         updatedAt: Timestamp.now()
       });
 

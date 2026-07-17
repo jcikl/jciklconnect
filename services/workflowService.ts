@@ -194,10 +194,8 @@ export class WorkflowService {
       () => {},
       async () => {
         try {
-          // Delete the workflow document first.
-          await deleteDoc(doc(db, WF_COL(), workflowId));
-
-          // Batch-archive all execution records in pages of 400 (Firestore batch limit = 500).
+          // P1 — archive all execution records BEFORE deleting the parent workflow
+          // so that execution records are not orphaned on partial failure.
           let hasMore = true;
           while (hasMore) {
             const execSnap = await getDocs(
@@ -219,6 +217,9 @@ export class WorkflowService {
             // If fewer than 400 came back, we've processed the last page.
             if (execSnap.docs.length < 400) hasMore = false;
           }
+
+          // Delete the parent workflow document only after executions are archived.
+          await deleteDoc(doc(db, WF_COL(), workflowId));
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'WorkflowService.deleteWorkflow', additionalData: { workflowId } });
           throw error;

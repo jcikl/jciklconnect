@@ -1,6 +1,7 @@
 // Reconciliation Service - Auto-matching & splitting bank transactions with project transactions
 import { Transaction, TransactionSplit } from '../types';
 import { FinanceService } from './financeService';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface MatchResult {
   bankTxId: string;
@@ -834,8 +835,9 @@ export class ReconciliationService {
 
     try {
       await FinanceService.updateProjectTransaction(projectTxId, updates);
-    } catch {
-      // Silently skip
+    } catch (err) {
+      console.warn('[ReconciliationService] removeProjectTxMatchEntry partially failed', err);
+      errorLoggingService.logError(err as Error, { component: 'ReconciliationService' });
     }
   }
 }

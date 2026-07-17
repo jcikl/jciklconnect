@@ -12,6 +12,7 @@ import {
   where,
   orderBy,
   limit,
+  increment,
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -255,7 +256,8 @@ export class AutomationService {
       // ── Fix P1: Build idempotency key to match workflowService schema ────────
       const triggerId: string =
         context.triggerId ?? context.entityId ?? triggeredBy ?? 'manual';
-      const idempotencyKey = `${workflowId}_${triggerId}_${executionStartTime}`;
+      // P1 — exclude timestamp so the same trigger never spawns a second execution
+      const idempotencyKey = `${workflowId}_${triggerId}`;
 
       // ── Fix P1: Recover stuck executions (running > 30 min) ─────────────────
       const thirtyMinutesAgo = Timestamp.fromMillis(Date.now() - 30 * 60 * 1000);
@@ -317,7 +319,11 @@ export class AutomationService {
           };
 
           try {
-            await this.executeStep(step, { ...context, executionId, workflowId });
+            const stepResult = await this.executeStep(step, { ...context, executionId, workflowId });
+            // P1 — propagate conditionResult back to outer context so subsequent steps can read it
+            if (step.type === 'conditional' && stepResult && stepResult.conditionResult !== undefined) {
+              context._conditionResult = stepResult.conditionResult;
+            }
             stepExecution.completedAt = new Date().toISOString();
             stepExecution.duration = Date.now() - stepStartTime;
             executedSteps.push(stepExecution);
@@ -349,9 +355,9 @@ export class AutomationService {
           ...(executionError && { error: executionError }),
         });
 
-        // Update workflow execution count
+        // Update workflow execution count — P1: use increment() to avoid race
         await updateDoc(doc(db, COLLECTIONS.WORKFLOWS, workflowId), {
-          executions: workflow.executions + 1,
+          executions: increment(1),
           lastExecuted: Timestamp.now(),
         });
 
@@ -390,7 +396,7 @@ export class AutomationService {
   }
 
   // Execute a single workflow step
-  private static async executeStep(step: WorkflowStep, context: Record<string, any>): Promise<void> {
+  private static async executeStep(step: WorkflowStep, context: Record<string, any>): Promise<{ conditionResult?: boolean } | void> {
     switch (step.type) {
       case 'send_email':
         try {
@@ -565,9 +571,8 @@ export class AutomationService {
         if (process.env.NODE_ENV === 'development') {
           console.log(`Condition evaluated: ${conditionMet}`, condition);
         }
-        // This would affect which steps execute next
-        context._conditionResult = conditionMet;
-        break;
+        // P1 — return result so the caller can persist it on the outer context
+        return { conditionResult: conditionMet };
       }
 
       default:

@@ -52,8 +52,10 @@ export const formatDateToDDMMMYYYY = (date: any): string => {
   return `${day} ${month} ${year}`;
 };
 
-export const formatDateTime = (date: string | Date): string => {
+export const formatDateTime = (date: string | Date | null | undefined): string => {
+  if (!date) return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -63,16 +65,20 @@ export const formatDateTime = (date: string | Date): string => {
   });
 };
 
-export const formatTime = (date: string | Date): string => {
+export const formatTime = (date: string | Date | null | undefined): string => {
+  if (!date) return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
 };
 
-export const getRelativeTime = (date: string | Date): string => {
+export const getRelativeTime = (date: string | Date | null | undefined): string => {
+  if (!date) return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '—';
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - d.getTime()) / 1000);
   
@@ -140,12 +146,15 @@ export const getMYTTodayStr = (): string => {
 };
 
 export const getStartOfYear = (year?: number): Date => {
-  const y = year || new Date().getFullYear();
-  return new Date(y, 0, 1);
+  const y = year || getMYTYear();
+  // 1 Jan 00:00 MYT (UTC+8) expressed as a fixed-offset ISO string — avoids
+  // local-time ambiguity on machines outside Malaysia.
+  return new Date(`${y}-01-01T00:00:00+08:00`);
 };
 
 export const getEndOfYear = (year?: number): Date => {
-  const y = year || new Date().getFullYear();
-  return new Date(y, 11, 31, 23, 59, 59, 999);
+  const y = year || getMYTYear();
+  // 31 Dec 23:59:59.999 MYT (UTC+8)
+  return new Date(`${y}-12-31T23:59:59.999+08:00`);
 };
 

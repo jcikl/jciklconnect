@@ -388,25 +388,13 @@ export class EventsService {
           const event = await this.getEventById(eventId);
           if (!event) throw new Error('Event not found');
 
-          // P0 FIX: use a single writeBatch so the registration status update and
-          // the event counter decrement are committed atomically.
-          // Finance-tx cleanup is async and must happen BEFORE the batch commit
-          // (we need the tx data while it still exists), so it runs first.
+          // P1 FIX: commit the registration status change FIRST (atomically with the event
+          // counter decrement), then delete the finance transaction. If finance deletion
+          // fails, it only means a stale Pending income record survives — much safer than
+          // the previous order where finance was deleted before the batch commit, leaving
+          // the member still showing as 'registered' if the batch then failed.
           const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
           const financeTransactionId: string | undefined = reg?.financeTransactionId ?? undefined;
-
-          // Delete linked finance transaction BEFORE flipping status to 'cancelled'.
-          if (financeTransactionId) {
-            try {
-              const { FinanceService } = await import('./financeService');
-              const tx = await FinanceService.getTransactionById(financeTransactionId);
-              if (tx && (tx.status === 'Pending' || tx.status === 'Cleared')) {
-                await FinanceService.deleteTransaction(financeTransactionId);
-              }
-            } catch (txErr) {
-              console.warn('[EventsService.cancelRegistration] Could not delete tx', financeTransactionId, txErr);
-            }
-          }
 
           if (reg) {
             const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id);
@@ -425,6 +413,20 @@ export class EventsService {
               registeredMembers: arrayRemove(memberId),
             });
             await batch.commit();
+          }
+
+          // After status is committed, clean up the linked finance transaction (best effort).
+          if (financeTransactionId) {
+            try {
+              const { FinanceService } = await import('./financeService');
+              const tx = await FinanceService.getTransactionById(financeTransactionId);
+              if (tx && (tx.status === 'Pending' || tx.status === 'Cleared')) {
+                await FinanceService.deleteTransaction(financeTransactionId);
+              }
+            } catch (txErr) {
+              console.warn('[EventsService.cancelRegistration] Could not delete tx', financeTransactionId, txErr);
+              // Non-fatal: registration is already cancelled; finance team can void manually.
+            }
           }
           this.invalidateEventsCache();
         } catch (error) {
@@ -499,6 +501,16 @@ export class EventsService {
                 updatedAt: now,
               });
             }
+            // P1 fix: include the event status update in the first batch so the event
+            // document is marked 'Cancelled' atomically with its first batch of
+            // registration cancellations, avoiding a standalone updateDoc that could
+            // fail independently leaving registrations cancelled but the event still Active.
+            if (i === 0) {
+              batch.update(doc(db, COLLECTIONS.PROJECTS, eventId), {
+                status: 'Cancelled',
+                updatedAt: now,
+              });
+            }
             await batch.commit();
           }
 
@@ -560,10 +572,14 @@ export class EventsService {
           }
         }
 
-        await updateDoc(doc(db, COLLECTIONS.PROJECTS, eventId), {
-          status: 'Cancelled',
-          updatedAt: Timestamp.now(),
-        });
+        // Event status is now set inside the first batch chunk above (when active.length > 0).
+        // When there are no active registrations, we still need to mark the event Cancelled.
+        if (active.length === 0) {
+          await updateDoc(doc(db, COLLECTIONS.PROJECTS, eventId), {
+            status: 'Cancelled',
+            updatedAt: Timestamp.now(),
+          });
+        }
         this.invalidateEventsCache();
 
         // Best-effort notifications to all members whose registrations were cancelled

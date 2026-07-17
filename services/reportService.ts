@@ -301,7 +301,7 @@ export class ReportService {
       // Calculate project statistics
       const statusDistribution = this.calculateProjectStatusDistribution(filteredProjects);
       const averageCompletion = filteredProjects.length > 0
-        ? Math.round(filteredProjects.reduce((sum, p) => sum + p.completion, 0) / filteredProjects.length)
+        ? Math.round(filteredProjects.reduce((sum, p) => sum + (p.completion ?? 0), 0) / filteredProjects.length)
         : 0;
 
       return {
@@ -438,22 +438,24 @@ export class ReportService {
       lines.push('');
     }
 
+    const esc = (v: unknown) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+
     // Data
     if (Array.isArray(reportData.data)) {
       if (reportData.data.length > 0) {
         const headers = Object.keys(reportData.data[0]);
-        lines.push(headers.join(','));
+        lines.push(headers.map(h => esc(h)).join(','));
         reportData.data.forEach((row: any) => {
-          lines.push(headers.map(h => row[h] || '').join(','));
+          lines.push(headers.map(h => esc(row[h])).join(','));
         });
       }
     } else {
       lines.push('Data');
       Object.entries(reportData.data).forEach(([key, value]) => {
         if (Array.isArray(value)) {
-          lines.push(`${key},${value.length} items`);
+          lines.push(`${esc(key)},${esc(value.length + ' items')}`);
         } else {
-          lines.push(`${key},${value}`);
+          lines.push(`${esc(key)},${esc(value)}`);
         }
       });
     }

@@ -153,6 +153,18 @@ export const EventRegistrationService = {
         return id;
       },
       async () => {
+        // P1 fix: check for an existing non-cancelled registration before creating a new one.
+        // This prevents duplicate registrations when the user double-clicks or retries.
+        const dupCheck = await getDocs(query(
+          collection(db, COLLECTIONS.EVENT_REGISTRATIONS),
+          where('eventId', '==', eventId),
+          where('memberId', '==', memberId),
+          where('status', 'in', ['registered', 'paid', 'checked_in'])
+        ));
+        if (!dupCheck.empty) {
+          throw new Error('会员已注册此活动');
+        }
+
         const payload: Record<string, unknown> = {
           eventId,
           memberId,
@@ -294,26 +306,9 @@ export const EventRegistrationService = {
         const snap = await getDoc(ref);
         const financeTransactionId: string | undefined = snap.exists() ? snap.data().financeTransactionId : undefined;
 
-        // Clean up the linked income transaction before cancelling
-        if (financeTransactionId) {
-          try {
-            const { FinanceService } = await import('./financeService');
-            const tx = await FinanceService.getTransactionById(financeTransactionId);
-            if (tx) {
-              if (tx.status === 'Pending' || tx.status === 'Cleared') {
-                // Delete Pending or Cleared income tx — cancellation voids the revenue claim.
-                // A Cleared-then-left-as-Pending orphan would permanently inflate P&A income.
-                await FinanceService.deleteTransaction(financeTransactionId);
-              }
-              // Reconciled/Partially Reconciled — can't safely delete; leave for finance to void manually.
-              // Add a note so finance can trace the cancelled registration.
-            }
-          } catch (err) {
-            console.error('[EventRegistrationService.cancel] Could not clean up income tx:', err);
-            throw err;
-          }
-        }
-
+        // P1 fix: commit the status change FIRST, then clean up the finance transaction.
+        // If finance deletion fails, the registration is still properly cancelled and
+        // the finance team can void the transaction manually.
         await updateDoc(ref, {
           status: 'cancelled',
           cancelledAt: Timestamp.now(),
@@ -323,6 +318,22 @@ export const EventRegistrationService = {
           financeTransactionId: null,
           updatedAt: Timestamp.now(),
         });
+
+        if (financeTransactionId) {
+          try {
+            const { FinanceService } = await import('./financeService');
+            const tx = await FinanceService.getTransactionById(financeTransactionId);
+            if (tx) {
+              if (tx.status === 'Pending' || tx.status === 'Cleared') {
+                await FinanceService.deleteTransaction(financeTransactionId);
+              }
+              // Reconciled/Partially Reconciled — leave for finance to void manually.
+            }
+          } catch (err) {
+            // Non-fatal: registration is cancelled; warn so finance can clean up manually.
+            console.warn('[EventRegistrationService.cancel] Could not clean up income tx:', err);
+          }
+        }
       }
     );
   },

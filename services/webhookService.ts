@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { withDevMode } from '../utils/devMode';
+import { withDevMode, isDevMode } from '../utils/devMode';
 import { errorLoggingService } from './errorLoggingService';
 
 export interface Webhook {
@@ -176,6 +176,7 @@ export class WebhookService {
 
   // Trigger webhook
   static async triggerWebhook(webhookId: string, event: string, data: any): Promise<boolean> {
+    if (isDevMode()) { console.log('[WebhookService] dev mode — skipping real HTTP request'); return true; }
     const webhook = await this.getWebhookById(webhookId);
     if (!webhook || !webhook.active) {
       return false;
@@ -194,16 +195,26 @@ export class WebhookService {
         headers['X-Webhook-Signature'] = 'signature-placeholder';
       }
 
-      const response = await fetch(webhook.url, {
-        method: webhook.method,
-        headers,
-        body: webhook.method !== 'GET' ? JSON.stringify({
-          event,
-          data,
-          timestamp: new Date().toISOString(),
-          ...webhook.payload,
-        }) : undefined,
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      let response: Response;
+      try {
+        response = await fetch(webhook.url, {
+          method: webhook.method,
+          headers,
+          body: webhook.method !== 'GET' ? JSON.stringify({
+            event,
+            data,
+            timestamp: new Date().toISOString(),
+            ...webhook.payload,
+          }) : undefined,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+      } catch (err) {
+        clearTimeout(timeout);
+        throw err;
+      }
 
       const duration = Date.now() - startTime;
       const success = response.ok;
@@ -214,7 +225,7 @@ export class WebhookService {
         event,
         status: success ? 'success' : 'failed',
         responseCode: response.status,
-        responseBody: await response.text().catch(() => ''),
+        responseBody: (await response.text().catch(() => '')).slice(0, 2000),
         triggeredAt: new Date(),
         duration,
       });
@@ -302,7 +313,7 @@ export class WebhookService {
           event: data.event || '',
           status: data.status || 'pending',
           triggeredAt: (data.triggeredAt as Timestamp)?.toDate() || new Date(),
-          responseCode: data.responseStatus,
+          responseCode: data.responseCode,
           responseBody: data.responseBody,
           error: data.error,
           duration: data.duration || 0,

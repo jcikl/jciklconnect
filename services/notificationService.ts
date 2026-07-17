@@ -1,6 +1,7 @@
 import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
 import { doc, setDoc, deleteField, updateDoc } from 'firebase/firestore';
 import { app, db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
@@ -47,7 +48,7 @@ export async function registerPushNotifications(userId: string): Promise<string 
         const token = await getToken(m, { vapidKey: VAPID_KEY });
         if (token) {
           await setDoc(
-            doc(db, 'users', userId),
+            doc(db, COLLECTIONS.MEMBERS, userId),
             { fcmToken: token, fcmUpdatedAt: new Date().toISOString() },
             { merge: true }
           );
@@ -67,7 +68,7 @@ export async function unregisterPushNotifications(userId: string): Promise<void>
     () => {},
     async () => {
       try {
-        await updateDoc(doc(db, 'users', userId), { fcmToken: deleteField() });
+        await updateDoc(doc(db, COLLECTIONS.MEMBERS, userId), { fcmToken: deleteField() });
       } catch {
         // ignore — user may not have a token
       }

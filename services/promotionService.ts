@@ -423,50 +423,6 @@ export class PromotionService {
   static async checkAllRequirements(memberId: string): Promise<PromotionRequirement[]> {
     const member = await this.getMemberById(memberId);
     return member ? this.checkAllRequirementsForMember(member) : this.createBaseRequirements();
-
-    const requirements: PromotionRequirement[] = [
-      {
-        id: 'bod_meeting',
-        type: 'bod_meeting_attendance',
-        name: 'BOD Meeting Attendance',
-        description: 'Attend at least one Board of Directors meeting',
-        isCompleted: false
-      },
-      {
-        id: 'organizing_committee',
-        type: 'event_organizing_committee',
-        name: 'Event Organizing Committee',
-        description: 'Serve as organizing committee member for at least one event',
-        isCompleted: false
-      },
-      {
-        id: 'event_participation',
-        type: 'event_participation',
-        name: 'Event Participation',
-        description: 'Participate in at least two events',
-        isCompleted: false
-      },
-      {
-        id: 'jci_inspire',
-        type: 'jci_inspire_completion',
-        name: 'Course Completion',
-        description: 'Complete the JCIM Inspire course OR JCI KL New Membersâ€™ Orientation',
-        isCompleted: false
-      }
-    ];
-
-    // Check each requirement
-    for (const requirement of requirements) {
-      const completion = await this.checkRequirement(memberId, requirement.type);
-      if (completion) {
-        requirement.isCompleted = true;
-        requirement.completedAt = completion.completedAt;
-        requirement.completionDetails = completion.details;
-        requirement.evidence = completion.evidence;
-      }
-    }
-
-    return requirements;
   }
 
   /**
@@ -482,24 +438,6 @@ export class PromotionService {
   } | null> {
     const member = await this.getMemberById(memberId);
     return member ? this.getRequirementCompletionFromMember(member, requirementType) : null;
-
-    // In real implementation, this would query the database
-    switch (requirementType) {
-      case 'bod_meeting_attendance':
-        return this.checkBODMeetingAttendance(memberId);
-
-      case 'event_organizing_committee':
-        return this.checkEventOrganizingCommittee(memberId);
-
-      case 'event_participation':
-        return this.checkEventParticipation(memberId);
-
-      case 'jci_inspire_completion':
-        return this.checkJCIInspireCompletion(memberId);
-
-      default:
-        return null;
-    }
   }
 
   /**
@@ -641,11 +579,17 @@ export class PromotionService {
       status: 'pending'
     };
 
-    await this.saveManualPromotionRequest(request);
+    const savedId = await this.saveManualPromotionRequest(request);
 
-    // If override is true, perform promotion immediately to ensure roll and membershipType update
+    // If override is true, perform promotion immediately and mark request approved atomically
     if (overrideRequirements) {
       await this.promoteToOfficialMember(memberId, requestedBy, 'manual', reason);
+      await updateDoc(doc(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS, savedId), {
+        status: 'approved',
+        approvedBy: requestedBy,
+        approvedAt: serverTimestamp()
+      });
+      request.status = 'approved';
     }
 
     return request;
@@ -847,62 +791,6 @@ export class PromotionService {
     }));
   }
 
-  private static async checkBODMeetingAttendance(memberId: string) {
-    const member = await this.getMemberById(memberId);
-    const value = String(member?.promotionProgress?.bodMeetingAttended ?? '');
-    if (value && value.trim()) {
-      return {
-        completedAt: new Date(),
-        details: { meetingId: value },
-        evidence: [] as string[]
-      };
-    }
-    return null;
-  }
-
-  private static async checkEventOrganizingCommittee(memberId: string) {
-    const member = await this.getMemberById(memberId);
-    const value = String(member?.promotionProgress?.eventOrganizerParticipation ?? '');
-    if (value && value.trim()) {
-      return {
-        completedAt: new Date(),
-        details: { eventName: value },
-        evidence: [] as string[]
-      };
-    }
-    return null;
-  }
-
-  private static async checkEventParticipation(memberId: string) {
-    const member = await this.getMemberById(memberId);
-    const value = String(member?.promotionProgress?.eventParticipation ?? '');
-    if (value && value.trim()) {
-      // Check for at least 2 events separated by comma, semicolon, or newline
-      const events = value.split(/[,\n;]+/).filter(e => e.trim().length > 0);
-      if (events.length >= 2) {
-        return {
-          completedAt: new Date(),
-          details: { eventNames: events },
-          evidence: [] as string[]
-        };
-      }
-    }
-    return null;
-  }
-
-  private static async checkJCIInspireCompletion(memberId: string) {
-    const member = await this.getMemberById(memberId);
-    const value = String(member?.promotionProgress?.jciInspireCompleted ?? '');
-    if (value && value.trim()) {
-      return {
-        completedAt: new Date(),
-        details: { courseName: value },
-        evidence: [] as string[]
-      };
-    }
-    return null;
-  }
-
   /**
    * Save a single promotion progress field for a member
    */
@@ -960,12 +848,13 @@ export class PromotionService {
     console.log(`Saved promotion history for member ${promotion.memberId}`);
   }
 
-  private static async saveManualPromotionRequest(request: ManualPromotionRequest): Promise<void> {
-    await addDoc(collection(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS), {
+  private static async saveManualPromotionRequest(request: ManualPromotionRequest): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS), {
       ...request,
       requestedAt: serverTimestamp()
     });
     console.log(`Saved manual promotion request for member ${request.memberId}`);
+    return docRef.id;
   }
 
   // FIX 6 (P1): read/list/approve/reject methods for manualPromotionRequests
@@ -1006,15 +895,21 @@ export class PromotionService {
       if (snap.empty) throw new Error(`Manual promotion request ${requestId} not found`);
       const requestData = { ...snap.docs[0].data(), id: requestId } as ManualPromotionRequest;
 
-      // Mark approved
+      // Trigger promotion first; update status only after success to keep them in sync
+      try {
+        await this.promoteToOfficialMember(requestData.memberId, approvedBy, 'manual');
+      } catch (promotionError) {
+        // Promotion failed — ensure request remains 'pending' (rollback)
+        await updateDoc(requestRef, { status: 'pending' }).catch(() => {});
+        throw promotionError;
+      }
+
+      // Mark approved only after successful promotion
       await updateDoc(requestRef, {
         status: 'approved',
         approvedBy,
         approvedAt: serverTimestamp()
       });
-
-      // Trigger promotion
-      await this.promoteToOfficialMember(requestData.memberId, approvedBy, 'manual');
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'approveManualPromotionRequest', additionalData: { requestId, approvedBy } });
       throw error;

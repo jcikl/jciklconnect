@@ -9,6 +9,7 @@ import {
   where,
   orderBy,
   limit,
+  increment,
   Timestamp,
   onSnapshot,
 } from 'firebase/firestore';
@@ -267,10 +268,11 @@ export class MessagingService {
             const conversation = conversationDoc.data() as Conversation;
             const participants = conversation.participants || [];
 
-            const unreadCount = { ...(conversation.unreadCount || {}) };
-            participants.forEach(participantId => {
-              if (participantId !== senderId) {
-                unreadCount[participantId] = (unreadCount[participantId] || 0) + 1;
+            // P1 — use increment() per-participant to avoid read-then-write race
+            const unreadIncrements: Record<string, ReturnType<typeof increment>> = {};
+            participants.forEach(pid => {
+              if (pid !== senderId) {
+                unreadIncrements[`unreadCount.${pid}`] = increment(1);
               }
             });
 
@@ -281,7 +283,7 @@ export class MessagingService {
                 timestamp: now,
               },
               lastActivity: now,
-              unreadCount,
+              ...unreadIncrements,
             });
 
             // Invalidate conversations cache for all participants
@@ -307,7 +309,7 @@ export class MessagingService {
         try {
           // Fetch conversation and unread messages in parallel
           const [messages, conversationDoc] = await Promise.all([
-            this.getMessages(conversationId, 100),
+            this.getMessages(conversationId, 500),
             getDoc(doc(db, CONV_COLLECTION, conversationId)),
           ]);
 

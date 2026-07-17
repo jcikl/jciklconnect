@@ -96,7 +96,7 @@ export class BoardManagementService {
       const q = loId ? query(col, where('loId', '==', loId)) : col;
       const snap = await getDocs(q);
       const result = snap.docs.map(d => ({ id: d.id, ...d.data() } as BoardMember));
-      apiCache.set(cacheKey, result, 300);
+      apiCache.set(cacheKey, result, 5 * 60 * 1000);
       return result;
     } catch (error) {
       logServiceError(
@@ -527,13 +527,6 @@ export class BoardManagementService {
           const boardMembersRef = collection(db, 'boardMembers');
       const existing = await this.getBoardMembersByYear(year);
 
-      // Delete ALL existing records for this term (reconfiguration replaces them fully).
-      // Using deleteDoc ensures superseded / erroneous assignments never surface in Career Path.
-      for (const bm of existing) {
-        const boardMemberRef = doc(db, 'boardMembers', bm.id);
-        await deleteDoc(boardMemberRef);
-      }
-
       const now = new Date().toISOString();
       const startDate = `${year}-01-01`;
       const endDate = `${year}-12-31`;
@@ -574,8 +567,12 @@ export class BoardManagementService {
         boardMemberEntries.push({ newRef: doc(boardMembersRef), data: newMemberData, memberId });
       }
 
-      // Single atomic batch: boardMembers creation + member.role elevation
+      // Single atomic batch: delete existing + boardMembers creation + member.role elevation
       const boardBatch = writeBatch(db);
+      // Delete ALL existing records for this term atomically so superseded assignments never surface
+      for (const bm of existing) {
+        boardBatch.delete(doc(db, 'boardMembers', bm.id));
+      }
       for (const { newRef, data, memberId } of boardMemberEntries) {
         boardBatch.set(newRef, data);
         boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
@@ -883,10 +880,14 @@ export class BoardManagementService {
           let archived = 0;
           let notificationsSent = 0;
 
+          // Collect all member updates then apply atomically via writeBatch
+          const transitionBatch = writeBatch(db);
+          const notificationPayloads: Array<Parameters<typeof CommunicationService.createNotification>[0]> = [];
+          const now = Timestamp.now();
+
           for (const member of currentBoardMembers) {
             try {
-              // Archive current board position
-              const boardHistory = member.boardHistory || [];
+              const boardHistory = [...(member.boardHistory || [])];
               if (member.currentBoardYear && member.currentBoardPosition) {
                 const archivedPosition: BoardPosition = {
                   year: member.currentBoardYear,
@@ -899,26 +900,21 @@ export class BoardManagementService {
                 archived++;
               }
 
-              // Transition member role based on "one year to lead" principle
-              const updatedMember: Partial<Member> = {
-                boardHistory: boardHistory,
-                currentBoardYear: undefined,
-                currentBoardPosition: undefined,
+              transitionBatch.update(doc(db, COLLECTIONS.MEMBERS, member.id), {
+                boardHistory,
+                currentBoardYear: deleteField(),
+                currentBoardPosition: deleteField(),
                 role: UserRole.MEMBER,
-              };
-
-              await MembersService.updateMember(member.id, updatedMember);
+                updatedAt: now,
+              });
               transitioned++;
 
-              // Send notification to member
-              await CommunicationService.createNotification({
+              notificationPayloads.push({
                 memberId: member.id,
                 title: `Board Term Completion - ${member.currentBoardYear || 'Previous Year'}`,
                 message: `Your board term for ${member.currentBoardYear || 'the previous year'} has been completed. Thank you for your leadership! Your board position has been archived.`,
                 type: 'info',
               });
-
-              notificationsSent++;
             } catch (error) {
               logServiceError(
                 error instanceof Error ? error : new Error(String(error)),
@@ -926,6 +922,21 @@ export class BoardManagementService {
               );
             }
           }
+
+          await transitionBatch.commit();
+          MembersService.invalidateMembersCache();
+
+          // Best-effort notifications — failures do not undo the committed transition
+          const notifResults = await Promise.allSettled(
+            notificationPayloads.map(p => CommunicationService.createNotification(p))
+          );
+          notifResults.forEach((r, i) => {
+            if (r.status === 'fulfilled') {
+              notificationsSent++;
+            } else {
+              console.warn(`[BoardManagementService.transitionBoardMembers] Notification failed for member ${notificationPayloads[i].memberId}:`, r.reason);
+            }
+          });
 
           if (isDevMode()) { console.log(`Board transition completed for year ${newYear}: ${transitioned} members transitioned, ${archived} positions archived`); }
 
@@ -954,6 +965,10 @@ export class BoardManagementService {
       () => { if (isDevMode()) { console.log(`[Dev Mode] Would assign board members for year ${year}`); } },
       async () => {
         try {
+          const assignBatch = writeBatch(db);
+          const notificationPayloads: Array<Parameters<typeof CommunicationService.createNotification>[0]> = [];
+          const now = Timestamp.now();
+
           for (const assignment of assignments) {
             const member = await MembersService.getMemberById(assignment.memberId);
             if (!member) {
@@ -961,8 +976,7 @@ export class BoardManagementService {
               continue;
             }
 
-            // Update member with new board position
-            const boardHistory = member.boardHistory || [];
+            const boardHistory = [...(member.boardHistory || [])];
             const newPosition: BoardPosition = {
               year,
               role: assignment.position,
@@ -970,22 +984,31 @@ export class BoardManagementService {
               startDate: `${year}-01-01`,
               endDate: `${year}-12-31`,
             };
+            boardHistory.push(newPosition);
 
-            await MembersService.updateMember(assignment.memberId, {
+            assignBatch.update(doc(db, COLLECTIONS.MEMBERS, assignment.memberId), {
               role: UserRole.BOARD,
               currentBoardYear: year,
               currentBoardPosition: assignment.position,
-              boardHistory: [...boardHistory, newPosition],
+              boardHistory,
+              updatedAt: now,
             });
 
-            // Send notification
-            await CommunicationService.createNotification({
+            notificationPayloads.push({
               memberId: assignment.memberId,
               title: `Board Position Assigned - ${year}`,
               message: `Congratulations! You have been assigned to the board position: ${assignment.position} for ${year}.`,
               type: 'success',
             });
           }
+
+          await assignBatch.commit();
+          MembersService.invalidateMembersCache();
+
+          // Best-effort notifications
+          await Promise.allSettled(
+            notificationPayloads.map(p => CommunicationService.createNotification(p))
+          );
         } catch (error) {
           logServiceError(
             error instanceof Error ? error : new Error(String(error)),

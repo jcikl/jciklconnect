@@ -22,6 +22,7 @@ import {
   where,
   Timestamp,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -144,43 +145,40 @@ export class EventPaymentMatchingService {
 
   /** Apply a confirmed match between an income tx and a bank tx. */
   static async applyMatch(incomeTxId: string, bankTxId: string, _path: 'A' | 'B' | 'C' = 'B'): Promise<void> {
-    const batch = writeBatch(db);
-
     const incomeRef = doc(db, COLLECTIONS.TRANSACTIONS, incomeTxId);
     const bankRef = doc(db, COLLECTIONS.TRANSACTIONS, bankTxId);
 
-    // Get current docs to calculate new allocation
-    const [bankSnap, incomeSnap] = await Promise.all([
-      getDoc(bankRef),
-      getDoc(incomeRef),
-    ]);
-    const bankData = bankSnap.exists() ? (bankSnap.data() as Transaction) : null;
-    const incomeData = incomeSnap.exists() ? (incomeSnap.data() as Transaction) : null;
+    await runTransaction(db, async (transaction) => {
+      const [bankSnap, incomeSnap] = await Promise.all([
+        transaction.get(bankRef),
+        transaction.get(incomeRef),
+      ]);
+      const bankData = bankSnap.exists() ? (bankSnap.data() as Transaction) : null;
+      const incomeData = incomeSnap.exists() ? (incomeSnap.data() as Transaction) : null;
 
-    const newAllocated = (bankData?.matchedBankAmount ?? 0) + Math.abs(incomeData?.amount ?? 0);
-    const bankTotal = Math.abs(bankData?.amount ?? 0);
-    const bankMatchStatus: Transaction['matchStatus'] =
-      newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
+      const newAllocated = (bankData?.matchedBankAmount ?? 0) + Math.abs(incomeData?.amount ?? 0);
+      const bankTotal = Math.abs(bankData?.amount ?? 0);
+      const bankMatchStatus: Transaction['matchStatus'] =
+        newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
 
-    // Update income tx → Cleared; record prevStatus so removeMatch can restore exactly
-    batch.update(incomeRef, {
-      matchStatus: 'full',
-      matchedBankTxIds: [...(incomeData?.matchedBankTxIds ?? []), bankTxId],
-      status: 'Cleared',
-      prevStatus: incomeData?.status ?? 'Pending',
-      updatedAt: Timestamp.now(),
+      // Update income tx → Cleared; record prevStatus so removeMatch can restore exactly
+      transaction.update(incomeRef, {
+        matchStatus: 'full',
+        matchedBankTxIds: [...(incomeData?.matchedBankTxIds ?? []), bankTxId],
+        status: 'Cleared',
+        prevStatus: incomeData?.status ?? 'Pending',
+        updatedAt: Timestamp.now(),
+      });
+
+      // Update bank tx allocation
+      const existingProjectTxIds: string[] = (bankData as any)?.projectTransactionIds ?? [];
+      transaction.update(bankRef, {
+        matchedBankAmount: newAllocated,
+        matchStatus: bankMatchStatus,
+        projectTransactionIds: [...existingProjectTxIds, incomeTxId],
+        updatedAt: Timestamp.now(),
+      });
     });
-
-    // Update bank tx allocation
-    const existingProjectTxIds: string[] = (bankData as any)?.projectTransactionIds ?? [];
-    batch.update(bankRef, {
-      matchedBankAmount: newAllocated,
-      matchStatus: bankMatchStatus,
-      projectTransactionIds: [...existingProjectTxIds, incomeTxId],
-      updatedAt: Timestamp.now(),
-    });
-
-    await batch.commit();
   }
 
   /**
@@ -189,44 +187,45 @@ export class EventPaymentMatchingService {
    * decreases the bank tx's matchedBankAmount by the income amount.
    */
   static async removeMatch(incomeTxId: string, bankTxId: string): Promise<void> {
-    const batch = writeBatch(db);
-
     const incomeRef = doc(db, COLLECTIONS.TRANSACTIONS, incomeTxId);
     const bankRef = doc(db, COLLECTIONS.TRANSACTIONS, bankTxId);
 
-    const [incomeSnap, bankSnap] = await Promise.all([getDoc(incomeRef), getDoc(bankRef)]);
-    const incomeData = incomeSnap.exists() ? (incomeSnap.data() as Transaction) : null;
-    const bankData = bankSnap.exists() ? (bankSnap.data() as Transaction) : null;
+    await runTransaction(db, async (transaction) => {
+      const [incomeSnap, bankSnap] = await Promise.all([
+        transaction.get(incomeRef),
+        transaction.get(bankRef),
+      ]);
+      const incomeData = incomeSnap.exists() ? (incomeSnap.data() as Transaction) : null;
+      const bankData = bankSnap.exists() ? (bankSnap.data() as Transaction) : null;
 
-    if (!incomeData || !bankData) throw new Error('Transaction not found');
+      if (!incomeData || !bankData) throw new Error('Transaction not found');
 
-    // Restore income tx
-    const newIncomeBankTxIds = (incomeData.matchedBankTxIds ?? []).filter((id) => id !== bankTxId);
-    batch.update(incomeRef, {
-      matchStatus: newIncomeBankTxIds.length > 0 ? 'partial' : null,
-      matchedBankTxIds: newIncomeBankTxIds.length > 0 ? newIncomeBankTxIds : null,
-      status: incomeData.prevStatus ?? 'Pending',
-      prevStatus: null,
-      updatedAt: Timestamp.now(),
+      // Restore income tx
+      const newIncomeBankTxIds = (incomeData.matchedBankTxIds ?? []).filter((id) => id !== bankTxId);
+      transaction.update(incomeRef, {
+        matchStatus: newIncomeBankTxIds.length > 0 ? 'partial' : null,
+        matchedBankTxIds: newIncomeBankTxIds.length > 0 ? newIncomeBankTxIds : null,
+        status: incomeData.prevStatus ?? 'Pending',
+        prevStatus: null,
+        updatedAt: Timestamp.now(),
+      });
+
+      // Reduce bank tx allocation — clamp at 0 to prevent negative matchedBankAmount
+      const removedAmount = Math.abs(incomeData.amount ?? 0);
+      const newAllocated = Math.max(0, (bankData.matchedBankAmount ?? 0) - removedAmount);
+      const bankTotal = Math.abs(bankData.amount ?? 0);
+      const newBankMatchStatus: Transaction['matchStatus'] =
+        newAllocated <= AMOUNT_TOLERANCE ? 'unmatched' :
+        newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
+      const newProjectTxIds = (bankData.projectTransactionIds ?? []).filter((id) => id !== incomeTxId);
+
+      transaction.update(bankRef, {
+        matchedBankAmount: newAllocated,
+        matchStatus: newAllocated <= AMOUNT_TOLERANCE ? null : newBankMatchStatus,
+        projectTransactionIds: newProjectTxIds.length > 0 ? newProjectTxIds : null,
+        updatedAt: Timestamp.now(),
+      });
     });
-
-    // Reduce bank tx allocation
-    const removedAmount = Math.abs(incomeData.amount ?? 0);
-    const newAllocated = Math.max(0, (bankData.matchedBankAmount ?? 0) - removedAmount);
-    const bankTotal = Math.abs(bankData.amount ?? 0);
-    const newBankMatchStatus: Transaction['matchStatus'] =
-      newAllocated <= AMOUNT_TOLERANCE ? 'unmatched' :
-      newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
-    const newProjectTxIds = (bankData.projectTransactionIds ?? []).filter((id) => id !== incomeTxId);
-
-    batch.update(bankRef, {
-      matchedBankAmount: newAllocated,
-      matchStatus: newAllocated <= AMOUNT_TOLERANCE ? null : newBankMatchStatus,
-      projectTransactionIds: newProjectTxIds.length > 0 ? newProjectTxIds : null,
-      updatedAt: Timestamp.now(),
-    });
-
-    await batch.commit();
   }
 
   private static _findBestBankTx(

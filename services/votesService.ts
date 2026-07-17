@@ -11,6 +11,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   runTransaction,
   query,
   where,
@@ -192,7 +193,12 @@ export class VotesService {
   static async deleteVote(voteId: string): Promise<void> {
     if (isDevMode()) return;
     try {
-      await deleteDoc(doc(db, COLLECTIONS.VOTES, voteId));
+      // P1 — delete voteCasts subcollection and parent in the same batch
+      const castsSnap = await getDocs(collection(db, COLLECTIONS.VOTES, voteId, 'voteCasts'));
+      const batch = writeBatch(db);
+      castsSnap.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db, COLLECTIONS.VOTES, voteId));
+      await batch.commit();
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'VotesService.deleteVote', additionalData: { voteId } });
       throw error;
@@ -236,6 +242,11 @@ export class VotesService {
         if (!voteSnap.exists()) throw new Error('Vote not found.');
 
         const voteData = voteSnap.data() as VoteDoc;
+
+        // P0 — eligible voters enforcement
+        if (voteData.eligibleVoters && voteData.eligibleVoters.length > 0 && !voteData.eligibleVoters.includes(voterId)) {
+          throw new Error('您不在此投票的资格名单内');
+        }
 
         // P1-C — deadline enforcement
         if (voteData.endDate) {
@@ -330,75 +341,85 @@ export class VotesService {
 
     try {
       const voteRef = doc(db, COLLECTIONS.VOTES, voteId);
-      const voteSnap = await getDoc(voteRef);
-      if (!voteSnap.exists()) throw new Error('Vote not found.');
 
-      const voteData = voteSnap.data() as VoteDoc;
+      // P1 — wrap entire tally in runTransaction to prevent concurrent double-close
+      let tallyResult: TallyResult = { success: false, reason: 'Transaction incomplete' };
 
-      if (voteData.status === 'closed') {
-        return { success: false, reason: 'Vote is already closed.' };
-      }
+      await runTransaction(db, async (transaction) => {
+        const voteSnap = await transaction.get(voteRef);
+        if (!voteSnap.exists()) throw new Error('Vote not found.');
 
-      // Fetch all cast records from the subcollection
-      const castsSnap = await getDocs(
-        collection(db, COLLECTIONS.VOTES, voteId, 'voteCasts')
-      );
-      const casts = castsSnap.docs.map(d => d.data() as VoteCastDoc);
-      const totalCast = casts.length;
+        const voteData = voteSnap.data() as VoteDoc;
 
-      // P1-B — quorum enforcement
-      if (voteData.quorum && totalCast < voteData.quorum) {
-        await updateDoc(voteRef, {
-          status: 'failed',
-          failReason: 'Quorum not reached',
-          closedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+        if (voteData.status === 'closed') {
+          tallyResult = { success: false, reason: 'Vote is already closed.' };
+          return; // skip writes
+        }
+
+        // Fetch all cast records from the subcollection (reads must happen before writes in a transaction)
+        const castsSnap = await getDocs(
+          collection(db, COLLECTIONS.VOTES, voteId, 'voteCasts')
+        );
+        const casts = castsSnap.docs.map(d => d.data() as VoteCastDoc);
+        const totalCast = casts.length;
+
+        // P1-B — quorum enforcement
+        if (voteData.quorum && totalCast < voteData.quorum) {
+          transaction.update(voteRef, {
+            status: 'failed',
+            failReason: 'Quorum not reached',
+            closedAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          tallyResult = { success: false, reason: 'Quorum not reached' };
+          return;
+        }
+
+        // P2-D — weighted voting note
+        // TODO: implement weighted voting per member role.
+        // When voteData.weightedVoting === true, look up each voter's
+        // `votingWeight` from their member profile and multiply their cast
+        // by that weight instead of counting 1 per cast.
+
+        // Count votes per option
+        const countMap: Record<string, number> = {};
+        for (const option of voteData.options ?? []) {
+          countMap[option.id] = 0;
+        }
+        for (const cast of casts) {
+          if (cast.optionId in countMap) {
+            countMap[cast.optionId] += 1;
+          }
+        }
+
+        const results = (voteData.options ?? []).map((opt: VoteOption) => ({
+          optionId: opt.id,
+          text: opt.text,
+          count: countMap[opt.id] ?? 0,
+        }));
+
+        // Determine winner (highest count)
+        let winner: string | undefined;
+        if (results.length > 0) {
+          const sorted = [...results].sort((a, b) => b.count - a.count);
+          if (sorted[0].count > 0) {
+            winner = sorted[0].optionId;
+          }
+        }
+
+        transaction.update(voteRef, {
+          status: 'closed',
+          tallyResults: results,
+          winner: winner ?? null,
+          totalVotes: totalCast,
+          closedAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
         });
-        return { success: false, reason: 'Quorum not reached' };
-      }
 
-      // P2-D — weighted voting note
-      // TODO: implement weighted voting per member role.
-      // When voteData.weightedVoting === true, look up each voter's
-      // `votingWeight` from their member profile and multiply their cast
-      // by that weight instead of counting 1 per cast.
-
-      // Count votes per option
-      const countMap: Record<string, number> = {};
-      for (const option of voteData.options ?? []) {
-        countMap[option.id] = 0;
-      }
-      for (const cast of casts) {
-        if (cast.optionId in countMap) {
-          countMap[cast.optionId] += 1;
-        }
-      }
-
-      const results = (voteData.options ?? []).map((opt: VoteOption) => ({
-        optionId: opt.id,
-        text: opt.text,
-        count: countMap[opt.id] ?? 0,
-      }));
-
-      // Determine winner (highest count)
-      let winner: string | undefined;
-      if (results.length > 0) {
-        const sorted = [...results].sort((a, b) => b.count - a.count);
-        if (sorted[0].count > 0) {
-          winner = sorted[0].optionId;
-        }
-      }
-
-      await updateDoc(voteRef, {
-        status: 'closed',
-        tallyResults: results,
-        winner: winner ?? null,
-        totalVotes: totalCast,
-        closedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        tallyResult = { success: true, results, winner };
       });
 
-      return { success: true, results, winner };
+      return tallyResult;
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'VotesService.tallyVotes', additionalData: { voteId } });
       throw error;

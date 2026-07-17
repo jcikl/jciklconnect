@@ -360,15 +360,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     return tabs;
   }, [isCommitteeMember]);
 
-  useEffect(() => {
-    if (activeTab === 'feedback') {
-      loadEventFeedback();
-    } else if (activeTab === 'participants' || activeTab === 'stats') {
-      loadParticipations();
-    }
-  }, [activeTab, event.id]);
-
-  const loadParticipations = async () => {
+  const loadParticipations = useCallback(async () => {
     setLoadingParticipants(true);
     try {
       const [list, guestSnap] = await Promise.all([
@@ -404,7 +396,27 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     } finally {
       setLoadingParticipants(false);
     }
-  };
+  }, [event.id]);
+
+  const loadEventFeedback = useCallback(async () => {
+    setLoadingFeedback(true);
+    try {
+      const summary = await EventFeedbackService.getFeedbackSummary(event.id);
+      setEventFeedback(summary);
+    } catch (err) {
+      showToast('Failed to load event feedback', 'error');
+    } finally {
+      setLoadingFeedback(false);
+    }
+  }, [event.id, showToast]);
+
+  useEffect(() => {
+    if (activeTab === 'feedback') {
+      loadEventFeedback();
+    } else if (activeTab === 'participants' || activeTab === 'stats') {
+      loadParticipations();
+    }
+  }, [activeTab, event.id, loadEventFeedback, loadParticipations]);
 
   useEffect(() => {
     if (!member) return;
@@ -562,23 +574,26 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setUpdatingRegId(reg.id);
     const nextStatus = reg.status === 'checked_in' ? 'checked_in' : 'registered';
     try {
-      // Undoing a payment must not leave the Finance income transaction behind —
-      // otherwise revenue is double-counted the next time this registration is marked paid.
+      // Guard: if the linked finance transaction has already cleared, abort early.
       if (reg.financeTransactionId) {
         const tx = await FinanceService.getTransactionById(reg.financeTransactionId);
         if (tx && (tx.status === 'Cleared' || tx.status === 'Reconciled' || tx.status === 'Partially Reconciled')) {
           showToast('Cannot undo — the linked transaction has already cleared/reconciled. Ask finance to void it first.', 'error');
           return;
         }
-        if (tx) {
-          await FinanceService.deleteTransaction(reg.financeTransactionId);
-          // If the registration status update below fails, there is no reliable way to
-          // recreate the deleted transaction automatically. Surface an explicit error so
-          // finance can reconcile manually rather than silently leaving inconsistent data.
-        }
       }
+      // Step 1: update registration status first so the record is always consistent.
       await EventRegistrationService.updateStatus(reg.id, nextStatus, { paidAt: null, paidByName: null, financeTransactionId: null });
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: nextStatus as EventRegistration['status'], paidAt: null, paidByName: null } : r)));
+      // Step 2: delete the finance transaction. If this fails, registration is already corrected
+      // — warn the user so finance can clean up manually rather than silently double-counting.
+      if (reg.financeTransactionId) {
+        try {
+          await FinanceService.deleteTransaction(reg.financeTransactionId);
+        } catch {
+          showToast('Registration reverted, but finance transaction could not be deleted — please remove it manually.', 'warning');
+        }
+      }
       showToast('Payment reverted', 'success');
     } catch {
       showToast('Operation failed', 'error');
@@ -618,24 +633,13 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     }
   };
 
-  const loadEventFeedback = async () => {
-    setLoadingFeedback(true);
-    try {
-      const summary = await EventFeedbackService.getFeedbackSummary(event.id);
-      setEventFeedback(summary);
-    } catch (err) {
-      showToast('Failed to load event feedback', 'error');
-    } finally {
-      setLoadingFeedback(false);
-    }
-  };
 
-  const date = new Date(event.date);
+  const date = event.date ? new Date(event.date) : null;
   const endDate = event.endDate ? new Date(event.endDate) : null;
-  const isMultiDay = endDate && endDate.toDateString() !== date.toDateString();
+  const isMultiDay = date && endDate && endDate.toDateString() !== date.toDateString();
   const formatDay = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); // "22 Oct 2026"
   const formatWeekday = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' }); // "Thu"
-  const eventTime = event.time || (date.getHours() !== 0 || date.getMinutes() !== 0 ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null);
+  const eventTime = event.time || (date && (date.getHours() !== 0 || date.getMinutes() !== 0) ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null);
   const fmtTime12 = (t: string) => { const [h,m]=t.split(':').map(Number); return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`; };
   const eventTimeRange = eventTime ? (event.endTime && fmtTime12(event.endTime) !== fmtTime12(eventTime) ? `${fmtTime12(eventTime)} – ${fmtTime12(event.endTime)}` : fmtTime12(eventTime)) : null;
   const formatDayShort = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -769,7 +773,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</p>
-                        {isMultiDay ? (
+                        {isMultiDay && date ? (
                           <>
                             <p className="text-sm font-semibold text-slate-800">
                               {formatDayShort(date)} – {formatDay(endDate!)} ({formatWeekday(date)} – {formatWeekday(endDate!)})
@@ -778,8 +782,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                           </>
                         ) : (
                           <>
-                            <p className="text-sm font-semibold text-slate-800">{formatDay(date)}</p>
-                            {eventTimeRange && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTimeRange}</p>}
+                            <p className="text-sm font-semibold text-slate-800">{date ? formatDay(date) : '日期未设置'}</p>
+                            {date && eventTimeRange && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTimeRange}</p>}
                           </>
                         )}
                       </div>
@@ -1248,15 +1252,15 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Date & Time</p>
-                    {isMultiDay ? (
+                    {isMultiDay && date ? (
                       <>
                         <p className="text-sm font-semibold text-slate-800">{formatDayShort(date)} – {formatDay(endDate!)} ({formatWeekday(date)} – {formatWeekday(endDate!)})</p>
                         {eventTimeRange && <p className="text-xs text-slate-500">{eventTimeRange}</p>}
                       </>
                     ) : (
                       <>
-                        <p className="text-sm font-semibold text-slate-800">{formatDay(date)}</p>
-                        {eventTimeRange && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTimeRange}</p>}
+                        <p className="text-sm font-semibold text-slate-800">{date ? formatDay(date) : '日期未设置'}</p>
+                        {date && eventTimeRange && <p className="text-xs text-slate-500">{formatWeekday(date)} · {eventTimeRange}</p>}
                       </>
                     )}
                   </div>

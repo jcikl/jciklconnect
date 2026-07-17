@@ -1,4 +1,12 @@
 import { ErrorInfo } from 'react';
+import { auth } from '../config/firebase';
+
+function sanitizeContext(obj: Record<string, unknown>): Record<string, unknown> {
+  const SENSITIVE = ['password', 'token', 'secret', 'key', 'credential', 'apikey', 'api_key'];
+  return Object.fromEntries(
+    Object.entries(obj).filter(([k]) => !SENSITIVE.some(s => k.toLowerCase().includes(s)))
+  );
+}
 
 export interface ErrorLogEntry {
   id: string;
@@ -180,8 +188,6 @@ class ErrorLoggingService {
 
   private getCurrentUserId(): string | undefined {
     try {
-      // Dynamic import avoids a circular dependency at module-load time
-      const { auth } = require('../config/firebase');
       return auth?.currentUser?.uid ?? undefined;
     } catch {
       return undefined;
@@ -201,9 +207,14 @@ class ErrorLoggingService {
       if (!db) return;
 
       const isNative = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
+      // Sanitize and strip sensitive keys from context before writing to Firestore
+      const sanitizedLogEntry = {
+        ...logEntry,
+        context: logEntry.context ? sanitizeContext(logEntry.context as Record<string, unknown>) : undefined,
+      };
       // Firestore rejects undefined values — strip them
       const payload = JSON.parse(JSON.stringify({
-        ...logEntry,
+        ...sanitizedLogEntry,
         platform: isNative ? 'apk' : 'web',
       }));
 

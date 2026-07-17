@@ -25,6 +25,7 @@ import type {
 import { UserRole } from '../../../types';
 import { BoardManagementService } from '../../../services/boardManagementService';
 import { MembersService } from '../../../services/membersService';
+import { useAuth } from '../../../hooks/useAuth';
 import { useToast, Tabs } from '../../ui/Common';
 import * as Forms from '../../ui/Form';
 
@@ -45,6 +46,8 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [transitionYear, setTransitionYear] = useState<string>(new Date().getFullYear().toString());
   const [incomingBoard, setIncomingBoard] = useState<Partial<BoardMember>[]>([]);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const { user } = useAuth();
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -105,6 +108,7 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
   };
 
   const handleExecuteTransition = async () => {
+    setIsExecuting(true);
     try {
       // Validate incoming board
       const validIncomingBoard = incomingBoard.filter(member =>
@@ -121,7 +125,7 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
         transitionYear,
         currentBoardMembers,
         validIncomingBoard,
-        'current-user' // In real app, get from auth context
+        user?.uid ?? ''
       );
 
       // Execute the transition
@@ -133,6 +137,8 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
     } catch (error) {
       console.error('Error executing board transition:', error);
       showToast('Failed to execute board transition', 'error');
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -576,11 +582,11 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
               </button>
               <button
                 onClick={handleExecuteTransition}
-                disabled={incomingBoard.filter(m => m.memberId && m.position).length === 0}
+                disabled={isExecuting || incomingBoard.filter(m => m.memberId && m.position).length === 0}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Save size={16} />
-                Execute Transition
+                {isExecuting ? '执行中...' : 'Execute Transition'}
               </button>
             </div>
           </div>

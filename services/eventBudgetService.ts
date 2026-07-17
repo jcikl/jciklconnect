@@ -90,7 +90,7 @@ export class EventBudgetService {
       async () => {
         try {
           const budgetQuery = query(
-            collection(db, COLLECTIONS.EVENTS || 'eventBudgets'),
+            collection(db, COLLECTIONS.EVENT_BUDGETS),
             where('eventId', '==', eventId),
             limit(1)
           );
@@ -130,7 +130,7 @@ export class EventBudgetService {
 
           if (existingBudget && existingBudget.id) {
             // Update existing budget
-            await updateDoc(doc(db, COLLECTIONS.EVENTS || 'eventBudgets', existingBudget.id), {
+            await updateDoc(doc(db, COLLECTIONS.EVENT_BUDGETS, existingBudget.id), {
               ...budgetData,
               updatedAt: Timestamp.now(),
             });
@@ -147,7 +147,7 @@ export class EventBudgetService {
               newBudget.approvedAt = Timestamp.fromDate(budgetData.approvedAt as Date);
             }
 
-            const docRef = await addDoc(collection(db, COLLECTIONS.EVENTS || 'eventBudgets'), newBudget);
+            const docRef = await addDoc(collection(db, COLLECTIONS.EVENT_BUDGETS), newBudget);
             EventsService.invalidateEventsCache();
             return docRef.id;
           }

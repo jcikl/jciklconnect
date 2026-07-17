@@ -528,9 +528,6 @@ export class FinanceService {
 
           const cleanTransaction = removeUndefined(newTransaction);
 
-          // Sync with inventory BEFORE creating the transaction so we can abort if it fails
-          await this.syncTransactionWithInventory({ ...transactionData, id: '' });
-
           // Sync with Member Membership BEFORE creating the transaction (best-effort: non-blocking)
           if (transactionData.category === 'Membership' && transactionData.memberId) {
             try {
@@ -570,6 +567,9 @@ export class FinanceService {
           createBatch.set(txRef, cleanTransaction);
           createBatch.update(bankAccountRef, { currentBalance: increment(amountDelta) });
           await createBatch.commit();
+
+          // Sync with inventory AFTER the transaction is committed so the tx ID is available
+          await this.syncTransactionWithInventory({ ...transactionData, id: txRef.id });
 
           invalidateFinanceCache();
           return txRef.id;
