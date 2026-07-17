@@ -550,7 +550,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           {/* Mobile: segmented control + year filter standalone */}
           <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
             <Tabs
-             
               fullWidth
               tabs={['Ongoing', 'Past', 'Templates']}
               activeTab={activeTab === 'projects' ? 'Ongoing' : activeTab === 'past-projects' ? 'Past' : 'Templates'}
