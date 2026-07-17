@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, Tabs, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
 import { Project } from '../../../types';
-import { ProjectAccountsService, ProjectAccount } from '../../../services/projectAccountsService';
 import { ProjectReportService, ProjectReport } from '../../../services/projectReportService';
 import { ProjectGanttChart } from '../ProjectManagement/ProjectGanttChart';
 import { ProjectKanban } from './ProjectKanban';
-import { ProjectFinancialAccount } from './ProjectFinancialAccount';
+import { ProjectFinancialAccountView as ProjectFinancialAccount } from '../ProjectManagement/ProjectFinancialAccount';
 import { ProjectActivityPlanTab } from './ProjectActivityPlanTab';
 import { ProjectCommitteeTab } from './ProjectCommitteeTab';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
@@ -25,32 +24,12 @@ export interface ProjectDetailTabsProps {
 export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, onUpdateProject, onDeleteProject, onNavigate }) => {
   const { projectId, projectName } = { projectId: project.id, projectName: project.name ?? project.title ?? 'Project' };
   const [activeTab, setActiveTab] = useState<'activity-plan' | 'committee' | 'trainers' | 'kanban' | 'gantt' | 'finance' | 'reports' | 'ai'>('activity-plan');
-  const [projectAccount, setProjectAccount] = useState<ProjectAccount | null>(null);
   const [projectReport, setProjectReport] = useState<ProjectReport | null>(null);
-  const [loadingAccount, setLoadingAccount] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   // Modal states removed for inline editing
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const { showToast } = useToast();
-
-  useEffect(() => {
-    if (activeTab === 'finance') {
-      loadProjectAccount();
-    }
-  }, [activeTab, projectId]);
-
-  const loadProjectAccount = async () => {
-    setLoadingAccount(true);
-    try {
-      const account = await ProjectAccountsService.getProjectAccountByProjectId(projectId);
-      setProjectAccount(account);
-    } catch (err) {
-      showToast('Failed to load project account', 'error');
-    } finally {
-      setLoadingAccount(false);
-    }
-  };
 
   const handleGenerateReport = async () => {
     setLoadingReport(true);
@@ -80,25 +59,6 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
         }
       },
     });
-  };
-
-  const handleReconcileAccount = async () => {
-    try {
-      const result = await ProjectAccountsService.reconcileProjectAccount(projectId);
-      if (result.reconciled) {
-        showToast('Project account reconciled successfully - No discrepancies found', 'success');
-      } else {
-        showToast(
-          `Project account reconciled - ${result.discrepancies.length} discrepancy(ies) found. Please review.`,
-          'info'
-        );
-      }
-      await loadProjectAccount();
-      return result;
-    } catch (err) {
-      showToast('Failed to reconcile account', 'error');
-      throw err;
-    }
   };
 
   const TAB_ITEMS: { key: typeof activeTab; label: string; shortLabel: string }[] = [
@@ -152,17 +112,8 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
           )}
           {activeTab === 'finance' && (
             <ProjectFinancialAccount
-              projectId={projectId}
               project={project}
-              account={projectAccount}
-              loading={loadingAccount}
-              onReconcile={handleReconcileAccount}
-              onUpdateBudget={async (newBudget) => {
-                await onUpdateProject(projectId, { budget: newBudget });
-                await loadProjectAccount(); // Refresh account to reflect new budget
-              }}
-              onRefresh={loadProjectAccount}
-              onNavigate={onNavigate}
+              onClose={() => setActiveTab('activity-plan')}
             />
           )}
           {activeTab === 'reports' && (
