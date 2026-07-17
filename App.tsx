@@ -733,8 +733,8 @@ export const JCIKLApp: React.FC = () => {
         if (!hasPermission('canViewFinance')) return dashboardFallback;
         return wrapEB(<InventoryView searchQuery={searchQuery} />, '库存');
       case 'DIRECTORY':
-        // AUTH-004: DIRECTORY contains member PII — block guests and unauthenticated users.
-        if (!member || member.role === UserRole.GUEST) return dashboardFallback;
+        // AUTH-004: Block unauthenticated users; GUEST role sees the view with MembersOnlyOverlay mask.
+        if (!member) return dashboardFallback;
         return wrapEB(<BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />, '商业目录');
       case 'AUTOMATION':
         if (!isAdmin && !isBoard) return dashboardFallback;
@@ -753,7 +753,8 @@ export const JCIKLApp: React.FC = () => {
         if (member?.role === UserRole.INACTIVE) return dashboardFallback;
         return wrapEB(<SurveysView searchQuery={searchQuery} />, '问卷');
       case 'BENEFITS':
-        if (member?.role === UserRole.GUEST || member?.role === UserRole.INACTIVE) return dashboardFallback;
+        // GUEST sees Benefits with MembersOnlyOverlay mask; INACTIVE is a hard block.
+        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
         return wrapEB(<MemberBenefitsView searchQuery={searchQuery} />, '会员福利');
       case 'DATA_IMPORT_EXPORT':
         if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
@@ -929,7 +930,7 @@ export const JCIKLApp: React.FC = () => {
                 onClick={() => { handleViewChange('KNOWLEDGE'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
-              {member?.role !== UserRole.GUEST && (
+              {member?.role !== UserRole.INACTIVE && (
                 <SidebarItem
                   icon={<Gift size={18} />}
                   label="Benefits"
