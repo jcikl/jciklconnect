@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Bell, FileText, Send, MoreHorizontal, ThumbsUp, TrendingUp, TrendingDown, BarChart3, Info, X, Megaphone, Users, Calendar, Target, Edit, Trash2, Eye } from 'lucide-react';
-import { Card, Button, Tabs, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
+import { Card, Button, Tabs, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { ProgressBar } from '../ui/Common';
 import { useCommunication } from '../../hooks/useCommunication';

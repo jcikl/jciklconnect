@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { MembershipType, MembershipRuleConfig } from '../../types';
 import { MembershipConfigService, DEFAULT_MEMBERSHIP_RULES } from '../../services/membershipConfigService';
 import { Save, AlertCircle, RefreshCw } from 'lucide-react';
-import { Button, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
+import { Button, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { MembersService } from '../../services/membersService';
 
 const MEMBERSHIP_TYPES: MembershipType[] = ['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'];

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, Plus, Edit, Trash2, Image as ImageIcon, Check, Upload, Folder, Settings, Images } from 'lucide-react';
-import { Card, Button, Modal, useToast, ProgressBar, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
+import { Card, Button, Modal, useToast, ProgressBar, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { FlagshipProjectsService } from '../../services/flagshipProjectsService';

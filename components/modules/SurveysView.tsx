@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { MessageSquare, BarChart2, Plus, ArrowRight, Edit, Trash2, Type, List, Star, CheckSquare, Share2, Send, FileText } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, PageHeader, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useSurveys } from '../../hooks/useSurveys';
 import { useAuth } from '../../hooks/useAuth';

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Shield, CheckCircle, Clock, RefreshCw, XCircle, Search } from 'lucide-react';
-import { Card, Button, Badge, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../../ui/Common';
+import { Card, Button, Badge, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import type { ConfirmState } from '../../ui/Common';
 import { Member } from '../../../types';
 import { MembersService } from '../../../services/membersService';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';

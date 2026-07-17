@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tabs, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../../ui/Common';
+import { Card, Tabs, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import type { ConfirmState } from '../../ui/Common';
 import { Project } from '../../../types';
 import { ProjectAccountsService, ProjectAccount } from '../../../services/projectAccountsService';
 import { ProjectReportService, ProjectReport } from '../../../services/projectReportService';

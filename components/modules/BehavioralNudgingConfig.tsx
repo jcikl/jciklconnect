@@ -1,7 +1,8 @@
 // Behavioral Nudging Configuration Component
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Power, PowerOff, AlertCircle, CheckCircle, Lightbulb, Target, TrendingUp, Settings } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { BehavioralNudgingService, NudgeRule } from '../../services/behavioralNudgingService';

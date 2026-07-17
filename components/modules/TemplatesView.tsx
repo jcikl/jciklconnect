@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Plus, Edit, Trash2, Copy, Calendar, DollarSign, Target, CheckSquare, X } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useTemplates } from '../../hooks/useTemplates';

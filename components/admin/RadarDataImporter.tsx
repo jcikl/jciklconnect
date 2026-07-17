@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
+import { Card, Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { MembersService } from '../../services/membersService';
 import { PointsService } from '../../services/pointsService';

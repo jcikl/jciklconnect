@@ -3,7 +3,8 @@ import { CreditCard, ExternalLink, Plus, RefreshCw, Download, AlertCircle, Link2
 import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
-import { Card, Button, Badge, Modal, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED, Tabs } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, Tabs } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { ToyyibService, ToyyibBillRecord, ToyyibCategory } from '../../services/toyyibService';
 import { ProjectsService } from '../../services/projectsService';
