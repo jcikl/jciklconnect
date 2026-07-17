@@ -377,10 +377,12 @@ export class PointsService {
       if (year) {
         const startDate = new Date(year, 0, 1);
         const endDate = new Date(year, 11, 31, 23, 59, 59);
+        // TODO: consider paginating or using an aggregate summary — this pulls all points system-wide for the year
         const q = query(
           collection(db, COLLECTIONS.POINTS),
           where('createdAt', '>=', Timestamp.fromDate(startDate)),
-          where('createdAt', '<=', Timestamp.fromDate(endDate))
+          where('createdAt', '<=', Timestamp.fromDate(endDate)),
+          limit(500)
         );
         const snapshot = await getDocs(q);
         snapshot.forEach(doc => {
@@ -1845,7 +1847,8 @@ export class PointsService {
       let leadership = 0;
       let training = 0;
 
-      const projectsSnap = await getDocs(collection(db, COLLECTIONS.PROJECTS));
+      // TODO: filter by loId or active status to avoid full-collection scan
+      const projectsSnap = await getDocs(query(collection(db, COLLECTIONS.PROJECTS), limit(200)));
       projectsSnap.forEach(pDoc => {
         const proj = pDoc.data();
         
