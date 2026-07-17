@@ -32,26 +32,41 @@ export const checkMemberPromotion = functions.firestore
       progress.jciInspireCompleted;
 
     if (allRequirementsMet && !progress.promotedToFull) {
-      // Promote to Full Member — batch member update + notification atomically
-      const batch = db.batch();
-      batch.update(db.collection('members').doc(memberId), {
-        membershipType: 'full',
-        'promotionProgress.promotedToFull': true,
-        'promotionProgress.completedDate': admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      const notifRef = db.collection('notifications').doc();
-      batch.set(notifRef, {
-        memberId: memberId,
-        type: 'promotion',
-        title: 'Congratulations! You have been promoted to Full Member',
-        message: 'You have successfully completed all requirements and have been promoted from Probation Member to Full Member. Your dues for next renewal will be RM300.',
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      await batch.commit();
+      try {
+        // Idempotency: re-read the member to confirm not already promoted before committing.
+        // Retries triggered by a transient batch.commit() failure would otherwise double-promote.
+        const freshSnap = await db.collection('members').doc(memberId).get();
+        if (freshSnap.data()?.promotionProgress?.promotedToFull === true) {
+          console.log(`Member ${memberId} already promoted — skipping (idempotent retry)`);
+          return null;
+        }
 
-      console.log(`Member ${memberId} promoted from Probation to Full Member`);
+        // Promote to Full Member — batch member update + notification atomically
+        const batch = db.batch();
+        batch.update(db.collection('members').doc(memberId), {
+          membershipType: 'full',
+          'promotionProgress.promotedToFull': true,
+          'promotionProgress.completedDate': admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        const notifRef = db.collection('notifications').doc();
+        batch.set(notifRef, {
+          memberId: memberId,
+          type: 'promotion',
+          title: 'Congratulations! You have been promoted to Full Member',
+          message: 'You have successfully completed all requirements and have been promoted from Probation Member to Full Member. Your dues for next renewal will be RM300.',
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        await batch.commit();
+
+        console.log(`Member ${memberId} promoted from Probation to Full Member`);
+      } catch (error) {
+        console.error(`[checkMemberPromotion] Failed to promote member ${memberId}:`, error);
+        // Re-throw transient errors so Cloud Functions retries with backoff.
+        // The idempotency check above ensures retries are safe.
+        throw error;
+      }
     }
 
     return null;
@@ -76,10 +91,13 @@ export const generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).ht
 
   const previousYear = duesYear - 1;
   
-  // Get members who paid dues in previous year
-  const previousYearDues = await db.collection('duesTransactions')
+  // CF-06 fix: dues records are written to 'transactions' (not the nonexistent 'duesTransactions'),
+  // with type='Income', category='Membership', status='Cleared', and a duesYear field.
+  const previousYearDues = await db.collection('transactions')
+    .where('type', '==', 'Income')
+    .where('category', '==', 'Membership')
+    .where('status', '==', 'Cleared')
     .where('duesYear', '==', previousYear)
-    .where('status', '==', 'paid')
     .get();
 
   const renewalMemberIds = new Set(previousYearDues.docs.map(doc => doc.data().memberId));

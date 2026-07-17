@@ -7,7 +7,7 @@ import {
   DataExportFilter
 } from '../../../types';
 import { DataImportExportService } from '../../../services/dataImportExportService';
-import { Tabs } from '../../ui/Common';
+import { Tabs, useToast } from '../../ui/Common';
 
 interface DataImportExportProps {
   onImportComplete?: (result: DataImportResult) => void;
@@ -31,6 +31,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   const entityTypes = [
     { value: 'members', label: 'Members' },
@@ -108,7 +109,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
 
   const handleExport = async () => {
     if (exportFields.length === 0) {
-      alert('Please select at least one field to export');
+      showToast('Please select at least one field to export', 'error');
       return;
     }
 
@@ -165,7 +166,7 @@ export const DataImportExport: React.FC<DataImportExportProps> = ({
       onExportComplete?.(exportRequest);
     } catch (error) {
       console.error('Export failed:', error);
-      alert(`Export failed: ${error}`);
+      showToast(`Export failed: ${error}`, 'error');
     } finally {
       setIsExporting(false);
     }

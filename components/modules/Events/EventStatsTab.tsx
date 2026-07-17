@@ -46,7 +46,7 @@ const EventStatsTabBase: React.FC<EventStatsTabProps> = ({ participations, membe
   return (
     <div className="animate-fade-in space-y-4">
       {/* Summary tiles */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
           { label: 'Registered', value: totalActive, color: 'text-slate-800' },
           { label: 'Pending Pay', value: totalRegistered, color: 'text-amber-600' },

@@ -47,12 +47,7 @@ import {
 } from '../utils/transactionCategoryUtils';
 import { apiCache } from './cacheService';
 
-// PERF6: helper used by reconcileBankAccount to batch-fetch splits
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
-  return chunks;
-}
+// PERF6: chunkArray above is also used by reconcileBankAccount to batch-fetch splits
 import { SponsorshipsService } from './sponsorshipService';
 
 /** Typed shape for raw Firestore transaction/split documents (avoids `as any` escapes). */
@@ -209,26 +204,40 @@ export class FinanceService {
           const boundaryDate = new Date(year, 0, 1, 0, 0, 0, 0);
           const boundaryTimestamp = Timestamp.fromDate(boundaryDate);
 
-          const q = query(
-            collection(db, COLLECTIONS.TRANSACTIONS),
-            where('date', '<', boundaryTimestamp),
-            orderBy('date', 'desc'),
-            limit(500)
-          );
-
-          const snapshot = await getDocs(q);
+          // EXPORT-001: intentionally fetch ALL historical transactions without a limit so that
+          // the computed opening balance is accurate regardless of how many transactions exist.
+          // Paginate in batches of 500 to avoid Firestore's 1 MiB response limit.
+          const PAGE_SIZE = 500;
           const netFlows: Record<string, number> = {};
-
-          snapshot.docs.forEach(doc => {
-            const data = doc.data() as RawTransactionDoc;
-            const type = data.type;
-            const amount = data.amount || 0;
-            const bankAccountId = data.bankAccountId;
-            if (!bankAccountId) return;
-
-            const change = type === 'Income' ? amount : -amount;
-            netFlows[bankAccountId] = (netFlows[bankAccountId] || 0) + change;
-          });
+          let lastDoc: import('firebase/firestore').QueryDocumentSnapshot | null = null;
+          while (true) {
+            const pageQuery = lastDoc
+              ? query(
+                  collection(db, COLLECTIONS.TRANSACTIONS),
+                  where('date', '<', boundaryTimestamp),
+                  orderBy('date', 'desc'),
+                  limit(PAGE_SIZE),
+                  startAfter(lastDoc)
+                )
+              : query(
+                  collection(db, COLLECTIONS.TRANSACTIONS),
+                  where('date', '<', boundaryTimestamp),
+                  orderBy('date', 'desc'),
+                  limit(PAGE_SIZE)
+                );
+            const pageSnap = await getDocs(pageQuery);
+            pageSnap.docs.forEach(d => {
+              const data = d.data() as RawTransactionDoc;
+              const type = data.type;
+              const amount = data.amount || 0;
+              const bankAccountId = data.bankAccountId;
+              if (!bankAccountId) return;
+              const change = type === 'Income' ? amount : -amount;
+              netFlows[bankAccountId] = (netFlows[bankAccountId] || 0) + change;
+            });
+            if (pageSnap.docs.length < PAGE_SIZE) break;
+            lastDoc = pageSnap.docs[pageSnap.docs.length - 1];
+          }
 
           return netFlows;
         } catch (error) {
@@ -536,6 +545,26 @@ export class FinanceService {
             ? transactionData.amount
             : -Math.abs(transactionData.amount);
           const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, transactionData.bankAccountId);
+
+          // VAL-03: warn if transaction would result in negative balance
+          const accountSnap = await getDoc(bankAccountRef);
+          if (accountSnap.exists()) {
+            const accountData = accountSnap.data();
+            const projectedBalance = (accountData.currentBalance ?? 0) + amountDelta;
+            if (projectedBalance < 0 && !accountData.allowNegativeBalance) {
+              console.warn('[financeService] createTransaction: projected balance would go negative', {
+                bankAccountId: transactionData.bankAccountId,
+                currentBalance: accountData.currentBalance,
+                amountDelta,
+                projectedBalance,
+              });
+              errorLoggingService.logError(
+                new Error(`Transaction would result in negative balance (${projectedBalance}) for account ${transactionData.bankAccountId}`),
+                { component: 'financeService', action: 'createTransaction', severity: 'warning' }
+              );
+            }
+          }
+
           const createBatch = writeBatch(db);
           createBatch.set(txRef, cleanTransaction);
           createBatch.update(bankAccountRef, { currentBalance: increment(amountDelta) });
@@ -553,7 +582,13 @@ export class FinanceService {
   }
 
   // Create project transaction
-  static async createProjectTransaction(transactionData: Omit<Transaction, 'id'>): Promise<string> {
+  // ATOMIC-001: accepts an optional externalBatch so callers can keep multi-document operations
+  // in a single writeBatch instead of using standalone addDoc. When externalBatch is provided,
+  // the set operation is added to it and the caller is responsible for committing.
+  static async createProjectTransaction(
+    transactionData: Omit<Transaction, 'id'>,
+    externalBatch?: import('firebase/firestore').WriteBatch
+  ): Promise<string> {
     return withDevMode(
       () => {
         console.log('[Dev Mode] Mocking project transaction creation');
@@ -583,15 +618,27 @@ export class FinanceService {
           }
 
           const cleanTransaction = removeUndefined(newTransaction);
-          const docRef = await addDoc(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), cleanTransaction);
+          const newDocRef = doc(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS));
+
+          if (externalBatch) {
+            // Caller owns the batch commit; we just register the set operation.
+            externalBatch.set(newDocRef, cleanTransaction);
+            // Inventory sync and cache invalidation are deferred to the caller post-commit.
+            return newDocRef.id;
+          }
+
+          // Standalone path: create our own batch so the set is still an atomic operation.
+          const ownBatch = writeBatch(db);
+          ownBatch.set(newDocRef, cleanTransaction);
+          await ownBatch.commit();
 
           // Sync with inventory if linked
-          await this.syncTransactionWithInventory({ ...transactionData, id: docRef.id });
+          await this.syncTransactionWithInventory({ ...transactionData, id: newDocRef.id });
 
           // TX-C1: invalidate cache so subsequent reads reflect the new project transaction
           invalidateFinanceCache();
 
-          return docRef.id;
+          return newDocRef.id;
         } catch (error) {
           console.error('Error creating project transaction:', error);
           throw error;
@@ -1201,6 +1248,26 @@ export class FinanceService {
         (updateData as Record<string, unknown>).date = Timestamp.fromDate(new Date(updates.date));
       }
 
+      // SYNC-005: if amount or type changed (and transaction is not already Voided), adjust
+      // bankAccount.currentBalance by the delta so the stored balance stays accurate.
+      const amountChanged = updates.amount !== undefined && updates.amount !== currentTransaction.amount;
+      const typeChanged = updates.type !== undefined && updates.type !== currentTransaction.type;
+      const notVoided = currentTransaction.status !== 'Voided';
+      const bankAccountId = updates.bankAccountId ?? currentTransaction.bankAccountId;
+      let balanceDeltaUpdate: Record<string, unknown> | null = null;
+      if (notVoided && bankAccountId && (amountChanged || typeChanged)) {
+        const oldType = currentTransaction.type as string;
+        const newType = (updates.type ?? currentTransaction.type) as string;
+        const oldAmount = currentTransaction.amount ?? 0;
+        const newAmount = updates.amount ?? currentTransaction.amount ?? 0;
+        const oldDelta = oldType === 'Income' ? oldAmount : -Math.abs(oldAmount);
+        const newDelta = newType === 'Income' ? newAmount : -Math.abs(newAmount);
+        const balanceAdjustment = newDelta - oldDelta;
+        if (balanceAdjustment !== 0) {
+          balanceDeltaUpdate = { bankAccountId, balanceAdjustment };
+        }
+      }
+
       // If transaction type is updated, propagate to all splits in the same batch
       if (updates.type) {
         const splits = await this.getTransactionSplits(transactionId);
@@ -1213,14 +1280,34 @@ export class FinanceService {
               updatedAt: Timestamp.now(),
             });
           }
+          if (balanceDeltaUpdate) {
+            const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, balanceDeltaUpdate.bankAccountId as string);
+            typeBatch.update(baRef, { currentBalance: increment(balanceDeltaUpdate.balanceAdjustment as number) });
+          }
           await typeBatch.commit();
           invalidateFinanceCache();
         } else {
-          await updateDoc(transactionRef, updateData);
+          if (balanceDeltaUpdate) {
+            const balBatch = writeBatch(db);
+            balBatch.update(transactionRef, updateData);
+            const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, balanceDeltaUpdate.bankAccountId as string);
+            balBatch.update(baRef, { currentBalance: increment(balanceDeltaUpdate.balanceAdjustment as number) });
+            await balBatch.commit();
+          } else {
+            await updateDoc(transactionRef, updateData);
+          }
           invalidateFinanceCache();
         }
       } else {
-        await updateDoc(transactionRef, updateData);
+        if (balanceDeltaUpdate) {
+          const balBatch = writeBatch(db);
+          balBatch.update(transactionRef, updateData);
+          const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, balanceDeltaUpdate.bankAccountId as string);
+          balBatch.update(baRef, { currentBalance: increment(balanceDeltaUpdate.balanceAdjustment as number) });
+          await balBatch.commit();
+        } else {
+          await updateDoc(transactionRef, updateData);
+        }
         invalidateFinanceCache();
       }
 
@@ -1862,6 +1949,15 @@ export class FinanceService {
             reversedBy: operatorId,
             updatedAt: new Date().toISOString(),
           });
+          // SYNC-003: reverse the original transaction's balance impact atomically.
+          // The reversal entry is Voided so it does not affect currentBalance itself.
+          if (original.bankAccountId && original.amount && original.type) {
+            const amountDelta = original.type === 'Income'
+              ? original.amount
+              : -Math.abs(original.amount);
+            const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, original.bankAccountId);
+            batch.update(bankAccountRef, { currentBalance: increment(-amountDelta) });
+          }
           await batch.commit();
 
           invalidateFinanceCache();
@@ -3909,9 +4005,16 @@ export class FinanceService {
         accounts.forEach(acc => {
           lines.push(`${acc.name},${acc.balance.toFixed(2)},${acc.currency}`);
         });
-        const totalCash = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+        // FIN-007: group totals by currency to avoid meaningless cross-currency sums.
+        const totalsByCurrency: Record<string, number> = {};
+        accounts.forEach(acc => {
+          const ccy = acc.currency || 'MYR';
+          totalsByCurrency[ccy] = (totalsByCurrency[ccy] || 0) + acc.balance;
+        });
         lines.push('');
-        lines.push(`Total Cash & Bank,${totalCash.toFixed(2)},`);
+        Object.entries(totalsByCurrency).forEach(([ccy, total]) => {
+          lines.push(`Total Cash & Bank (${ccy}),${total.toFixed(2)},${ccy}`);
+        });
       } else if (reportType === 'cashflow') {
         lines.push('Month,Income,Expenses,Net Cash Flow');
         Object.entries(report.data.monthlyCashFlow)
@@ -4624,8 +4727,10 @@ export class FinanceService {
           await this.syncMemberMembership(tx.memberId as string, tx.projectId);
         }
 
-        // All cleanup succeeded — now commit the status change
-        await updateDoc(ref, {
+        // All cleanup succeeded — now commit the status change + balance reversal atomically.
+        // SYNC-004: voiding a transaction must undo its balance impact, exactly as deleteTransaction does.
+        const voidBatch = writeBatch(db);
+        voidBatch.update(ref, {
           status: 'Voided',
           voidedAt: Timestamp.now(),
           voidedBy,
@@ -4635,6 +4740,12 @@ export class FinanceService {
           matchStatus: 'unmatched',
           updatedAt: Timestamp.now(),
         });
+        if (tx.bankAccountId && tx.amount && tx.type) {
+          const amountDelta = tx.type === 'Income' ? tx.amount : -Math.abs(tx.amount);
+          const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, tx.bankAccountId);
+          voidBatch.update(bankAccountRef, { currentBalance: increment(-amountDelta) });
+        }
+        await voidBatch.commit();
 
         invalidateFinanceCache();
       }

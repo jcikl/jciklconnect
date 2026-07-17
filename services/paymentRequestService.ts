@@ -8,6 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
+  runTransaction,
   query,
   where,
   orderBy,
@@ -119,6 +120,8 @@ export class PaymentRequestService {
         return { id, referenceNumber };
       },
       async () => {
+    // VAL-02: amount must be a positive finite number
+    if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error('Payment request amount must be a positive number');
     const now = Timestamp.now();
     const payload = removeUndefined({
       applicantId: data.applicantId,
@@ -277,12 +280,11 @@ export class PaymentRequestService {
       },
       async () => {
         const ref = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
+        // RC-002: Preliminary read used for budget check only.  The actual
+        // status-check + write is wrapped in runTransaction below so two
+        // simultaneous Approve clicks cannot both commit (double-approval race).
         const snap0 = await getDoc(ref);
         if (!snap0.exists()) throw new Error('Payment request not found');
-        const currentStatus = (snap0.data() as PaymentRequest).status;
-        if (currentStatus !== 'submitted') {
-          throw new Error(`Cannot ${status} a payment request with status "${currentStatus}" — only submitted requests can be approved or rejected.`);
-        }
 
         const now = Timestamp.now();
         const prUpdatePayload: any = {
@@ -297,6 +299,24 @@ export class PaymentRequestService {
           const pr = { id: snap0.id, ...snap0.data() } as PaymentRequest;
           const category = pr.category === 'projects_activities' ? 'Projects & Activities' : 'Administrative';
           const projectId = pr.activityId || pr.activityRef || undefined;
+
+          // BUD-001: guard against overspending a project budget before writing anything.
+          if (projectId) {
+            const projectDoc = await projectFinancialService.getProjectById(projectId).catch(() => null);
+            if (projectDoc && typeof projectDoc.budget === 'number' && projectDoc.budget > 0) {
+              const currentExpenses = typeof projectDoc.totalExpenses === 'number'
+                ? projectDoc.totalExpenses
+                : 0;
+              const prAmount = pr.totalAmount ?? pr.amount ?? 0;
+              if (currentExpenses + prAmount > projectDoc.budget) {
+                throw new Error(
+                  `Approving this payment request (RM ${prAmount.toFixed(2)}) would exceed the project budget. ` +
+                  `Budget: RM ${projectDoc.budget.toFixed(2)}, spent so far: RM ${currentExpenses.toFixed(2)}.`
+                );
+              }
+            }
+          }
+
           const year = new Date(pr.date || pr.createdAt).getFullYear();
           const description = pr.items?.length
             ? pr.items.map((i: any) => i.purpose).filter(Boolean).join(', ')
@@ -319,11 +339,18 @@ export class PaymentRequestService {
             createdAt: now,
             updatedAt: now,
           });
-          const batch = writeBatch(db);
           const txRef = doc(collection(db, COLLECTIONS.TRANSACTIONS));
-          batch.set(txRef, transactionPayload);
-          batch.update(ref, prUpdatePayload);
-          await batch.commit();
+          // RC-002: atomic guard — second approver sees updated status and throws.
+          await runTransaction(db, async (txn) => {
+            const freshSnap = await txn.get(ref);
+            if (!freshSnap.exists()) throw new Error('Payment request not found');
+            const currentStatus = (freshSnap.data() as PaymentRequest).status;
+            if (currentStatus !== 'submitted') {
+              throw new Error(`Cannot ${status} a payment request with status "${currentStatus}" — only submitted requests can be approved or rejected.`);
+            }
+            txn.set(txRef, transactionPayload);
+            txn.update(ref, prUpdatePayload);
+          });
           invalidateFinanceCache();
 
           // BIZ-003: Sync project financial account balance if this PR is tied to a project.

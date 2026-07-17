@@ -739,7 +739,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
           {statistics && (
             <Card>
               {/* Always-visible: 4 stat chips + expand toggle */}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: 'Probation', value: statistics.totalProbationMembers, color: 'text-slate-900' },
                   { label: 'Eligible', value: statistics.eligibleForPromotion, color: 'text-green-600' },

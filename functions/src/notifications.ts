@@ -139,63 +139,89 @@ export const markNotificationRead = functions.https.onCall(async (data, context)
 export const sendDuesRenewalReminders = functions.pubsub
   .schedule('0 9 * * 1') // Every Monday at 9 AM
   .onRun(async (context) => {
-    const now = new Date();
-    const reminderDate = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
+    try {
+      const now = new Date();
+      const reminderDate = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
+      const currentYear = now.getFullYear();
 
-    // Get pending dues transactions that are due soon
-    const pendingDuesSnapshot = await db.collection('duesTransactions')
-      .where('status', '==', 'pending')
-      .where('dueDate', '<=', reminderDate)
-      .get();
+      // Get pending dues transactions that are due soon
+      const pendingDuesSnapshot = await db.collection('duesTransactions')
+        .where('status', '==', 'pending')
+        .where('dueDate', '<=', reminderDate)
+        .get();
 
-    if (pendingDuesSnapshot.empty) {
-      console.log('No pending dues requiring reminders');
-      return null;
-    }
-
-    const batch = db.batch();
-    let reminderCount = 0;
-
-    for (const duesDoc of pendingDuesSnapshot.docs) {
-      const dues = duesDoc.data();
-      
-      // Skip senators (they don't pay dues)
-      if (dues.membershipType === 'senator') {
-        continue;
+      if (pendingDuesSnapshot.empty) {
+        console.log('No pending dues requiring reminders');
+        return null;
       }
 
-      // Create reminder notification
-      const notificationRef = db.collection('notifications').doc();
-      batch.set(notificationRef, {
-        memberId: dues.memberId,
-        type: 'dues_reminder',
-        title: 'Dues Payment Reminder',
-        message: `Your ${dues.duesYear} membership dues of RM${dues.amount} are due soon. Please make your payment to maintain your membership status.`,
-        data: {
-          duesTransactionId: duesDoc.id,
-          amount: dues.amount,
-          duesYear: dues.duesYear,
-          membershipType: dues.membershipType
-        },
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      // Idempotency: fetch existing unread dues_reminder notifications for this year
+      // to avoid sending duplicates when Cloud Scheduler retries a failed invocation.
+      const existingRemindersSnap = await db.collection('notifications')
+        .where('type', '==', 'dues_reminder')
+        .where('read', '==', false)
+        .get();
+      const alreadyRemindedThisYear = new Set<string>();
+      for (const doc of existingRemindersSnap.docs) {
+        const d = doc.data();
+        if ((d.data?.duesYear ?? d.duesYear) === currentYear && d.memberId) {
+          alreadyRemindedThisYear.add(d.memberId as string);
+        }
+      }
 
-      reminderCount++;
+      const batch = db.batch();
+      let reminderCount = 0;
+
+      for (const duesDoc of pendingDuesSnapshot.docs) {
+        const dues = duesDoc.data();
+
+        // Skip senators (they don't pay dues)
+        if (dues.membershipType === 'senator') {
+          continue;
+        }
+
+        // Skip members who already have an unread dues_reminder this year (retry safety)
+        if (alreadyRemindedThisYear.has(dues.memberId)) {
+          continue;
+        }
+
+        // Create reminder notification
+        const notificationRef = db.collection('notifications').doc();
+        batch.set(notificationRef, {
+          memberId: dues.memberId,
+          type: 'dues_reminder',
+          title: 'Dues Payment Reminder',
+          message: `Your ${dues.duesYear} membership dues of RM${dues.amount} are due soon. Please make your payment to maintain your membership status.`,
+          data: {
+            duesTransactionId: duesDoc.id,
+            amount: dues.amount,
+            duesYear: dues.duesYear,
+            membershipType: dues.membershipType
+          },
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        reminderCount++;
+      }
+
+      if (reminderCount > 0) {
+        await batch.commit();
+        console.log(`Sent ${reminderCount} dues renewal reminders`);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[sendDuesRenewalReminders] Fatal error — aborting run:', error);
+      return null;
     }
-
-    if (reminderCount > 0) {
-      await batch.commit();
-      console.log(`Sent ${reminderCount} dues renewal reminders`);
-    }
-
-    return null;
   });
 
 // Function to send event reminders
 export const sendEventReminders = functions.pubsub
   .schedule('0 8 * * *') // Every day at 8 AM
   .onRun(async (context) => {
+    try {
     const now = new Date();
     const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
     const dayAfterTomorrow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
@@ -264,6 +290,10 @@ export const sendEventReminders = functions.pubsub
     }
 
     return null;
+    } catch (error) {
+      console.error('[sendEventReminders] Fatal error — aborting run:', error);
+      return null;
+    }
   });
 
 // ─── Helper: send FCM push + create Firestore notification doc ───────────────

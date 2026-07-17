@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Member, UserRole, MemberTier } from '../types';
@@ -58,6 +58,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [originalMember, setOriginalMember] = useState<Member | null>(null);
   const [originalRole, setOriginalRole] = useState<UserRole | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  // AUTH-003: client-side cooldown to prevent password-reset email flooding
+  const lastResetRequestRef = useRef<number>(0);
   // Prevents onAuthStateChanged from signing out a user whose member doc hasn't been written yet
   const isSigningUpRef = useRef(false);
 
@@ -92,8 +94,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } as User;
 
       setUser(mockUser);
-      // TODO SEC-003: VITE_DEV_EMAIL is bundled into the browser build. Move to .env.local with DEV_EMAIL (non-VITE_ prefix).
-    const _devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
+      // AUTH-006 / TODO SEC-003: guard with import.meta.env.DEV so this path is compiled out of production.
+    const _devEmail = import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL as string | undefined) : undefined;
       const member = (_devEmail && storedState.user.email === _devEmail) ? MOCK_DEV_ADMIN : (storedState.member as Member);
       setMember(member);
       setLoading(false);
@@ -115,6 +117,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     let isMounted = true;
     let unsubscribe: (() => void) | null = null;
+    // AUTH-001: real-time role listener — unsubscribed when auth state changes or component unmounts
+    let memberUnsubscribe: (() => void) | null = null;
 
     // Only set up listener if not in dev mode
     if (!checkDevMode()) {
@@ -181,6 +185,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // Atomic: user + member land in the same commit so no render sees user without member
               setUser(firebaseUser);
               setMember(memberData);
+
+              // AUTH-001: Subscribe to real-time role changes so demotions/promotions take
+              // effect within seconds instead of waiting up to 60 min for a token refresh.
+              if (memberUnsubscribe) memberUnsubscribe();
+              memberUnsubscribe = onSnapshot(
+                doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid),
+                (snap) => {
+                  if (!isMounted || checkDevMode()) return;
+                  if (snap.exists()) {
+                    setMember({ id: firebaseUser.uid, ...snap.data() } as Member);
+                  }
+                },
+                (err) => console.warn('[auth] member onSnapshot error:', err)
+              );
             } else if (!memberData && isMounted && !checkDevMode()) {
               // Still no member record — sign out, unless we're mid-signup (doc not written yet)
               if (!isMidSignUp) {
@@ -233,14 +251,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (unsubscribe) {
         unsubscribe();
       }
+      if (memberUnsubscribe) {
+        memberUnsubscribe();
+      }
     };
   }, [isDevMode]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    // Developer mock login — credentials set via VITE_DEV_EMAIL / VITE_DEV_PASSWORD env vars
-    // TODO SEC-003: These vars should not be VITE_ prefixed. Move to .env.local with DEV_EMAIL / DEV_PASSWORD prefix.
-    const devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
-    const devPassword = import.meta.env.VITE_DEV_PASSWORD as string | undefined;
+    // AUTH-006: Dev mock login is compiled OUT of production builds via the import.meta.env.DEV
+    // guard. VITE_DEV_EMAIL / VITE_DEV_PASSWORD are still VITE_-prefixed (bundled), but because
+    // this entire block is dead code in production the values are tree-shaken out.
+    // TODO SEC-003: rename to DEV_EMAIL / DEV_PASSWORD (non-VITE_) for full elimination.
+    const devEmail = import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL as string | undefined) : undefined;
+    const devPassword = import.meta.env.DEV ? (import.meta.env.VITE_DEV_PASSWORD as string | undefined) : undefined;
     if (devEmail && devPassword && email === devEmail && password === devPassword) {
       setIsDevMode(true);
       setDevMode(true);
@@ -556,6 +579,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [isDevMode]);
 
   const resetPassword = useCallback(async (email: string) => {
+    // AUTH-003: 60-second client-side cooldown to prevent inbox-flooding abuse.
+    const COOLDOWN_MS = 60_000;
+    const now = Date.now();
+    const elapsed = now - lastResetRequestRef.current;
+    if (elapsed < COOLDOWN_MS) {
+      const remaining = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
+      throw new Error(`请等待 ${remaining} 秒后再重新发送重置邮件。`);
+    }
+    lastResetRequestRef.current = now;
     await sendPasswordResetEmail(auth, email);
   }, []);
 

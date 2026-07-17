@@ -16,6 +16,7 @@ const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 
 const TOYYIB_SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
 if (!TOYYIB_SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
+if (!process.env.TOYYIBPAY_WEBHOOK_SECRET) throw new Error('TOYYIBPAY_WEBHOOK_SECRET env var not set — set it in Netlify and append ?secret=<value> to the callback URL in toyyibpay-api.js createBill');
 const TOYYIB_IS_SANDBOX = process.env.TOYYIBPAY_SANDBOX !== 'false';
 const TOYYIB_BASE_URL = TOYYIB_IS_SANDBOX
   ? 'https://dev.toyyibpay.com/index.php/api'
@@ -73,17 +74,10 @@ exports.handler = async (event) => {
   // callback URL at bill creation time (toyyibpay-api.js createBill case) so
   // only our own webhook endpoint receives calls with the correct secret.
   const webhookSecret = process.env.TOYYIBPAY_WEBHOOK_SECRET;
-  if (webhookSecret) {
-    const receivedSecret = event.queryStringParameters?.secret;
-    if (receivedSecret !== webhookSecret) {
-      console.warn('[toyyibpay-callback] Webhook secret mismatch — rejecting callback');
-      return { statusCode: 401, body: 'Unauthorized' };
-    }
-  } else {
-    // TODO (NET-005): Set TOYYIBPAY_WEBHOOK_SECRET in Netlify env vars and append
-    // ?secret=<value> to billCallbackUrl in toyyibpay-api.js createBill to enforce
-    // shared-secret verification. Without it any party can POST to this endpoint.
-    console.warn('[toyyibpay-callback] TOYYIBPAY_WEBHOOK_SECRET not set — skipping secret verification');
+  const receivedSecret = event.queryStringParameters?.secret;
+  if (receivedSecret !== webhookSecret) {
+    console.warn('[toyyibpay-callback] Webhook secret mismatch — rejecting callback');
+    return { statusCode: 401, body: 'Unauthorized' };
   }
 
   let data = {};

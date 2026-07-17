@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from '../../ui/Common';
 import {
   Users,
   DollarSign,
@@ -153,6 +154,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   onInitiateRenewal,
 }) => {
   const selectedYear = year;
+  const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [filterType, setFilterType] = useState<MembershipType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<MembershipStatus | 'all'>('all');
@@ -202,12 +204,12 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         }
       }
 
-      alert(`自动匹配完成！\n✅ 成功关联: ${matched} 笔\n⏭️ 未匹配: ${skipped} 笔\n📌 已关联: ${filteredByYear.length - unlinked.length} 笔（跳过）`);
+      showToast(`自动匹配完成！成功关联: ${matched} 笔，未匹配: ${skipped} 笔`, 'success');
 
       // Reload page data to reflect changes
       window.location.reload();
     } catch (err: any) {
-      alert(`自动匹配失败: ${err.message}`);
+      showToast(`自动匹配失败: ${err.message}`, 'error');
     } finally {
       setAutoMatching(false);
     }
@@ -220,13 +222,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     setFixingFirstDues(true);
     try {
       const result = await MembersService.fixFirstMembershipDuesTo350();
-      alert(
-        `首次会费调整完成\n` +
-          `扫描会员: ${result.scanned}\n` +
-          `已更新: ${result.updated}\n` +
-          `无 membership 记录: ${result.skippedNoMembership}\n` +
-          `已是 RM350: ${result.alreadyCorrect}` +
-          (result.errors.length > 0 ? `\n失败: ${result.errors.length}（见控制台）` : '')
+      showToast(
+        `首次会费调整完成：扫描 ${result.scanned}，更新 ${result.updated}，已是RM350 ${result.alreadyCorrect}${result.errors.length > 0 ? `，失败 ${result.errors.length}（见控制台）` : ''}`,
+        result.errors.length > 0 ? 'warning' : 'success'
       );
       if (result.errors.length > 0) {
         console.error('fixFirstMembershipDuesTo350 errors:', result.errors);
@@ -234,7 +232,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       await onMembershipDataChanged?.();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '未知错误';
-      alert(`首次会费调整失败: ${message}`);
+      showToast(`首次会费调整失败: ${message}`, 'error');
     } finally {
       setFixingFirstDues(false);
     }
@@ -247,19 +245,16 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     setSyncingMembershipTypes(true);
     try {
       const result = await MembersService.batchSyncMembershipTypes({ year: selectedYear });
-      alert(
-        `membershipType 同步完成（${result.year} 年）\n` +
-          `扫描: ${result.scanned}\n` +
-          `已更新: ${result.updated}\n` +
-          `无需变更: ${result.alreadyCorrect}` +
-          (result.errors.length > 0 ? `\n失败: ${result.errors.length}（见控制台）` : '')
+      showToast(
+        `membershipType 同步完成（${result.year} 年）：扫描 ${result.scanned}，更新 ${result.updated}${result.errors.length > 0 ? `，失败 ${result.errors.length}（见控制台）` : ''}`,
+        result.errors.length > 0 ? 'warning' : 'success'
       );
       if (result.errors.length > 0) {
         console.error('batchSyncMembershipTypes errors:', result.errors);
       }
       await onMembershipDataChanged?.();
     } catch (err: unknown) {
-      alert(`membershipType 同步失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      showToast(`membershipType 同步失败: ${err instanceof Error ? err.message : '未知错误'}`, 'error');
     } finally {
       setSyncingMembershipTypes(false);
     }
@@ -276,21 +271,16 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         membershipTransactions,
         onlyExistingRecords: false,
       });
-      alert(
-        `membership 同步完成（${result.year} 年）\n` +
-          `扫描: ${result.scanned}\n` +
-          `更新: ${result.updated}\n` +
-          `新建: ${result.created}\n` +
-          `未达本年度: ${result.skippedNotEligible}\n` +
-          `已是最新: ${result.alreadyCorrect}` +
-          (result.errors.length > 0 ? `\n失败: ${result.errors.length}（见控制台）` : '')
+      showToast(
+        `membership 同步完成（${result.year} 年）：扫描 ${result.scanned}，更新 ${result.updated}，新建 ${result.created}${result.errors.length > 0 ? `，失败 ${result.errors.length}（见控制台）` : ''}`,
+        result.errors.length > 0 ? 'warning' : 'success'
       );
       if (result.errors.length > 0) {
         console.error('batchSyncMembershipRecords errors:', result.errors);
       }
       await onMembershipDataChanged?.();
     } catch (err: unknown) {
-      alert(`membership 同步失败: ${err instanceof Error ? err.message : '未知错误'}`);
+      showToast(`membership 同步失败: ${err instanceof Error ? err.message : '未知错误'}`, 'error');
     } finally {
       setSyncingMembershipRecords(false);
     }
@@ -341,7 +331,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       await new Promise(r => setTimeout(r, 600));
     }
 
-    alert(`已打开 ${sent} 个 WhatsApp 会话。`);
+    showToast(`已打开 ${sent} 个 WhatsApp 会话。`, 'success');
     await handleDismissWaCampaign();
   };
 
@@ -352,7 +342,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       (filterType === 'all' || r.membershipType === filterType)
     );
     if (targets.length === 0) {
-      alert('没有符合条件的待提醒会员（overdue / pending / partial）。');
+      showToast('没有符合条件的待提醒会员（overdue / pending / partial）。', 'warning');
       return;
     }
     setConfirmState({ open: true, title: 'Send WhatsApp Reminders', message: `将为 ${targets.length} 位会员逐一打开 WhatsApp 提醒。\n浏览器可能拦截弹出窗口，请确保已允许此页面弹窗。\n\n继续？`, variant: 'info', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBulkWhatsApp(targets); } });
@@ -372,7 +362,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         await new Promise(r => setTimeout(r, 600));
       }
     }
-    alert(`已打开 ${sent} 个 WhatsApp 会话。${targets.length - sent > 0 ? `\n⚠️ ${targets.length - sent} 位会员没有电话号码，已跳过。` : ''}`);
+    showToast(`已打开 ${sent} 个 WhatsApp 会话。${targets.length - sent > 0 ? ` ${targets.length - sent} 位会员没有电话号码，已跳过。` : ''}`, sent > 0 ? 'success' : 'warning');
   };
 
   const mergedRenewals = React.useMemo((): RenewalWithTargetDues[] => {

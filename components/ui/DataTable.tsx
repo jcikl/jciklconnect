@@ -1,5 +1,6 @@
 // Reusable Data Table Component
 import React, { useMemo, useState } from 'react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { Card } from './Common';
 import { Pagination, PaginationProps } from './Pagination';
 
@@ -35,25 +36,50 @@ export function DataTable<T extends { id: string }>({
 }: DataTableProps<T>) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(initialItemsPerPage);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const sortedData = useMemo(() => {
+    if (!sortKey) return data;
+    return [...data].sort((a, b) => {
+      const av = (a as any)[sortKey];
+      const bv = (b as any)[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [data, sortKey, sortDir]);
 
   const paginatedData = useMemo(() => {
-    if (!pagination) return data;
+    if (!pagination) return sortedData;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return data.slice(startIndex, endIndex);
-  }, [data, currentPage, itemsPerPage, pagination]);
+    return sortedData.slice(startIndex, endIndex);
+  }, [sortedData, currentPage, itemsPerPage, pagination]);
 
   const totalPages = useMemo(() => {
     if (!pagination) return 1;
-    return Math.ceil(data.length / itemsPerPage);
-  }, [data.length, itemsPerPage, pagination]);
+    return Math.ceil(sortedData.length / itemsPerPage);
+  }, [sortedData.length, itemsPerPage, pagination]);
 
   // Reset to page 1 when data changes or items per page changes
   React.useEffect(() => {
     if (pagination && currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [data.length, itemsPerPage, totalPages, pagination, currentPage]);
+  }, [sortedData.length, itemsPerPage, totalPages, pagination, currentPage]);
 
   if (loading) {
     return (
@@ -87,7 +113,20 @@ export function DataTable<T extends { id: string }>({
                     key={column.key}
                     className="px-6 py-4 text-sm font-semibold text-slate-500"
                   >
-                    {column.header}
+                    {column.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(column.key)}
+                        className="flex items-center gap-1 hover:text-slate-700 transition-colors"
+                      >
+                        {column.header}
+                        {sortKey === column.key ? (
+                          sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                        ) : (
+                          <ChevronDown size={14} className="opacity-30" />
+                        )}
+                      </button>
+                    ) : column.header}
                   </th>
                 ))}
               </tr>
@@ -115,12 +154,12 @@ export function DataTable<T extends { id: string }>({
         </div>
       </Card>
       
-      {pagination && data.length > 0 && (
+      {pagination && sortedData.length > 0 && (
         <div className="mt-4">
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            totalItems={data.length}
+            totalItems={sortedData.length}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
             onItemsPerPageChange={setItemsPerPage}

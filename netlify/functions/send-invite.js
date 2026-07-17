@@ -6,9 +6,10 @@ const rateLimitMap = new Map() // callerUid -> { count, resetAt }
 const RATE_LIMIT = 10 // max invites per window
 const RATE_WINDOW_MS = 10 * 60 * 1000 // 10 minutes
 
-const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
-const clientEmail = process.env.VITE_FIREBASE_CLIENT_EMAIL;
-const privateKey = process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+// SEC-CF05: FIREBASE_ADMIN_* (no VITE_ prefix) so Vite never injects these into the browser bundle.
+const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 console.log('[send-invite] init check:', {
   hasProjectId: !!projectId,

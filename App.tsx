@@ -688,7 +688,17 @@ export const JCIKLApp: React.FC = () => {
     // Per-module error boundary: isolates crashes so only the affected module
     // shows an error instead of the entire content area going blank.
     const wrapEB = (component: React.ReactNode, moduleName: string) => (
-      <ErrorBoundary fallback={<div className="p-8 text-center text-red-600">{moduleName} 加载失败，请刷新或联系 IT</div>}>
+      <ErrorBoundary fallback={
+        <div className="p-8 text-center">
+          <p className="text-red-600 mb-4">{moduleName} 加载失败，请刷新或联系 IT</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-jci-blue text-white rounded-lg text-sm hover:bg-jci-blue/90 transition-colors"
+          >
+            重试 / Retry
+          </button>
+        </div>
+      }>
         {component}
       </ErrorBoundary>
     );
@@ -723,11 +733,15 @@ export const JCIKLApp: React.FC = () => {
         if (!hasPermission('canViewFinance')) return dashboardFallback;
         return wrapEB(<InventoryView searchQuery={searchQuery} />, '库存');
       case 'DIRECTORY':
+        // AUTH-004: DIRECTORY contains member PII — block guests and unauthenticated users.
+        if (!member || member.role === UserRole.GUEST) return dashboardFallback;
         return wrapEB(<BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />, '商业目录');
       case 'AUTOMATION':
         if (!isAdmin && !isBoard) return dashboardFallback;
         return wrapEB(<AutomationStudio />, '自动化');
       case 'KNOWLEDGE':
+        // AUTH-004: KNOWLEDGE is an authenticated-member resource — block guests.
+        if (!member || member.role === UserRole.GUEST) return dashboardFallback;
         return wrapEB(<KnowledgeView searchQuery={searchQuery} />, '知识库');
       case 'COMMUNICATION':
         if (!canAccessWorkspaceModules) return dashboardFallback;

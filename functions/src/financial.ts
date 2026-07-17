@@ -41,33 +41,39 @@ export const validateTransactionSplits = functions.firestore
     }
 
     // Fetch splits from TRANSACTION_SPLITS collection
-    const splitsSnapshot = await db.collection('transactionSplits')
-      .where('parentTransactionId', '==', transactionId)
-      .get();
-    
-    const splits = splitsSnapshot.docs.map(doc => doc.data());
-    
-    // Calculate sum of splits
-    const splitSum = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
-    
-    // Check if splits sum equals transaction amount (with small tolerance for floating point)
-    const tolerance = 0.01;
-    if (Math.abs(splitSum - transaction.amount) > tolerance) {
-      console.error(`Transaction ${transactionId} split sum (${splitSum}) does not equal transaction amount (${transaction.amount})`);
-      
-      // Update transaction with validation error
-      await db.collection('transactions').doc(transactionId).update({
-        validationError: `Split amounts (${splitSum}) do not sum to transaction amount (${transaction.amount})`,
-        validatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        _validationSource: 'validator'
-      });
-    } else {
-      // Clear any previous validation errors
-      await db.collection('transactions').doc(transactionId).update({
-        validationError: admin.firestore.FieldValue.delete(),
-        validatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        _validationSource: 'validator'
-      });
+    try {
+      const splitsSnapshot = await db.collection('transactionSplits')
+        .where('parentTransactionId', '==', transactionId)
+        .get();
+
+      const splits = splitsSnapshot.docs.map(doc => doc.data());
+
+      // Calculate sum of splits
+      const splitSum = splits.reduce((sum: number, split: any) => sum + split.amount, 0);
+
+      // Check if splits sum equals transaction amount (with small tolerance for floating point)
+      const tolerance = 0.01;
+      if (Math.abs(splitSum - transaction.amount) > tolerance) {
+        console.error(`Transaction ${transactionId} split sum (${splitSum}) does not equal transaction amount (${transaction.amount})`);
+
+        // Update transaction with validation error
+        await db.collection('transactions').doc(transactionId).update({
+          validationError: `Split amounts (${splitSum}) do not sum to transaction amount (${transaction.amount})`,
+          validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          _validationSource: 'validator'
+        });
+      } else {
+        // Clear any previous validation errors
+        await db.collection('transactions').doc(transactionId).update({
+          validationError: admin.firestore.FieldValue.delete(),
+          validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          _validationSource: 'validator'
+        });
+      }
+    } catch (error) {
+      // Log and swallow to prevent unbounded retries on permanent failures (e.g. document deleted).
+      console.error(`[validateTransactionSplits] Error validating transaction ${transactionId}:`, error);
+      return null;
     }
 
     return null;

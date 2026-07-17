@@ -444,6 +444,10 @@ export class MembersService {
       const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!EMAIL_RE.test(memberData.email)) throw new Error('Invalid email format');
 
+      // VAL-01: check email uniqueness before writing
+      const existing = await this.getMemberByEmail(memberData.email);
+      if (existing) throw new Error('A member with this email already exists');
+
       const payload = {
         ...memberData,
         ...(await this.syncComputedMembershipType(memberData as Partial<Member>)),

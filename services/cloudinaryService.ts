@@ -196,7 +196,16 @@ export const uploadToCloudinary = (
         try {
           const errorData = JSON.parse(xhr.responseText);
           console.error('Cloudinary upload failed:', errorData);
-          reject(new Error(errorData.error?.message || 'Failed to upload image to Cloudinary'));
+          const rawMsg: string = errorData.error?.message || '';
+          let friendlyMsg: string;
+          if (rawMsg.match(/format|file type/i)) {
+            friendlyMsg = 'Unsupported file format. Please use JPG, PNG, or WEBP.';
+          } else if (rawMsg.match(/too large|size/i)) {
+            friendlyMsg = 'File is too large. Please compress or resize the image and try again.';
+          } else {
+            friendlyMsg = rawMsg || 'Failed to upload image. Please try again.';
+          }
+          reject(new Error(friendlyMsg));
         } catch (e) {
           console.error('Cloudinary upload failed:', xhr.responseText);
           reject(new Error(`Failed to upload to Cloudinary (status ${xhr.status})`));

@@ -607,7 +607,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             drawerOnMobile
           >
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                 <div className="p-4 bg-slate-50 rounded-xl">
                   <p className="text-xs text-slate-500 font-medium uppercase mb-1">Current Stock</p>
                   <div className="text-2xl font-bold text-slate-900">{selectedItem.quantity}</div>
@@ -1447,7 +1447,7 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
 
       {/* KPI Strip — only shown when data exists */}
       {itemsWithDepreciation.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 md:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
           {[
             { label: 'Purchase Value',  value: formatCurrency(totalPurchaseValue),  icon: <DollarSign size={16} />,   color: 'blue' },
             { label: 'Current Value',   value: formatCurrency(totalCurrentValue),   icon: <TrendingDown size={16} />, color: 'green' },
@@ -1567,7 +1567,7 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
                         <RefreshCw size={13} className={isUpdating ? 'animate-spin' : ''} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center mb-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center mb-2.5">
                       <div className="bg-slate-50 rounded-lg py-1.5 px-1">
                         <p className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Purchase</p>
                         <p className="text-xs font-bold text-slate-700 tabular-nums">{formatCurrency(item.purchasePrice || 0)}</p>
@@ -1632,7 +1632,7 @@ const FinancialHistoryTab: React.FC<FinancialHistoryTabProps> = ({ transactions,
 
       {/* Summary strip — only when data exists */}
       {linkedTransactions.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 md:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
           {[
             { label: 'Total Transactions', value: String(linkedTransactions.length), icon: <Package size={16} />, color: 'blue' },
             { label: 'Total Restocked', value: formatCurrency(totalIn), icon: <TrendingDown size={16} />, color: 'green' },

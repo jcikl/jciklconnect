@@ -42,8 +42,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     } catch (err: any) {
       let errorMessage = err?.message || 'Failed to login. Please check your credentials.';
       
-      const isCredentialError = 
-        errorMessage.includes('auth/invalid-credential') || 
+      // Handle specific Firebase auth error codes first
+      if (errorMessage.includes('auth/user-disabled')) {
+        errorMessage = 'Your account has been suspended. Please contact an admin.';
+      } else if (errorMessage.includes('auth/too-many-requests')) {
+        errorMessage = 'Too many failed attempts. Please wait a few minutes and try again.';
+      } else if (errorMessage.includes('auth/network-request-failed')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      }
+
+      const isCredentialError =
+        errorMessage.includes('auth/invalid-credential') ||
         errorMessage.includes('auth/wrong-password') ||
         errorMessage.includes('auth/user-not-found');
 

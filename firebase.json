@@ -28,6 +28,7 @@
     ],
     "headers": [
       {
+        "_comment": "CFG-007: Firebase Hosting is the secondary deployment target. Netlify (netlify.toml) is the primary host and carries the full security-header set (CSP, X-Frame-Options, HSTS, etc.). If this Firebase Hosting config is ever promoted to primary, copy the [[headers]] blocks from netlify.toml here.",
         "source": "**/*.@(js|css)",
         "headers": [
           {

@@ -166,7 +166,10 @@ export function useFinanceData(searchQuery?: string) {
 
   // ── Core data loaders (stable references via useCallback) ────────────────
 
-  const loadData = useCallback(async (targetYear: number = reportYear) => {
+  // RC-003: accepts an optional stale-response guard so the reportYear useEffect
+  // can abort a slow response that arrived after a newer year was selected.
+  const loadData = useCallback(async (targetYear: number = reportYear, getIgnore?: () => boolean) => {
+    const stale = () => getIgnore?.() ?? false;
     try {
       setLoading(true);
       setError(null);
@@ -179,6 +182,7 @@ export function useFinanceData(searchQuery?: string) {
         targetYear !== 0 ? FinanceService.getHistoricalNetFlowBeforeYear(targetYear) : Promise.resolve({}),
         FinanceService.getAllTransactionYears()
       ]);
+      if (stale()) return;
       setTransactions(txs);
       setAccounts(accts);
       setSummary(summ);
@@ -189,15 +193,17 @@ export function useFinanceData(searchQuery?: string) {
       setAllTransactionYears(allYears);
       try {
         const projectAccountList = await projectFinancialService.getAllProjectAccounts(targetYear);
-        setProjectAccounts(projectAccountList);
+        if (!stale()) setProjectAccounts(projectAccountList);
       } catch (projectAccountError) {
         errorLoggingService.logError(
           projectAccountError instanceof Error ? projectAccountError : new Error(String(projectAccountError)),
           { component: 'useFinanceData', action: 'loadData.projectAccounts' }
         );
+        if (!stale()) showToast('Failed to load project accounts', 'error');
       }
 
       const allSplits = await FinanceService.getAllTransactionSplits(targetYear);
+      if (stale()) return;
       const splitsMap: Record<string, TransactionSplit[]> = {};
       const txIdsSet = new Set(txs.map(t => t.id));
       allSplits.forEach(split => {
@@ -210,11 +216,12 @@ export function useFinanceData(searchQuery?: string) {
       });
       setTransactionSplits(splitsMap);
     } catch (err) {
+      if (stale()) return;
       const errorMessage = err instanceof Error ? err.message : 'Failed to load financial data';
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
-      setLoading(false);
+      if (!stale()) setLoading(false);
     }
   }, [reportYear, showToast]);
 
@@ -288,10 +295,14 @@ export function useFinanceData(searchQuery?: string) {
     }
   }, [showToast]);
 
-  const loadPrPendingReconciliation = useCallback(async () => {
+  // RC-008: accepts optional stale-response guard; gating all setters ensures
+  // that a slow response from a previous trigger cannot overwrite fresher results.
+  const loadPrPendingReconciliation = useCallback(async (getIgnore?: () => boolean) => {
+    const stale = () => getIgnore?.() ?? false;
     setPrReconcileLoading(true);
     try {
       const { items } = await PaymentRequestService.list({ pageSize: 200 });
+      if (stale()) return;
       const approved = items.filter(pr => pr.status === 'approved');
       const linkedPrIds = new Set(
         transactions.filter(t => t.paymentRequestId && t.status === 'Reconciled').map(t => t.paymentRequestId!)
@@ -307,18 +318,20 @@ export function useFinanceData(searchQuery?: string) {
           .filter(t => Math.abs(t.amount - prAmount) < 0.01 && Math.abs(new Date(t.date).getTime() - prDate.getTime()) <= 14 * 86400000)
           .sort((a, b) => Math.abs(new Date(a.date).getTime() - prDate.getTime()) - Math.abs(new Date(b.date).getTime() - prDate.getTime()));
       }
+      if (stale()) return;
       setPrBankSuggestions(suggestions);
       const initial: Record<string, string> = {};
       for (const pr of pending) { if (suggestions[pr.id]?.[0]) initial[pr.id] = suggestions[pr.id][0].id; }
       setPrSelectedBankTx(initial);
     } catch (e) {
+      if (stale()) return;
       errorLoggingService.logError(
         e instanceof Error ? e : new Error(String(e)),
         { component: 'useFinanceData', action: 'loadPrPendingReconciliation' }
       );
       showToast('Failed to load PR reconciliation data', 'error');
     } finally {
-      setPrReconcileLoading(false);
+      if (!stale()) setPrReconcileLoading(false);
     }
   }, [transactions, showToast]);
 
@@ -521,7 +534,10 @@ export function useFinanceData(searchQuery?: string) {
           err instanceof Error ? err : new Error(String(err)),
           { component: 'useFinanceData', action: 'loadSelectedProjectTransactions' }
         );
-        if (!ignore) setSelectedProjectTransactions([]);
+        if (!ignore) {
+          setSelectedProjectTransactions([]);
+          showToast('Failed to load project transactions', 'error');
+        }
       } finally {
         if (!ignore) setLoadingSelectedProjectTransactions(false);
       }
@@ -531,9 +547,12 @@ export function useFinanceData(searchQuery?: string) {
   }, [selectedProjectFilter]);
 
   useEffect(() => {
-    if (moduleTab === 'Reconciliation' && transactions.length > 0) {
-      loadPrPendingReconciliation();
-    }
+    // RC-008: ignore flag prevents a stale response (triggered by the previous
+    // moduleTab or transactions value) from overwriting a newer in-flight result.
+    if (moduleTab !== 'Reconciliation' || transactions.length === 0) return;
+    let ignore = false;
+    loadPrPendingReconciliation(() => ignore);
+    return () => { ignore = true; };
   }, [moduleTab, transactions, loadPrPendingReconciliation]);
 
   useEffect(() => {
@@ -1032,7 +1051,11 @@ export function useFinanceData(searchQuery?: string) {
   }, [txSearchTerm, startTransition]);
 
   useEffect(() => {
-    loadData(reportYear);
+    // RC-003: ignore flag prevents a slow response for a previous year from
+    // overwriting fresher data when the user changes reportYear rapidly.
+    let ignore = false;
+    loadData(reportYear, () => ignore);
+    return () => { ignore = true; };
   }, [reportYear, loadData]);
 
   useEffect(() => {
@@ -1195,12 +1218,24 @@ export function useFinanceData(searchQuery?: string) {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
+  // RC-004: per-handler submission guards — prevent duplicate records from
+  // double-clicks. Using refs (not state) so the guard check + set is
+  // synchronous and cannot lose a race inside an async handler.
+  const isAddingTransactionRef = useRef(false);
+  const isUpdatingTransactionRef = useRef(false);
+
   const handleAddTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isAddingTransactionRef.current) return; // RC-004: double-click guard
+    if (!navigator.onLine) {
+      showToast('You are offline. Please reconnect and try again.', 'warning');
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     const category = formData.get('category') as Transaction['category'];
 
     try {
+      isAddingTransactionRef.current = true;
       setLoading(true);
       let projectId: string | undefined;
       let purpose: string | undefined;
@@ -1245,9 +1280,17 @@ export function useFinanceData(searchQuery?: string) {
       showToast('Transaction recorded successfully', 'success');
       setIsModalOpen(false);
       await loadData();
-    } catch (err) {
-      showToast('Failed to record transaction', 'error');
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      if (code === 'permission-denied') {
+        showToast('You do not have permission to record transactions. Contact an ADMIN.', 'error');
+      } else if (code === 'unavailable' || code === 'deadline-exceeded') {
+        showToast('Network error — please check your connection and try again.', 'error');
+      } else {
+        showToast('Failed to record transaction', 'error');
+      }
     } finally {
+      isAddingTransactionRef.current = false;
       setLoading(false);
     }
   }, [showToast, loadData]);
@@ -1326,45 +1369,66 @@ export function useFinanceData(searchQuery?: string) {
     let successCount = 0;
     let failCount = 0;
 
-    try {
-      const txResults = await Promise.all(
-        Array.from(selectedTxIds).map(async (id) => {
-          try {
-            const tx = transactions.find(t => t.id === id);
-            if (tx?.isSplit) {
-              const splits = await FinanceService.getTransactionSplits(id);
-              await Promise.all(splits.map(s => FinanceService.deleteTransactionSplit(s.id)));
-            }
-            await FinanceService.deleteTransaction(id);
-            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-            return { success: true };
-          } catch (err) {
-            errorLoggingService.logError(
-              err instanceof Error ? err : new Error(String(err)),
-              { component: 'useFinanceData', action: 'handleBatchDelete.tx', additionalData: { id } }
-            );
-            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-            return { success: false, id };
-          }
-        })
-      );
+    // RC-005: process in chunks of 20 to avoid hitting Firestore write-rate
+    // limits and exhausting client connection slots on large selections.
+    const CHUNK_SIZE = 20;
+    const chunkArray = <T,>(arr: T[]): T[][] => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < arr.length; i += CHUNK_SIZE) chunks.push(arr.slice(i, i + CHUNK_SIZE));
+      return chunks;
+    };
 
-      const splitResults = await Promise.all(
-        Array.from(selectedSplitIds).map(async (id) => {
-          try {
-            await FinanceService.deleteTransactionSplit(id);
-            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-            return { success: true };
-          } catch (err) {
-            errorLoggingService.logError(
-              err instanceof Error ? err : new Error(String(err)),
-              { component: 'useFinanceData', action: 'handleBatchDelete.split', additionalData: { id } }
-            );
-            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-            return { success: false, id };
-          }
-        })
-      );
+    try {
+      const txIds = Array.from(selectedTxIds);
+      const txChunks = chunkArray(txIds);
+      const txResults: { success: boolean; id?: string }[] = [];
+      for (const chunk of txChunks) {
+        const chunkResults = await Promise.all(
+          chunk.map(async (id) => {
+            try {
+              const tx = transactions.find(t => t.id === id);
+              if (tx?.isSplit) {
+                const splits = await FinanceService.getTransactionSplits(id);
+                await Promise.all(splits.map(s => FinanceService.deleteTransactionSplit(s.id)));
+              }
+              await FinanceService.deleteTransaction(id);
+              setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+              return { success: true };
+            } catch (err) {
+              errorLoggingService.logError(
+                err instanceof Error ? err : new Error(String(err)),
+                { component: 'useFinanceData', action: 'handleBatchDelete.tx', additionalData: { id } }
+              );
+              setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+              return { success: false, id };
+            }
+          })
+        );
+        txResults.push(...chunkResults);
+      }
+
+      const splitIds = Array.from(selectedSplitIds);
+      const splitChunks = chunkArray(splitIds);
+      const splitResults: { success: boolean; id?: string }[] = [];
+      for (const chunk of splitChunks) {
+        const chunkResults = await Promise.all(
+          chunk.map(async (id) => {
+            try {
+              await FinanceService.deleteTransactionSplit(id);
+              setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+              return { success: true };
+            } catch (err) {
+              errorLoggingService.logError(
+                err instanceof Error ? err : new Error(String(err)),
+                { component: 'useFinanceData', action: 'handleBatchDelete.split', additionalData: { id } }
+              );
+              setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+              return { success: false, id };
+            }
+          })
+        );
+        splitResults.push(...chunkResults);
+      }
 
       successCount = txResults.filter(r => r.success).length + splitResults.filter(r => r.success).length;
       failCount = txResults.filter(r => !r.success).length + splitResults.filter(r => !r.success).length;
@@ -1399,25 +1463,33 @@ export function useFinanceData(searchQuery?: string) {
     let failCount = 0;
 
     try {
-      const txResults = await Promise.all(
-        Array.from(selectedTxIds).map(async (id) => {
-          try {
-            const tx = transactions.find(t => t.id === id);
-            if (tx && tx.status !== 'Cleared' && tx.status !== 'Reconciled' && tx.status !== 'Partially Reconciled') {
-              await FinanceService.updateTransaction(id, { ...tx, status: 'Cleared' });
+      // RC-005: process in chunks of 20 to avoid Firestore write-rate limits.
+      const APPROVE_CHUNK = 20;
+      const txIdArr = Array.from(selectedTxIds);
+      const txResults: { success: boolean }[] = [];
+      for (let i = 0; i < txIdArr.length; i += APPROVE_CHUNK) {
+        const chunk = txIdArr.slice(i, i + APPROVE_CHUNK);
+        const chunkResults = await Promise.all(
+          chunk.map(async (id) => {
+            try {
+              const tx = transactions.find(t => t.id === id);
+              if (tx && tx.status !== 'Cleared' && tx.status !== 'Reconciled' && tx.status !== 'Partially Reconciled') {
+                await FinanceService.updateTransaction(id, { ...tx, status: 'Cleared' });
+              }
+              setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+              return { success: true };
+            } catch (err) {
+              errorLoggingService.logError(
+                err instanceof Error ? err : new Error(String(err)),
+                { component: 'useFinanceData', action: 'handleBatchApprove', additionalData: { id } }
+              );
+              setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+              return { success: false };
             }
-            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-            return { success: true };
-          } catch (err) {
-            errorLoggingService.logError(
-              err instanceof Error ? err : new Error(String(err)),
-              { component: 'useFinanceData', action: 'handleBatchApprove', additionalData: { id } }
-            );
-            setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-            return { success: false };
-          }
-        })
-      );
+          })
+        );
+        txResults.push(...chunkResults);
+      }
 
       const splitResults = Array.from(selectedSplitIds).map(() => {
         setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
@@ -1582,6 +1654,7 @@ export function useFinanceData(searchQuery?: string) {
 
   const handleUpdateTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isUpdatingTransactionRef.current) return; // RC-004: double-click guard
     if (!editingTransaction) return;
 
     const formData = new FormData(e.currentTarget);
@@ -1645,6 +1718,7 @@ export function useFinanceData(searchQuery?: string) {
     };
 
     try {
+      isUpdatingTransactionRef.current = true;
       await FinanceService.updateTransaction(editingTransaction.id, updatedTransaction);
       showToast('Transaction updated successfully', 'success');
       setIsEditModalOpen(false);
@@ -1655,6 +1729,8 @@ export function useFinanceData(searchQuery?: string) {
       await loadData();
     } catch (err) {
       showToast('Failed to update transaction', 'error');
+    } finally {
+      isUpdatingTransactionRef.current = false;
     }
   }, [editingTransaction, editingMembershipYear, editingAdministrativeYear, editingAdministrativePurposeBase, showToast, loadData]);
 

@@ -274,63 +274,71 @@ export const evaluateAutomationRules = functions
       return null;
     }
 
-    // Get all active automation rules
-    const rulesSnapshot = await db.collection('automationRules')
-      .where('enabled', '==', true)
-      .get();
+    // CF-07: Outer try/catch prevents the wildcard trigger from retrying indefinitely
+    // when there is an infrastructure error (quota, network) fetching rules or writing
+    // execution logs. The inner per-rule try/catch already isolates bad rule configs.
+    try {
+      // Get all active automation rules
+      const rulesSnapshot = await db.collection('automationRules')
+        .where('enabled', '==', true)
+        .get();
 
-    if (rulesSnapshot.empty) {
-      return null;
-    }
-
-    const document = change.after.exists ? change.after.data() : null;
-    const collection = context.params.collection;
-    const documentId = context.params.documentId;
-
-    // Evaluate each rule
-    for (const ruleDoc of rulesSnapshot.docs) {
-      const rule = ruleDoc.data();
-      
-      // Check if rule applies to this collection
-      if (rule.trigger && rule.trigger !== collection) {
-        continue;
+      if (rulesSnapshot.empty) {
+        return null;
       }
 
-      try {
-        // Evaluate rule conditions
-        const conditionsMet = evaluateRuleConditions(rule.conditions, rule.logicOperator, document);
-        
-        if (conditionsMet) {
-          // Execute rule actions
-          await executeRuleActions(rule.actions, {
-            collection,
-            documentId,
-            document,
-            ruleId: ruleDoc.id
-          });
+      const document = change.after.exists ? change.after.data() : null;
+      const collection = context.params.collection;
+      const documentId = context.params.documentId;
 
-          // P1-B: Increment triggerCount on the rule so we have an accurate
-          // count of how many times each rule has fired.
-          await ruleDoc.ref.update({
-            lastTriggeredAt: admin.firestore.FieldValue.serverTimestamp(),
-            triggerCount: admin.firestore.FieldValue.increment(1),
-          });
+      // Evaluate each rule
+      for (const ruleDoc of rulesSnapshot.docs) {
+        const rule = ruleDoc.data();
 
-          // Log rule execution
-          await db.collection('rule_executions').add({
-            ruleId: ruleDoc.id,
-            triggeredBy: {
-              collection,
-              documentId
-            },
-            executedAt: admin.firestore.FieldValue.serverTimestamp(),
-            conditionsEvaluated: rule.conditions,
-            actionsExecuted: rule.actions
-          });
+        // Check if rule applies to this collection
+        if (rule.trigger && rule.trigger !== collection) {
+          continue;
         }
-      } catch (error) {
-        console.error(`Error executing rule ${ruleDoc.id}:`, error);
+
+        try {
+          // Evaluate rule conditions
+          const conditionsMet = evaluateRuleConditions(rule.conditions, rule.logicOperator, document);
+
+          if (conditionsMet) {
+            // Execute rule actions
+            await executeRuleActions(rule.actions, {
+              collection,
+              documentId,
+              document,
+              ruleId: ruleDoc.id
+            });
+
+            // P1-B: Increment triggerCount on the rule so we have an accurate
+            // count of how many times each rule has fired.
+            await ruleDoc.ref.update({
+              lastTriggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+              triggerCount: admin.firestore.FieldValue.increment(1),
+            });
+
+            // Log rule execution
+            await db.collection('rule_executions').add({
+              ruleId: ruleDoc.id,
+              triggeredBy: {
+                collection,
+                documentId
+              },
+              executedAt: admin.firestore.FieldValue.serverTimestamp(),
+              conditionsEvaluated: rule.conditions,
+              actionsExecuted: rule.actions
+            });
+          }
+        } catch (error) {
+          console.error(`Error executing rule ${ruleDoc.id}:`, error);
+        }
       }
+    } catch (error) {
+      console.error('[evaluateAutomationRules] Outer infrastructure error — aborting without retry:', error);
+      return null;
     }
 
     return null;

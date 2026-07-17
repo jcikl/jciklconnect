@@ -226,9 +226,9 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
     const availableOperators = getAvailableOperators(condition.field);
 
     return (
-      <div key={condition.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+      <div key={condition.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-700/50">
         <div className="flex items-center justify-between mb-4">
-          <h4 className="font-medium text-gray-900">Condition {index + 1}</h4>
+          <h4 className="font-medium text-slate-900 dark:text-slate-100">Condition {index + 1}</h4>
           <button
             onClick={() => removeCondition(condition.id)}
             className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded"
@@ -313,13 +313,13 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
 
   const renderActionEditor = (action: RuleAction, index: number) => {
     return (
-      <div key={action.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+      <div key={action.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-700/50">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
               {index + 1}
             </span>
-            <h4 className="font-medium text-gray-900">Action</h4>
+            <h4 className="font-medium text-slate-900 dark:text-slate-100">Action</h4>
           </div>
           <div className="flex items-center gap-2">
             <Forms.Checkbox
@@ -484,23 +484,23 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
               <Settings className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                 {initialRule ? 'Edit Rule' : 'Create Rule'}
               </h2>
-              <p className="text-sm text-gray-500">Configure automation rule conditions and actions</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Configure automation rule conditions and actions</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+            className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
           >
             <Trash2 size={20} />
           </button>
@@ -529,7 +529,7 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Basic Information</h2>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Basic Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Forms.Input
                 label="Rule Name"
@@ -569,14 +569,14 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
           <div className="space-y-4">
             <button
               onClick={() => toggleSection('conditions')}
-              className="flex items-center gap-2 text-lg font-semibold text-gray-900 hover:text-gray-700"
+              className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100 hover:text-slate-700 dark:text-slate-200"
             >
               {expandedSections.conditions ? (
-                <ChevronDown className="w-5 h-5 text-gray-400" />
+                <ChevronDown className="w-5 h-5 text-slate-400 dark:text-slate-500" />
               ) : (
-                <ChevronRight className="w-5 h-5 text-gray-400" />
+                <ChevronRight className="w-5 h-5 text-slate-400 dark:text-slate-500" />
               )}
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Conditions ({rule.conditions.length})
               </h2>
             </button>
@@ -584,7 +584,7 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
             {expandedSections.conditions && (
               <div className="space-y-4">
                 {rule.conditions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                     <Filter className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                     <p>No conditions defined</p>
                     <p className="text-sm">Add conditions to specify when this rule should trigger</p>
@@ -612,14 +612,14 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
           <div className="space-y-4">
             <button
               onClick={() => toggleSection('actions')}
-              className="flex items-center gap-2 text-lg font-semibold text-gray-900 hover:text-gray-700"
+              className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100 hover:text-slate-700 dark:text-slate-200"
             >
               {expandedSections.actions ? (
-                <ChevronDown className="w-5 h-5 text-gray-400" />
+                <ChevronDown className="w-5 h-5 text-slate-400 dark:text-slate-500" />
               ) : (
-                <ChevronRight className="w-5 h-5 text-gray-400" />
+                <ChevronRight className="w-5 h-5 text-slate-400 dark:text-slate-500" />
               )}
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Actions ({rule.actions.length})
               </h2>
             </button>
@@ -627,7 +627,7 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
             {expandedSections.actions && (
               <div className="space-y-4">
                 {rule.actions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                     <Zap className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                     <p>No actions defined</p>
                     <p className="text-sm">Add actions to specify what should happen when conditions are met</p>
@@ -653,7 +653,7 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
           <div className="flex items-center gap-3">
             <button
               onClick={handleTest}
@@ -666,7 +666,7 @@ const RuleEngineConfig: React.FC<RuleEngineConfigProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
             >
               Cancel
             </button>

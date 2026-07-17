@@ -90,6 +90,7 @@ export const CreateBillForm: React.FC<CreateBillFormProps> = ({
       onSuccess?.(res);
     } catch (e) {
       const err = e instanceof Error ? e : new Error('Failed to create bill');
+      setValidationError(err.message || 'Failed to create payment link. Please try again.');
       onError?.(err);
     }
   };

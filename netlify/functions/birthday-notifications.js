@@ -2,15 +2,15 @@ const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
-// NOTE: These env vars should be renamed to FIREBASE_* (without VITE_ prefix) to avoid
-// accidental inclusion in the Vite client bundle. Update Netlify env var settings when renaming.
+// SEC-CF05: Use FIREBASE_ADMIN_* names (no VITE_ prefix) so Vite never injects
+// the private key into the browser bundle. Align Netlify dashboard env var names.
 
 if (!getApps().length) {
   initializeApp({
     credential: cert({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.VITE_FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
 }

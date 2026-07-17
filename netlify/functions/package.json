@@ -2,8 +2,8 @@
   "name": "jcikl-netlify-functions",
   "version": "1.0.0",
   "dependencies": {
-    "cloudinary": "^1.41.3",
-    "firebase-admin": "^11.0.0",
+    "cloudinary": "^2.5.1",
+    "firebase-admin": "^12.7.0",
     "jose": "^4.15.9"
   },
   "overrides": {

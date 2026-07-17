@@ -304,63 +304,65 @@ export class EventsService {
       async () => {
         try {
           const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-          const event = await this.getEventById(eventId);
+          // RC-009: Use a deterministic registration doc ID ({eventId}_{memberId})
+          // and wrap the duplicate-check + write in a runTransaction so two
+          // concurrent registrations from the same member (e.g. two browser tabs)
+          // cannot both read "not registered" and both commit a new document.
+          const deterministicRegId = `${eventId}_${memberId}`;
+          const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, deterministicRegId);
 
-          if (!event) throw new Error('Event not found');
+          await runTransaction(db, async (txn) => {
+            const [existingSnap, eventSnap] = await Promise.all([
+              txn.get(regRef),
+              txn.get(eventRef),
+            ]);
 
-          const existing = await EventRegistrationService.getByEventAndMember(eventId, memberId);
-          if (existing && existing.status !== 'cancelled') throw new Error('You have already registered for this event');
+            if (!eventSnap.exists()) throw new Error('Event not found');
+            const eventData = eventSnap.data() as import('../types').Event;
 
-          if (event.maxAttendees && event.attendees >= event.maxAttendees) {
-            throw new Error('Event is full');
-          }
+            if (existingSnap.exists() && existingSnap.data().status !== 'cancelled') {
+              throw new Error('You have already registered for this event');
+            }
 
-          if (existing && existing.status === 'cancelled') {
-            // Reactivation path: atomic writeBatch so registration status and event
-            // counter always land together.
-            const reactivateBatch = writeBatch(db);
-            const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, existing.id);
-            reactivateBatch.update(regRef, {
-              status: 'registered',
-              updatedAt: Timestamp.now(),
-              ...(extraFields?.registeredBy ? { registeredBy: extraFields.registeredBy } : {}),
-              ...(extraFields?.registeredByName ? { registeredByName: extraFields.registeredByName } : {}),
-            });
-            reactivateBatch.update(eventRef, {
+            if (eventData.maxAttendees && (eventData.attendees ?? 0) >= eventData.maxAttendees) {
+              throw new Error('Event is full');
+            }
+
+            if (existingSnap.exists() && existingSnap.data().status === 'cancelled') {
+              // Reactivation path — update existing doc
+              txn.update(regRef, {
+                status: 'registered',
+                updatedAt: Timestamp.now(),
+                ...(extraFields?.registeredBy ? { registeredBy: extraFields.registeredBy } : {}),
+                ...(extraFields?.registeredByName ? { registeredByName: extraFields.registeredByName } : {}),
+              });
+            } else {
+              // New registration — set deterministic doc
+              const payload: Record<string, unknown> = {
+                eventId,
+                memberId,
+                status: 'registered',
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+                loId: DEFAULT_LO_ID,
+              };
+              if (extraFields?.dietary) payload.dietary = extraFields.dietary;
+              if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
+              if (extraFields?.emergencyContactName) payload.emergencyContactName = extraFields.emergencyContactName;
+              if (extraFields?.emergencyContactPhone) payload.emergencyContactPhone = extraFields.emergencyContactPhone;
+              if (extraFields?.tshirtSize) payload.tshirtSize = extraFields.tshirtSize;
+              if (extraFields?.memberName) payload.memberName = extraFields.memberName;
+              if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
+              if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
+              txn.set(regRef, payload);
+            }
+
+            txn.update(eventRef, {
               attendees: increment(1),
               registeredMembers: arrayUnion(memberId),
             });
-            await reactivateBatch.commit();
-          } else {
-            // P0 FIX: new registration — use setDoc + writeBatch so the registration
-            // doc and event counter update land atomically. addDoc cannot participate
-            // in a batch, so we create the doc ref manually first.
-            const newRegRef = doc(collection(db, COLLECTIONS.EVENT_REGISTRATIONS));
-            const payload: Record<string, unknown> = {
-              eventId,
-              memberId,
-              status: 'registered',
-              createdAt: Timestamp.now(),
-              updatedAt: Timestamp.now(),
-              loId: DEFAULT_LO_ID,
-            };
-            if (extraFields?.dietary) payload.dietary = extraFields.dietary;
-            if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
-            if (extraFields?.emergencyContactName) payload.emergencyContactName = extraFields.emergencyContactName;
-            if (extraFields?.emergencyContactPhone) payload.emergencyContactPhone = extraFields.emergencyContactPhone;
-            if (extraFields?.tshirtSize) payload.tshirtSize = extraFields.tshirtSize;
-            if (extraFields?.memberName) payload.memberName = extraFields.memberName;
-            if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
-            if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
+          });
 
-            const batch = writeBatch(db);
-            batch.set(newRegRef, payload);
-            batch.update(eventRef, {
-              attendees: event.attendees + 1,
-              registeredMembers: arrayUnion(memberId),
-            });
-            await batch.commit();
-          }
           this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
         } catch (error) {
           console.error('Error registering for event:', error);

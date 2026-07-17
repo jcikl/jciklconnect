@@ -70,6 +70,14 @@ export function useFirestoreCollection<T>({
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  // RC-007: guard setState calls in reload() so they never fire after the
+  // component using this hook has unmounted.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
   // Keep a ref to the latest loader so reload() never captures a stale closure.
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
@@ -106,17 +114,15 @@ export function useFirestoreCollection<T>({
 
   const reload = useCallback(async () => {
     if (!enabled) {
-      setData([]);
-      setLoading(false);
-      setError(null);
+      if (mountedRef.current) { setData([]); setLoading(false); setError(null); }
       return;
     }
     try {
-      setLoading(true);
-      setError(null);
+      if (mountedRef.current) { setLoading(true); setError(null); }
       const result = await loadWithRetry();
-      if (result !== null) setData(result);
+      if (result !== null && mountedRef.current) setData(result);
     } catch (err) {
+      if (!mountedRef.current) return;
       const msg = describeError(err);
       setError(msg);
       showToast(msg, 'error');
@@ -125,7 +131,7 @@ export function useFirestoreCollection<T>({
         console.warn('[useFirestoreCollection] Firestore quota-exceeded', err);
       }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [enabled, loadWithRetry]);
 

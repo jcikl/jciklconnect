@@ -999,7 +999,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           </div>{/* end åŒºå—ä¸‰ */}
         </div>{/* end desktop hero wrapper */}
 
-        <div className="grid grid-cols-4 gap-0 border-t border-slate-100 divide-x divide-slate-100 bg-slate-50/50">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 border-t border-slate-100 divide-slate-100 bg-slate-50/50 [&>*]:border-b [&>*]:sm:border-b-0 [&>*]:border-slate-100 divide-x">
           <div className="p-2 md:p-4 text-center hover:bg-white transition-colors group">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Coins size={12} className="text-jci-blue" />

@@ -77,6 +77,9 @@ export class ProjectsService {
     if (isDevMode()) { return 'mock-project-' + Math.floor(Math.random() * 10000); }
     try {
       // P1-A: write both name and title for backward-compat callers that use either field
+      // VAL-04: budget must not be negative
+      if (projectData.budget !== undefined && projectData.budget < 0) throw new Error('Project budget cannot be negative');
+
       const resolvedName = projectData.name || projectData.title || '';
       const resolvedTitle = projectData.title || projectData.name || '';
 
