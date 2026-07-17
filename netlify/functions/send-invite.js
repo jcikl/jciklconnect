@@ -10,7 +10,6 @@ console.log('[send-invite] init check:', {
   hasProjectId: !!projectId,
   hasClientEmail: !!clientEmail,
   hasPrivateKey: !!privateKey,
-  privateKeyStart: privateKey?.slice(0, 40),
 });
 
 if (!getApps().length) {
@@ -66,9 +65,10 @@ exports.handler = async (event) => {
 
     const link = await auth.generatePasswordResetLink(email);
 
+    // TODO: Integrate with SendGrid/Nodemailer to deliver automatically
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true, message: 'Invite sent' }),
+      body: JSON.stringify({ success: true, message: 'User created. Send this invite link to the member:', inviteLink: link }),
     };
   } catch (err) {
     console.error('[send-invite] error:', err);

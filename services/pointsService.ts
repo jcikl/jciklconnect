@@ -1902,8 +1902,10 @@ export class PointsService {
       });
 
       // 2. Calculate Recruitment Points
+      // TODO: Store introducerId (memberId) instead of introducer name string, then use where() query
       let recruitment = 0;
-      const membersSnap = await getDocs(collection(db, COLLECTIONS.MEMBERS));
+      const membersSnap = await getDocs(query(collection(db, COLLECTIONS.MEMBERS), limit(500)));
+      if (membersSnap.size >= 500) console.warn('calculateRadarStats: hit 500-member cap, results may be incomplete');
       let referCount = 0;
       membersSnap.forEach(mDoc => {
         const m = mDoc.data() as Member;

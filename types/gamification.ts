@@ -18,8 +18,8 @@ export interface AwardDefinition {
   criteria: AwardCriteria;
   milestones?: AwardMilestone[];
   active: boolean;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: string | import('firebase/firestore').Timestamp | Date;
+  updatedAt?: string | import('firebase/firestore').Timestamp | Date;
 }
 
 export interface AwardCriteria {
@@ -41,7 +41,7 @@ export interface MemberAward {
   id?: string;
   awardId: string;
   memberId: string;
-  earnedAt: any;
+  earnedAt: string | import('firebase/firestore').Timestamp | Date;
   progress?: number;
   completedMilestones?: string[];
   awardedBy?: string;

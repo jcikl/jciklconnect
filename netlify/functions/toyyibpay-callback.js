@@ -49,8 +49,16 @@ async function verifyBillWithToyyib(billCode) {
   if (!response.ok) throw new Error(`ToyyibPay verify HTTP ${response.status}`);
   const records = await response.json();
   if (!Array.isArray(records) || records.length === 0) return null;
-  // Prefer the record matching this transaction_id; otherwise use the most recent.
-  return records[0];
+  // Prefer the record matching this transaction_id; otherwise fall back to the most recent.
+  const exactMatch = records.find(
+    r => r.billExternalReferenceNo === data.transaction_id || r.id === data.transaction_id
+  );
+  if (!exactMatch) {
+    console.warn(
+      `[toyyibpay-callback] No exact transaction_id match for ${data.transaction_id} in ${records.length} record(s) — using first record`
+    );
+  }
+  return exactMatch || records[0];
 }
 
 exports.handler = async (event) => {
@@ -86,21 +94,25 @@ exports.handler = async (event) => {
   // Keyed by transactionId. Only skip when a PRIOR attempt fully succeeded
   // (processed===true) — a record left at processed:false means the last
   // attempt errored out and must be retried, not silently swallowed.
+  // Wrapped in a Firestore transaction so concurrent webhooks cannot both
+  // read processed:false and both proceed — only one wins the write.
   const idempotencyRef = db.collection('toyyibpay_webhooks').doc(transactionId);
-  const idempotencySnap = await idempotencyRef.get();
-
-  if (idempotencySnap.exists && idempotencySnap.data().processed === true) {
+  const alreadyProcessed = await db.runTransaction(async (t) => {
+    const doc = await t.get(idempotencyRef);
+    if (doc.exists && doc.data().processed === true) return true;
+    t.set(idempotencyRef, {
+      transactionId,
+      billCode,
+      orderId,
+      receivedAt: Timestamp.now(),
+      processed: false,
+    }, { merge: true });
+    return false;
+  });
+  if (alreadyProcessed) {
     console.log(`[toyyibpay-callback] Already processed txn ${transactionId}, skipping`);
-    return { statusCode: 200, body: 'OK (duplicate)' };
+    return { statusCode: 200, body: 'Already processed' };
   }
-
-  await idempotencyRef.set({
-    transactionId,
-    billCode,
-    orderId,
-    receivedAt: Timestamp.now(),
-    processed: false,
-  }, { merge: true });
 
   // ── Verify against ToyyibPay's own record before trusting anything ──────────
   let verified;
@@ -159,11 +171,26 @@ exports.handler = async (event) => {
         updatedAt: Timestamp.now(),
       };
       if (billExternalReferenceNo) billUpdate.billExternalReferenceNo = billExternalReferenceNo;
-      await billsQuery.docs[0].ref.update(billUpdate);
-    }
 
-    // ── Write billExternalReferenceNo back to member's membership record ─────
-    if (billMemberId && billYear && billExternalReferenceNo) {
+      // ── Batch: toyyibBills update + member billExternalReferenceNo sync ────
+      // These two writes always happen together when a bill is found; batching
+      // ensures they are atomic — no window where toyyibBills is updated but
+      // the member record still shows the old reference.
+      // TODO: Refactor downstream membership/event writes into single batch —
+      //       currently conditional on payment type, making full batching complex.
+      const headerBatch = db.batch();
+      headerBatch.update(billsQuery.docs[0].ref, billUpdate);
+
+      if (billMemberId && billYear && billExternalReferenceNo) {
+        headerBatch.update(db.collection('members').doc(billMemberId), {
+          [`membership.${billYear}.billExternalReferenceNo`]: billExternalReferenceNo,
+          [`membership.${billYear}.toyyibPaymentStatus`]: billpaymentStatus,
+          updatedAt: Timestamp.now(),
+        });
+      }
+      await headerBatch.commit();
+    } else if (billMemberId && billYear && billExternalReferenceNo) {
+      // No toyyibBills doc found — still sync member field if we have the info
       await db.collection('members').doc(billMemberId).update({
         [`membership.${billYear}.billExternalReferenceNo`]: billExternalReferenceNo,
         [`membership.${billYear}.toyyibPaymentStatus`]: billpaymentStatus,

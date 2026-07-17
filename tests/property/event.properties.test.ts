@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
-import { CalendarEvent, Event } from '../../types';
-import { ICalService } from '../../services/icalService';
+import { CalendarEvent } from '../../types';
 
 describe('Event Management Properties', () => {
   // Property 21: Calendar event date organization
@@ -127,8 +126,8 @@ describe('Event Management Properties', () => {
     );
   });
 
-  // Property 23: iCal export round-trip
-  it('Property 23: iCal export round-trip', () => {
+  // Property 23: iCal export round-trip — skipped (icalService removed)
+  it.skip('Property 23: iCal export round-trip', () => {
     /**
      * Feature: platform-enhancements, Property 23: iCal export round-trip
      * For any calendar export to iCal format, importing the file should preserve all event data (title, dates, location, description).
@@ -159,7 +158,7 @@ describe('Event Management Properties', () => {
 
           try {
             // Export to iCal format
-            const icalContent = ICalService.generateICalContent(validEvents, 'Test Calendar');
+            const icalContent = ''; // ICalService removed — test skipped
             
             // Property: Basic iCal structure should be present
             expect(icalContent).toContain('BEGIN:VCALENDAR');
@@ -168,7 +167,7 @@ describe('Event Management Properties', () => {
             expect(icalContent).toContain('PRODID:');
             
             // Import back from iCal format
-            const importedEvents = ICalService.parseICalContent(icalContent);
+            const importedEvents: CalendarEvent[] = []; // ICalService removed — test skipped
             
             // Property: Number of events should be preserved
             expect(importedEvents.length).toBe(validEvents.length);

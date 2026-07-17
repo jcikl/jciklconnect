@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, limit, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, orderBy, limit, increment } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 
@@ -311,7 +311,8 @@ export class ToyyibService {
   }
 
   static async getBills(): Promise<ToyyibBillRecord[]> {
-    const snap = await getDocs(collection(db, COLLECTIONS.TOYYIB_BILLS));
+    // TODO: Implement cursor-based pagination for admin view
+    const snap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), orderBy('createdAt', 'desc'), limit(200)));
     return snap.docs.map(d => ({ ...(d.data() as ToyyibBillRecord), id: d.id }));
   }
 

@@ -28,7 +28,7 @@ const MOCK_PARTNERSHIPS: Partnership[] = [
     memberBenefits: '15% off all gym membership tiers and free assessment.',
     redeemMethod: 'Show your JCI membership card at checkout and use code JCI15GYM.',
     banner: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=400',
-    eligbleRoles: ['official member', 'paid_due_member', 'lifetime member'],
+    eligibleRoles: ['official member', 'paid_due_member', 'lifetime member'],
     status: 'active',
   },
   {
@@ -38,7 +38,7 @@ const MOCK_PARTNERSHIPS: Partnership[] = [
     memberBenefits: 'Buy 1 Free 1 on all Espresso-based drinks on weekdays.',
     redeemMethod: 'Scan the JCI app barcode at the counter to redeem.',
     banner: 'https://images.unsplash.com/photo-1507133750040-4a8f57021571?auto=format&fit=crop&q=80&w=400',
-    eligbleRoles: ['probation member', 'official member', 'paid_due_member', 'associate member', 'lifetime member'],
+    eligibleRoles: ['probation member', 'official member', 'paid_due_member', 'associate member', 'lifetime member'],
     status: 'active',
   },
   {
@@ -48,7 +48,7 @@ const MOCK_PARTNERSHIPS: Partnership[] = [
     memberBenefits: '10% off room bookings with complimentary buffet breakfast.',
     redeemMethod: 'Enter promo code JCIHOTEL10 on the resort booking site.',
     banner: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=400',
-    eligbleRoles: ['paid_due_member', 'lifetime member'],
+    eligibleRoles: ['paid_due_member', 'lifetime member'],
     status: 'active',
   },
 ];
@@ -115,7 +115,7 @@ export class PartnershipsService {
                   redeemMethod: d.linkUrl || d.description || '',
                   logo: d.logoUrl || '',
                   banner: d.imageUrl || '',
-                  eligbleRoles: d.targetCriteria?.tiers ||
+                  eligibleRoles: d.targetCriteria?.tiers ||
                     d.targetCriteria?.roles || [
                       'probation member', 'official member', 'paid_due_member',
                       'associate member', 'lifetime member',
@@ -161,8 +161,8 @@ export class PartnershipsService {
             linkUrl: data.redeemMethod || null,
             logoUrl: data.logo || null,
             imageUrl: data.banner || null,
-            targetCriteria: data.eligbleRoles?.length
-              ? { roles: data.eligbleRoles }
+            targetCriteria: data.eligibleRoles?.length
+              ? { roles: data.eligibleRoles }
               : null,
             status: data.status === 'active' ? 'Active' : 'Inactive',
             type: 'Banner', // default type for partnerships
@@ -204,7 +204,7 @@ export class PartnershipsService {
           if (updates.redeemMethod !== undefined) updateData.linkUrl = updates.redeemMethod;
           if (updates.logo !== undefined) updateData.logoUrl = updates.logo;
           if (updates.banner !== undefined) updateData.imageUrl = updates.banner;
-          if (updates.eligbleRoles !== undefined) updateData.targetCriteria = { roles: updates.eligbleRoles };
+          if (updates.eligibleRoles !== undefined) updateData.targetCriteria = { roles: updates.eligibleRoles };
           if (updates.status !== undefined) updateData.status = updates.status === 'active' ? 'Active' : 'Inactive';
           if (updates.period?.startDate !== undefined)
             updateData.startDate = Timestamp.fromDate(new Date(updates.period.startDate));

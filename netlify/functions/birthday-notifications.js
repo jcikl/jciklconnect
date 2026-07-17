@@ -2,12 +2,15 @@ const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
+// NOTE: These env vars should be renamed to FIREBASE_* (without VITE_ prefix) to avoid
+// accidental inclusion in the Vite client bundle. Update Netlify env var settings when renaming.
+
 if (!getApps().length) {
   initializeApp({
     credential: cert({
       projectId: process.env.VITE_FIREBASE_PROJECT_ID,
       clientEmail: process.env.VITE_FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\n/g, '\n'),
+      privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
 }
@@ -41,7 +44,13 @@ async function sendFcmPush(memberId, title, body, type, extraData = {}) {
   });
 }
 
-exports.handler = async () => {
+exports.handler = async (event) => {
+  const cronSecret = process.env.CRON_SECRET;
+  const requestSecret = event.headers['x-cron-secret'] || event.headers['X-Cron-Secret'];
+  if (cronSecret && requestSecret !== cronSecret) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  }
+
   try {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
     const todayMMDD = String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');

@@ -309,8 +309,8 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
                           {hasPermission('canEditFinance') && (
                             <td className="py-2.5 px-3 text-center">
                               <div className="flex justify-center gap-0.5">
-                                <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
-                                <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                                <button aria-label={`Edit transaction: ${tx.description}`} onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
+                                <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                               </div>
                             </td>
                           )}
@@ -352,8 +352,8 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
                           </div>
                           {hasPermission('canEditFinance') && (
                             <div className="flex items-center gap-0.5 shrink-0">
-                              <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
-                              <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                              <button aria-label={`Edit transaction: ${tx.description}`} onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
+                              <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                             </div>
                           )}
                         </div>

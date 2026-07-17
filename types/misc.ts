@@ -251,7 +251,7 @@ export interface Partnership {
   memberBenefits: string;
   logo?: string;
   banner: string;
-  eligbleRoles: string[];
+  eligibleRoles: string[];
   status: 'active' | 'inactive';
   createdAt?: any;
   updatedAt?: any;

@@ -1,4 +1,6 @@
+import { Timestamp } from 'firebase/firestore';
 import { UserRole, MemberTier, RadarStats } from './common';
+import type { Badge } from './gamification';
 
 export type MembershipType =
   | 'Guest'
@@ -35,10 +37,10 @@ export interface MembershipRecord {
 }
 
 export interface MemberPromotionProgress {
-  bodMeetingAttended: any;
-  eventOrganizerParticipation: any;
-  eventParticipation: any;
-  jciInspireCompleted: any;
+  bodMeetingAttended: boolean | number | null;
+  eventOrganizerParticipation: boolean | number | null;
+  eventParticipation: boolean | number | null;
+  jciInspireCompleted: boolean | number | null;
   completedAt?: string;
 }
 
@@ -251,8 +253,8 @@ export interface Member {
     senatorshipValidatedAt?: string;
     senatorshipValidatedBy?: string;
   };
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: string | Timestamp | Date;
+  updatedAt?: string | Timestamp | Date;
   /** @deprecated use jciCareer.radarStats */
   radarStats?: RadarStats;
   /** @deprecated use jciCareer.radarStatsByYear */
@@ -333,7 +335,7 @@ export interface Member {
   achievementSummary?: string[];
   /** @deprecated use jciCareer.membershipDuesHistory */
   membershipDuesHistory?: Record<string, MembershipRecord>;
-  membership?: Record<string, MembershipRecord> | any;
+  membership?: Record<string, MembershipRecord>;
   probationTasks?: ProbationTask[];
   promotionProgress?: MemberPromotionProgress;
   points?: number;
@@ -349,11 +351,11 @@ export interface Member {
   churnRisk?: string;
   duesStatus?: string;
   skills?: string[];
-  badges?: any[];
+  badges?: Badge[];
   mentorId?: string;
   menteeIds?: string[];
-  boardHistory?: any[];
-  careerHistory?: any[];
+  boardHistory?: { year: number; role: string; loId?: string }[];
+  careerHistory?: CareerMilestone[];
   /** @deprecated use jciCareer.leaderboardVisibility */
   leaderboardVisibility?: boolean | string;
   /** @deprecated use jciCareer.hasPaidInitiationFee */

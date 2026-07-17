@@ -34,7 +34,7 @@ export interface Transaction {
   purpose?: string;
   amount: number;
   type: 'Income' | 'Expense';
-  category: 'Projects & Activities' | 'Membership' | 'Administrative';
+  category: 'Projects & Activities' | 'Membership' | 'Administrative' | ''; // '' used for split-parent records — see financeService.ts
   status: 'Pending' | 'Cleared' | 'Reconciled' | 'Partially Reconciled' | 'Voided';
   projectId?: string;
   memberId?: string;

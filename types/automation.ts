@@ -5,6 +5,9 @@ export interface AutomationRule {
   action: string;
   active: boolean;
   executions: number;
+  conditions?: RuleCondition[];
+  actions?: RuleAction[];
+  logicalOperator?: 'AND' | 'OR';
 }
 
 export interface WorkflowExecution {

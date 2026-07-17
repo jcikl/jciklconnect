@@ -700,10 +700,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
             <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-              <button onClick={onClose} className="w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all">
+              <button aria-label="Close event detail" onClick={onClose} className="w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all">
                 <ArrowLeft size={18} />
               </button>
-              <button className="w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all">
+              <button aria-label="Share event" className="w-9 h-9 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/40 transition-all">
                 <Share2 size={18} />
               </button>
             </div>

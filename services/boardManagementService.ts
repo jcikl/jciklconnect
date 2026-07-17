@@ -85,6 +85,28 @@ export class BoardManagementService {
     );
   }
 
+  // Get all board members across all years in a single query, then group by term in memory
+  static async getAllBoardMembers(loId?: string): Promise<BoardMember[]> {
+    if (isDevMode()) return [];
+    const cacheKey = 'boardMembers:all:' + (loId || 'all');
+    const cached = apiCache.get<BoardMember[]>(cacheKey);
+    if (cached) return cached;
+    try {
+      const col = collection(db, 'boardMembers');
+      const q = loId ? query(col, where('loId', '==', loId)) : col;
+      const snap = await getDocs(q);
+      const result = snap.docs.map(d => ({ id: d.id, ...d.data() } as BoardMember));
+      apiCache.set(cacheKey, result, 300);
+      return result;
+    } catch (error) {
+      logServiceError(
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'BoardManagementService', action: 'getAllBoardMembers' }
+      );
+      throw error;
+    }
+  }
+
   // Get board members for a specific year
   static async getBoardMembersByYear(year: string): Promise<BoardMember[]> {
     if (isDevMode()) { return []; }

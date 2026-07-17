@@ -132,18 +132,39 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
     setLoading(true);
     try {
       const currentYear = new Date().getFullYear();
-      const years = Array.from({ length: currentYear - 1954 + 1 }, (_, i) => String(1954 + i));
 
-      const summaries: TermSummary[] = await Promise.all(years.map(async (year) => {
-        const board = await BoardManagementService.getBoardMembersByYear(year);
-        const president = board.find(m => m.position === 'President' && m.isActive);
-        const presidentName = president ? members.find(m => m.id === president.memberId)?.name || 'Unknown' : 'Not Set';
-        return {
-          year,
-          presidentName,
-          totalMembers: board.filter(m => m.isActive).length
-        };
-      }));
+      // Single Firestore query instead of one-per-year N+1 loop
+      const allBoardMembers = await BoardManagementService.getAllBoardMembers();
+
+      // Group by term in memory
+      const byYear = allBoardMembers.reduce<Record<string, BoardMember[]>>((acc, bm) => {
+        const term = bm.term;
+        if (!term) return acc;
+        if (!acc[term]) acc[term] = [];
+        acc[term].push(bm);
+        return acc;
+      }, {});
+
+      // Cap displayed years to the last 15 (most recent first) while keeping all data
+      const recentYears = Array.from(
+        { length: 15 },
+        (_, i) => String(currentYear - i)
+      );
+
+      const summaries: TermSummary[] = recentYears
+        .map(year => {
+          const board = byYear[year] || [];
+          const president = board.find(m => m.position === 'President' && m.isActive);
+          const presidentName = president
+            ? members.find(m => m.id === president.memberId)?.name || 'Unknown'
+            : 'Not Set';
+          return {
+            year,
+            presidentName,
+            totalMembers: board.filter(m => m.isActive).length,
+          };
+        })
+        .filter(s => s.totalMembers > 0 || s.presidentName !== 'Not Set');
 
       setTerms(summaries.sort((a, b) => b.year.localeCompare(a.year)));
 

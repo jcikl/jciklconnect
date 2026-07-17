@@ -132,11 +132,12 @@ export const IntroducerManagement: React.FC<Props> = ({
     setIsSaving(true);
     try {
       const idsArray = Array.from(selectedMemberIds);
-      if (onBatchUpdateMembers) {
-        await onBatchUpdateMembers(idsArray, { introducer: batchIntroducerVal });
-      } else {
-        await Promise.all(idsArray.map(id => onUpdateMember(id, { introducer: batchIntroducerVal })));
+      if (!onBatchUpdateMembers) {
+        console.error('IntroducerManagement: onBatchUpdateMembers prop is required');
+        showToast('Configuration error — please contact admin', 'error');
+        return;
       }
+      await onBatchUpdateMembers(idsArray, { introducer: batchIntroducerVal });
       showToast(`Successfully updated introducer for ${selectedMemberIds.size} members`, 'success');
       setSelectedMemberIds(new Set());
       setIsBatchEditing(false);

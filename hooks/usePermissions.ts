@@ -123,7 +123,7 @@ export const usePermissions = () => {
     effectiveRole !== UserRole.INACTIVE;
 
   // B-3: Derive board-position flags from currentBoardPosition field
-  const boardPosition = ((member as any)?.currentBoardPosition || '').toLowerCase();
+  const boardPosition = (member?.currentBoardPosition ?? '').toLowerCase();
   const isOrganizationSecretary = isBoardUser && boardPosition.includes('secretary');
   const isPresident = isBoardUser && boardPosition.includes('president') && !boardPosition.includes('vice');
   const isOrganizationFinance =

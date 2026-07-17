@@ -4,6 +4,29 @@
  * Supported actions: getCategories, getCategoryDetails, createCategory, createBill, getBills, getSettlements
  */
 
+const { initializeApp, getApps, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
+
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+      clientEmail: process.env.VITE_FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+
+// FIX 2: Restrict CORS to known origins only
+const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001'];
+
+// FIX 3: Allowlist of safe params that may be forwarded to ToyyibPay createBill
+const CREATE_BILL_ALLOWED_PARAMS = [
+  'billName', 'billDescription', 'billAmount', 'billTo',
+  'billEmail', 'billPhone', 'billSplitPayment', 'billSplitPaymentArgs',
+];
+
 const SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
 if (!SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
 const IS_SANDBOX = process.env.TOYYIBPAY_SANDBOX !== 'false'; // default sandbox
@@ -41,10 +64,14 @@ async function callToyyibOrEmpty(endpoint, extraParams = {}, fallback = []) {
 }
 
 exports.handler = async (event) => {
+  // FIX 2: Only reflect origin back if it is in the allowlist
+  const requestOrigin = event.headers.origin || event.headers.Origin || '';
+  const allowedOrigin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
   const cors = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -52,6 +79,23 @@ exports.handler = async (event) => {
   }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+  }
+
+  // FIX 1: Require Firebase ID token with BOARD/ADMIN role
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
+  }
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const decoded = await getAuth().verifyIdToken(idToken);
+    const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
+    const role = callerDoc.data()?.role;
+    if (!['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
+    }
+  } catch {
+    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
 
   let body = {};
@@ -79,9 +123,28 @@ exports.handler = async (event) => {
         if (!params.catname || !params.catdescription) return { statusCode: 400, headers: cors, body: 'catname and catdescription required' };
         result = await callToyyib('createCategory', { catname: params.catname, catdescription: params.catdescription });
         break;
-      case 'createBill':
-        result = await callToyyib('createBill', params);
+      case 'createBill': {
+        // FIX 3: Only forward explicitly allowlisted params; lock callback/return URLs
+        const sanitized = {};
+        for (const key of CREATE_BILL_ALLOWED_PARAMS) {
+          if (params[key] !== undefined) sanitized[key] = params[key];
+        }
+        // Lock callback URL to our own webhook — never accept from caller
+        sanitized.billCallbackUrl =
+          process.env.TOYYIBPAY_CALLBACK_URL ||
+          'https://app.jcikl.cc/.netlify/functions/toyyibpay-callback';
+        // Restrict return URL to our own domain
+        const returnUrl = params.billReturnUrl || '';
+        const isAllowedReturn =
+          returnUrl.startsWith('https://app.jcikl.cc') ||
+          returnUrl.startsWith('http://localhost:3000') ||
+          returnUrl.startsWith('http://localhost:3001');
+        sanitized.billReturnUrl = isAllowedReturn
+          ? returnUrl
+          : 'https://app.jcikl.cc/payment/result';
+        result = await callToyyib('createBill', sanitized);
         break;
+      }
       case 'getBills':
         // ToyyibPay has no "list all bills" endpoint — getBillTransactions requires a specific billCode.
         // Return empty array; bills are tracked in our own Firestore instead.

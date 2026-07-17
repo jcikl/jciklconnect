@@ -2284,10 +2284,12 @@ export class FinanceService {
               } as BankAccount));
             }
 
+            // TODO: Store runningBalance on bankAccount doc, update atomically with each transaction write — eliminates full transaction scan
             const [accountsSnapshot, transactionsSnapshot] = await Promise.all([
               getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
-              getDocs(collection(db, COLLECTIONS.TRANSACTIONS))
+              getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000)))
             ]);
+            if (transactionsSnapshot.size >= 1000) console.warn('getAllBankAccounts: hit 1000-transaction cap, balances may be incomplete');
 
             const accounts = accountsSnapshot.docs.map(doc => ({
               id: doc.id,

@@ -60,7 +60,7 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
     }
 
     const userRole = member.role || 'guest';
-    const isRoleEligible = !partner.eligbleRoles || partner.eligbleRoles.length === 0 || partner.eligbleRoles.includes(userRole);
+    const isRoleEligible = !partner.eligibleRoles || partner.eligibleRoles.length === 0 || partner.eligibleRoles.includes(userRole);
     if (!isRoleEligible) {
       return { allowed: false, reason: 'role' };
     }

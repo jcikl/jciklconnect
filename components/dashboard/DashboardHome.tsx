@@ -671,7 +671,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       </div>
                       <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
                         <Clock size={12} />
-                        Ends: {c.deadline?.seconds ? new Date(c.deadline.seconds * 1000).toLocaleDateString() : 'N/A'}
+                        Ends: {c.deadline ? (typeof (c.deadline as any).seconds === 'number' ? new Date((c.deadline as any).seconds * 1000).toLocaleDateString() : new Date(c.deadline as unknown as Date).toLocaleDateString()) : 'N/A'}
                       </div>
                       <div className="mt-3 text-[10px] p-2 bg-red-50 text-red-700 rounded-lg border border-red-100 font-bold italic">
                         WARNING: Failure to prove completion will results in permanent loss of {c.stakedPoints} PTS.
